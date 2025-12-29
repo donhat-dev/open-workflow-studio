@@ -2,8 +2,6 @@
 trigger: always_on
 ---
 
-Each time dive into n8n codebase, if you find out a file that responsible for a feature, mark it location into a file/knowledge.
-
 Creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.

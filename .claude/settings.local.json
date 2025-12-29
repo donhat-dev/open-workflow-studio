@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "mcp__ide__executeCode",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
