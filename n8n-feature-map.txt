@@ -1,0 +1,1 @@
+Edge Rendering: n8n\packages\frontend\editor-ui\src\features\workflows\canvas\components\elements\edges\utils\getEdgeRenderData.ts

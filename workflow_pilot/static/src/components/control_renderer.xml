@@ -6,12 +6,7 @@
 			<label t-if="label" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text'">
-				<t t-if="isMultiline">
-					<textarea class="control-input control-textarea" t-att-placeholder="placeholder" t-att-value="value" t-on-input="onInput" rows="3" />
-				</t>
-				<t t-else="">
-					<input type="text" class="control-input" t-att-placeholder="placeholder" t-att-value="value" t-on-input="onInput" />
-				</t>
+				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" onChange="(v) => this.onExpressionChange(v)"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
@@ -32,7 +27,7 @@
 			<!-- KEY-VALUE PAIRS -->
 			<t t-elif="controlType === 'keyvalue'">
 				<div class="control-keyvalue">
-					<t t-foreach="pairs" t-as="pair" t-key="pair_index">
+					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
 						<div class="kv-row">
 							<input type="text" class="kv-key" t-att-placeholder="props.control.keyPlaceholder" t-att-value="pair.key" t-on-input="(ev) => this.onKeyChange(pair_index, ev)" />
 							<input type="text" class="kv-value" t-att-placeholder="props.control.valuePlaceholder" t-att-value="pair.value" t-on-input="(ev) => this.onValueChange(pair_index, ev)" />

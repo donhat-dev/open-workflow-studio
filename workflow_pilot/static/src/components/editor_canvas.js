@@ -4,6 +4,7 @@ import { Component, useRef, useState, useExternalListener, reactive, onMounted }
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
+import { NodeConfigPanel } from "./node_config_panel";
 import { WorkflowGraph } from "../utils/graph_utils";
 import { DimensionConfig, CONNECTION } from "../core/dimensions";
 
@@ -17,7 +18,7 @@ import { DimensionConfig, CONNECTION } from "../core/dimensions";
  */
 export class EditorCanvas extends Component {
     static template = "workflow_pilot.editor_canvas";
-    static components = { WorkflowNode, NodeMenu, ConnectionToolbar };
+    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel };
 
     static props = {
         nodes: { type: Array, optional: true },
@@ -75,6 +76,11 @@ export class EditorCanvas extends Component {
             },
             // Viewport tracking for culling
             viewRect: { x: 0, y: 0, w: 0, h: 0 },
+            // Config panel state
+            configPanel: {
+                visible: false,
+                nodeId: null,
+            },
         });
 
         // Resize observer to update viewport on window resize
@@ -143,6 +149,16 @@ export class EditorCanvas extends Component {
             set.add(`${c.source}:${c.sourceHandle}`);
         }
         return set;
+    }
+
+    /**
+     * Get workflow data for NodeConfigPanel context aggregation
+     */
+    get workflowData() {
+        return {
+            nodes: this.nodes,
+            connections: this.connections,
+        };
     }
 
     /**
@@ -1056,25 +1072,29 @@ export class EditorCanvas extends Component {
 
     /**
      * Copy selected nodes to system clipboard
+     * Phase 3: Uses adapterService to get config (no _node access)
      */
     async copySelectedNodes() {
         // Prioritize multiple selection list
         if (this.selection.size === 0) return;
 
-        const nodeIds = Array.from(this.selection);
         const nodesToCopy = this.nodes.filter(n => this.selection.has(n.id));
         const connectionsToCopy = this.connections.filter(
             c => this.selection.has(c.source) && this.selection.has(c.target)
         );
 
+        // Use adapterService to get config for each node
+        const adapterService = this.env.services.workflowAdapter;
+
         const data = {
             nodes: nodesToCopy.map(n => ({
+                id: n.id,  // Include for connection mapping
                 type: n.type,
                 x: n.x,
                 y: n.y,
                 title: n.title,
-                // Include node reference if it has _node (from adapter)
-                config: n._node ? n._node.getConfig() : {},
+                // Get config via adapter service (no _node access)
+                config: adapterService?.getNodeConfig(n.id) || {},
             })),
             connections: connectionsToCopy,
         };
@@ -1517,6 +1537,56 @@ export class EditorCanvas extends Component {
                 sourceSocketKey: socketKey,
             },
         };
+    };
+
+    // ============================================
+    // CONFIG PANEL HANDLERS
+    // ============================================
+
+    /**
+     * Handle double-click on node to open config panel
+     */
+    onNodeDoubleClick = (nodeId) => {
+        this.state.configPanel = {
+            visible: true,
+            nodeId: nodeId,
+            node: this.nodes.find(n => n.id === nodeId),
+        };
+    };
+
+    /**
+     * Get the node currently being configured
+     */
+    get configPanelNode() {
+        if (!this.state.configPanel.nodeId) return null;
+        return this.nodes.find(n => n.id === this.state.configPanel.nodeId) || null;
+    }
+
+    /**
+     * Close config panel
+     */
+    onConfigPanelClose = () => {
+        this.state.configPanel = {
+            visible: false,
+            nodeId: null,
+        };
+    };
+
+    /**
+     * Save config panel changes
+     *
+     * Phase 3: Config is saved via adapterService
+     * No direct _node access needed
+     */
+    onConfigPanelSave = (values) => {
+        const nodeId = this.state.configPanel.nodeId;
+        if (!nodeId) return;
+
+        // adapterService handles config persistence to Core layer
+        // NodeConfigPanel already syncs config when saving
+        console.log('[EditorCanvas] Config panel saved for node:', nodeId);
+
+        this.onConfigPanelClose();
     };
 }
 

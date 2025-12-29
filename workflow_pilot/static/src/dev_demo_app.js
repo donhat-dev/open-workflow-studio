@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
 import { Component, useState, xml, onPatched, onMounted } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
 
 import { NodePalette } from "./components/node_palette";
 import { EditorCanvas } from "./components/editor_canvas";
@@ -13,9 +14,11 @@ const STORAGE_KEY = 'workflow_pilot_state';
 
 /**
  * WorkflowPilotDevApp - Development Demo Application
- * 
- * Now uses WorkflowAdapter (Core layer) as single source of truth.
- * UI state is derived from adapter on each change.
+ *
+ * Architecture (Phase 3 - Full Separation):
+ * - Adapter is the bridge between UI and Core
+ * - UI components use adapterService for config/execution
+ * - No _node reference exposed to UI layer
  */
 export class WorkflowPilotDevApp extends Component {
     static template = xml`
@@ -35,7 +38,7 @@ export class WorkflowPilotDevApp extends Component {
                     <button class="workflow-pilot-dev__btn" t-on-click="clear">Clear All</button>
                 </div>
 
-                <EditorCanvas 
+                <EditorCanvas
                     nodes="state.nodes"
                     connections="state.connections"
                     dimensionConfig="dimensionConfig"
@@ -59,6 +62,11 @@ export class WorkflowPilotDevApp extends Component {
     setup() {
         // Initialize adapter (Core layer)
         this.adapter = new WorkflowAdapter();
+
+        // Register adapter with service for child components
+        // This allows NodeConfigPanel to access adapter methods via useService
+        this.adapterService = useService("workflowAdapter");
+        this.adapterService.setAdapter(this.adapter);
 
         // Initialize history manager for undo/redo
         this.history = new HistoryManager();
@@ -87,12 +95,6 @@ export class WorkflowPilotDevApp extends Component {
 
         // Load from localStorage
         this._loadFromStorage();
-
-        // Initial load
-        this._loadFromStorage();
-
-        // No need to manually sync or listen to changes
-        // useState(adapter.state) handles reactivity automatically
 
         // Auto-save on state changes
         onPatched(() => this._autoSave());
@@ -199,36 +201,42 @@ export class WorkflowPilotDevApp extends Component {
     };
 
     _createNode(type, position) {
-        const node = this.adapter.addNode(type, position);
-        if (!node) return null;
+        // addNode now returns nodeId (string) not node object
+        const nodeId = this.adapter.addNode(type, position);
+        if (!nodeId) return null;
 
-        // Record for undo
-        this.history.push(createAddNodeAction(this.adapter, node.toJSON()));
+        // Get config for undo recording
+        const config = this.adapter.getNodeConfig(nodeId);
+        this.history.push(createAddNodeAction(this.adapter, { id: nodeId, type, position, config }));
 
         // n8n-style Loop Auto-Creation Pattern
         if (type === 'loop') {
             const LOOP_OFFSET_Y = 160;
-            const noopNode = this.adapter.addNode('noop', {
+            const noopId = this.adapter.addNode('noop', {
                 x: position.x + 80,
                 y: position.y + LOOP_OFFSET_Y,
             });
 
-            if (noopNode) {
+            if (noopId) {
                 // Record NoOp for undo
-                this.history.push(createAddNodeAction(this.adapter, noopNode.toJSON()));
+                const noopConfig = this.adapter.getNodeConfig(noopId);
+                this.history.push(createAddNodeAction(this.adapter, {
+                    id: noopId, type: 'noop',
+                    position: { x: position.x + 80, y: position.y + LOOP_OFFSET_Y },
+                    config: noopConfig
+                }));
 
                 // Loop.loop → NoOp.data
-                const conn1 = this.adapter.addConnection(node.id, 'loop', noopNode.id, 'data');
+                const conn1 = this.adapter.addConnection(nodeId, 'loop', noopId, 'data');
                 if (conn1) this.history.push(createAddConnectionAction(this.adapter, conn1));
 
                 // NoOp.result → Loop.data (back-edge)
-                const conn2 = this.adapter.addConnection(noopNode.id, 'result', node.id, 'data');
+                const conn2 = this.adapter.addConnection(noopId, 'result', nodeId, 'data');
                 if (conn2) this.history.push(createAddConnectionAction(this.adapter, conn2));
             }
         }
 
-        this._syncState();
-        return node.id;
+        return nodeId;
     }
 
     clear = () => {
@@ -253,10 +261,16 @@ export class WorkflowPilotDevApp extends Component {
     // =========================================
 
     removeNode(nodeId) {
-        // Record for undo before removing
-        const node = this.adapter.getNode(nodeId);
-        if (node) {
-            const nodeData = node.toJSON();
+        // Record for undo before removing - use adapter methods
+        const config = this.adapter.getNodeConfig(nodeId);
+        const uiNode = this.state.nodes.find(n => n.id === nodeId);
+        if (uiNode) {
+            const nodeData = {
+                id: nodeId,
+                type: uiNode.type,
+                position: { x: uiNode.x, y: uiNode.y },
+                config,
+            };
             const relatedConnections = this.adapter.getConnectionsForUI().filter(
                 c => c.source === nodeId || c.target === nodeId
             );
@@ -268,8 +282,6 @@ export class WorkflowPilotDevApp extends Component {
         if (this.uiState.selectedNode?.id === nodeId) {
             this.uiState.selectedNode = null;
         }
-
-        this._syncState();
     }
 
     removeConnection(connId) {
@@ -280,7 +292,6 @@ export class WorkflowPilotDevApp extends Component {
         }
 
         this.adapter.removeConnection(connId);
-        this._syncState();
     }
 
     // =========================================
@@ -288,16 +299,16 @@ export class WorkflowPilotDevApp extends Component {
     // =========================================
 
     onPasteNode = ({ type, position, config }) => {
-        const node = this.adapter.addNode(type, position);
-        if (node) {
+        // addNode now returns nodeId (string)
+        const nodeId = this.adapter.addNode(type, position);
+        if (nodeId) {
             if (config) {
-                node.setConfig(config);
+                this.adapter.setNodeConfig(nodeId, config);
             }
             // Record for undo
-            this.history.push(createAddNodeAction(this.adapter, node.toJSON()));
+            this.history.push(createAddNodeAction(this.adapter, { id: nodeId, type, position, config }));
         }
-        this._syncState();
-        return node?.id;
+        return nodeId;
     };
 
     // =========================================

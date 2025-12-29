@@ -47,7 +47,7 @@
 				<!-- Render WorkflowNode components with zoom and snapped socket props -->
 				<!-- Render WorkflowNode components (Viewport Culling: only visible nodes) -->
 				<t t-foreach="visibleNodes" t-as="node" t-key="node.id">
-					<WorkflowNode node="node" zoom="state.viewport.zoom" selected="isNodeSelected(node)" snappedSocketKey="state.snappedSocket and state.snappedSocket.nodeId === node.id ? state.snappedSocket.socketKey : null" connectedOutputsSet="connectedOutputsSet" dimensionConfig="dimensions" onMove.bind="onNodeMove" onSelect.bind="onNodeSelect" onSocketMouseDown="onSocketMouseDown" onSocketMouseUp="onSocketMouseUp" onSocketQuickAdd="onSocketQuickAdd"/>
+					<WorkflowNode node="node" zoom="state.viewport.zoom" selected="isNodeSelected(node)" snappedSocketKey="state.snappedSocket and state.snappedSocket.nodeId === node.id ? state.snappedSocket.socketKey : null" connectedOutputsSet="connectedOutputsSet" dimensionConfig="dimensions" onMove.bind="onNodeMove" onSelect.bind="onNodeSelect" onSocketMouseDown="onSocketMouseDown" onSocketMouseUp="onSocketMouseUp" onSocketQuickAdd="onSocketQuickAdd" onDoubleClick="onNodeDoubleClick"/>
 				</t>
 				<!-- Selection box -->
 				<div t-if="state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/></div>
@@ -57,6 +57,8 @@
 				<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" onAddNode.bind="onConnectionAddNode" onDelete.bind="removeConnectionById" onHoverChange.bind="onToolbarHoverChange"/>
 				<!-- Node Menu (context menu) -->
 				<NodeMenu t-if="state.nodeMenu.visible" position="{ x: state.nodeMenu.x, y: state.nodeMenu.y }" variant="state.nodeMenu.variant" connectionContext="state.nodeMenu.connectionContext" onSelect.bind="onNodeMenuSelect" onClose.bind="onNodeMenuClose"/>
+				<!-- Node Config Panel -->
+				<NodeConfigPanel t-if="state.configPanel.visible and configPanelNode" node="configPanelNode" workflow="workflowData" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
 			</div>
 		</div>
 	</t>

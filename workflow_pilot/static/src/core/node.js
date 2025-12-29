@@ -117,6 +117,28 @@ export class BaseNode {
     }
 
     // ============================================
+    // EXECUTION
+    // ============================================
+
+    /**
+     * Execute node with input data
+     * Override in subclasses for actual logic
+     * @param {Object} inputData - Data from previous node
+     * @returns {Promise<{output: Object, error: string|null}>}
+     */
+    async execute(inputData = {}) {
+        // Base implementation - passthrough
+        return {
+            output: inputData,
+            error: null,
+            meta: {
+                nodeType: this.type,
+                executedAt: new Date().toISOString(),
+            }
+        };
+    }
+
+    // ============================================
     // SERIALIZATION (n8n compatible format)
     // ============================================
 

@@ -25,6 +25,7 @@ export class WorkflowNode extends Component {
         onSocketMouseDown: { type: Function, optional: true },
         onSocketMouseUp: { type: Function, optional: true },
         onSocketQuickAdd: { type: Function, optional: true },  // Quick-add button on unconnected sockets
+        onDoubleClick: { type: Function, optional: true },  // Double-click to open config
         selected: { type: Boolean, optional: true },
     };
 
@@ -61,6 +62,15 @@ export class WorkflowNode extends Component {
 
         // Notify parent of selection (pass event for Ctrl+click multi-select)
         this.props.onSelect(this.props.node, ev);
+    }
+
+    /**
+     * Handle double-click on node to open config panel
+     */
+    onNodeDoubleClick(ev) {
+        ev.stopPropagation();
+        if (!this.props.onDoubleClick) return;
+        this.props.onDoubleClick(this.props.node.id);
     }
 
     /**

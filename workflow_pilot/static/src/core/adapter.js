@@ -2,12 +2,29 @@
 
 /**
  * WorkflowAdapter - Bridge between Core WorkflowEditor and OWL UI
- * 
- * This adapter converts between:
- * - Core: BaseNode instances with typed sockets
- * - UI: Plain objects expected by current OWL components
- * 
- * Allows gradual migration without breaking existing UI.
+ *
+ * ARCHITECTURE (Phase 3 - Full Separation):
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │  UI Layer (OWL Components)                                  │
+ * │    - Only sees plain objects (id, type, x, y, inputs, etc.) │
+ * │    - NO access to Core layer internals                      │
+ * │    - Calls adapter methods for config/execution             │
+ * └─────────────────────────┬───────────────────────────────────┘
+ *                           │ Adapter Methods
+ *                           ▼
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │  Adapter Layer (This Class)                                 │
+ * │    - Translates between UI ↔ Core                           │
+ * │    - Exposes clean API: getNodeConfig, setNodeConfig, etc.  │
+ * │    - Hides Core implementation details                      │
+ * └─────────────────────────┬───────────────────────────────────┘
+ *                           │ Internal Access
+ *                           ▼
+ * ┌─────────────────────────────────────────────────────────────┐
+ * │  Core Layer (WorkflowEditor, BaseNode, Controls)            │
+ * │    - Pure JS, no Odoo/OWL dependencies                      │
+ * │    - Source of truth for node config & execution            │
+ * └─────────────────────────────────────────────────────────────┘
  */
 
 import { reactive, markRaw } from "@odoo/owl";
@@ -18,7 +35,7 @@ export class WorkflowAdapter {
     constructor() {
         this.editor = new WorkflowEditor({ nodeRegistry: NodeRegistry });
 
-        // Reactive Store Pattern
+        // Reactive Store Pattern - UI state
         this.state = reactive({
             nodes: [],
             connections: [],
@@ -37,7 +54,10 @@ export class WorkflowAdapter {
     }
 
     /**
-     * Get nodes logic (now used for syncing to state)
+     * Get nodes for UI layer (plain objects only)
+     *
+     * IMPORTANT: No _node reference exposed!
+     * UI components must use adapter methods for config/execution.
      */
     getNodesForUI() {
         return this.editor.getNodes().map(node => ({
@@ -47,10 +67,10 @@ export class WorkflowAdapter {
             x: node.position.x,
             y: node.position.y,
             icon: node.icon,
+            category: node.category,
             inputs: this._socketsToUI(node.inputs),
             outputs: this._socketsToUI(node.outputs),
-            // Keep reference to original node for control access
-            _node: markRaw(node),
+            // NO _node reference - clean separation!
         }));
     }
 
@@ -78,23 +98,22 @@ export class WorkflowAdapter {
         return result;
     }
 
+    // ============================================
+    // NODE MANAGEMENT
+    // ============================================
+
     /**
      * Add node by type
+     * @returns {string|null} New node ID or null if failed
      */
     addNode(type, position) {
         const NodeClass = NodeRegistry[type];
         if (!NodeClass) {
-            console.warn(`Unknown node type: ${type}`);
+            console.warn(`[Adapter] Unknown node type: ${type}`);
             return null;
         }
         const node = this.editor.addNode(NodeClass, position);
-        if (node) {
-            // Apply markRaw to config if it exists at creation (optimization)
-            if (node.config) {
-                node.config = markRaw(node.config);
-            }
-        }
-        return node;
+        return node?.id || null;
     }
 
     /**
@@ -119,6 +138,159 @@ export class WorkflowAdapter {
     }
 
     /**
+     * Get Core node instance by ID (internal use only)
+     * @private
+     */
+    _getCoreNode(nodeId) {
+        return this.editor.getNode(nodeId);
+    }
+
+    // ============================================
+    // CONFIG MANAGEMENT (Phase 3 API)
+    // ============================================
+
+    /**
+     * Get node configuration
+     * UI calls this instead of accessing _node.getConfig()
+     *
+     * @param {string} nodeId - Node ID
+     * @returns {Object} Config object from Core layer
+     */
+    getNodeConfig(nodeId) {
+        const coreNode = this._getCoreNode(nodeId);
+        if (!coreNode) {
+            console.warn(`[Adapter] Node not found: ${nodeId}`);
+            return {};
+        }
+        return coreNode.getConfig();
+    }
+
+    /**
+     * Set node configuration
+     * UI calls this instead of accessing _node.setConfig()
+     *
+     * @param {string} nodeId - Node ID
+     * @param {Object} config - Config object to set
+     * @returns {boolean} Success
+     */
+    setNodeConfig(nodeId, config) {
+        const coreNode = this._getCoreNode(nodeId);
+        if (!coreNode) {
+            console.warn(`[Adapter] Node not found: ${nodeId}`);
+            return false;
+        }
+        coreNode.setConfig(config);
+        console.log(`[Adapter] Config set for ${nodeId}:`, coreNode.getConfig());
+        return true;
+    }
+
+    /**
+     * Get node controls metadata (for UI rendering)
+     * Returns control definitions without exposing Control instances
+     *
+     * @param {string} nodeId - Node ID
+     * @returns {Array<{key, type, label, value, section?, options?, placeholder?, ...}>}
+     */
+    getNodeControls(nodeId) {
+        const coreNode = this._getCoreNode(nodeId);
+        if (!coreNode) {
+            return [];
+        }
+
+        return Object.entries(coreNode.controls).map(([key, control]) => ({
+            key,
+            type: control.type,
+            label: control.label,
+            value: control.getValue(),
+            section: control.section,  // For grouping in UI
+            // Type-specific properties
+            placeholder: control.placeholder,
+            multiline: control.multiline,
+            options: control.options,  // For select
+            keyPlaceholder: control.keyPlaceholder,  // For keyvalue
+            valuePlaceholder: control.valuePlaceholder,
+            min: control.min,
+            max: control.max,
+            step: control.step,
+        }));
+    }
+
+    /**
+     * Update a single control value
+     *
+     * @param {string} nodeId - Node ID
+     * @param {string} controlKey - Control key
+     * @param {*} value - New value
+     * @returns {boolean} Success
+     */
+    setControlValue(nodeId, controlKey, value) {
+        const coreNode = this._getCoreNode(nodeId);
+        if (!coreNode?.controls[controlKey]) {
+            return false;
+        }
+        coreNode.controls[controlKey].setValue(value);
+        return true;
+    }
+
+    // ============================================
+    // EXECUTION (Phase 3 API)
+    // ============================================
+
+    /**
+     * Execute a single node with input data
+     *
+     * @param {string} nodeId - Node ID
+     * @param {Object} inputData - Input data for execution
+     * @returns {Promise<{json: *, error: string|null, meta: Object}>}
+     */
+    async executeNode(nodeId, inputData = {}) {
+        const coreNode = this._getCoreNode(nodeId);
+        if (!coreNode) {
+            return {
+                json: null,
+                error: `Node not found: ${nodeId}`,
+                meta: {}
+            };
+        }
+
+        const startTime = Date.now();
+        try {
+            const output = await coreNode.execute(inputData);
+            return {
+                json: output,
+                error: null,
+                meta: {
+                    duration: Date.now() - startTime,
+                    executedAt: new Date().toISOString(),
+                }
+            };
+        } catch (error) {
+            return {
+                json: null,
+                error: error.message || String(error),
+                meta: {
+                    duration: Date.now() - startTime,
+                    executedAt: new Date().toISOString(),
+                }
+            };
+        }
+    }
+
+    /**
+     * Get node class by type (for executor service)
+     *
+     * @param {string} type - Node type
+     * @returns {Function|null} Node class constructor
+     */
+    getNodeClass(type) {
+        return NodeRegistry[type] || null;
+    }
+
+    // ============================================
+    // CONNECTION MANAGEMENT
+    // ============================================
+
+    /**
      * Add connection
      */
     addConnection(sourceId, sourceHandle, targetId, targetHandle) {
@@ -132,12 +304,9 @@ export class WorkflowAdapter {
         return this.editor.removeConnection(connectionId);
     }
 
-    /**
-     * Get node instance by ID
-     */
-    getNode(nodeId) {
-        return this.editor.getNode(nodeId);
-    }
+    // ============================================
+    // SERIALIZATION
+    // ============================================
 
     /**
      * Clear all
@@ -168,15 +337,18 @@ export class WorkflowAdapter {
 
         // Convert legacy nodes to new format
         (data.nodes || []).forEach(legacyNode => {
-            const node = this.addNode(legacyNode.type, {
+            const nodeId = this.addNode(legacyNode.type, {
                 x: legacyNode.x,
                 y: legacyNode.y,
             });
-            if (node) {
+            if (nodeId) {
                 // Override auto-generated ID with legacy ID
-                this.editor.nodes.delete(node.id);
-                node.id = legacyNode.id;
-                this.editor.nodes.set(node.id, node);
+                const coreNode = this._getCoreNode(nodeId);
+                if (coreNode) {
+                    this.editor.nodes.delete(nodeId);
+                    coreNode.id = legacyNode.id;
+                    this.editor.nodes.set(legacyNode.id, coreNode);
+                }
             }
         });
 

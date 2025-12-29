@@ -1,27 +1,56 @@
 /** @odoo-module **/
 
-import { Component } from "@odoo/owl";
+import { Component, useState } from "@odoo/owl";
+import { ExpressionInput } from "./expression/ExpressionInput";
 
 /**
  * ControlRenderer Component
- * 
- * Dynamically renders control UI based on control type.
- * Bridges Core Control classes with OWL UI.
+ *
+ * Phase 3 Architecture:
+ * - Receives plain control metadata objects (NOT Control instances)
+ * - No more getValue()/setValue() method calls
+ * - Uses onChange callback to notify parent of value changes
+ *
+ * Control object shape:
+ * {
+ *   key: string,
+ *   type: 'text' | 'select' | 'checkbox' | 'number' | 'keyvalue',
+ *   label: string,
+ *   value: any,
+ *   placeholder?: string,
+ *   multiline?: boolean,
+ *   options?: Array<{value, label}>,
+ *   keyPlaceholder?: string,
+ *   valuePlaceholder?: string,
+ * }
  */
 export class ControlRenderer extends Component {
     static template = "workflow_pilot.control_renderer";
+    static components = { ExpressionInput };
 
     static props = {
-        control: Object,
-        onChange: { type: Function, optional: true },
+        control: Object,  // Plain object, not Control instance
+        onChange: { type: Function },
+        inputContext: { type: Object, optional: true },  // { $json: {...} } for expression preview
     };
+
+    setup() {
+        // For keyvalue controls, maintain reactive state
+        this.state = useState({
+            // Copy pairs from control to reactive state
+            pairs: this.props.control?.type === 'keyvalue'
+                ? [...(this.props.control.value || [])]
+                : [],
+        });
+    }
 
     get controlType() {
         return this.props.control?.type || 'text';
     }
 
+    // Phase 3: Read value directly from plain object
     get value() {
-        return this.props.control?.getValue() || '';
+        return this.props.control?.value ?? '';
     }
 
     get label() {
@@ -41,16 +70,24 @@ export class ControlRenderer extends Component {
     }
 
     get pairs() {
-        return this.props.control?.value || [];
+        // Return reactive state for keyvalue controls
+        return this.state.pairs;
     }
 
     /**
      * Handle text/number input change
+     * Phase 3: Only call onChange, no setValue()
      */
     onInput(ev) {
         const value = ev.target.value;
-        this.props.control.setValue(value);
-        this.props.onChange?.(this.props.control.key, value);
+        this.props.onChange(this.props.control.key, value);
+    }
+
+    /**
+     * Handle ExpressionInput change (supports expressions + drag-drop)
+     */
+    onExpressionChange(value) {
+        this.props.onChange(this.props.control.key, value);
     }
 
     /**
@@ -58,8 +95,7 @@ export class ControlRenderer extends Component {
      */
     onSelectChange(ev) {
         const value = ev.target.value;
-        this.props.control.setValue(value);
-        this.props.onChange?.(this.props.control.key, value);
+        this.props.onChange(this.props.control.key, value);
     }
 
     /**
@@ -67,8 +103,7 @@ export class ControlRenderer extends Component {
      */
     onCheckboxChange(ev) {
         const value = ev.target.checked;
-        this.props.control.setValue(value);
-        this.props.onChange?.(this.props.control.key, value);
+        this.props.onChange(this.props.control.key, value);
     }
 
     // ============================================
@@ -76,28 +111,38 @@ export class ControlRenderer extends Component {
     // ============================================
 
     onKeyChange(index, ev) {
-        const pairs = this.props.control.value;
-        if (pairs[index]) {
-            pairs[index].key = ev.target.value;
-            this.props.onChange?.(this.props.control.key, pairs);
+        const control = this.props.control;
+        if (!this.state.pairs[index]) {
+            throw new Error(`[ControlRenderer] Pair at index ${index} not found for key change`);
         }
+        this.state.pairs[index].key = ev.target.value;
+        // Notify parent with updated pairs
+        this.props.onChange(control.key, [...this.state.pairs]);
     }
 
     onValueChange(index, ev) {
-        const pairs = this.props.control.value;
-        if (pairs[index]) {
-            pairs[index].value = ev.target.value;
-            this.props.onChange?.(this.props.control.key, pairs);
+        const control = this.props.control;
+        if (!this.state.pairs[index]) {
+            throw new Error(`[ControlRenderer] Pair at index ${index} not found for value change`);
         }
+        this.state.pairs[index].value = ev.target.value;
+        // Notify parent with updated pairs
+        this.props.onChange(control.key, [...this.state.pairs]);
     }
 
     addPair() {
-        this.props.control.addPair();
-        this.props.onChange?.(this.props.control.key, this.props.control.value);
+        const control = this.props.control;
+        // Add new pair to reactive state
+        this.state.pairs.push({ key: '', value: '' });
+        // Notify parent with updated pairs
+        this.props.onChange(control.key, [...this.state.pairs]);
     }
 
     removePair(index) {
-        this.props.control.removePair(index);
-        this.props.onChange?.(this.props.control.key, this.props.control.value);
+        const control = this.props.control;
+        // Remove pair from reactive state
+        this.state.pairs.splice(index, 1);
+        // Notify parent with updated pairs
+        this.props.onChange(control.key, [...this.state.pairs]);
     }
 }

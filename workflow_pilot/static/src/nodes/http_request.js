@@ -58,6 +58,102 @@ export class HttpRequestNode extends BaseNode {
             multiline: true,
         }));
     }
+
+    /**
+     * Execute HTTP request
+     * Uses real fetch when URL is provided, falls back to mock for testing
+     */
+    async execute(inputData = {}) {
+        const config = this.getConfig();
+        const url = config.url?.trim();
+        const method = config.method || 'GET';
+
+        // If no URL provided, return mock data
+        if (!url) {
+            return this._getMockResponse(config);
+        }
+
+        try {
+            // Build headers from KeyValue control
+            const headers = {};
+            if (config.headers && Array.isArray(config.headers)) {
+                for (const { key, value } of config.headers) {
+                    if (key) headers[key] = value || '';
+                }
+            }
+
+            // Build fetch options
+            const options = {
+                method,
+                headers,
+            };
+
+            // Add body for non-GET requests
+            if (method !== 'GET' && config.body) {
+                options.body = config.body;
+                if (!headers['Content-Type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+            }
+
+            console.log(`[HTTP Request] Fetching: ${method} ${url}`);
+            const response = await fetch(url, options);
+
+            // Try to parse response
+            let body;
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                body = await response.json();
+            } else {
+                body = await response.text();
+            }
+
+            return {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                body,
+            };
+        } catch (error) {
+            console.warn('[HTTP Request] Fetch failed, using mock:', error.message);
+            // Return mock on fetch error (CORS, network, etc.)
+            return this._getMockResponse(config, error.message);
+        }
+    }
+
+    /**
+     * Generate mock response for testing
+     */
+    _getMockResponse(config, errorNote = null) {
+        return {
+            status: 200,
+            statusText: 'OK (Mock)',
+            headers: {
+                'content-type': 'application/json',
+                'x-request-id': `mock-${Date.now()}`,
+            },
+            body: {
+                _mock: true,
+                _note: errorNote || 'No URL provided - using mock data',
+                success: true,
+                message: 'Mock response from HTTP Request node',
+                request: {
+                    url: config.url || 'https://api.example.com',
+                    method: config.method || 'GET',
+                },
+                data: {
+                    id: 1,
+                    name: 'Sample Data',
+                    email: 'sample@example.com',
+                    items: [
+                        { id: 101, title: 'Item 1', price: 29.99 },
+                        { id: 102, title: 'Item 2', price: 49.99 },
+                    ],
+                },
+                timestamp: new Date().toISOString(),
+            },
+        };
+    }
 }
 
 // Self-register to Odoo registry (like Odoo actions/fields pattern)

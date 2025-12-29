@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<t t-name="workflow_pilot.expression_input">
+		<div class="expression-input" t-att-class="{
+				 'expression-mode': isExpression,
+				 'focused': state.isFocused,
+				 'drag-over': state.isDragOver
+			 }">
+			<!-- Header with label and toggle -->
+			<div class="expression-input__header">
+				<label t-if="props.label" class="expression-input__label">
+					<t t-esc="props.label"/>
+				</label>
+				<!-- Fixed/Expression Toggle (n8n style) -->
+				<div class="expression-input__mode-toggle">
+					<button type="button" class="mode-btn" t-att-class="{ active: !isExpression }" t-on-click="() => this.setMode(false)" title="Fixed value">
+						Fixed
+					</button>
+					<button type="button" class="mode-btn mode-btn--expression" t-att-class="{ active: isExpression }" t-on-click="() => this.setMode(true)" title="Dynamic expression">
+						Expression
+					</button>
+				</div>
+			</div>
+			<!-- Input field -->
+			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
+				<!-- Expression mode prefix -->
+				<span t-if="isExpression" class="expression-input__fx">ƒx</span>
+				<t t-if="props.multiline or isExpression">
+					<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-placeholder="isExpression ? '{{ $json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" rows="2" spellcheck="false"/>
+				</t>
+				<t t-else="">
+					<input type="text" class="expression-input__text" t-att-value="currentValue" t-att-placeholder="props.placeholder || 'Enter value...'" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur"/>
+				</t>
+				<!-- Drop indicator -->
+				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
+					<i class="fa fa-plus-circle"/>
+					Drop to insert
+				
+				</div>
+			</div>
+			<!-- Result Preview (expression mode only) -->
+			<div t-if="isExpression" class="expression-input__result">
+				<div class="result-header">
+					<span class="result-label">Result</span>
+					<span class="result-tip">Tip: Drag fields from INPUT panel</span>
+				</div>
+				<div class="result-value">
+					<t t-if="previewResult and !previewResult.error">
+						<t t-esc="previewDisplay"/></t>
+					<t t-elif="previewResult and previewResult.error">
+						<span class="error">
+							<t t-esc="previewDisplay"/>
+						</span>
+					</t>
+					<t t-else="">
+						<span class="empty">[Execute previous nodes for preview]</span>
+					</t>
+				</div>
+			</div>
+		</div>
+	</t>
+</templates>

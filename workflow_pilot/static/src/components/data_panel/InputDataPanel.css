@@ -1,0 +1,231 @@
+/* InputDataPanel & JsonTreeNode Styles */
+
+/* ============================================
+   INPUT DATA PANEL
+   ============================================ */
+
+.input-data-panel {
+  display: flex;
+  flex-direction: column;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  overflow: hidden;
+}
+
+.input-data-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #242424;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.input-data-panel__header:hover {
+  background: #2a2a2a;
+}
+
+.input-data-panel__header > i {
+  color: #666;
+  font-size: 10px;
+  width: 12px;
+}
+
+.input-data-panel__title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.input-data-panel__title i {
+  color: #6366f1;
+}
+
+.input-data-panel__badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: #3a3a3a;
+  color: #888;
+  border-radius: 4px;
+}
+
+.input-data-panel__content {
+  padding: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.input-data-panel__empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: #666;
+  font-size: 12px;
+}
+
+.input-data-panel__empty i {
+  color: #4a4a4a;
+}
+
+.input-data-panel__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #0d0d0d;
+  border-top: 1px solid #2a2a2a;
+  font-size: 11px;
+  color: #555;
+}
+
+.input-data-panel__hint i {
+  color: #444;
+}
+
+/* ============================================
+   JSON TREE NODE
+   ============================================ */
+
+.json-tree-node {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+}
+
+.json-tree-node__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  user-select: none;
+  transition: background 0.1s ease;
+}
+
+.json-tree-node__row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.json-tree-node__toggle {
+  width: 16px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.json-tree-node__toggle:hover {
+  color: #aaa;
+}
+
+.json-tree-node__spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   KEY BADGE (Draggable)
+   ============================================ */
+
+.json-tree-node__key-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  background: transparent;
+  border: 1px dashed #71717a;
+  border-radius: 4px;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 400;
+  cursor: grab;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.json-tree-node__key-badge .type-icon {
+  font-size: 10px;
+  color: #71717a;
+  width: 14px;
+  text-align: center;
+}
+
+.json-tree-node__key-badge:hover {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  color: #c4b5fd;
+}
+
+.json-tree-node__key-badge:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.json-tree-node__key-badge.dragging {
+  opacity: 0.5;
+  border-style: solid;
+  border-color: #6366f1;
+}
+
+/* ============================================
+   VALUE DISPLAY
+   ============================================ */
+
+.json-tree-node__value {
+  flex: 1;
+  font-size: 11px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.json-value--string {
+  color: #ce9178;
+}
+
+.json-value--number {
+  color: #b5cea8;
+}
+
+.json-value--boolean {
+  color: #569cd6;
+}
+
+.json-value--null {
+  color: #808080;
+  font-style: italic;
+}
+
+.json-value--array,
+.json-value--object {
+  color: #dcdcaa;
+}
+
+.json-tree-node__drag-handle {
+  opacity: 0;
+  color: #555;
+  padding: 0 4px;
+  transition: opacity 0.15s ease;
+}
+
+.json-tree-node__row:hover .json-tree-node__drag-handle {
+  opacity: 1;
+}
+
+/* Children indentation */
+.json-tree-node__children {
+  padding-left: 16px;
+  border-left: 1px solid #2a2a2a;
+  margin-left: 7px;
+}

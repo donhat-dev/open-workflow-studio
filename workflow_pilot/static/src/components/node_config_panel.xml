@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<t t-name="workflow_pilot.node_config_panel">
+		<!-- Backdrop -->
+		<div class="node-config-backdrop" t-on-click="onBackdropClick" t-on-wheel.stop="">
+			<!-- Panel -->
+			<div class="node-config-panel" t-ref="panel" t-on-wheel.stop="">
+				<!-- Header -->
+				<div class="node-config-header">
+					<div class="node-config-title">
+						<i t-att-class="'fa ' + nodeIcon"/>
+						<span t-esc="nodeTitle"/>
+					</div>
+					<div class="node-config-actions">
+						<button class="node-config-close" t-on-click="onClose" title="Close">
+							<i class="fa fa-times"/>
+						</button>
+					</div>
+				</div>
+				<!-- Two Column Content -->
+				<div class="node-config-content">
+					<!-- LEFT PANEL: Ancestor Node Outputs -->
+					<div class="node-config-left-panel">
+						<div class="left-panel-header">
+							<i class="fa fa-database"/>
+							<span>INPUT</span>
+						</div>
+						<div class="left-panel-content">
+							<!-- Show ancestor nodes with their outputs -->
+							<t t-if="leftPanelData and Object.keys(leftPanelData).length > 0">
+								<t t-foreach="Object.entries(leftPanelData)" t-as="entry" t-key="entry[0]">
+									<div class="ancestor-node-section" t-att-class="{ collapsed: isSectionCollapsed(entry[0]) }">
+										<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection(entry[0])">
+											<i t-att-class="'fa ' + (isSectionCollapsed(entry[0]) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
+											<i class="fa fa-cube"/>
+											<span t-esc="entry[1].title"/>
+										</div>
+										<div class="ancestor-node-data" t-if="!isSectionCollapsed(entry[0])">
+											<JsonTreeNode data="entry[1].json" path="[]"/>
+										</div>
+									</div>
+								</t>
+							</t>
+							<!-- Fallback: show inputData if no ancestor context -->
+							<t t-elif="inputData">
+								<div class="input-data-tree">
+									<JsonTreeNode data="inputData" path="[]"/>
+								</div>
+							</t>
+							<t t-else="">
+								<div class="input-data-empty">
+									<i class="fa fa-database"/>
+									<p>No input data</p>
+									<span>Execute previous nodes to see data</span>
+								</div>
+							</t>
+						</div>
+						<div class="left-panel-footer">
+							<button class="node-execute-btn small" t-on-click="onExecute" t-att-disabled="state.isExecuting or !canExecute" t-att-class="{ executing: state.isExecuting }">
+								<t t-if="state.isExecuting">
+									<i class="fa fa-spinner fa-spin"/> Running...
+								
+								
+								
+								
+								
+								
+								
+								
+								
+								
+								</t>
+								<t t-else="">
+									<i class="fa fa-play"/> Execute
+								
+								
+								
+								
+								
+								
+								
+								
+								
+								
+								</t>
+							</button>
+							<t t-if="state.executionResult">
+								<span t-att-class="'execution-status status-' + executionStatus">
+									<i t-att-class="executionStatus === 'success' ? 'fa fa-check' : 'fa fa-exclamation'"/>
+									<t t-esc="executionStatusLabel"/>
+								</span>
+							</t>
+						</div>
+					</div>
+					<!-- RIGHT PANEL: Node Configuration -->
+					<div class="node-config-right-panel">
+						<!-- Tabs -->
+						<div class="node-config-tabs">
+							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')">
+								<i class="fa fa-sliders"/> Parameters
+							
+							
+							</button>
+							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
+								<i class="fa fa-code"/> Output
+							
+							
+							</button>
+							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
+								<i class="fa fa-cog"/> Settings
+							
+							
+							</button>
+						</div>
+						<!-- Tab Content -->
+						<div class="tab-content">
+							<!-- Parameters Tab -->
+							<t t-if="state.activeTab === 'parameters'">
+								<t t-foreach="groupedControls" t-as="group" t-key="group.name">
+									<div class="node-config-section">
+										<div class="node-config-section-title" t-esc="group.name"/>
+										<t t-foreach="group.controls" t-as="control" t-key="control.key">
+											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="{ $json: inputData }"/>
+										</t>
+									</div>
+								</t>
+								<t t-if="groupedControls.length === 0">
+									<div class="node-config-empty">
+										No parameters to configure
+									</div>
+								</t>
+							</t>
+							<!-- Output Tab -->
+							<t t-if="state.activeTab === 'output'">
+								<div class="node-config-section">
+									<div class="node-config-section-title">Execution Output</div>
+									<t t-if="state.executionResult">
+										<div class="output-panel">
+											<t t-if="state.executionResult.error">
+												<div class="output-error">
+													<i class="fa fa-exclamation-triangle"/>
+													<span t-esc="state.executionResult.error"/>
+												</div>
+											</t>
+											<t t-else="">
+												<pre class="output-json">
+													<t t-esc="executionOutputJson"/>
+												</pre>
+											</t>
+										</div>
+									</t>
+									<t t-else="">
+										<div class="input-data-empty">
+											<i class="fa fa-terminal"/>
+											<p>No output yet</p>
+											<span>Click Execute to run this node</span>
+										</div>
+									</t>
+								</div>
+							</t>
+							<!-- Settings Tab -->
+							<t t-if="state.activeTab === 'settings'">
+								<div class="node-config-section">
+									<div class="node-config-section-title">Node Settings</div>
+									<div class="control-renderer">
+										<label class="control-label">Node Name</label>
+										<input type="text" class="control-input" t-att-value="props.node.title || ''" placeholder="Enter node name..."/>
+									</div>
+								</div>
+							</t>
+						</div>
+					</div>
+				</div>
+				<!-- Footer -->
+				<div class="node-config-footer">
+					<button class="node-config-btn secondary" t-on-click="onClose">
+						Cancel
+					</button>
+					<button class="node-config-btn primary" t-on-click="onSave" t-att-disabled="!state.isDirty">
+						Save
+					</button>
+				</div>
+			</div>
+		</div>
+	</t>
+</templates>

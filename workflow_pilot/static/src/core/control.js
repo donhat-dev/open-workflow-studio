@@ -101,26 +101,46 @@ export class KeyValueControl extends Control {
         this.type = 'keyvalue';
         this.keyPlaceholder = options.keyPlaceholder || 'Key';
         this.valuePlaceholder = options.valuePlaceholder || 'Value';
-        // Default to one empty pair
+
+        // Default to one empty pair with unique ID
         if (!this.value || !Array.isArray(this.value)) {
-            this.value = [{ key: '', value: '' }];
+            this._nextId = 1;
+            this.value = [{ id: this._nextId++, key: '', value: '' }];
+        } else {
+            // Calculate _nextId from max existing ID to avoid duplicates
+            const maxId = this.value.reduce((max, p) => Math.max(max, p.id || 0), 0);
+            this._nextId = maxId + 1;
+            // Ensure existing values have IDs
+            this.value = this.value.map(p => ({
+                id: p.id || this._nextId++,
+                key: p.key || '',
+                value: p.value || '',
+            }));
         }
     }
 
     addPair() {
-        this.value.push({ key: '', value: '' });
+        // Create new array reference for reactivity
+        this.value = [...this.value, { id: this._nextId++, key: '', value: '' }];
+        return this.value;
     }
 
     removePair(index) {
         if (this.value.length > 1) {
-            this.value.splice(index, 1);
+            // Create new array reference for reactivity
+            this.value = this.value.filter((_, i) => i !== index);
         }
+        return this.value;
     }
 
     setPair(index, key, value) {
         if (this.value[index]) {
-            this.value[index] = { key, value };
+            // Create new array reference for reactivity
+            this.value = this.value.map((p, i) =>
+                i === index ? { ...p, key, value } : p
+            );
         }
+        return this.value;
     }
 
     /**
