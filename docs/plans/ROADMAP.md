@@ -185,6 +185,6 @@ Sprint | Phase   | Focus                        | Target SP
 
 ## Reference
 
-- **Backlog**: [PRODUCT_BACKLOG.md](../../PRODUCT_BACKLOG.md)
-- **Sprint Planning**: [SPRINT_PLANNING.md](./SPRINT_PLANNING.md)
+- **Backlog**: [PRODUCT_BACKLOG.md](./backlog/PRODUCT_BACKLOG.md)
+- **Sprint Planning**: [Sprint Plans](./sprint/)
 - **Velocity**: [VELOCITY_TRACKER.md](./VELOCITY_TRACKER.md)

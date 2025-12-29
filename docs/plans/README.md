@@ -8,11 +8,11 @@
 
 | Document | Description |
 |----------|-------------|
-| [SPRINT_PLANNING.md](./SPRINT_PLANNING.md) | Current sprint board & history |
+| [Sprint Plans](./sprint/) | Current sprint board & history |
 | [ROADMAP.md](./ROADMAP.md) | Quarterly milestones & release plan |
 | [VELOCITY_TRACKER.md](./VELOCITY_TRACKER.md) | Burndown charts & metrics |
 | [ADR/](./ADR/) | Architecture Decision Records |
-| [PRODUCT_BACKLOG.md](../../PRODUCT_BACKLOG.md) | Master backlog (source of truth) |
+| [PRODUCT_BACKLOG.md](./backlog/PRODUCT_BACKLOG.md) | Master backlog (source of truth) |
 
 ---
 
@@ -33,7 +33,7 @@
 ```
 PRODUCT_BACKLOG.md (Source of Truth)
         │
-        ├──► SPRINT_PLANNING.md
+        ├──► Sprint Plans (in ./sprint/)
         │    └── References task IDs (E1.x, E2.x, etc.)
         │
         ├──► ROADMAP.md
@@ -51,8 +51,8 @@ PRODUCT_BACKLOG.md (Source of Truth)
 ## How to Use
 
 ### Sprint Planning
-1. Review [PRODUCT_BACKLOG.md](../../PRODUCT_BACKLOG.md) for prioritized tasks
-2. Select tasks for sprint in [SPRINT_PLANNING.md](./SPRINT_PLANNING.md)
+1. Review [PRODUCT_BACKLOG.md](./backlog/PRODUCT_BACKLOG.md) for prioritized tasks
+2. Create/Update plans in [./sprint/](./sprint/)
 3. Update status daily (To Do → In Progress → Done)
 4. Record velocity in [VELOCITY_TRACKER.md](./VELOCITY_TRACKER.md)
 

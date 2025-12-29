@@ -192,6 +192,6 @@ After each sprint:
 
 ## Reference
 
-- **Backlog**: [PRODUCT_BACKLOG.md](../../PRODUCT_BACKLOG.md)
-- **Sprint Details**: [SPRINT_PLANNING.md](./SPRINT_PLANNING.md)
+- **Backlog**: [PRODUCT_BACKLOG.md](./backlog/PRODUCT_BACKLOG.md)
+- **Sprint Details**: [Sprint Plans](./sprint/)
 - **Roadmap**: [ROADMAP.md](./ROADMAP.md)

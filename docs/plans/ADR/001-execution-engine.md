@@ -168,7 +168,7 @@ Use RxJS-style streams for data flow.
 ## References
 
 - [n8n-research.md](../../../n8n-research.md) - Stack-based execution analysis
-- [PRODUCT_BACKLOG.md](../../../PRODUCT_BACKLOG.md) - E2.2 Queue-Based Executor tasks
+- [PRODUCT_BACKLOG.md](../backlog/PRODUCT_BACKLOG.md) - E2.2 Queue-Based Executor tasks
 - [n8n Source: WorkflowExecute.ts](https://github.com/n8n-io/n8n/blob/master/packages/core/src/WorkflowExecute.ts)
 
 ---

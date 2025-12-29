@@ -45,5 +45,5 @@ Proposed → Accepted → Deprecated
 
 ## Reference
 
-- [PRODUCT_BACKLOG.md](../../../PRODUCT_BACKLOG.md) - Technical context
+- [PRODUCT_BACKLOG.md](../backlog/PRODUCT_BACKLOG.md) - Technical context
 - [n8n-research.md](../../../n8n-research.md) - Execution engine research
