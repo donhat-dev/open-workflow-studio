@@ -11,7 +11,7 @@
 				<span t-else="" class="json-tree-node__spacer"/>
 				<!-- Key Badge (draggable) -->
 				<t t-if="props.keyName !== undefined">
-					<span class="json-tree-node__key-badge" draggable="true" t-att-data-path="expressionPath" t-att-data-expression="expressionTemplate" t-on-dragstart="onDragStart" t-on-dragend="onDragEnd" t-att-title="'Drag to map: ' + expressionPath">
+					<span class="json-tree-node__key-badge" t-att-draggable="isDraggable" t-att-data-path="expressionPath" t-att-data-expression="expressionTemplate" t-on-dragstart="onDragStart" t-on-dragend="onDragEnd" t-att-title="isDraggable ? ('Drag to map: ' + expressionPath) : 'Preview (read-only)'">
 						<span class="type-icon" t-esc="typeIcon"/>
 						<t t-esc="props.keyName"/>
 					</span>
@@ -24,7 +24,7 @@
 			<!-- Children (recursive) -->
 			<div t-if="hasChildren and state.isExpanded" class="json-tree-node__children">
 				<t t-foreach="children" t-as="child" t-key="child.key">
-					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick"/>
+					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" sourceNodeId="props.sourceNodeId" draggable="props.draggable"/>
 				</t>
 			</div>
 		</div>

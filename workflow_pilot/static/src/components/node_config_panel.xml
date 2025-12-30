@@ -36,7 +36,7 @@
 											<span t-esc="entry[1].title"/>
 										</div>
 										<div class="ancestor-node-data" t-if="!isSectionCollapsed(entry[0]) and entry[1].json !== undefined">
-											<JsonTreeNode data="entry[1].json" path="[]"/>
+											<JsonTreeNode data="entry[1].json" path="[]" sourceNodeId="entry[0]"/>
 										</div>
 										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(entry[0])">
 											<div class="input-data-empty"><span>No output data</span></div>
@@ -47,7 +47,7 @@
 							<!-- Fallback: show inputData if no ancestor context -->
 							<t t-elif="inputData">
 								<div class="input-data-tree">
-									<JsonTreeNode data="inputData" path="[]"/>
+									<JsonTreeNode data="inputData" path="[]" draggable="false"/>
 								</div>
 							</t>
 							<t t-else="">
@@ -86,8 +86,6 @@
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
 								<i class="fa fa-code"/> Output
-							
-							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
 								<i class="fa fa-cog"/> Settings
@@ -118,19 +116,12 @@
 								<div class="node-config-section">
 									<div class="node-config-section-title">Execution Output</div>
 									<t t-if="state.executionResult">
-										<div class="output-panel">
-											<t t-if="state.executionResult.error">
-												<div class="output-error">
-													<i class="fa fa-exclamation-triangle"/>
-													<span t-esc="state.executionResult.error"/>
-												</div>
-											</t>
-											<t t-else="">
-												<pre class="output-json">
-													<t t-esc="executionOutputJson"/>
-												</pre>
-											</t>
-										</div>
+										<t t-if="state.executionResult.error">
+											<JsonTreeNode data="state.executionResult.error" path="[]" draggable="false"/>
+										</t>
+										<t t-else="">
+											<JsonTreeNode data="state.executionResult.output" path="[]" draggable="false"/>
+										</t>
 									</t>
 									<t t-else="">
 										<div class="input-data-empty">

@@ -26,6 +26,10 @@ export const EXPRESSION_PATTERNS = {
     EXPRESSION_PREFIX: /^=/,
     // Match namespace prefix: $json, $vars, $loop, $node
     NAMESPACE: /^\$(\w+)/,
+    // n8n-style node selector: $('nodeId') or $("nodeId")
+    NODE_SELECTOR: /\$\(\s*['"]([^'"]+)['"]\s*\)/g,
+    // Single node selector match
+    SINGLE_NODE_SELECTOR: /^\$\(\s*['"]([^'"]+)['"]\s*\)/,
 };
 
 /**
@@ -82,10 +86,10 @@ export function extractExpressions(value) {
  * @param {string[]} pathParts - Array of path segments
  * @returns {string} - Expression like $json.items[0].name
  */
-export function generateExpressionPath(pathParts) {
-    if (!pathParts || pathParts.length === 0) return '$json';
+export function generateExpressionPath(pathParts, root = '$json') {
+    if (!pathParts || pathParts.length === 0) return root;
 
-    let path = '$json';
+    let path = root;
 
     for (const part of pathParts) {
         // Check if part is array index
@@ -106,12 +110,83 @@ export function generateExpressionPath(pathParts) {
 }
 
 /**
+ * Generate node-scoped expression path using n8n-style node selector.
+ *
+ * Example:
+ * - nodeId: "n_1", pathParts: ["body", "data"]
+ * - result: $("n_1").json.body.data
+ *
+ * Note: nodeId must not contain unescaped quotes; IDs are expected to be safe (e.g., n_1).
+ *
+ * @param {string} nodeId
+ * @param {string[]} pathParts
+ * @returns {string}
+ */
+export function generateNodeSelectorExpressionPath(nodeId, pathParts) {
+    if (!nodeId) {
+        // Force-safe fallback
+        return generateExpressionPath(pathParts, '$json');
+    }
+
+    // Prefer double quotes for consistency and to avoid common single-quote pitfalls.
+    // Supported by rewriteNodeSelector(): $("nodeId").json...
+    const root = `$("${nodeId}").json`;
+    return generateExpressionPath(pathParts, root);
+}
+
+/**
  * Wrap expression in template syntax
  * @param {string} expression - e.g., $json.email
  * @returns {string} - e.g., {{ $json.email }}
  */
 export function wrapExpression(expression) {
     return `{{ ${expression} }}`;
+}
+
+/**
+ * Rewrite n8n-style node selector to standard $node path.
+ * 
+ * Converts: $('n_1').json.body.data  →  $node['n_1'].json.body.data
+ * Converts: $("n_1").json.key       →  $node['n_1'].json.key
+ * 
+ * @param {string} expression - Expression that may contain $('nodeId') selectors
+ * @returns {{ rewritten: string, error: string|null }}
+ */
+export function rewriteNodeSelector(expression) {
+    if (!expression || typeof expression !== 'string') {
+        return { rewritten: expression, error: null };
+    }
+
+    // Check if expression contains node selector pattern
+    if (!expression.includes('$(')) {
+        return { rewritten: expression, error: null };
+    }
+
+    let result = expression;
+    let hasError = null;
+
+    // Replace all $('nodeId') or $("nodeId") with $node['nodeId']
+    result = result.replace(EXPRESSION_PATTERNS.NODE_SELECTOR, (match, nodeId) => {
+        return `$node['${nodeId}']`;
+    });
+
+    // Validate: after rewrite, $node['id'] must be followed by .json
+    // Pattern: $node['...'] not followed by .json is invalid
+    const invalidPattern = /\$node\['[^']+'](?!\.json)/g;
+    if (invalidPattern.test(result)) {
+        // Check if it's actually missing .json or has different property
+        const checkPattern = /\$node\['[^']+'](\.\w+)?/g;
+        let match;
+        while ((match = checkPattern.exec(result)) !== null) {
+            const afterBracket = match[1];
+            if (afterBracket && !afterBracket.startsWith('.json')) {
+                hasError = `Node selector must use .json accessor, got: ${match[0]}`;
+                break;
+            }
+        }
+    }
+
+    return { rewritten: result, error: hasError };
 }
 
 /**
@@ -249,14 +324,24 @@ export function evaluateExpression(expression, context = {}) {
 
         // For single template, evaluate and return value
         if (templates.length === 1 && templates[0].full === expression) {
-            const value = resolveExpression(templates[0].expression, context);
+            // Rewrite n8n-style node selectors before resolving
+            const { rewritten, error: rewriteError } = rewriteNodeSelector(templates[0].expression);
+            if (rewriteError) {
+                return { value: null, error: rewriteError };
+            }
+            const value = resolveExpression(rewritten, context);
             return { value, error: null };
         }
 
         // Multiple templates or mixed content: replace each
         let result = expression;
         for (const tmpl of templates) {
-            const value = resolveExpression(tmpl.expression, context);
+            // Rewrite n8n-style node selectors
+            const { rewritten, error: rewriteError } = rewriteNodeSelector(tmpl.expression);
+            if (rewriteError) {
+                return { value: null, error: rewriteError };
+            }
+            const value = resolveExpression(rewritten, context);
             const stringValue = value === undefined ? '' : String(value);
             result = result.replace(tmpl.full, stringValue);
         }

@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { Component, useState } from "@odoo/owl";
-import { generateExpressionPath, wrapExpression } from "@workflow_pilot/utils/expression_utils";
+import { generateExpressionPath, generateNodeSelectorExpressionPath, wrapExpression } from "@workflow_pilot/utils/expression_utils";
 
 /**
  * JsonTreeNode Component
@@ -18,6 +18,10 @@ export class JsonTreeNode extends Component {
         path: { type: Array },  // Array of path segments
         keyName: { type: String, optional: true },  // Key name for display
         onItemClick: { type: Function, optional: true },
+        // Force require: if provided, expression paths will be node-scoped: $("nodeId").json...
+        sourceNodeId: { type: String, optional: true },
+        // When false, disables drag entirely (readonly tree)
+        draggable: { type: Boolean, optional: true },
     };
 
     setup() {
@@ -104,6 +108,13 @@ export class JsonTreeNode extends Component {
     }
 
     get expressionPath() {
+        // Force require source node for drag/copy semantics.
+        // If sourceNodeId is provided, always generate node-scoped selector.
+        if (this.props.sourceNodeId) {
+            return generateNodeSelectorExpressionPath(this.props.sourceNodeId, this.props.path);
+        }
+
+        // Fallback for legacy/preview contexts (typically readonly).
         return generateExpressionPath(this.props.path);
     }
 
@@ -126,7 +137,19 @@ export class JsonTreeNode extends Component {
     // DRAG HANDLERS
     // ============================================
 
+    get isDraggable() {
+        // Explicitly disabled by parent
+        if (this.props.draggable === false) return false;
+        // Force require: only allow drag when data is tied to a concrete source node
+        return Boolean(this.props.sourceNodeId);
+    }
+
     onDragStart(ev) {
+        if (!this.isDraggable) {
+            ev.preventDefault?.();
+            return;
+        }
+
         ev.stopPropagation();
 
         // Set data transfer
