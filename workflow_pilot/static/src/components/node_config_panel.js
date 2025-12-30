@@ -190,6 +190,48 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
+     * Full expression context for ExpressionInput preview.
+     *
+     * Goal: allow preview/evaluation of $vars expressions without requiring UI mapping.
+     *
+     * - $json: immediate previous node output (existing behavior)
+     * - $node: ancestor node outputs (for cross-node lookup)
+     * - $vars/$loop: from workflowVariable service via adapterService.getExpressionContext()
+     */
+    get expressionPreviewContext() {
+        const base = this.adapterService.getExpressionContext?.() || {
+            $vars: {},
+            $node: {},
+            $json: {},
+            $loop: null,
+        };
+
+        const workflow = this._getWorkflowFromContext();
+        if (!workflow) {
+            const json = this.inputData || {};
+            return {
+                $vars: base.$vars || {},
+                $loop: base.$loop || null,
+                $node: base.$node || {},
+                $json: json,
+                $input: json,
+            };
+        }
+
+        const wfContext = this.executorService.buildContextForNode(workflow, this.props.node.id);
+        const json = wfContext.$json || {};
+
+        return {
+            $vars: base.$vars || {},
+            $loop: base.$loop || null,
+            // Prefer workflow-scoped node outputs for this node (ancestors)
+            $node: wfContext.$node || base.$node || {},
+            $json: json,
+            $input: json,
+        };
+    }
+
+    /**
      * Get workflow context from props
      * @private
      */
@@ -222,7 +264,7 @@ export class NodeConfigPanel extends Component {
 
         try {
             const workflow = this._getWorkflowFromContext();
-
+            let result = null;
             if (workflow) {
                 // Use executor service for proper data flow
                 await this.executorService.executeUntil(
@@ -234,22 +276,21 @@ export class NodeConfigPanel extends Component {
                 );
 
                 // Get result from executor service
-                const result = this.executorService.getNodeOutput(nodeId);
+                result = this.executorService.getNodeOutput(nodeId);
                 this.state.executionResult = result
                     ? { output: result.json, error: result.error, meta: result.meta }
                     : null;
             } else {
                 // Fallback to single node execution via adapterService
-                const result = await this.adapterService.executeNode(nodeId, {});
+                result = await this.adapterService.executeNode(nodeId, {});
                 this.state.executionResult = {
                     output: result.json,
                     error: result.error,
                     meta: result.meta,
                 };
-                
-                // Notify parent to refresh variable inspector
-                this.props.onExecute?.(nodeId, result);
             }
+            // Notify parent to refresh variable inspector
+            this.props.onExecute?.(nodeId, result);
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
             this.state.executionResult = {

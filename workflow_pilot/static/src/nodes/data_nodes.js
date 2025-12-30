@@ -17,6 +17,25 @@ function resolveValue(value, context) {
 }
 
 /**
+ * Build expression evaluation context for a node.
+ *
+ * Supports both:
+ * - ExecutionContext instances (preferred): context.toExpressionContext()
+ * - Plain expression context objects: { $vars, $node, $json, $loop }
+ *
+ * Ensures $json/$input always reflect current node inputData.
+ */
+function getExpressionContext(inputData, context) {
+    const base = context?.toExpressionContext?.() || (context && typeof context === 'object' ? context : {});
+    const json = inputData || {};
+    return {
+        ...base,
+        $json: json,
+        $input: json,
+    };
+}
+
+/**
  * DataValidationNode - Validates incoming data against rules
  */
 export class DataValidationNode extends BaseNode {
@@ -113,9 +132,9 @@ export class SetDataNode extends BaseNode {
         }));
     }
 
-    async execute(inputData = {}) {
+    async execute(inputData = {}, context = null) {
         const config = this.getConfig();
-        const context = { $json: inputData, $input: inputData };
+        const exprContext = getExpressionContext(inputData, context);
 
         // Build output data
         let output = {};
@@ -129,7 +148,7 @@ export class SetDataNode extends BaseNode {
         const fields = config.fields || [];
         for (const { key, value } of fields) {
             if (key) {
-                output[key] = resolveValue(value, context);
+                output[key] = resolveValue(value, exprContext);
             }
         }
 
@@ -185,16 +204,16 @@ export class DataMappingNode extends BaseNode {
         }));
     }
 
-    async execute(inputData = {}) {
+    async execute(inputData = {}, context = null) {
         const config = this.getConfig();
-        const context = { $json: inputData, $input: inputData };
+        const exprContext = getExpressionContext(inputData, context);
         const output = {};
 
         // Apply mappings
         const mappings = config.mappings || [];
         for (const { key, value } of mappings) {
             if (key) {
-                let resolvedValue = resolveValue(value, context);
+                let resolvedValue = resolveValue(value, exprContext);
 
                 // Apply transform
                 if (config.transform && config.transform !== 'none') {

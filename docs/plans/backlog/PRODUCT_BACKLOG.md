@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
 > **Version**: 1.1.0
-> **Last Updated**: 2024-12-29
+> **Last Updated**: 2025-12-30
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -13,13 +13,13 @@
 | **E1: Core Infrastructure** | P0 | 34 | 95% | Near Complete |
 | **E9: Variable System** | P0 | 19 | 0% | 🆕 Sprint 1 |
 | **E2: Node Execution Engine** | P0 | 55 | 40% | In Progress |
-| **E3: Node Library** | P0 | 42 | 45% | In Progress |
-| **E4: UI/UX Editor** | P1 | 38 | 75% | In Progress |
-| **E5: Expression System** | P1 | 21 | 50% | In Progress |
+| **E3: Node Library** | P0 | 45 | 42% | In Progress |
+| **E4: UI/UX Editor** | P1 | 48 | 63% | In Progress |
+| **E5: Expression System** | P1 | 24 | 38% | In Progress |
 | **E6: Persistence & Storage** | P1 | 26 | 5% | Not Started |
 | **E7: Production Features** | P2 | 34 | 0% | Planned |
 | **E8: Integrations** | P2 | 40 | 0% | Planned |
-| **TOTAL** | | **309** | **36%** | |
+| **TOTAL** | | **325** | **36%** | |
 
 ---
 
@@ -142,6 +142,9 @@
 | E3.4.1 | Code (JS/Python) | 5 | P2 | 0% | ❌ | Custom code execution |
 | E3.4.2 | Delay | 1 | P2 | 0% | ❌ | Wait timer |
 | E3.4.3 | Error Handler | 2 | P2 | 0% | ❌ | Catch & process errors |
+| | | | | | | |
+| **E3.5** | **ExecutionContext Expression Integration** | **3** | P0 | **100%** | ✅ Sprint 1 | unlock $vars usage in nodes |
+| E3.5.1 | Data nodes evaluate expressions with ExecutionContext | 3 | P0 | 100% | ✅ | Pass/consume ExecutionContext in execute(); allow $vars in Set/Mapping |
 
 ---
 
@@ -176,6 +179,11 @@
 | E4.4.3 | Keyboard shortcuts | 2 | P2 | 100% | ✅ | Del, Ctrl+C/V, Ctrl+Z |
 | E4.4.4 | Connection labels | 2 | P2 | 0% | ❌ | Edge annotations |
 | E4.4.5 | Subgraph grouping | 5 | P3 | 0% | ❌ | Collapsible groups |
+| | | | | | | |
+| **E4.5** | **Expression Builder UX (Major)** | **10** | P0 | **20%** | 🔄 In Progress | High priority, schedule later |
+| E4.5.1 | Node-scoped drag/drop from Input panel | 3 | P0 | 0% | ❌ | Dragging from a node section must generate `$('n_1').json.key` |
+| E4.5.2 | Expressions in KeyValue controls (drop + preview) | 5 | P0 | 0% | ❌ | Enable drop into KeyValue "value" cells (Set/Mapping nodes) |
+| E4.5.3 | Expression preview supports full context ($vars/$node/$loop) | 2 | P0 | 100% | ✅ Sprint 1 | Pass full expression context to ExpressionInput |
 
 ---
 
@@ -200,6 +208,9 @@
 | E5.3.2 | Conditional expressions | 2 | P2 | 0% | ❌ | Ternary operators |
 | E5.3.3 | Date/time helpers | 2 | P2 | 0% | ❌ | Format, parse, now |
 | E5.3.4 | Backend evaluation | 1 | P2 | 0% | ❌ | Python engine integration |
+| | | | | | | |
+| **E5.4** | **Node Selector Syntax (n8n-style)** | **3** | P0 | **0%** | ❌ Planned | Option B: `$('n_1').json.key` |
+| E5.4.1 | Support `$('nodeId').json.path` selector | 3 | P0 | 0% | ❌ | Parser/rewriter + evaluation parity (frontend first) |
 
 ---
 

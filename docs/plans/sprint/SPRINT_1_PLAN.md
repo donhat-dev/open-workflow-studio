@@ -1,8 +1,8 @@
 # SPRINT 1 PLANNING
 > **Focus**: Variable System POC + Core Flow Control Foundation
 > **Duration**: 2 Weeks
-> **Status**: ✅ Variable POC Complete, Flow Control Pending
-> **Updated**: 2025-01-xx - Variable System POC tasks complete, tests created
+> **Status**: ✅ COMPLETE
+> **Updated**: 2025-12-30 - Added Sprint 1 bugfix ticket (ExecutionContext wiring for VariableNode)
 
 ---
 
@@ -23,10 +23,11 @@
 | **V1.3** | Create `mocks/execution_engine.js` | 2 | P0 | - | ✅ Done |
 | **V2.1** | Create `services/variable_service.js` | 2 | P0 | - | ✅ Done |
 | **V2.2** | Integrate with WorkflowAdapter | 1 | P0 | - | ✅ Done |
+| **V2.3** | Bugfix: executor uses ExecutionContext for $vars/$node/$json | 1 | P0 | - | ✅ Done |
 | **V4.1** | Add $vars to expression_utils.js | 1 | P0 | - | ✅ Done |
 | **V4.2** | Add $loop to expression_utils.js | 1 | P0 | - | ✅ Done |
 | **V7** | Create tests/ directory with unit tests | - | P0 | - | ✅ Done |
-| | **Subtotal Variable POC** | **10** | | | ✅ |
+| | **Subtotal Variable POC** | **11** | | | ✅ |
 
 ### Flow Control Foundation - ✅ COMPLETE
 
@@ -36,9 +37,11 @@
 | **E3.2.2** | Loop Node execute() - full implementation | 3 | P1 | - | ✅ Done |
 | **BONUS** | VariableNode with set/get/append/merge | - | P0 | - | ✅ Done |
 | **BONUS** | Variable Inspector sidebar panel | - | P1 | - | ✅ Done |
-| | **Subtotal Flow Control** | **6** | | | ✅ |
+| **BONUS** | ExpressionInput preview supports full context ($vars/$node) | 2 | P0 | - | ✅ Done |
+| **BONUS** | Data nodes (Set/Mapping) evaluate with ExecutionContext | 3 | P0 | - | ✅ Done |
+| | **Subtotal Flow Control** | **11** | | | ✅ |
 
-| | **SPRINT TOTAL** | **16** | | | ✅ **COMPLETE** |
+| | **SPRINT TOTAL** | **22** | | | ✅ **COMPLETE** |
 
 ### Deferred to Sprint 2
 
@@ -56,11 +59,70 @@
 - 📦 Basic If/Loop node stubs with placeholder execute()
 
 ## SUCCESS CRITERIA
-- [ ] ExecutionContext can get/set/append/merge variables
-- [ ] MockExecutionEngine can execute simple linear workflow
-- [ ] Expressions resolve $vars and $loop references
-- [ ] All new code has JSDoc documentation
-- [ ] No regression in existing node execution
+- [x] ExecutionContext can get/set/append/merge variables
+- [x] MockExecutionEngine can execute simple linear workflow
+- [x] Expressions resolve $vars and $loop references
+- [x] All new code has JSDoc documentation
+- [x] No regression in existing node execution
+
+---
+
+## BUGFIX LOG
+
+### S1-BUG-01 — VariableNode does not persist $vars when executed via workflowExecutorService
+
+**Type**: Bugfix (unplanned, Sprint 1)
+
+**SP**: 1
+
+**Severity**: High (blocks VariableNode + Variable Inspector end-to-end)
+
+**Affected Area**:
+- UI: NodeConfigPanel → executorService.executeUntil() → App Variable Inspector refresh
+- Execution: workflowExecutorService context construction
+
+#### Repro Steps
+1. Add `HTTP Request` node and `Set Variable` node.
+2. Connect HTTP → Set Variable.
+3. Configure `Set Variable`:
+	 - operation: `set`
+	 - variableName: `data`
+	 - value: `{{ $json.body.data }}`
+4. Execute via NodeConfigPanel (Execute button).
+5. Observe Variable Inspector.
+
+#### Actual
+- Node execution result returns `{ json, meta, error }` but `$vars` stays empty.
+- `VariableNode.execute(input, context)` receives a plain object context (no methods), so:
+	- `hasContextMethods === false`
+	- `setVariable()` never runs
+- Variable Inspector reads `$vars` via `workflowAdapter.getExpressionContext()` (backed by `workflowVariable`), which was never mutated.
+
+#### Expected
+- `$vars.data` is set after executing VariableNode.
+- Variable Inspector shows `$vars` updated immediately.
+
+#### Root Cause
+`workflowExecutorService.buildContextForNode()` returns a plain JS object:
+`{ $node, $json }`.
+
+This context is passed into node execution, but VariableNode requires a real `ExecutionContext` instance (methods: `setVariable/getVariable/...`).
+
+#### Fix (Sprint 1 Quick Fix)
+- Make `workflowExecutorService` depend on `workflowVariable` and create a fresh `ExecutionContext` at the start of `executeUntil()`.
+- Execute all nodes with the same `ExecutionContext` instance.
+- After each node:
+	- Persist node output into `ExecutionContext` via `workflowVariable.setNodeOutput()` so `$json/$node` stay in sync.
+
+**Files changed**:
+- `workflow_pilot/static/src/services/workflow_executor_service.js`
+
+#### Verification
+- Execute workflow up to VariableNode via NodeConfigPanel.
+- Confirm `workflowVariable.getExpressionContext().$vars` contains the variable.
+
+#### Follow-ups (Sprint 2)
+- FIXME: consolidate `workflowExecutorService` logic by delegating to `MockExecutionEngine` as the single source of execution truth.
 
 ## RISKS
 | Risk | Impact | Mitigation |
@@ -81,3 +143,11 @@
 - Sprint replanned to prioritize Variable System POC
 - Original If/Loop routing deferred - requires Variable System foundation
 - Reference: VARIABLE_SYSTEM_PLAN.md created with full specifications
+
+### Day 2 (2025-12-30)
+- Fixed S1-BUG-01: VariableNode now persists $vars via ExecutionContext
+- Bonus: ExpressionInput preview wired with full context ($vars/$node/$loop)
+- Bonus: SetDataNode/DataMappingNode now evaluate expressions with ExecutionContext
+- Backlog items added for n8n-style node selector (E5.4) and Expression Builder UX (E4.5)
+- All Sprint 1 success criteria verified ✅
+- Sprint 1 closed; ready for Sprint 2 planning

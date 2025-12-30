@@ -62,29 +62,9 @@
 							<button class="node-execute-btn small" t-on-click="onExecute" t-att-disabled="state.isExecuting or !canExecute" t-att-class="{ executing: state.isExecuting }">
 								<t t-if="state.isExecuting">
 									<i class="fa fa-spinner fa-spin"/> Running...
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
 								</t>
 								<t t-else="">
 									<i class="fa fa-play"/> Execute
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
 								</t>
 							</button>
 							<t t-if="state.executionResult">
@@ -123,7 +103,7 @@
 									<div class="node-config-section">
 										<div class="node-config-section-title" t-esc="group.name"/>
 										<t t-foreach="group.controls" t-as="control" t-key="control.key">
-											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="{ $json: inputData }"/>
+											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext"/>
 										</t>
 									</div>
 								</t>

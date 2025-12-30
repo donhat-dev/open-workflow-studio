@@ -8,12 +8,12 @@
 
 | Metric | Value |
 |--------|------:|
-| **Total Backlog** | 290 SP |
-| **Completed** | 110 SP |
-| **Remaining** | 180 SP |
-| **Progress** | 38% |
+| **Total Backlog** | 325 SP |
+| **Completed** | 132 SP |
+| **Remaining** | 193 SP |
+| **Progress** | 41% |
 | **Target Velocity** | 15-20 SP/sprint |
-| **Sprints to Complete** | 9-12 |
+| **Sprints to Complete** | 10-13 |
 
 ---
 
@@ -53,8 +53,8 @@ Legend: ████ Completed   ░░░░ Committed (not done)
 | Sprint | Committed | Completed | Velocity | Trend |
 |--------|----------:|----------:|---------:|-------|
 | Pre-Sprint | - | 110 | - | Baseline |
-| Sprint 1 | 20 | - | - | Current |
-| Sprint 2 | - | - | - | Planned |
+| Sprint 1 | 22 | 22 | 22 | ✅ Above target |
+| Sprint 2 | - | - | - | Planning |
 | Sprint 3 | - | - | - | Planned |
 
 ### Velocity Trend

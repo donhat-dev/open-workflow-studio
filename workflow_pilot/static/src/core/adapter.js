@@ -30,7 +30,6 @@
 import { reactive, markRaw } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { WorkflowEditor } from '../core/editor';
-
 // Odoo registry for node types
 const nodeTypeRegistry = registry.category("workflow_node_types");
 
@@ -61,7 +60,6 @@ export class WorkflowAdapter {
     /**
      * Get nodes for UI layer (plain objects only)
      *
-     * IMPORTANT: No _node reference exposed!
      * UI components must use adapter methods for config/execution.
      */
     getNodesForUI() {
@@ -75,7 +73,6 @@ export class WorkflowAdapter {
             category: node.category,
             inputs: this._socketsToUI(node.inputs),
             outputs: this._socketsToUI(node.outputs),
-            // NO _node reference - clean separation!
         }));
     }
 
@@ -149,10 +146,6 @@ export class WorkflowAdapter {
     _getCoreNode(nodeId) {
         return this.editor.getNode(nodeId);
     }
-
-    // ============================================
-    // CONFIG MANAGEMENT (Phase 3 API)
-    // ============================================
 
     /**
      * Get node configuration

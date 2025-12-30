@@ -3,7 +3,6 @@
 /**
  * Workflow Executor Service
  *
- * Phase 3 Architecture:
  * - Uses workflowAdapter service for config resolution
  * - NO direct _node access
  * - Clean separation between execution and Core layer
@@ -16,9 +15,12 @@ import { registry } from "@web/core/registry";
 import { WorkflowGraph } from "../utils/graph_utils";
 
 export const workflowExecutorService = {
-    dependencies: ["workflowNode", "workflowAdapter"],
+    // NOTE: workflowVariable provides a real ExecutionContext instance.
+    // This is required for VariableNode and expression resolution to work.
+    // FIXME: In Sprint 2, consolidate executor logic by delegating to MockExecutionEngine.
+    dependencies: ["workflowNode", "workflowAdapter", "workflowVariable"],
 
-    start(env, { workflowNode, workflowAdapter }) {
+    start(env, { workflowNode, workflowAdapter, workflowVariable }) {
         // Store outputs per node: nodeId → { json, meta, error }
         let nodeOutputs = new Map();
 
@@ -162,6 +164,11 @@ export const workflowExecutorService = {
                 // Clear previous results to ensure fresh execution
                 nodeOutputs.clear();
 
+                // Sprint 1 POC: reset variable context for a clean run.
+                // This ensures Variable Inspector reflects the latest execution.
+                // (Future: support incremental runs / persistence keyed by workflowId.)
+                const execContext = workflowVariable.createContext(workflow?.id || null);
+
                 try {
                     const order = this.getExecutionOrder(workflow);
                     const targetIndex = order.indexOf(targetNodeId);
@@ -179,14 +186,23 @@ export const workflowExecutorService = {
                             continue;
                         }
 
-                        // Build context for this node
-                        const context = this.buildContextForNode(workflow, nodeId);
-
                         // Execute node
-                        const result = await this._executeNode(workflow, nodeId, context);
+                        const result = await this._executeNode(workflow, nodeId, execContext);
 
                         // Store result
                         nodeOutputs.set(nodeId, result);
+
+                        // Keep ExecutionContext in sync for:
+                        // - $json (previous node output)
+                        // - $node (node outputs map)
+                        // - VariableNode mutations ($vars)
+                        const node = workflow.nodes.find(n => n.id === nodeId);
+                        workflowVariable.setNodeOutput(nodeId, {
+                            title: node?.title || nodeId,
+                            json: result.json,
+                            meta: result.meta || {},
+                            error: result.error || null,
+                        });
 
                         // Callback
                         onNodeComplete?.(nodeId, result);
@@ -246,7 +262,7 @@ export const workflowExecutorService = {
 
                     // Execute with context
                     const inputData = context.$json || {};
-                    const output = await instance.execute(inputData);
+                    const output = await instance.execute(inputData, context);
 
                     return {
                         json: output,

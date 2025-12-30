@@ -16,7 +16,8 @@ export class ExpressionInput extends Component {
         value: { type: String, optional: true },
         placeholder: { type: String, optional: true },
         label: { type: String, optional: true },
-        context: { type: Object, optional: true },  // { $json: {...} } for preview
+        // Expression evaluation context for preview, e.g. { $vars, $node, $json, $loop, $input }
+        context: { type: Object, optional: true },
         multiline: { type: Boolean, optional: true },  // Use textarea
         onChange: { type: Function },
         onDrop: { type: Function, optional: true },
