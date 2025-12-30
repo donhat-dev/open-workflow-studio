@@ -58,7 +58,7 @@
 				<!-- Node Menu (context menu) -->
 				<NodeMenu t-if="state.nodeMenu.visible" position="{ x: state.nodeMenu.x, y: state.nodeMenu.y }" variant="state.nodeMenu.variant" connectionContext="state.nodeMenu.connectionContext" onSelect.bind="onNodeMenuSelect" onClose.bind="onNodeMenuClose"/>
 				<!-- Node Config Panel -->
-				<NodeConfigPanel t-if="state.configPanel.visible and configPanelNode" node="configPanelNode" workflow="workflowData" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
+				<NodeConfigPanel t-if="state.configPanel.visible and configPanelNode" node="configPanelNode" workflow="workflowData" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 			</div>
 		</div>
 	</t>

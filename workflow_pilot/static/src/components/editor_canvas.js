@@ -34,6 +34,7 @@ export class EditorCanvas extends Component {
         redo: { type: Function, optional: true },
         onBeginBatch: { type: Function, optional: true },
         onEndBatch: { type: Function, optional: true },
+        onNodeExecute: { type: Function, optional: true },  // Callback when node is executed
         // Dimension configuration for node sizing
         dimensionConfig: { type: Object, optional: true },
     };
@@ -1587,6 +1588,15 @@ export class EditorCanvas extends Component {
         console.log('[EditorCanvas] Config panel saved for node:', nodeId);
 
         this.onConfigPanelClose();
+    };
+
+    /**
+     * Handle node execution callback
+     * Passes to parent for variable inspector refresh
+     */
+    onConfigPanelExecute = (nodeId, result) => {
+        console.log('[EditorCanvas] Node executed:', nodeId);
+        this.props.onNodeExecute?.(nodeId, result);
     };
 }
 

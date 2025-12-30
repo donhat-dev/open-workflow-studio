@@ -22,12 +22,29 @@ const STORAGE_KEY = 'workflow_pilot_state';
  */
 export class WorkflowPilotDevApp extends Component {
     static template = xml`
-        <div class="workflow-pilot-dev workflow-pilot-dev--no-sidebar">
-            <!-- Sidebar hidden for now
+        <div class="workflow-pilot-dev">
             <div class="workflow-pilot-dev__sidebar">
                 <NodePalette onAddNode="onAddNode"/>
+                
+                <!-- Variable Inspector -->
+                <div class="variable-inspector">
+                    <h3 class="sidebar__title">Variables ($vars)</h3>
+                    <div class="variable-inspector__content">
+                        <t t-if="Object.keys(variableState.vars).length === 0">
+                            <div class="variable-inspector__empty">No variables set</div>
+                        </t>
+                        <t t-else="">
+                            <t t-foreach="Object.entries(variableState.vars)" t-as="entry" t-key="entry[0]">
+                                <div class="variable-inspector__item">
+                                    <span class="variable-inspector__key">$vars.<t t-esc="entry[0]"/></span>
+                                    <span class="variable-inspector__value"><t t-esc="formatVarValue(entry[1])"/></span>
+                                </div>
+                            </t>
+                        </t>
+                    </div>
+                    <button class="workflow-pilot-dev__btn workflow-pilot-dev__btn--small" t-on-click="clearVariables">Clear Vars</button>
+                </div>
             </div>
-            -->
 
             <div class="workflow-pilot-dev__main">
                 <div class="workflow-pilot-dev__topbar">
@@ -52,7 +69,8 @@ export class WorkflowPilotDevApp extends Component {
                     undo.bind="undo"
                     redo.bind="redo"
                     onBeginBatch.bind="onBeginBatch"
-                    onEndBatch.bind="onEndBatch"/>
+                    onEndBatch.bind="onEndBatch"
+                    onNodeExecute="onNodeExecute"/>
             </div>
         </div>
     `;
@@ -74,6 +92,11 @@ export class WorkflowPilotDevApp extends Component {
         // UI state: Use adapter's reactive state directly
         // The adapter is now the single source of truth using a reactive Store
         this.state = useState(this.adapter.state);
+
+        // Variable Inspector state - reactive view of $vars
+        this.variableState = useState({
+            vars: {},
+        });
 
         // Local UI state
         this.uiState = useState({
@@ -100,6 +123,7 @@ export class WorkflowPilotDevApp extends Component {
         onPatched(() => this._autoSave());
 
         this._offset = { x: 40, y: 40 };
+        window.app = this; // For debugging
     }
 
     /**
@@ -340,4 +364,58 @@ export class WorkflowPilotDevApp extends Component {
     onEndBatch(description) {
         this.history.commitBatch(description);
     }
+
+    // =========================================
+    // Variable Inspector
+    // =========================================
+
+    /**
+     * Format variable value for display
+     */
+    formatVarValue(value) {
+        if (value === null) return 'null';
+        if (value === undefined) return 'undefined';
+        if (typeof value === 'object') {
+            try {
+                const str = JSON.stringify(value);
+                return str.length > 50 ? str.slice(0, 47) + '...' : str;
+            } catch {
+                return '[Object]';
+            }
+        }
+        return String(value);
+    }
+
+    /**
+     * Update variable inspector from execution context
+     */
+    updateVariableInspector(context) {
+        if (context && context.$vars) {
+            this.variableState.vars = { ...context.$vars };
+        } else {
+            this.variableState.vars = {};
+        }
+    }
+
+    /**
+     * Clear all variables
+     */
+    clearVariables = () => {
+        this.variableState.vars = {};
+        // Also clear in adapter if context exists
+        if (this.adapterService.clearContext) {
+            this.adapterService.clearContext();
+        }
+    };
+
+    /**
+     * Handle node execution - refresh variable inspector
+     */
+    onNodeExecute = (nodeId, result) => {
+        console.log('[DevApp] Node executed:', nodeId, result);
+        
+        // Refresh variable inspector from current context
+        const context = this.adapterService.getExpressionContext?.() || {};
+        this.variableState.vars = { ...(context.$vars || {}) };
+    };
 }

@@ -135,6 +135,9 @@
 .node-palette__item--http .node-palette__icon {
   color: #10b981;
 }
+.node-palette__item--variable .node-palette__icon {
+  color: #06b6d4;
+}
 .node-palette__item--validation .node-palette__icon {
   color: #f43f5e;
 }
@@ -149,4 +152,58 @@
 }
 .node-palette__item--code .node-palette__icon {
   color: #10b981;
+}
+
+/* ========================================
+   Variable Inspector
+   ======================================== */
+
+.variable-inspector {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #2a2d33;
+}
+
+.variable-inspector__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.variable-inspector__empty {
+  font-size: 0.8rem;
+  color: #71717a;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.variable-inspector__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #1e2025;
+  border: 1px solid #2a2d33;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+}
+
+.variable-inspector__key {
+  color: #06b6d4;
+  font-weight: 600;
+}
+
+.variable-inspector__value {
+  color: #a3e635;
+  word-break: break-all;
+}
+
+.workflow-pilot-dev__btn--small {
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  width: 100%;
 }

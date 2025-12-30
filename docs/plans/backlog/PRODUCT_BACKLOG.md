@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
-> **Version**: 1.0.0
-> **Last Updated**: 2025-12-28
+> **Version**: 1.1.0
+> **Last Updated**: 2024-12-29
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -11,6 +11,7 @@
 | Epic | Priority | Story Points | % Done | Status |
 |------|----------|--------------|--------|--------|
 | **E1: Core Infrastructure** | P0 | 34 | 95% | Near Complete |
+| **E9: Variable System** | P0 | 19 | 0% | 🆕 Sprint 1 |
 | **E2: Node Execution Engine** | P0 | 55 | 40% | In Progress |
 | **E3: Node Library** | P0 | 42 | 45% | In Progress |
 | **E4: UI/UX Editor** | P1 | 38 | 75% | In Progress |
@@ -18,7 +19,37 @@
 | **E6: Persistence & Storage** | P1 | 26 | 5% | Not Started |
 | **E7: Production Features** | P2 | 34 | 0% | Planned |
 | **E8: Integrations** | P2 | 40 | 0% | Planned |
-| **TOTAL** | | **290** | **38%** | |
+| **TOTAL** | | **309** | **36%** | |
+
+---
+
+## E9: VARIABLE SYSTEM (NEW)
+> Mutable workflow state management - Sprint 1 Priority
+> **Reference**: `workflow_pilot/docs/plans/VARIABLE_SYSTEM_PLAN.md`
+
+| ID | Feature | SP | Priority | % Done | Status | Notes |
+|----|---------|----:|----------|-------:|--------|-------|
+| **V1** | **Core Infrastructure** | **5** | P0 | **0%** | 🆕 Sprint 1 | |
+| V1.1 | ExecutionContext class | 2 | P0 | 0% | To Do | $vars, $node, $json, $loop |
+| V1.2 | Mocks directory structure | 1 | P0 | 0% | To Do | index.js + empty files |
+| V1.3 | MockExecutionEngine | 2 | P0 | 0% | To Do | Basic mock executor |
+| | | | | | | |
+| **V2** | **Variable Service** | **3** | P0 | **0%** | 🆕 Sprint 1 | |
+| V2.1 | VariableService | 2 | P0 | 0% | To Do | Odoo service wrapper |
+| V2.2 | Adapter integration | 1 | P0 | 0% | To Do | Expose to UI layer |
+| | | | | | | |
+| **V3** | **VariableNode** | **5** | P0 | **0%** | ❌ Sprint 2 | |
+| V3.1 | VariableNode definition | 3 | P0 | 0% | To Do | set/get/append/merge |
+| V3.2 | VariableNode config UI | 2 | P0 | 0% | To Do | Operation dropdown |
+| | | | | | | |
+| **V4** | **Expression Enhancement** | **3** | P0 | **0%** | 🆕 Sprint 1 | |
+| V4.1 | $vars in expressions | 1 | P0 | 0% | To Do | Path resolution |
+| V4.2 | $loop in expressions | 1 | P0 | 0% | To Do | Iteration context |
+| V4.3 | Expression preview update | 1 | P1 | 0% | To Do | Show resolved values |
+| | | | | | | |
+| **V5** | **Loop Enhancement** | **3** | P1 | **0%** | ❌ Sprint 2 | |
+| V5.1 | LoopNode $loop context | 2 | P0 | 0% | To Do | Iteration state |
+| V5.2 | Accumulator option | 1 | P1 | 0% | To Do | Auto-collect results |
 
 ---
 

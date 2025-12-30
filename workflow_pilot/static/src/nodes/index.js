@@ -25,23 +25,23 @@ import { DataValidationNode, DataMappingNode } from './data_nodes';
  * @deprecated Use workflowNode service or import directly from node files
  * Legacy NodeRegistry for backward compatibility during migration
  */
-export const NodeRegistry = {
-    [HttpRequestNode.nodeType]: HttpRequestNode,
-    [LoopNode.nodeType]: LoopNode,
-    [IfNode.nodeType]: IfNode,
-    [CodeNode.nodeType]: CodeNode,
-    [NoOpNode.nodeType]: NoOpNode,
-    [DataValidationNode.nodeType]: DataValidationNode,
-    [DataMappingNode.nodeType]: DataMappingNode,
-};
+// export const NodeRegistry = {
+//     [HttpRequestNode.nodeType]: HttpRequestNode,
+//     [LoopNode.nodeType]: LoopNode,
+//     [IfNode.nodeType]: IfNode,
+//     [CodeNode.nodeType]: CodeNode,
+//     [NoOpNode.nodeType]: NoOpNode,
+//     [DataValidationNode.nodeType]: DataValidationNode,
+//     [DataMappingNode.nodeType]: DataMappingNode,
+// };
 
-// Convenience array of all node classes
-export const NodeClasses = [
-    HttpRequestNode,
-    LoopNode,
-    IfNode,
-    CodeNode,
-    NoOpNode,
-    DataValidationNode,
-    DataMappingNode,
-];
+// // Convenience array of all node classes
+// export const NodeClasses = [
+//     HttpRequestNode,
+//     LoopNode,
+//     IfNode,
+//     CodeNode,
+//     NoOpNode,
+//     DataValidationNode,
+//     DataMappingNode,
+// ];

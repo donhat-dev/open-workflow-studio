@@ -26,6 +26,7 @@ export class NodeConfigPanel extends Component {
         workflow: { type: Object, optional: true },  // { nodes: [], connections: [] }
         onClose: { type: Function },
         onSave: { type: Function },
+        onExecute: { type: Function, optional: true },  // Callback after node execution
     };
 
     setup() {
@@ -245,6 +246,9 @@ export class NodeConfigPanel extends Component {
                     error: result.error,
                     meta: result.meta,
                 };
+                
+                // Notify parent to refresh variable inspector
+                this.props.onExecute?.(nodeId, result);
             }
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);

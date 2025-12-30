@@ -28,12 +28,17 @@
  */
 
 import { reactive, markRaw } from "@odoo/owl";
+import { registry } from "@web/core/registry";
 import { WorkflowEditor } from '../core/editor';
-import { NodeRegistry } from '../nodes/index';
+
+// Odoo registry for node types
+const nodeTypeRegistry = registry.category("workflow_node_types");
 
 export class WorkflowAdapter {
     constructor() {
-        this.editor = new WorkflowEditor({ nodeRegistry: NodeRegistry });
+        // Build nodeRegistry from Odoo registry for WorkflowEditor compatibility
+        const nodeRegistry = this._buildNodeRegistryFromOdoo();
+        this.editor = new WorkflowEditor({ nodeRegistry });
 
         // Reactive Store Pattern - UI state
         this.state = reactive({
@@ -107,7 +112,7 @@ export class WorkflowAdapter {
      * @returns {string|null} New node ID or null if failed
      */
     addNode(type, position) {
-        const NodeClass = NodeRegistry[type];
+        const NodeClass = this.getNodeClass(type);
         if (!NodeClass) {
             console.warn(`[Adapter] Unknown node type: ${type}`);
             return null;
@@ -237,13 +242,14 @@ export class WorkflowAdapter {
     // ============================================
 
     /**
-     * Execute a single node with input data
+     * Execute a single node with input data and context
      *
      * @param {string} nodeId - Node ID
      * @param {Object} inputData - Input data for execution
+     * @param {Object} context - Expression context { $vars, $json, $node, $loop }
      * @returns {Promise<{json: *, error: string|null, meta: Object}>}
      */
-    async executeNode(nodeId, inputData = {}) {
+    async executeNode(nodeId, inputData = {}, context = null) {
         const coreNode = this._getCoreNode(nodeId);
         if (!coreNode) {
             return {
@@ -255,7 +261,8 @@ export class WorkflowAdapter {
 
         const startTime = Date.now();
         try {
-            const output = await coreNode.execute(inputData);
+            // Pass context to node execute for expression resolution
+            const output = await coreNode.execute(inputData, context);
             return {
                 json: output,
                 error: null,
@@ -277,13 +284,32 @@ export class WorkflowAdapter {
     }
 
     /**
-     * Get node class by type (for executor service)
+     * Get node class by type (from Odoo registry)
      *
      * @param {string} type - Node type
      * @returns {Function|null} Node class constructor
      */
     getNodeClass(type) {
-        return NodeRegistry[type] || null;
+        const entry = nodeTypeRegistry.get(type, null);
+        if (!entry) return null;
+        // Support both: raw Class or definition object { class: NodeClass, ... }
+        return entry.class || entry;
+    }
+
+    /**
+     * Build nodeRegistry object from Odoo registry
+     * For WorkflowEditor compatibility (deserialization)
+     * @private
+     */
+    _buildNodeRegistryFromOdoo() {
+        const reg = {};
+        for (const [key, value] of nodeTypeRegistry.getEntries()) {
+            const NodeClass = value.class || value;
+            if (typeof NodeClass === 'function') {
+                reg[key] = NodeClass;
+            }
+        }
+        return reg;
     }
 
     // ============================================

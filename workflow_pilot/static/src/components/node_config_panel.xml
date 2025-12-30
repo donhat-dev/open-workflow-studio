@@ -35,8 +35,11 @@
 											<i class="fa fa-cube"/>
 											<span t-esc="entry[1].title"/>
 										</div>
-										<div class="ancestor-node-data" t-if="!isSectionCollapsed(entry[0])">
+										<div class="ancestor-node-data" t-if="!isSectionCollapsed(entry[0]) and entry[1].json !== undefined">
 											<JsonTreeNode data="entry[1].json" path="[]"/>
+										</div>
+										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(entry[0])">
+											<div class="input-data-empty"><span>No output data</span></div>
 										</div>
 									</div>
 								</t>

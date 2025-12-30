@@ -240,7 +240,144 @@ export class DataMappingNode extends BaseNode {
     }
 }
 
-// Self-register all data nodes to Odoo registry
+// Self-register data nodes to Odoo registry (continued after VariableNode below)
 registry.category("workflow_node_types").add("validation", DataValidationNode);
 registry.category("workflow_node_types").add("set_data", SetDataNode);
 registry.category("workflow_node_types").add("mapping", DataMappingNode);
+
+/**
+ * VariableNode - Set/Get workflow variables ($vars)
+ * 
+ * Operations:
+ * - set: Set a variable value (with expression support)
+ * - get: Read a variable value
+ * - append: Append to array variable
+ * - merge: Merge object into variable
+ * - increment: Add to numeric variable
+ * - delete: Remove a variable
+ */
+export class VariableNode extends BaseNode {
+    static nodeType = 'variable';
+    static label = 'Set Variable';
+    static icon = 'fa-cube';
+    static category = 'data';
+    static description = 'Set or get workflow variables';
+
+    constructor() {
+        super();
+
+        // Inputs
+        this.addInput('trigger', DataSocket, 'Trigger');
+
+        // Outputs
+        this.addOutput('output', DataSocket, 'Output');
+
+        // Controls
+        this.addControl('operation', new SelectControl('operation', {
+            label: 'Operation',
+            options: [
+                { value: 'set', label: 'Set' },
+                { value: 'get', label: 'Get' },
+                { value: 'append', label: 'Append to Array' },
+                { value: 'merge', label: 'Merge Object' },
+                { value: 'increment', label: 'Increment' },
+                { value: 'delete', label: 'Delete' },
+            ],
+            defaultValue: 'set',
+        }));
+
+        this.addControl('variableName', new TextInputControl('variableName', {
+            label: 'Variable Name',
+            placeholder: 'e.g., result.order_lines',
+        }));
+
+        this.addControl('value', new TextInputControl('value', {
+            label: 'Value (supports expressions)',
+            placeholder: '{{ $json.data }} or static value',
+            multiline: true,
+        }));
+    }
+
+    /**
+     * Execute variable operation
+     * @param {Object} inputData - Input from previous node
+     * @param {ExecutionContext} context - ExecutionContext instance with $vars, $json, etc.
+     * @returns {Object} Output data
+     */
+    async execute(inputData = {}, context = null) {
+        const config = this.getConfig();
+        const operation = config.operation || 'set';
+        const varName = config.variableName || '';
+        let value = config.value;
+
+        if (!varName) {
+            return { error: 'Variable name is required', success: false };
+        }
+
+        // Get expression context for resolving expressions
+        const exprContext = context?.toExpressionContext?.() || context || {};
+
+        // Resolve expression in value if context provided
+        if (value && typeof value === 'string' && value.includes('{{')) {
+            value = resolveValue(value, exprContext);
+        }
+
+        // Parse JSON if value looks like JSON
+        if (typeof value === 'string') {
+            try {
+                if (value.startsWith('{') || value.startsWith('[')) {
+                    value = JSON.parse(value);
+                }
+            } catch {
+                // Keep as string
+            }
+        }
+
+        let result = { success: true, operation, variable: varName };
+
+        // Use context methods if available (ExecutionContext instance)
+        const hasContextMethods = context && typeof context.setVariable === 'function';
+
+        switch (operation) {
+            case 'set':
+                if (hasContextMethods) context.setVariable(varName, value);
+                result.value = value;
+                break;
+
+            case 'get':
+                result.value = hasContextMethods ? context.getVariable(varName) : undefined;
+                break;
+
+            case 'append':
+                if (hasContextMethods) context.appendVariable(varName, value);
+                result.value = hasContextMethods ? context.getVariable(varName) : [];
+                break;
+
+            case 'merge':
+                if (hasContextMethods && typeof value === 'object') {
+                    context.mergeVariable(varName, value);
+                }
+                result.value = hasContextMethods ? context.getVariable(varName) : value;
+                break;
+
+            case 'increment':
+                const increment = parseFloat(value) || 1;
+                result.value = hasContextMethods ? context.incrementVariable(varName, increment) : increment;
+                break;
+
+            case 'delete':
+                if (hasContextMethods) context.deleteVariable(varName);
+                result.value = null;
+                break;
+
+            default:
+                result.error = `Unknown operation: ${operation}`;
+                result.success = false;
+        }
+
+        return result;
+    }
+}
+
+// Register VariableNode
+registry.category("workflow_node_types").add("variable", VariableNode);

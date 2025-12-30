@@ -23,6 +23,7 @@
  */
 
 import { ExecutionContext } from '../core/context';
+import { resolveExpression, evaluateExpression, hasExpressions } from '../utils/expression_utils';
 
 export class MockExecutionEngine {
     constructor() {
@@ -293,31 +294,11 @@ export class MockExecutionEngine {
      */
     _resolveExpression(expr, context) {
         if (typeof expr !== 'string') return expr;
+        if (!hasExpressions(expr)) return expr;
 
-        // Simple expression resolution
-        // TODO: Use expression_utils.js for full support
-        const match = expr.match(/\{\{\s*(.+?)\s*\}\}/);
-        if (!match) return expr;
-
-        const path = match[1];
-
-        // Handle different namespaces
-        if (path.startsWith('$vars.')) {
-            return this._resolvePath(context.$vars, path.replace('$vars.', ''));
-        }
-        if (path.startsWith('$json.')) {
-            return this._resolvePath(context.$json, path.replace('$json.', ''));
-        }
-        if (path.startsWith('$loop.')) {
-            return this._resolvePath(context.$loop, path.replace('$loop.', ''));
-        }
-        if (path.startsWith('$node.')) {
-            const [, nodeName, ...rest] = path.split('.');
-            const nodeOutput = context.$node[nodeName];
-            return rest.length ? this._resolvePath(nodeOutput, rest.join('.')) : nodeOutput;
-        }
-
-        return expr;
+        // Use expression_utils for full namespace support
+        const result = evaluateExpression(expr, context);
+        return result.error ? expr : result.value;
     }
 
     /**

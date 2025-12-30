@@ -2,6 +2,8 @@
 
 import { registry } from "@web/core/registry";
 import { BaseNode, DataSocket } from '../core/node';
+import { TextInputControl, SelectControl } from '../core/control';
+import { evaluateExpression, hasExpressions } from '@workflow_pilot/utils/expression_utils';
 
 /**
  * LoopNode - Iterates over array items
@@ -28,6 +30,61 @@ export class LoopNode extends BaseNode {
         // Outputs - n8n style dual output
         this.addOutput('done', DataSocket, 'Done');
         this.addOutput('loop', DataSocket, 'Loop');
+
+        // Controls for collection expression
+        this.addControl('collection', new TextInputControl('collection', {
+            label: 'Collection Expression',
+            placeholder: '{{ $json.items }} or {{ $vars.orderLines }}',
+        }));
+
+        this.addControl('accumulate', new SelectControl('accumulate', {
+            label: 'Accumulate Results',
+            options: [
+                { value: 'false', label: 'No' },
+                { value: 'true', label: 'Yes' },
+            ],
+            defaultValue: 'false',
+        }));
+    }
+
+    /**
+     * Execute loop - resolve collection from expression
+     * The actual iteration is handled by the execution engine
+     * 
+     * @param {Object} inputData - Input from previous node
+     * @param {Object} context - Expression context with $vars, $json, etc.
+     * @returns {Object} { collection: Array, accumulate: boolean }
+     */
+    async execute(inputData = {}, context = null) {
+        const config = this.getConfig();
+        let collection = [];
+
+        // Resolve collection expression
+        const collectionExpr = config.collection || '';
+
+        if (collectionExpr && context) {
+            if (hasExpressions(collectionExpr)) {
+                const result = evaluateExpression(collectionExpr, context);
+                collection = result.error ? [] : result.value;
+            } else {
+                // Try to get from $json or inputData directly
+                collection = inputData.items || inputData.data || inputData;
+            }
+        } else if (inputData) {
+            // Default: use input data as collection
+            collection = Array.isArray(inputData) ? inputData : (inputData.items || inputData.data || []);
+        }
+
+        // Ensure collection is array
+        if (!Array.isArray(collection)) {
+            collection = collection ? [collection] : [];
+        }
+
+        return {
+            collection,
+            accumulate: config.accumulate === 'true',
+            total: collection.length,
+        };
     }
 }
 
@@ -55,6 +112,129 @@ export class IfNode extends BaseNode {
         // Outputs - conditional routing
         this.addOutput('true', DataSocket, 'True');
         this.addOutput('false', DataSocket, 'False');
+
+        // Controls for condition configuration
+        this.addControl('leftOperand', new TextInputControl('leftOperand', {
+            label: 'Left Operand',
+            placeholder: '{{ $vars.count }} or {{ $json.status }}',
+        }));
+
+        this.addControl('operator', new SelectControl('operator', {
+            label: 'Operator',
+            options: [
+                { value: 'eq', label: 'Equals (==)' },
+                { value: 'neq', label: 'Not Equals (!=)' },
+                { value: 'gt', label: 'Greater Than (>)' },
+                { value: 'gte', label: 'Greater or Equal (>=)' },
+                { value: 'lt', label: 'Less Than (<)' },
+                { value: 'lte', label: 'Less or Equal (<=)' },
+                { value: 'contains', label: 'Contains' },
+                { value: 'startsWith', label: 'Starts With' },
+                { value: 'endsWith', label: 'Ends With' },
+                { value: 'empty', label: 'Is Empty' },
+                { value: 'notEmpty', label: 'Is Not Empty' },
+                { value: 'truthy', label: 'Is Truthy' },
+                { value: 'falsy', label: 'Is Falsy' },
+            ],
+            defaultValue: 'eq',
+        }));
+
+        this.addControl('rightOperand', new TextInputControl('rightOperand', {
+            label: 'Right Operand',
+            placeholder: 'Value to compare against',
+        }));
+    }
+
+    /**
+     * Execute condition evaluation
+     * 
+     * @param {Object} inputData - Input from previous node
+     * @param {Object} context - Expression context with $vars, $json, etc.
+     * @returns {Object} { result: boolean, branch: 'true'|'false', left, right, operator }
+     */
+    async execute(inputData = {}, context = null) {
+        const config = this.getConfig();
+        const operator = config.operator || 'eq';
+
+        // Resolve left operand
+        let left = config.leftOperand || '';
+        if (context && hasExpressions(left)) {
+            const result = evaluateExpression(left, context);
+            left = result.error ? left : result.value;
+        }
+
+        // Resolve right operand
+        let right = config.rightOperand || '';
+        if (context && hasExpressions(right)) {
+            const result = evaluateExpression(right, context);
+            right = result.error ? right : result.value;
+        }
+
+        // Parse numbers if both look like numbers
+        if (!isNaN(left) && !isNaN(right) && left !== '' && right !== '') {
+            left = parseFloat(left);
+            right = parseFloat(right);
+        }
+
+        // Evaluate condition
+        let conditionResult = false;
+
+        switch (operator) {
+            case 'eq':
+                conditionResult = left == right;
+                break;
+            case 'neq':
+                conditionResult = left != right;
+                break;
+            case 'gt':
+                conditionResult = left > right;
+                break;
+            case 'gte':
+                conditionResult = left >= right;
+                break;
+            case 'lt':
+                conditionResult = left < right;
+                break;
+            case 'lte':
+                conditionResult = left <= right;
+                break;
+            case 'contains':
+                conditionResult = String(left).includes(String(right));
+                break;
+            case 'startsWith':
+                conditionResult = String(left).startsWith(String(right));
+                break;
+            case 'endsWith':
+                conditionResult = String(left).endsWith(String(right));
+                break;
+            case 'empty':
+                conditionResult = left === '' || left === null || left === undefined ||
+                    (Array.isArray(left) && left.length === 0) ||
+                    (typeof left === 'object' && Object.keys(left).length === 0);
+                break;
+            case 'notEmpty':
+                conditionResult = !(left === '' || left === null || left === undefined ||
+                    (Array.isArray(left) && left.length === 0) ||
+                    (typeof left === 'object' && Object.keys(left).length === 0));
+                break;
+            case 'truthy':
+                conditionResult = Boolean(left);
+                break;
+            case 'falsy':
+                conditionResult = !left;
+                break;
+            default:
+                conditionResult = false;
+        }
+
+        return {
+            result: conditionResult,
+            branch: conditionResult ? 'true' : 'false',
+            left,
+            right,
+            operator,
+            inputData,
+        };
     }
 }
 

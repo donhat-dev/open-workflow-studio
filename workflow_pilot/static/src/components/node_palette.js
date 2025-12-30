@@ -64,6 +64,7 @@ class NodePalette extends Component {
     get items() {
         return [
             { name: "http", title: ("HTTP Request"), icon: "🌐", className: "node-palette__item--http" },
+            { name: "variable", title: ("Set Variable"), icon: "📦", className: "node-palette__item--variable" },
             { name: "validation", title: ("Data Validation"), icon: "✓", className: "node-palette__item--validation" },
             { name: "mapping", title: ("Data Mapping"), icon: "⇄", className: "node-palette__item--mapping" },
             { name: "loop", title: ("Loop Over Items"), icon: "🔄", className: "node-palette__item--loop" },

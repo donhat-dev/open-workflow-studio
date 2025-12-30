@@ -3,7 +3,13 @@
 /**
  * Expression Utilities
  * 
- * n8n-style expression handling: {{ $json.field }}
+ * n8n-style expression handling: {{ $json.field }}, {{ $vars.name }}, {{ $loop.item }}
+ * 
+ * Supports all ExecutionContext namespaces:
+ * - $json: Previous node output (shortcut)
+ * - $node: Node outputs keyed by node ID
+ * - $vars: Mutable workflow variables
+ * - $loop: Current loop iteration context
  * 
  * @core - Pure JavaScript utilities, no Odoo dependencies.
  */
@@ -18,7 +24,14 @@ export const EXPRESSION_PATTERNS = {
     SINGLE_TEMPLATE: /\{\{(.+?)\}\}/,
     // Check if entire value is expression (n8n style: starts with =)
     EXPRESSION_PREFIX: /^=/,
+    // Match namespace prefix: $json, $vars, $loop, $node
+    NAMESPACE: /^\$(\w+)/,
 };
+
+/**
+ * Supported expression namespaces
+ */
+export const NAMESPACES = ['$json', '$vars', '$loop', '$node'];
 
 /**
  * Check if a value contains expression templates
@@ -102,39 +115,66 @@ export function wrapExpression(expression) {
 }
 
 /**
- * Parse an expression path into parts
- * @param {string} path - e.g., $json.items[0].name
- * @returns {string[]} - ['items', '0', 'name']
+ * Parse an expression path into namespace and parts
+ * @param {string} path - e.g., $json.items[0].name, $vars.result, $loop.item
+ * @returns {{ namespace: string, parts: string[] }}
  */
 export function parseExpressionPath(path) {
-    if (!path || typeof path !== 'string') return [];
+    if (!path || typeof path !== 'string') {
+        return { namespace: null, parts: [] };
+    }
 
-    // Remove $json prefix
-    let cleanPath = path.replace(/^\$json\.?/, '');
-    if (!cleanPath) return [];
+    // Extract namespace
+    const nsMatch = path.match(EXPRESSION_PATTERNS.NAMESPACE);
+    const namespace = nsMatch ? `$${nsMatch[1]}` : null;
+
+    // Remove namespace prefix for path parsing
+    let cleanPath = path;
+    if (namespace) {
+        cleanPath = path.slice(namespace.length);
+        // Remove leading dot if present
+        if (cleanPath.startsWith('.')) {
+            cleanPath = cleanPath.slice(1);
+        }
+    }
+
+    if (!cleanPath) {
+        return { namespace, parts: [] };
+    }
 
     const parts = [];
-    // Match: .property, ['property'], [0]
-    const regex = /\.?([a-zA-Z_][a-zA-Z0-9_]*)|(\[(\d+)\])|(\['([^']+)'\])/g;
+    // Match: property, .property, ['property'], [0], ["property"]
+    const regex = /\.?([a-zA-Z_][a-zA-Z0-9_]*)|(\[(\d+)\])|(\['([^']+)'\])|(\["([^"]+)"\])/g;
     let match;
 
     while ((match = regex.exec(cleanPath)) !== null) {
-        if (match[1]) parts.push(match[1]);       // .property
+        if (match[1]) parts.push(match[1]);       // property or .property
         else if (match[3]) parts.push(match[3]); // [0]
         else if (match[5]) parts.push(match[5]); // ['property']
+        else if (match[7]) parts.push(match[7]); // ["property"]
     }
 
-    return parts;
+    return { namespace, parts };
+}
+
+/**
+ * Legacy: Parse path and return just parts (for backward compatibility)
+ * @deprecated Use parseExpressionPath() instead
+ * @param {string} path 
+ * @returns {string[]}
+ */
+export function parsePathParts(path) {
+    return parseExpressionPath(path).parts;
 }
 
 /**
  * Get value from object using expression path
- * @param {Object} data - Source data object
- * @param {string} path - Expression path like $json.items[0].name
+ * @param {Object} data - Source data object (for single namespace)
+ * @param {string} path - Expression path like items[0].name (without namespace)
  * @returns {*} - Value at path or undefined
  */
 export function getValueByPath(data, path) {
-    const parts = parseExpressionPath(path);
+    const { parts } = parseExpressionPath(path);
 
     let current = data;
     for (const part of parts) {
@@ -146,12 +186,55 @@ export function getValueByPath(data, path) {
 }
 
 /**
+ * Resolve value from full expression context
+ * Supports all namespaces: $json, $vars, $loop, $node
+ * 
+ * @param {string} expression - Expression like $json.email, $vars.result, $loop.item
+ * @param {Object} context - Full context { $json, $vars, $loop, $node }
+ * @returns {*} - Resolved value or undefined
+ */
+export function resolveExpression(expression, context = {}) {
+    const { namespace, parts } = parseExpressionPath(expression);
+
+    // Determine source data based on namespace
+    let source;
+    switch (namespace) {
+        case '$json':
+            source = context.$json || {};
+            break;
+        case '$vars':
+            source = context.$vars || {};
+            break;
+        case '$loop':
+            source = context.$loop || {};
+            break;
+        case '$node':
+            source = context.$node || {};
+            break;
+        default:
+            // No namespace - try to resolve as-is (backward compat)
+            source = context.$json || {};
+    }
+
+    // Navigate to value
+    let current = source;
+    for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        current = current[part];
+    }
+
+    return current;
+}
+
+/**
  * Evaluate a simple expression against context
+ * Supports all namespaces: $json, $vars, $loop, $node
+ * 
  * Note: This is a basic evaluator for client-side preview.
  * Full evaluation happens on Python engine.
  * 
- * @param {string} expression - Expression like {{ $json.email }}
- * @param {Object} context - Context object { $json: {...} }
+ * @param {string} expression - Expression like {{ $json.email }} or {{ $vars.result }}
+ * @param {Object} context - Context object { $json, $vars, $loop, $node }
  * @returns {{ value: *, error: string|null }}
  */
 export function evaluateExpression(expression, context = {}) {
@@ -166,14 +249,14 @@ export function evaluateExpression(expression, context = {}) {
 
         // For single template, evaluate and return value
         if (templates.length === 1 && templates[0].full === expression) {
-            const value = getValueByPath(context.$json || {}, templates[0].expression);
+            const value = resolveExpression(templates[0].expression, context);
             return { value, error: null };
         }
 
         // Multiple templates or mixed content: replace each
         let result = expression;
         for (const tmpl of templates) {
-            const value = getValueByPath(context.$json || {}, tmpl.expression);
+            const value = resolveExpression(tmpl.expression, context);
             const stringValue = value === undefined ? '' : String(value);
             result = result.replace(tmpl.full, stringValue);
         }
