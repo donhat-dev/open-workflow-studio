@@ -11,15 +11,15 @@
 | Epic | Priority | Story Points | % Done | Status |
 |------|----------|--------------|--------|--------|
 | **E1: Core Infrastructure** | P0 | 34 | 95% | Near Complete |
-| **E9: Variable System** | P0 | 19 | 0% | 🆕 Sprint 1 |
+| **E9: Variable System** | P0 | 19 | 100% | ✅ Done |
 | **E2: Node Execution Engine** | P0 | 55 | 40% | In Progress |
 | **E3: Node Library** | P0 | 45 | 42% | In Progress |
-| **E4: UI/UX Editor** | P1 | 48 | 63% | In Progress |
-| **E5: Expression System** | P1 | 24 | 38% | In Progress |
+| **E4: UI/UX Editor** | P1 | 48 | 80% | In Progress |
+| **E5: Expression System** | P1 | 24 | 50% | In Progress |
 | **E6: Persistence & Storage** | P1 | 26 | 5% | Not Started |
 | **E7: Production Features** | P2 | 34 | 0% | Planned |
 | **E8: Integrations** | P2 | 40 | 0% | Planned |
-| **TOTAL** | | **325** | **36%** | |
+| **TOTAL** | | **325** | **45%** | |
 
 ---
 
@@ -29,27 +29,27 @@
 
 | ID | Feature | SP | Priority | % Done | Status | Notes |
 |----|---------|----:|----------|-------:|--------|-------|
-| **V1** | **Core Infrastructure** | **5** | P0 | **0%** | 🆕 Sprint 1 | |
-| V1.1 | ExecutionContext class | 2 | P0 | 0% | To Do | $vars, $node, $json, $loop |
-| V1.2 | Mocks directory structure | 1 | P0 | 0% | To Do | index.js + empty files |
-| V1.3 | MockExecutionEngine | 2 | P0 | 0% | To Do | Basic mock executor |
+| **V1** | **Core Infrastructure** | **5** | P0 | **100%** | ✅ Done | |
+| V1.1 | ExecutionContext class | 2 | P0 | 100% | ✅ | $vars, $node, $json, $loop |
+| V1.2 | Mocks directory structure | 1 | P0 | 100% | ✅ | index.js + empty files |
+| V1.3 | MockExecutionEngine | 2 | P0 | 100% | ✅ | Basic mock executor |
 | | | | | | | |
-| **V2** | **Variable Service** | **3** | P0 | **0%** | 🆕 Sprint 1 | |
-| V2.1 | VariableService | 2 | P0 | 0% | To Do | Odoo service wrapper |
-| V2.2 | Adapter integration | 1 | P0 | 0% | To Do | Expose to UI layer |
+| **V2** | **Variable Service** | **3** | P0 | **100%** | ✅ Done | |
+| V2.1 | VariableService | 2 | P0 | 100% | ✅ | Odoo service wrapper |
+| V2.2 | Adapter integration | 1 | P0 | 100% | ✅ | Expose to UI layer |
 | | | | | | | |
-| **V3** | **VariableNode** | **5** | P0 | **0%** | ❌ Sprint 2 | |
-| V3.1 | VariableNode definition | 3 | P0 | 0% | To Do | set/get/append/merge |
-| V3.2 | VariableNode config UI | 2 | P0 | 0% | To Do | Operation dropdown |
+| **V3** | **VariableNode** | **5** | P0 | **100%** | ✅ Done | |
+| V3.1 | VariableNode definition | 3 | P0 | 100% | ✅ | set/get/append/merge |
+| V3.2 | VariableNode config UI | 2 | P0 | 100% | ✅ | Operation dropdown |
 | | | | | | | |
-| **V4** | **Expression Enhancement** | **3** | P0 | **0%** | 🆕 Sprint 1 | |
-| V4.1 | $vars in expressions | 1 | P0 | 0% | To Do | Path resolution |
-| V4.2 | $loop in expressions | 1 | P0 | 0% | To Do | Iteration context |
-| V4.3 | Expression preview update | 1 | P1 | 0% | To Do | Show resolved values |
+| **V4** | **Expression Enhancement** | **3** | P0 | **100%** | ✅ Done | |
+| V4.1 | $vars in expressions | 1 | P0 | 100% | ✅ | Path resolution |
+| V4.2 | $loop in expressions | 1 | P0 | 100% | ✅ | Iteration context |
+| V4.3 | Expression preview update | 1 | P1 | 100% | ✅ | Show resolved values |
 | | | | | | | |
-| **V5** | **Loop Enhancement** | **3** | P1 | **0%** | ❌ Sprint 2 | |
-| V5.1 | LoopNode $loop context | 2 | P0 | 0% | To Do | Iteration state |
-| V5.2 | Accumulator option | 1 | P1 | 0% | To Do | Auto-collect results |
+| **V5** | **Loop Enhancement** | **3** | P1 | **100%** | ✅ Done | |
+| V5.1 | LoopNode $loop context | 2 | P0 | 100% | ✅ | Iteration state |
+| V5.2 | Accumulator option | 1 | P1 | 100% | ✅ | Auto-collect results |
 
 ---
 
@@ -181,8 +181,9 @@
 | E4.4.5 | Subgraph grouping | 5 | P3 | 0% | ❌ | Collapsible groups |
 | | | | | | | |
 | **E4.5** | **Expression Builder UX (Major)** | **10** | P0 | **20%** | 🔄 In Progress | High priority, schedule later |
-| E4.5.1 | Node-scoped drag/drop from Input panel | 3 | P0 | 0% | ❌ | Dragging from a node section must generate `$('n_1').json.key` |
-| E4.5.2 | Expressions in KeyValue controls (drop + preview) | 5 | P0 | 0% | ❌ | Enable drop into KeyValue "value" cells (Set/Mapping nodes) |
+| **E4.5** | **Expression Builder UX (Major)** | **10** | P0 | **100%** | ✅ Done | |
+| E4.5.1 | Node-scoped drag/drop from Input panel | 3 | P0 | 100% | ✅ | Dragging from a node section generates `$('n_1').json.key` |
+| E4.5.2 | Expressions in KeyValue controls (drop + preview) | 5 | P0 | 100% | ✅ | Enable drop into KeyValue "value" cells + preview |
 | E4.5.3 | Expression preview supports full context ($vars/$node/$loop) | 2 | P0 | 100% | ✅ Sprint 1 | Pass full expression context to ExpressionInput |
 
 ---
@@ -210,7 +211,8 @@
 | E5.3.4 | Backend evaluation | 1 | P2 | 0% | ❌ | Python engine integration |
 | | | | | | | |
 | **E5.4** | **Node Selector Syntax (n8n-style)** | **3** | P0 | **0%** | ❌ Planned | Option B: `$('n_1').json.key` |
-| E5.4.1 | Support `$('nodeId').json.path` selector | 3 | P0 | 0% | ❌ | Parser/rewriter + evaluation parity (frontend first) |
+| **E5.4** | **Node Selector Syntax (n8n-style)** | **3** | P0 | **100%** | ✅ Done | |
+| E5.4.1 | Support `$('nodeId').json.path` selector | 3 | P0 | 100% | ✅ | Parser/rewriter + evaluation parity (frontend first) |
 
 ---
 

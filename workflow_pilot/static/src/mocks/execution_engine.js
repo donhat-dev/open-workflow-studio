@@ -33,6 +33,15 @@ export class MockExecutionEngine {
     }
 
     /**
+     * Inject an existing ExecutionContext.
+     * Useful when another service owns the context lifecycle (e.g., workflowVariable).
+     * @param {ExecutionContext} context
+     */
+    setContext(context) {
+        this.context = context;
+    }
+
+    /**
      * Register a node executor
      * @param {string} nodeType - Node type identifier
      * @param {Function} executor - async (config, context) => output
@@ -59,7 +68,8 @@ export class MockExecutionEngine {
             throw new Error('Execution already in progress');
         }
 
-        this.context = new ExecutionContext();
+        // Allow caller to inject a real ExecutionContext (e.g., from workflowVariable service)
+        this.context = options.context || new ExecutionContext();
         this._isExecuting = true;
 
         // Initialize variables if provided
@@ -74,7 +84,7 @@ export class MockExecutionEngine {
             const targetIndex = executionOrder.indexOf(targetNodeId);
 
             if (targetIndex === -1) {
-                throw new Error(`Target node not found: ${targetNodeId}`);
+                    throw new Error(`Target node not found: ${targetNodeId}`);
             }
 
             for (let i = 0; i <= targetIndex; i++) {
@@ -117,19 +127,45 @@ export class MockExecutionEngine {
      * @returns {Promise<*>} Node output
      */
     async _executeNode(node, options = {}) {
-        const executor = this._nodeExecutors.get(node.type);
         const expressionContext = this.context.toExpressionContext();
 
-        if (!executor) {
-            console.warn(`[MockEngine] No executor for type: ${node.type}`);
-            return { _mock: true, _type: node.type, _message: 'No executor registered' };
-        }
-
-        // Resolve expressions in config
+        // Resolve expressions in config before executing
         const resolvedConfig = this._resolveConfigExpressions(
             node.config || {},
             expressionContext
         );
+
+        // Preferred: per-node runner (lets a service own how nodes execute)
+        if (typeof options.nodeRunner === 'function') {
+            try {
+                const result = await options.nodeRunner(node, resolvedConfig, expressionContext, this.context);
+                // Normalize: allow runner to return either NodeOutput-like or raw json
+                if (result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'json')) {
+                    return result;
+                }
+                return {
+                    json: result,
+                    meta: {
+                        executedAt: new Date().toISOString(),
+                    },
+                };
+            } catch (error) {
+                return {
+                    json: null,
+                    error: error?.message || String(error),
+                    meta: {
+                        executedAt: new Date().toISOString(),
+                    },
+                };
+            }
+        }
+
+        // Legacy: type-based executor registry
+        const executor = this._nodeExecutors.get(node.type);
+        if (!executor) {
+            console.warn(`[MockEngine] No executor for type: ${node.type}`);
+            return { _mock: true, _type: node.type, _message: 'No executor registered' };
+        }
 
         try {
             const startTime = Date.now();

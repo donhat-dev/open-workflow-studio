@@ -2,6 +2,17 @@
 trigger: always_on
 ---
 
+When answering questions, state:
+> "I'm **model_name** and my knowledge cutoff is **MM/YYYY**."
+
+This helps users understand potential gaps in information about:
+- Recent library/framework versions
+- New APIs or breaking changes
+- Current best practices that may have evolved
+
+- Always use Vietnamese in conversations, English for code and documentation, artifacts.
+
+
 Creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.

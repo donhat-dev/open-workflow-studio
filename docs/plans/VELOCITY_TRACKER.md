@@ -9,9 +9,9 @@
 | Metric | Value |
 |--------|------:|
 | **Total Backlog** | 325 SP |
-| **Completed** | 132 SP |
-| **Remaining** | 193 SP |
-| **Progress** | 41% |
+| **Completed** | 146 SP |
+| **Remaining** | 179 SP |
+| **Progress** | 45% |
 | **Target Velocity** | 15-20 SP/sprint |
 | **Sprints to Complete** | 10-13 |
 
@@ -54,7 +54,7 @@ Legend: ████ Completed   ░░░░ Committed (not done)
 |--------|----------:|----------:|---------:|-------|
 | Pre-Sprint | - | 110 | - | Baseline |
 | Sprint 1 | 22 | 22 | 22 | ✅ Above target |
-| Sprint 2 | - | - | - | Planning |
+| Sprint 2 | 14 | 14 | 14 | ⚠️ Slight below target |
 | Sprint 3 | - | - | - | Planned |
 
 ### Velocity Trend
@@ -74,7 +74,7 @@ Remaining SP
 
 200 │●
     │ ╲
-180 │  ╲                                               ← Current: 180 SP
+180 │  ╲                                               ← Current: 179 SP
     │   ╲
 160 │    ╲ ● ● ● ● ● ● ● ● ● ● ● ● ● ●
     │         ╲                       ╲
@@ -174,7 +174,7 @@ E8 ░░░░░░░░░░░░░░░░░░░░░░░░░�
 - **At 20 SP/sprint**: 2-3 sprints
 
 ### Full Project Completion
-- **Remaining**: 180 SP
+- **Remaining**: 179 SP
 - **At 15 SP/sprint**: 12 sprints
 - **At 20 SP/sprint**: 9 sprints
 

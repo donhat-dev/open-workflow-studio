@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState } from "@odoo/owl";
+import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { hasExpressions, wrapExpression, evaluateExpression } from "@workflow_pilot/utils/expression_utils";
 
 /**
@@ -30,6 +30,22 @@ export class ExpressionInput extends Component {
             isDragOver: false,
             // Local value for reactivity - syncs with props
             localValue: this.props.value || '',
+        });
+
+        // Option 2: sync localValue when parent updates props (avoid stale state if component is reused)
+        onWillUpdateProps((nextProps) => {
+            const nextValue = nextProps?.value ?? '';
+
+            // Don't override while user is actively editing.
+            if (this.state.isFocused) return;
+
+            if (nextValue !== this.state.localValue) {
+                this.state.localValue = nextValue;
+                // Keep expression-mode detection consistent with new value
+                if (hasExpressions(nextValue)) {
+                    this.state.isExpressionMode = true;
+                }
+            }
         });
     }
 

@@ -232,6 +232,23 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
+     * S2.3: Get workflow variables ($vars) for display in left panel
+     * This allows users to see and drag $vars expressions
+     */
+    get workflowVariables() {
+        const expressionContext = this.adapterService.getExpressionContext?.();
+        return expressionContext?.$vars || {};
+    }
+
+    /**
+     * S2.3: Check if there are any workflow variables to display
+     */
+    get hasWorkflowVariables() {
+        const vars = this.workflowVariables;
+        return vars && Object.keys(vars).length > 0;
+    }
+
+    /**
      * Get workflow context from props
      * @private
      */

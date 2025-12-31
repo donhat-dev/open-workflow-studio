@@ -44,6 +44,19 @@
 									</div>
 								</t>
 							</t>
+							<!-- S2.3: Workflow Variables ($vars) section -->
+							<t t-if="hasWorkflowVariables">
+								<div class="ancestor-node-section vars-section" t-att-class="{ collapsed: isSectionCollapsed('$vars') }">
+									<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('$vars')">
+										<i t-att-class="'fa ' + (isSectionCollapsed('$vars') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
+										<i class="fa fa-code"/>
+										<span>Workflow Variables ($vars)</span>
+									</div>
+									<div class="ancestor-node-data" t-if="!isSectionCollapsed('$vars')">
+										<JsonTreeNode data="workflowVariables" path="['$vars']" draggable="true"/>
+									</div>
+								</div>
+							</t>
 							<!-- Fallback: show inputData if no ancestor context -->
 							<t t-elif="inputData">
 								<div class="input-data-tree">

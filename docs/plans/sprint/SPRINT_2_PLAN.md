@@ -1,8 +1,9 @@
 # SPRINT 2 PLANNING
 > **Focus**: Expression Builder UX + n8n-style Node Selector + Executor Consolidation
 > **Duration**: 2 Weeks
-> **Status**: 📋 PLANNING
+> **Status**: ✅ COMPLETE
 > **Created**: 2025-12-30
+> **Updated**: 2025-12-30 - Completed E5.4.1, E4.5.1, E4.5.2, S2.1
 
 ---
 
@@ -18,22 +19,22 @@
 
 | Task ID | Description | SP | Priority | Assignee | Status |
 |---------|-------------|---:|----------|----------|--------|
-| **E5.4.1** | Support `$('nodeId').json.path` selector | 3 | P0 | - | ❌ To Do |
+| **E5.4.1** | Support `$('nodeId').json.path` selector | 3 | P0 | - | ✅ Done |
 | | **Subtotal Expression Syntax** | **3** | | | |
 
 ### Expression Builder UX
 
 | Task ID | Description | SP | Priority | Assignee | Status |
 |---------|-------------|---:|----------|----------|--------|
-| **E4.5.1** | Node-scoped drag/drop from Input panel | 3 | P0 | - | ❌ To Do |
-| **E4.5.2** | Expressions in KeyValue controls (drop + preview) | 5 | P0 | - | ❌ To Do |
+| **E4.5.1** | Node-scoped drag/drop from Input panel | 3 | P0 | - | ✅ Done |
+| **E4.5.2** | Expressions in KeyValue controls (drop + preview) | 5 | P0 | - | ✅ Done |
 | | **Subtotal Expression UX** | **8** | | | |
 
 ### Executor Consolidation (Tech Debt)
 
 | Task ID | Description | SP | Priority | Assignee | Status |
 |---------|-------------|---:|----------|----------|--------|
-| **S2.1** | Refactor workflowExecutorService → delegate to MockExecutionEngine | 3 | P1 | - | ❌ To Do |
+| **S2.1** | Refactor workflowExecutorService → delegate to MockExecutionEngine | 3 | P1 | - | ✅ Done |
 | | **Subtotal Consolidation** | **3** | | | |
 
 ### Optional / Stretch Goals
@@ -54,11 +55,11 @@
 - 🔧 Single execution engine (MockExecutionEngine as source of truth)
 
 ## SUCCESS CRITERIA
-- [ ] `$('n_1').json.body.data` resolves correctly in preview and runtime
-- [ ] Drag from ancestor node section produces `$('n_1').json.key` expression
-- [ ] KeyValue "value" cells accept expression drop and show preview
-- [ ] workflowExecutorService delegates to MockExecutionEngine
-- [ ] No regression in existing Variable/If/Loop node execution
+- [x] `$('n_1').json.body.data` resolves correctly in preview and runtime
+- [x] Drag from ancestor node section produces `$('n_1').json.key` expression
+- [x] KeyValue "value" cells accept expression drop and show preview
+- [x] workflowExecutorService delegates to MockExecutionEngine
+- [x] No regression in existing Variable/If/Loop node execution
 
 ## DEPENDENCIES
 - Sprint 1 ✅ (Variable System POC complete)

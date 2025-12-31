@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState } from "@odoo/owl";
+import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "./expression/ExpressionInput";
 
 /**
@@ -36,12 +36,63 @@ export class ControlRenderer extends Component {
 
     setup() {
         // For keyvalue controls, maintain reactive state
-        this.state = useState({
-            // Copy pairs from control to reactive state
-            pairs: this.props.control?.type === 'keyvalue'
-                ? [...(this.props.control.value || [])]
-                : [],
+        this._nextPairId = 1;
+
+        const initialPairs = this.props.control?.type === 'keyvalue'
+            ? this._normalizePairs(this.props.control.value || [])
+            : [];
+
+        this.state = useState({ pairs: initialPairs });
+
+        // Option 2: sync internal state when props update (avoid stale state if panel/control is reused)
+        onWillUpdateProps((nextProps) => {
+            const nextControl = nextProps?.control;
+            const prevControl = this.props?.control;
+
+            const nextType = nextControl?.type;
+            const prevType = prevControl?.type;
+
+            // Only keyvalue uses internal state
+            if (nextType !== 'keyvalue') {
+                if (prevType === 'keyvalue' && this.state.pairs.length) {
+                    this.state.pairs = [];
+                }
+                return;
+            }
+
+            const nextPairsRaw = nextControl?.value || [];
+            const nextPairs = this._normalizePairs(nextPairsRaw);
+
+            // Avoid clobbering local edits when parent re-renders with same data.
+            const nextSig = this._pairsSignature(nextPairs);
+            const currentSig = this._pairsSignature(this.state.pairs);
+
+            if (nextSig !== currentSig) {
+                this.state.pairs = nextPairs;
+            }
         });
+    }
+
+    _normalizePairs(pairs) {
+        const safePairs = Array.isArray(pairs) ? pairs : [];
+        const maxId = safePairs.reduce((max, p) => Math.max(max, p?.id || 0), 0);
+        this._nextPairId = Math.max(1, maxId + 1);
+
+        return safePairs.map((p) => {
+            const id = p?.id || this._nextPairId++;
+            return {
+                id,
+                key: p?.key || '',
+                value: p?.value || '',
+            };
+        });
+    }
+
+    _pairsSignature(pairs) {
+        const safe = Array.isArray(pairs) ? pairs : [];
+        return safe
+            .map((p) => `${p?.id || ''}:${p?.key || ''}=${p?.value || ''}`)
+            .join('|');
     }
 
     get controlType() {
@@ -130,16 +181,31 @@ export class ControlRenderer extends Component {
         this.props.onChange(control.key, [...this.state.pairs]);
     }
 
+    /**
+     * Handle ExpressionInput change for keyvalue value cell
+     * @param {number} index
+     * @param {string} value
+     */
+    onValueExpressionChange(index, value) {
+        const control = this.props.control;
+        if (!this.state.pairs[index]) {
+            throw new Error(`[ControlRenderer] Pair at index ${index} not found for value expression change`);
+        }
+        this.state.pairs[index].value = value;
+        this.props.onChange(control.key, [...this.state.pairs]);
+    }
+
     addPair() {
         const control = this.props.control;
         // Add new pair to reactive state
-        this.state.pairs.push({ key: '', value: '' });
+        this.state.pairs.push({ id: this._nextPairId++, key: '', value: '' });
         // Notify parent with updated pairs
         this.props.onChange(control.key, [...this.state.pairs]);
     }
 
     removePair(index) {
         const control = this.props.control;
+        if (this.state.pairs.length <= 1) return;
         // Remove pair from reactive state
         this.state.pairs.splice(index, 1);
         // Notify parent with updated pairs

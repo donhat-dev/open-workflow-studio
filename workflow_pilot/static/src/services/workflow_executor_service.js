@@ -13,6 +13,7 @@
 
 import { registry } from "@web/core/registry";
 import { WorkflowGraph } from "../utils/graph_utils";
+import { mockExecutionEngine } from "../mocks/execution_engine";
 
 export const workflowExecutorService = {
     // NOTE: workflowVariable provides a real ExecutionContext instance.
@@ -168,45 +169,71 @@ export const workflowExecutorService = {
                 // This ensures Variable Inspector reflects the latest execution.
                 // (Future: support incremental runs / persistence keyed by workflowId.)
                 const execContext = workflowVariable.createContext(workflow?.id || null);
+                mockExecutionEngine.setContext(execContext);
+
+                // Preserve existing execution ordering semantics (WorkflowGraph sorting)
+                const executionOrder = this.getExecutionOrder(workflow);
+
+                // Create a workflow view that ensures each node has config
+                // Primary: adapterService (Core layer)
+                // Fallback: nodeData.config (legacy)
+                const workflowWithConfig = {
+                    ...workflow,
+                    nodes: (workflow.nodes || []).map((n) => ({
+                        ...n,
+                        config: workflowAdapter.getNodeConfig(n.id) || n.config || {},
+                    })),
+                };
 
                 try {
-                    const order = this.getExecutionOrder(workflow);
-                    const targetIndex = order.indexOf(targetNodeId);
+                    await mockExecutionEngine.executeUntil(workflowWithConfig, targetNodeId, {
+                        context: execContext,
+                        executionOrder,
+                        nodeRunner: async (node, resolvedConfig, _exprCtx, context) => {
+                            const nodeId = node.id;
+                            const startTime = Date.now();
 
-                    if (targetIndex === -1) {
-                        throw new Error(`Node ${targetNodeId} not found in workflow`);
-                    }
+                            try {
+                                const NodeClass = workflowNode.getNodeClass(node.type);
+                                if (!NodeClass) {
+                                    return {
+                                        json: null,
+                                        error: `Unknown node type: ${node.type}`,
+                                        meta: {},
+                                    };
+                                }
 
-                    // Execute nodes up to and including target
-                    for (let i = 0; i <= targetIndex; i++) {
-                        const nodeId = order[i];
+                                const instance = new NodeClass();
+                                instance.setConfig(resolvedConfig || {});
 
-                        // Skip if already executed
-                        if (nodeOutputs.has(nodeId)) {
-                            continue;
-                        }
+                                const inputData = context?.$json || {};
+                                const output = await instance.execute(inputData, context);
 
-                        // Execute node
-                        const result = await this._executeNode(workflow, nodeId, execContext);
-
-                        // Store result
-                        nodeOutputs.set(nodeId, result);
-
-                        // Keep ExecutionContext in sync for:
-                        // - $json (previous node output)
-                        // - $node (node outputs map)
-                        // - VariableNode mutations ($vars)
-                        const node = workflow.nodes.find(n => n.id === nodeId);
-                        workflowVariable.setNodeOutput(nodeId, {
-                            title: node?.title || nodeId,
-                            json: result.json,
-                            meta: result.meta || {},
-                            error: result.error || null,
-                        });
-
-                        // Callback
-                        onNodeComplete?.(nodeId, result);
-                    }
+                                return {
+                                    json: output,
+                                    error: null,
+                                    meta: {
+                                        duration: Date.now() - startTime,
+                                        executedAt: new Date().toISOString(),
+                                    },
+                                };
+                            } catch (error) {
+                                console.error(`[WorkflowExecutor] Node ${nodeId} error:`, error);
+                                return {
+                                    json: null,
+                                    error: error?.message || String(error),
+                                    meta: {
+                                        duration: Date.now() - startTime,
+                                        executedAt: new Date().toISOString(),
+                                    },
+                                };
+                            }
+                        },
+                        onNodeComplete: (nodeId, result) => {
+                            nodeOutputs.set(nodeId, result);
+                            onNodeComplete?.(nodeId, result);
+                        },
+                    });
 
                     return nodeOutputs;
                 } finally {

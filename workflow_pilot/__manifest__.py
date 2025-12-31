@@ -21,6 +21,8 @@
             ('include', 'workflow_pilot.assets_libs'),
             # Registries (define categories and lib refs)
             'workflow_pilot/static/src/registries/**/*',
+            # Mocks / Frontend execution engine (used by services)
+            'workflow_pilot/static/src/mocks/**/*',
             # Services (depend on registries)
             'workflow_pilot/static/src/services/**/*',
             # Core classes (pure JS, minimal deps)
