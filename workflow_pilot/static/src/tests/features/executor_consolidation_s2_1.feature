@@ -1,9 +1,9 @@
-# S2.1 - Executor consolidation: workflowExecutorService delegates to MockExecutionEngine
+# S2.1 - Executor consolidation: workflowExecutorService delegates to StackExecutor
 # Gherkin scenarios for future Playwright / integration-style tests
 
 Feature: workflowExecutor delegates to engine
   As a developer
-  I want workflowExecutorService to delegate execution to MockExecutionEngine
+  I want workflowExecutorService to delegate execution to StackExecutor
   So that execution behavior is centralized and consistent
 
   Background:

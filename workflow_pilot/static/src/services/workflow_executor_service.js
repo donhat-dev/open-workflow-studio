@@ -3,25 +3,25 @@
 /**
  * Workflow Executor Service
  *
- * - Uses workflowAdapter service for config resolution
- * - NO direct _node access
- * - Clean separation between execution and Core layer
+ * Uses Stack-Based Execution (like n8n) for proper handling of:
+ * - Cyclic graphs (loops with back-edges)
+ * - Branch routing (IF/Switch nodes)
+ * - Multi-output nodes
  *
  * Config Resolution Flow:
  *   executor._executeNode() → adapterService.getNodeConfig(nodeId) → Core layer
  */
 
 import { registry } from "@web/core/registry";
-import { WorkflowGraph } from "../utils/graph_utils";
-import { mockExecutionEngine } from "../mocks/execution_engine";
+import { StackExecutor } from "../mocks/stack_executor";
 
 export const workflowExecutorService = {
-    // NOTE: workflowVariable provides a real ExecutionContext instance.
-    // This is required for VariableNode and expression resolution to work.
-    // FIXME: In Sprint 2, consolidate executor logic by delegating to MockExecutionEngine.
     dependencies: ["workflowNode", "workflowAdapter", "workflowVariable"],
 
     start(env, { workflowNode, workflowAdapter, workflowVariable }) {
+        // Create StackExecutor instance
+        const executor = new StackExecutor();
+
         // Store outputs per node: nodeId → { json, meta, error }
         let nodeOutputs = new Map();
 
@@ -34,14 +34,19 @@ export const workflowExecutorService = {
              * Get stored output for a node
              */
             getNodeOutput(nodeId) {
-                return nodeOutputs.get(nodeId) || null;
+                // First check our local map
+                const localResult = nodeOutputs.get(nodeId);
+                if (localResult) return localResult;
+
+                // Then check executor's state
+                return executor.getNodeOutput(nodeId) || null;
             },
 
             /**
              * Check if a node has been executed
              */
             hasExecuted(nodeId) {
-                return nodeOutputs.has(nodeId);
+                return nodeOutputs.has(nodeId) || !!executor.getNodeOutput(nodeId);
             },
 
             /**
@@ -49,67 +54,52 @@ export const workflowExecutorService = {
              */
             clearResults() {
                 nodeOutputs.clear();
-            },
-
-            /**
-             * Get execution order using topological sort
-             * @param {Object} workflow - { nodes: [], connections: [] }
-             * @returns {Array<string>} Ordered array of node IDs
-             */
-            getExecutionOrder(workflow) {
-                const wg = WorkflowGraph.fromNodes(
-                    workflow.nodes,
-                    workflow.connections
-                );
-
-                // Use Kahn's algorithm for topological sort
-                const graph = wg.graph;
-                const inDegree = {};
-                const order = [];
-                const queue = [];
-
-                // Initialize in-degrees
-                for (const nodeId of graph.nodes()) {
-                    const preds = graph.predecessors(nodeId) || [];
-                    inDegree[nodeId] = preds.length;
-                    if (preds.length === 0) {
-                        queue.push(nodeId);
-                    }
-                }
-
-                // Process queue
-                while (queue.length > 0) {
-                    const nodeId = queue.shift();
-                    order.push(nodeId);
-
-                    const successors = graph.successors(nodeId) || [];
-                    for (const succ of successors) {
-                        inDegree[succ]--;
-                        if (inDegree[succ] === 0) {
-                            queue.push(succ);
-                        }
-                    }
-                }
-
-                return order;
+                executor.reset();
             },
 
             /**
              * Get all ancestor nodes (nodes that should execute before given node)
+             * Uses BFS traversal on reverse graph
+             *
              * @param {Object} workflow - { nodes: [], connections: [] }
              * @param {string} nodeId - Target node ID
-             * @returns {Array<string>} Ancestor node IDs in execution order
+             * @returns {Array<string>} Ancestor node IDs
              */
             getAncestors(workflow, nodeId) {
-                const order = this.getExecutionOrder(workflow);
-                const targetIndex = order.indexOf(nodeId);
-                if (targetIndex <= 0) return [];
-                return order.slice(0, targetIndex);
+                const ancestors = [];
+                const visited = new Set();
+                const queue = [nodeId];
+
+                // Build reverse adjacency list
+                const reverseAdj = {};
+                for (const conn of workflow.connections) {
+                    if (!reverseAdj[conn.target]) {
+                        reverseAdj[conn.target] = [];
+                    }
+                    reverseAdj[conn.target].push(conn.source);
+                }
+
+                // BFS backwards
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    const parents = reverseAdj[current] || [];
+
+                    for (const parent of parents) {
+                        if (!visited.has(parent)) {
+                            visited.add(parent);
+                            ancestors.push(parent);
+                            queue.push(parent);
+                        }
+                    }
+                }
+
+                return ancestors;
             },
 
             /**
              * Build aggregated context for a node
              * Includes output from all ancestor nodes
+             *
              * @param {Object} workflow - { nodes: [], connections: [] }
              * @param {string} nodeId - Target node ID
              * @returns {Object} { $node: {NodeName: {json}}, $json: {...} }
@@ -124,23 +114,25 @@ export const workflowExecutorService = {
 
                 for (const ancestorId of ancestors) {
                     const node = workflow.nodes.find(n => n.id === ancestorId);
-                    const output = nodeOutputs.get(ancestorId);
+                    const output = nodeOutputs.get(ancestorId) || executor.getNodeOutput(ancestorId);
 
                     if (node && output) {
-                        const nodeId = node.id;
-                        const nodeTitle = node.title;
-                        context.$node[nodeId] = {
-                            title: nodeTitle,
+                        context.$node[ancestorId] = {
+                            title: node.title,
                             json: output.json || output,
                             meta: output.meta || {},
                         };
                     }
                 }
 
-                // $json = immediate previous node output
-                if (ancestors.length > 0) {
-                    const prevId = ancestors[ancestors.length - 1];
-                    const prevOutput = nodeOutputs.get(prevId);
+                // $json = immediate previous node output (last connected parent)
+                const immediateParents = workflow.connections
+                    .filter(c => c.target === nodeId)
+                    .map(c => c.source);
+
+                if (immediateParents.length > 0) {
+                    const prevId = immediateParents[0];
+                    const prevOutput = nodeOutputs.get(prevId) || executor.getNodeOutput(prevId);
                     context.$json = prevOutput?.json || prevOutput || {};
                 }
 
@@ -149,6 +141,8 @@ export const workflowExecutorService = {
 
             /**
              * Execute workflow up to (and including) target node
+             * Uses Stack-Based execution for proper cycle and branch handling.
+             *
              * @param {Object} workflow - { nodes: [], connections: [] }
              * @param {string} targetNodeId - Stop after this node
              * @param {Function} onNodeComplete - Callback(nodeId, result)
@@ -162,21 +156,14 @@ export const workflowExecutorService = {
                 isExecuting = true;
                 currentWorkflow = workflow;
 
-                // Clear previous results to ensure fresh execution
+                // Clear previous results
                 nodeOutputs.clear();
+                executor.reset();
 
-                // Sprint 1 POC: reset variable context for a clean run.
-                // This ensures Variable Inspector reflects the latest execution.
-                // (Future: support incremental runs / persistence keyed by workflowId.)
+                // Create fresh execution context
                 const execContext = workflowVariable.createContext(workflow?.id || null);
-                mockExecutionEngine.setContext(execContext);
 
-                // Preserve existing execution ordering semantics (WorkflowGraph sorting)
-                const executionOrder = this.getExecutionOrder(workflow);
-
-                // Create a workflow view that ensures each node has config
-                // Primary: adapterService (Core layer)
-                // Fallback: nodeData.config (legacy)
+                // Create workflow view with resolved config
                 const workflowWithConfig = {
                     ...workflow,
                     nodes: (workflow.nodes || []).map((n) => ({
@@ -186,10 +173,12 @@ export const workflowExecutorService = {
                 };
 
                 try {
-                    await mockExecutionEngine.executeUntil(workflowWithConfig, targetNodeId, {
+                    // Use StackExecutor for proper cycle and branch handling
+                    await executor.executeUntil(workflowWithConfig, targetNodeId, {
                         context: execContext,
-                        executionOrder,
-                        nodeRunner: async (node, resolvedConfig, _exprCtx, context) => {
+
+                        // Custom node runner that uses workflowNode service
+                        nodeRunner: async (node, resolvedConfig, exprCtx, context) => {
                             const nodeId = node.id;
                             const startTime = Date.now();
 
@@ -197,6 +186,7 @@ export const workflowExecutorService = {
                                 const NodeClass = workflowNode.getNodeClass(node.type);
                                 if (!NodeClass) {
                                     return {
+                                        outputs: [],
                                         json: null,
                                         error: `Unknown node type: ${node.type}`,
                                         meta: {},
@@ -206,20 +196,28 @@ export const workflowExecutorService = {
                                 const instance = new NodeClass();
                                 instance.setConfig(resolvedConfig || {});
 
+                                // Get input data from context
                                 const inputData = context?.$json || {};
-                                const output = await instance.execute(inputData, context);
 
+                                // Execute node - new signature supports executionContext
+                                const output = await instance.execute(inputData, exprCtx, context);
+
+                                // Normalize output to stack-compatible format
                                 return {
-                                    json: output,
+                                    outputs: output.outputs || [[output.json || output]],
+                                    json: output.json || output,
+                                    branch: output.branch,
                                     error: null,
                                     meta: {
                                         duration: Date.now() - startTime,
                                         executedAt: new Date().toISOString(),
+                                        ...output.meta,
                                     },
                                 };
                             } catch (error) {
                                 console.error(`[WorkflowExecutor] Node ${nodeId} error:`, error);
                                 return {
+                                    outputs: [],
                                     json: null,
                                     error: error?.message || String(error),
                                     meta: {
@@ -229,9 +227,19 @@ export const workflowExecutorService = {
                                 };
                             }
                         },
+
+                        onNodeStart: (nodeId, node) => {
+                            console.log(`[WorkflowExecutor] Starting: ${nodeId} (${node.type})`);
+                        },
+
                         onNodeComplete: (nodeId, result) => {
                             nodeOutputs.set(nodeId, result);
+                            console.log(`[WorkflowExecutor] Completed: ${nodeId}`, result);
                             onNodeComplete?.(nodeId, result);
+                        },
+
+                        onError: (error) => {
+                            console.error(`[WorkflowExecutor] Execution error:`, error);
                         },
                     });
 
@@ -242,81 +250,10 @@ export const workflowExecutorService = {
             },
 
             /**
-             * Execute a single node
-             * @private
-             *
-             * Phase 3 Config Resolution:
-             * - Uses workflowAdapter.getNodeConfig() as primary source
-             * - Falls back to nodeData.config for legacy compatibility
-             * - NO direct _node access
-             */
-            async _executeNode(workflow, nodeId, context) {
-                const nodeData = workflow.nodes.find(n => n.id === nodeId);
-                if (!nodeData) {
-                    return { json: null, error: `Node ${nodeId} not found`, meta: {} };
-                }
-
-                const startTime = Date.now();
-
-                try {
-                    // Get node class from service
-                    const NodeClass = workflowNode.getNodeClass(nodeData.type);
-                    if (!NodeClass) {
-                        return {
-                            json: null,
-                            error: `Unknown node type: ${nodeData.type}`,
-                            meta: {}
-                        };
-                    }
-
-                    // Create instance and configure
-                    const instance = new NodeClass();
-
-                    // Phase 3: Config resolution via adapterService
-                    // Primary: workflowAdapter.getNodeConfig() (reads from Core layer)
-                    // Fallback: nodeData.config (for legacy/test scenarios)
-                    const config = workflowAdapter.getNodeConfig(nodeId) || {};
-                    const hasConfig = Object.keys(config).length > 0;
-
-                    if (hasConfig) {
-                        instance.setConfig(config);
-                        console.log(`[Executor] Node ${nodeId} config from adapter:`, config);
-                    } else if (nodeData.config) {
-                        // Fallback for legacy format
-                        instance.setConfig(nodeData.config);
-                        console.log(`[Executor] Node ${nodeId} config from nodeData (legacy):`, nodeData.config);
-                    }
-
-                    // Execute with context
-                    const inputData = context.$json || {};
-                    const output = await instance.execute(inputData, context);
-
-                    return {
-                        json: output,
-                        error: null,
-                        meta: {
-                            duration: Date.now() - startTime,
-                            executedAt: new Date().toISOString(),
-                        }
-                    };
-                } catch (error) {
-                    console.error(`[WorkflowExecutor] Node ${nodeId} error:`, error);
-                    return {
-                        json: null,
-                        error: error.message || String(error),
-                        meta: {
-                            duration: Date.now() - startTime,
-                            executedAt: new Date().toISOString(),
-                        }
-                    };
-                }
-            },
-
-            /**
              * Get execution state
              */
             isExecuting() {
-                return isExecuting;
+                return isExecuting || executor.isExecuting();
             },
 
             /**
@@ -324,6 +261,13 @@ export const workflowExecutorService = {
              */
             getAllResults() {
                 return new Map(nodeOutputs);
+            },
+
+            /**
+             * Get the underlying executor (for advanced usage)
+             */
+            getExecutor() {
+                return executor;
             },
         };
     },

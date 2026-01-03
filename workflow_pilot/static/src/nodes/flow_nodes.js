@@ -49,13 +49,14 @@ export class LoopNode extends BaseNode {
 
     /**
      * Execute loop - resolve collection from expression
-     * The actual iteration is handled by the execution engine
-     * 
+     * Returns n8n-compatible outputs[][] format for stack-based execution.
+     *
      * @param {Object} inputData - Input from previous node
      * @param {Object} context - Expression context with $vars, $json, etc.
-     * @returns {Object} { collection: Array, accumulate: boolean }
+     * @param {Object} executionContext - Full ExecutionContext (optional, for nodeContext)
+     * @returns {Object} { outputs: [][], json, collection, accumulate, total, meta }
      */
-    async execute(inputData = {}, context = null) {
+    async execute(inputData = {}, context = null, executionContext = null) {
         const config = this.getConfig();
         let collection = [];
 
@@ -80,10 +81,20 @@ export class LoopNode extends BaseNode {
             collection = collection ? [collection] : [];
         }
 
+        // For stack-based execution: return first item on loop output
+        // The StackExecutor handles iteration state
+        const firstItem = collection.length > 0 ? collection[0] : null;
+
         return {
+            // n8n-compatible: outputs[0]=loop, outputs[1]=done
+            outputs: collection.length > 0 ? [[firstItem], []] : [[], [inputData]],
+            json: firstItem || inputData,
             collection,
             accumulate: config.accumulate === 'true',
             total: collection.length,
+            meta: {
+                executedAt: new Date().toISOString()
+            }
         };
     }
 }
@@ -147,12 +158,14 @@ export class IfNode extends BaseNode {
 
     /**
      * Execute condition evaluation
-     * 
+     * Returns n8n-compatible outputs[][] format for stack-based execution.
+     *
      * @param {Object} inputData - Input from previous node
      * @param {Object} context - Expression context with $vars, $json, etc.
-     * @returns {Object} { result: boolean, branch: 'true'|'false', left, right, operator }
+     * @param {Object} executionContext - Full ExecutionContext (optional)
+     * @returns {Object} { outputs: [][], json, result, branch, left, right, operator, meta }
      */
-    async execute(inputData = {}, context = null) {
+    async execute(inputData = {}, context = null, executionContext = null) {
         const config = this.getConfig();
         const operator = config.operator || 'eq';
 
@@ -227,13 +240,23 @@ export class IfNode extends BaseNode {
                 conditionResult = false;
         }
 
+        // n8n-compatible outputs: outputs[0]=true branch, outputs[1]=false branch
+        const outputs = conditionResult
+            ? [[inputData], []]   // TRUE: data to first output, nothing to second
+            : [[], [inputData]];  // FALSE: nothing to first, data to second
+
         return {
+            outputs,
+            json: inputData,
             result: conditionResult,
             branch: conditionResult ? 'true' : 'false',
             left,
             right,
             operator,
             inputData,
+            meta: {
+                executedAt: new Date().toISOString()
+            }
         };
     }
 }

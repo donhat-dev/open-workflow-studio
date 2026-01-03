@@ -12,14 +12,14 @@
 |------|----------|--------------|--------|--------|
 | **E1: Core Infrastructure** | P0 | 34 | 95% | Near Complete |
 | **E9: Variable System** | P0 | 19 | 100% | ✅ Done |
-| **E2: Node Execution Engine** | P0 | 55 | 40% | In Progress |
+| **E2: Node Execution Engine** | P0 | 55 | 60% | In Progress |
 | **E3: Node Library** | P0 | 45 | 42% | In Progress |
 | **E4: UI/UX Editor** | P1 | 48 | 80% | In Progress |
 | **E5: Expression System** | P1 | 24 | 50% | In Progress |
 | **E6: Persistence & Storage** | P1 | 26 | 5% | Not Started |
 | **E7: Production Features** | P2 | 34 | 0% | Planned |
 | **E8: Integrations** | P2 | 40 | 0% | Planned |
-| **TOTAL** | | **325** | **45%** | |
+| **TOTAL** | | **325** | **50%** | |
 
 ---
 
@@ -32,7 +32,7 @@
 | **V1** | **Core Infrastructure** | **5** | P0 | **100%** | ✅ Done | |
 | V1.1 | ExecutionContext class | 2 | P0 | 100% | ✅ | $vars, $node, $json, $loop |
 | V1.2 | Mocks directory structure | 1 | P0 | 100% | ✅ | index.js + empty files |
-| V1.3 | MockExecutionEngine | 2 | P0 | 100% | ✅ | Basic mock executor |
+| V1.3 | MockExecutionEngine | 2 | P0 | 100% | ✅ | Replaced by StackExecutor |
 | | | | | | | |
 | **V2** | **Variable Service** | **3** | P0 | **100%** | ✅ Done | |
 | V2.1 | VariableService | 2 | P0 | 100% | ✅ | Odoo service wrapper |
@@ -97,10 +97,11 @@
 | E2.1.4 | Node output storage | 2 | P0 | 100% | ✅ | nodeOutputs Map |
 | E2.1.5 | Error handling | 2 | P0 | 60% | 🔄 | Basic catch, no retry |
 | | | | | | | |
-| **E2.2** | **Queue-Based Executor** | **18** | P0 | **0%** | ❌ Not Started | |
-| E2.2.1 | Execution queue | 5 | P0 | 0% | ❌ | Replace topological sort |
-| E2.2.2 | Back-edge routing | 5 | P0 | 0% | ❌ | Loop node revisiting |
-| E2.2.3 | Branch routing | 5 | P0 | 0% | ❌ | If/Switch multi-output |
+| **E2.2** | **Stack-Based Executor** | **18** | P0 | **45%** | 🔄 In Progress | |
+| E2.2.0 | StackExecutor class (replaces topological sort) | 8 | P0 | 100% | ✅ | Sprint 2 - handles loops/branches |
+| E2.2.1 | Execution queue | 5 | P0 | 100% | ✅ | Merged into StackExecutor |
+| E2.2.2 | Back-edge routing | 5 | P0 | 50% | 🔄 | Basic loop support done |
+| E2.2.3 | Branch routing | 5 | P0 | 50% | 🔄 | IF node routing done |
 | E2.2.4 | Multi-input join | 3 | P0 | 0% | ❌ | Wait for all inputs |
 | | | | | | | |
 | **E2.3** | **Execution State** | **8** | P1 | **25%** | 🔄 In Progress | |
@@ -330,12 +331,12 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Backlog** | 290 SP |
-| **Completed** | 110 SP (38%) |
-| **Remaining** | 180 SP |
-| **Sprint Velocity** (est.) | 15-20 SP |
-| **Sprints to Complete** | 9-12 |
-| **Estimated Timeline** | 18-24 weeks |
+| **Total Backlog** | 325 SP |
+| **Completed** | 154 SP (47%) |
+| **Remaining** | 171 SP |
+| **Sprint Velocity** (est.) | 15-22 SP |
+| **Sprints to Complete** | 8-12 |
+| **Estimated Timeline** | 16-24 weeks |
 
 ### MVP Milestone (80% core features)
 - **Required Points**: ~160 SP completed

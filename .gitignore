@@ -6,7 +6,7 @@ __pycache__/
 .claude
 settings.json
 settings.local.json
-.github/
+.github
 
 # C extensions
 *.so

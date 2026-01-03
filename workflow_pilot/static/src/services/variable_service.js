@@ -67,7 +67,7 @@ export const workflowVariableService = {
             },
 
             /**
-             * Set execution context (e.g., from MockExecutionEngine)
+             * Set execution context (e.g., from StackExecutor)
              * @param {ExecutionContext} context
              */
             setContext(context) {

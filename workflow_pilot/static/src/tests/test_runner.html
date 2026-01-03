@@ -58,7 +58,6 @@
         <button onclick="runAllTests()">▶ Run All Tests</button>
         <button onclick="runContextTests()">Run Context Tests</button>
         <button onclick="runExpressionTests()">Run Expression Tests</button>
-        <button onclick="runEngineTests()">Run Engine Tests</button>
         <button onclick="clearOutput()">Clear</button>
     </div>
     
@@ -123,9 +122,7 @@
             await runContextTests();
             output.innerHTML += '\n';
             await runExpressionTests();
-            output.innerHTML += '\n';
-            await runEngineTests();
-            
+
             output.innerHTML += '\n<span class="info">═══════════════════════════════════════</span>\n';
             output.innerHTML += '<span class="success">   All test suites completed!</span>\n';
             output.innerHTML += '<span class="info">═══════════════════════════════════════</span>\n';
@@ -151,17 +148,6 @@
                 TestExpressionUtils.run();
             } catch (err) {
                 console.error('Failed to load test_expression_utils.js:', err.message);
-            }
-        };
-        
-        window.runEngineTests = async () => {
-            output.innerHTML += '<span class="info">Running MockExecutionEngine tests...</span>\n\n';
-            
-            try {
-                const { TestMockExecutionEngine } = await import('./test_mock_execution_engine.js');
-                await TestMockExecutionEngine.run();
-            } catch (err) {
-                console.error('Failed to load test_mock_execution_engine.js:', err.message);
             }
         };
     </script>

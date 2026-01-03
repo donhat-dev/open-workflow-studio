@@ -17,4 +17,3 @@
 
 export { TestContext } from './test_context';
 export { TestExpressionUtils } from './test_expression_utils';
-export { TestMockExecutionEngine } from './test_mock_execution_engine';

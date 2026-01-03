@@ -47,6 +47,12 @@ export class ExecutionContext {
 
         /** @type {Array<LoopState>} Stack for nested loops */
         this._loopStack = [];
+
+        /** @type {Map<string, any>} Per-node persistent context (e.g., loop counters) */
+        this._nodeContext = new Map();
+
+        /** @type {any} Current input data for the node being executed */
+        this._currentInput = null;
     }
 
     // ============================================
@@ -230,6 +236,43 @@ export class ExecutionContext {
     }
 
     // ============================================
+    // INPUT DATA ($input)
+    // ============================================
+
+    /**
+     * Set current input data for the node being executed
+     * This is the data flowing into the current node (e.g., loop item)
+     *
+     * @param {any} data - Input data
+     */
+    setCurrentInput(data) {
+        this._currentInput = data;
+    }
+
+    /**
+     * Get current input data ($input shortcut)
+     * For nodes inside a loop, this is the current loop item
+     *
+     * @returns {Object} Current input data
+     */
+    get $input() {
+        // If inside a loop, return the current loop item wrapped
+        if (this._loopStack.length > 0) {
+            const loopCtx = this.$loop;
+            return {
+                item: loopCtx?.item,
+                json: loopCtx?.item,
+                index: loopCtx?.index,
+            };
+        }
+        // Otherwise return the current input data
+        return {
+            item: this._currentInput,
+            json: this._currentInput,
+        };
+    }
+
+    // ============================================
     // LOOP CONTEXT ($loop)
     // ============================================
 
@@ -309,6 +352,52 @@ export class ExecutionContext {
     }
 
     // ============================================
+    // NODE CONTEXT (Per-node persistent state)
+    // ============================================
+
+    /**
+     * Get persistent context for a specific node
+     * Used for stateful nodes like Loop (iteration counter)
+     *
+     * @param {string} nodeId - Node identifier
+     * @returns {any} Node context or undefined
+     */
+    getNodeContext(nodeId) {
+        return this._nodeContext.get(nodeId);
+    }
+
+    /**
+     * Set persistent context for a specific node
+     *
+     * @param {string} nodeId - Node identifier
+     * @param {any} context - Context to store (null/undefined clears)
+     */
+    setNodeContext(nodeId, context) {
+        if (context === null || context === undefined) {
+            this._nodeContext.delete(nodeId);
+        } else {
+            this._nodeContext.set(nodeId, context);
+        }
+    }
+
+    /**
+     * Check if a node has persistent context
+     *
+     * @param {string} nodeId - Node identifier
+     * @returns {boolean}
+     */
+    hasNodeContext(nodeId) {
+        return this._nodeContext.has(nodeId);
+    }
+
+    /**
+     * Clear all node contexts
+     */
+    clearNodeContexts() {
+        this._nodeContext.clear();
+    }
+
+    // ============================================
     // EXPRESSION CONTEXT
     // ============================================
 
@@ -323,6 +412,7 @@ export class ExecutionContext {
             $node: this._nodeOutputs,
             $json: this.$json,
             $loop: this.$loop,
+            $input: this.$input,
         };
     }
 

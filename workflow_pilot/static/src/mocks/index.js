@@ -16,10 +16,12 @@
  *
  * USAGE:
  * ──────
- * import { mockExecutionEngine } from '@workflow_pilot/mocks';
- * const result = await mockExecutionEngine.executeUntil(workflow, nodeId);
+ * import { StackExecutor, stackExecutor } from '@workflow_pilot/mocks';
+ * const result = await stackExecutor.executeUntil(workflow, nodeId);
  */
 
-export { MockExecutionEngine, mockExecutionEngine } from './execution_engine';
+// Primary executor - Stack-Based (replaces topological sort approach)
+export { StackExecutor, stackExecutor } from './stack_executor';
+
 export { MockVariableStore, mockVariableStore } from './variable_store';
 export { MockOdooRPC, mockOdooRPC } from './odoo_rpc';
