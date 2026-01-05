@@ -508,6 +508,81 @@ class DataMappingNode extends ClassicPreset.Node {
     }
 }
 
+/**
+ * Code Node
+ * Executes custom JavaScript code with Monaco editor
+ */
+class CodeNode extends ClassicPreset.Node {
+    constructor() {
+        super("Code");
+        this.nodeType = "code";
+
+        // Inputs
+        this.addInput("data", new ClassicPreset.Input(dataSocket, "Input Data"));
+
+        // Outputs
+        this.addOutput("result", new ClassicPreset.Output(dataSocket, "Result"));
+        this.addOutput("error", new ClassicPreset.Output(errorSocket, "Error"));
+
+        // Controls
+        this.addControl("code", new TextInputControl(`// Nhập code JavaScript
+// Input data: biến 'data'
+// Return: giá trị output
+
+return {
+  message: "Hello from Code Node!",
+  inputData: data
+};`, {
+            label: "Code",
+            multiline: true
+        }));
+
+        this.addControl("language", new SelectControl([
+            { value: "javascript", label: "JavaScript" }
+        ], "javascript", { label: "Language" }));
+    }
+
+    getConfig() {
+        return {
+            code: this.controls.code.value,
+            language: this.controls.language.value
+        };
+    }
+
+    /**
+     * Execute code - Dataflow worker method
+     * @param {Object} inputs - Input data from connected nodes
+     * @returns {Object} Execution result or error
+     */
+    async data(inputs) {
+        const config = this.getConfig();
+        const inputData = inputs.data?.[0] || {};
+
+        try {
+            // Create safe execution context
+            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            const executeFn = new AsyncFunction('data', config.code);
+            
+            console.log('[Code] Executing code...');
+            const result = await executeFn(inputData);
+
+            return {
+                result: result,
+                error: null
+            };
+        } catch (err) {
+            console.error('[Code] Execution error:', err);
+            return {
+                result: null,
+                error: { 
+                    message: err.message,
+                    stack: err.stack
+                }
+            };
+        }
+    }
+}
+
 // Export for use in app.js
 window.WorkflowNodes = {
     DataSocket,
@@ -519,5 +594,6 @@ window.WorkflowNodes = {
     KeyValueControl,
     HttpRequestNode,
     DataValidationNode,
-    DataMappingNode
+    DataMappingNode,
+    CodeNode
 };
