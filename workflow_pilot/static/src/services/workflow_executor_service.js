@@ -21,7 +21,7 @@ export const workflowExecutorService = {
     start(env, { workflowNode, workflowAdapter, workflowVariable }) {
         // Create StackExecutor instance
         const executor = new StackExecutor();
-
+        window.executor = executor;
         // Store outputs per node: nodeId → { json, meta, error }
         let nodeOutputs = new Map();
 
@@ -178,7 +178,7 @@ export const workflowExecutorService = {
                         context: execContext,
 
                         // Custom node runner that uses workflowNode service
-                        nodeRunner: async (node, resolvedConfig, exprCtx, context) => {
+                        nodeRunner: async (node, resolvedConfig, exprCtx, context, helpers) => {
                             const nodeId = node.id;
                             const startTime = Date.now();
 
@@ -199,8 +199,8 @@ export const workflowExecutorService = {
                                 // Get input data from context
                                 const inputData = context?.$json || {};
 
-                                // Execute node - new signature supports executionContext
-                                const output = await instance.execute(inputData, exprCtx, context);
+                                // Execute node - pass helpers for n8n-style context injection
+                                const output = await instance.execute(inputData, exprCtx, context, helpers);
 
                                 // Normalize output to stack-compatible format
                                 return {

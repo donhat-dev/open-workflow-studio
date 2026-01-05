@@ -4,7 +4,10 @@
 		<!-- Backdrop -->
 		<div class="node-config-backdrop" t-on-click="onBackdropClick" t-on-wheel.stop="">
 			<!-- Panel -->
-			<div class="node-config-panel" t-ref="panel" t-on-wheel.stop="">
+			<div class="node-config-panel" t-ref="panel" t-att-class="{ 'panel-expanded': state.isExpanded }" t-att-style="panelStyle" t-on-wheel.stop="">
+				<!-- Drag Resize Handle -->
+				<div class="panel-resize-handle" t-on-mousedown="onResizeStart" title="Drag to resize">
+					<div class="resize-handle-bar"/></div>
 				<!-- Header -->
 				<div class="node-config-header">
 					<div class="node-config-title">
@@ -12,6 +15,10 @@
 						<span t-esc="nodeTitle"/>
 					</div>
 					<div class="node-config-actions">
+						<!-- Expand/Collapse Toggle Button -->
+						<button class="node-config-expand-btn" t-on-click="onToggleExpand" t-att-title="state.isExpanded ? 'Collapse panel' : 'Expand to full width'">
+							<i t-att-class="'fa ' + (state.isExpanded ? 'fa-compress' : 'fa-expand')"/>
+						</button>
 						<button class="node-config-close" t-on-click="onClose" title="Close">
 							<i class="fa fa-times"/>
 						</button>
@@ -39,7 +46,9 @@
 											<JsonTreeNode data="entry[1].json" path="[]" sourceNodeId="entry[0]"/>
 										</div>
 										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(entry[0])">
-											<div class="input-data-empty"><span>No output data</span></div>
+											<div class="input-data-empty">
+												<span>No output data</span>
+											</div>
 										</div>
 									</div>
 								</t>
@@ -75,9 +84,11 @@
 							<button class="node-execute-btn small" t-on-click="onExecute" t-att-disabled="state.isExecuting or !canExecute" t-att-class="{ executing: state.isExecuting }">
 								<t t-if="state.isExecuting">
 									<i class="fa fa-spinner fa-spin"/> Running...
+								
 								</t>
 								<t t-else="">
 									<i class="fa fa-play"/> Execute
+								
 								</t>
 							</button>
 							<t t-if="state.executionResult">
@@ -96,12 +107,15 @@
 								<i class="fa fa-sliders"/> Parameters
 							
 							
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
 								<i class="fa fa-code"/> Output
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
 								<i class="fa fa-cog"/> Settings
+							
 							
 							
 							</button>

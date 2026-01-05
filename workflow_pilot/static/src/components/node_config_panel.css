@@ -72,6 +72,79 @@
   color: #e2e8f0;
 }
 
+/* Expand/Collapse Button */
+.node-config-expand-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #71717a;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.node-config-expand-btn:hover {
+  background: #32353b;
+  color: #3b82f6;
+}
+
+.node-config-expand-btn i {
+  font-size: 12px;
+}
+
+/* Panel Resize Handle */
+.panel-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle:active {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.resize-handle-bar {
+  width: 3px;
+  height: 40px;
+  background: #32353b;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  opacity: 0;
+}
+
+.panel-resize-handle:hover .resize-handle-bar,
+.panel-resize-handle:active .resize-handle-bar {
+  opacity: 1;
+  background: #3b82f6;
+  height: 60px;
+}
+
+/* Expanded Panel State */
+.node-config-panel.panel-expanded {
+  width: calc(100vw - 60px) !important;
+  max-width: none;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Smooth width transition for panel */
+.node-config-panel {
+  transition: width 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
 /* Tabs */
 .node-config-tabs {
   display: flex;
@@ -109,7 +182,7 @@
 }
 
 .node-config-left-panel {
-  width: 50%;
+  width: 30%;
   border-right: 1px solid #32353b;
   display: flex;
   flex-direction: column;
@@ -117,7 +190,7 @@
 }
 
 .node-config-right-panel {
-  width: 50%;
+  width: 70%;
   display: flex;
   flex-direction: column;
   overflow-y: auto;

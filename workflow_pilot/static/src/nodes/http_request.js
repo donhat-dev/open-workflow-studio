@@ -62,6 +62,9 @@ export class HttpRequestNode extends BaseNode {
     /**
      * Execute HTTP request
      * Uses real fetch when URL is provided, falls back to mock for testing
+     * Returns n8n-compatible outputs[][] format:
+     *   outputs[0] = response socket
+     *   outputs[1] = error socket
      */
     async execute(inputData = {}) {
         const config = this.getConfig();
@@ -70,7 +73,11 @@ export class HttpRequestNode extends BaseNode {
 
         // If no URL provided, return mock data
         if (!url) {
-            return this._getMockResponse(config);
+            const mockResp = this._getMockResponse(config);
+            return {
+                outputs: [[mockResp], []],  // response socket, empty error
+                json: mockResp,
+            };
         }
 
         try {
@@ -108,16 +115,31 @@ export class HttpRequestNode extends BaseNode {
                 body = await response.text();
             }
 
-            return {
+            const result = {
                 status: response.status,
                 statusText: response.statusText,
                 headers: Object.fromEntries(response.headers.entries()),
                 body,
             };
+
+            // outputs[0] = response, outputs[1] = error (empty on success)
+            return {
+                outputs: [[result], []],
+                json: result,
+            };
         } catch (error) {
-            console.warn('[HTTP Request] Fetch failed, using mock:', error.message);
-            // Return mock on fetch error (CORS, network, etc.)
-            return this._getMockResponse(config, error.message);
+            console.warn('[HTTP Request] Fetch failed:', error.message);
+            const errorResult = {
+                error: error.message,
+                url,
+                method,
+            };
+            // outputs[0] = response (empty on error), outputs[1] = error
+            return {
+                outputs: [[], [errorResult]],
+                json: errorResult,
+                error: error.message,
+            };
         }
     }
 

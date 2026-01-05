@@ -37,6 +37,16 @@
 					<button class="kv-add" t-on-click="addPair">+ Add</button>
 				</div>
 			</t>
+			<!-- CODE EDITOR (Monaco) -->
+			<t t-elif="controlType === 'code'">
+				<CodeEditor
+					value="value"
+					height="props.control.height || 200"
+					language="props.control.language || 'javascript'"
+					placeholder="props.control.placeholder || ''"
+					onChange="(v) => this.onCodeChange(v)"
+				/>
+			</t>
 		</div>
 	</t>
 </templates>

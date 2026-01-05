@@ -150,7 +150,7 @@ export class WorkflowAdapter {
     /**
      * Get node configuration
      * UI calls this instead of accessing _node.getConfig()
-     *
+    *
      * @param {string} nodeId - Node ID
      * @returns {Object} Config object from Core layer
      */
@@ -231,7 +231,7 @@ export class WorkflowAdapter {
     }
 
     // ============================================
-    // EXECUTION (Phase 3 API)
+    // EXECUTION
     // ============================================
 
     /**

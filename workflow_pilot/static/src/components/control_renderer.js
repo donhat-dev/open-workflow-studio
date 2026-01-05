@@ -2,6 +2,7 @@
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "./expression/ExpressionInput";
+import { CodeEditor } from "./code_editor";
 
 /**
  * ControlRenderer Component
@@ -14,7 +15,7 @@ import { ExpressionInput } from "./expression/ExpressionInput";
  * Control object shape:
  * {
  *   key: string,
- *   type: 'text' | 'select' | 'checkbox' | 'number' | 'keyvalue',
+ *   type: 'text' | 'select' | 'checkbox' | 'number' | 'keyvalue' | 'code',
  *   label: string,
  *   value: any,
  *   placeholder?: string,
@@ -22,11 +23,13 @@ import { ExpressionInput } from "./expression/ExpressionInput";
  *   options?: Array<{value, label}>,
  *   keyPlaceholder?: string,
  *   valuePlaceholder?: string,
+ *   height?: number,       // For code control
+ *   language?: string,     // For code control
  * }
  */
 export class ControlRenderer extends Component {
     static template = "workflow_pilot.control_renderer";
-    static components = { ExpressionInput };
+    static components = { ExpressionInput, CodeEditor };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -154,6 +157,13 @@ export class ControlRenderer extends Component {
      */
     onCheckboxChange(ev) {
         const value = ev.target.checked;
+        this.props.onChange(this.props.control.key, value);
+    }
+
+    /**
+     * Handle code editor change
+     */
+    onCodeChange(value) {
         this.props.onChange(this.props.control.key, value);
     }
 

@@ -2,32 +2,74 @@
 
 /**
  * StackExecutor - Stack-Based Workflow Execution Engine
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Replaces topological sort with dynamic stack-based execution.
- * This approach correctly handles:
- * - Cyclic graphs (loops with back-edges)
- * - Branch routing (IF/Switch nodes)
- * - Multi-output nodes
+ * This execution engine follows n8n's Stack-Based State Machine pattern.
+ * See: docs/plans/ADR/001-execution-engine.md
  *
- * Based on n8n's WorkflowExecute pattern.
+ * ARCHITECTURE:
+ * ─────────────
+ * Unlike traditional DAG (Directed Acyclic Graph) algorithms like topological
+ * sort, this engine uses a stack-based approach that:
+ * - Dynamically determines execution order based on data flow
+ * - Handles cyclic graphs (loops with back-edges)
+ * - Enables data-driven routing (If/Switch nodes)
+ * - Supports multi-output nodes
  *
- * KEY CONCEPT:
- * ────────────
- * 1. Push start node to stack
- * 2. Pop node, execute it
- * 3. Based on outputs[][], push child nodes to stack
- * 4. Empty output = skip that branch (children not pushed)
- * 5. Repeat until stack empty or target reached
+ * Based on n8n's WorkflowExecute pattern:
+ * https://github.com/n8n-io/n8n/blob/master/packages/core/src/WorkflowExecute.ts
+ *
+ * KEY CONCEPT - Data-Driven Routing:
+ * ───────────────────────────────────
+ * The engine is completely GENERIC - it doesn't know about If/Switch/Loop
+ * semantics. All routing logic is embedded in node outputs:
+ *
+ *   - Each node returns outputs[][] (2D array)
+ *   - First dimension = output socket index
+ *   - Second dimension = array of items for that socket
+ *   - Empty array [] = skip that branch (children not pushed)
+ *
+ * Example If Node:
+ *   Condition TRUE:  outputs = [[inputData], []]   → true branch executes
+ *   Condition FALSE: outputs = [[], [inputData]]   → false branch executes
+ *
+ * MAIN LOOP:
+ * ──────────
+ * 1. Push start node(s) to executionStack
+ * 2. While stack not empty AND target not reached:
+ *    a. Pop {nodeId, inputData} from stack
+ *    b. Execute node → get outputs[][]
+ *    c. Store result in nodeOutputs Map
+ *    d. For each output socket with data:
+ *       - Find connected nodes
+ *       - Push them to stack with data
+ *    e. Next iteration
+ * 3. Return ExecutionContext with all results
+ *
+ * OUTPUT FORMAT (See ADR-002):
+ * ────────────────────────────
+ * All nodes MUST return:
+ * {
+ *   outputs: [
+ *     [item1, item2],  // Socket 0 items
+ *     [item3],         // Socket 1 items
+ *   ],
+ *   json: any,         // Convenience: first item
+ *   meta: { duration, executedAt, ... }
+ * }
  *
  * INTERFACE:
  * ──────────
  * executeUntil(workflow, targetNodeId, options) → Promise<ExecutionContext>
  * getNodeOutput(nodeId) → NodeOutput
+ * getNodeContext(nodeId) → any  (for loops)
  * isExecuting() → boolean
+ * reset() → void
  */
 
 import { ExecutionContext } from '../core/context';
 import { evaluateExpression, hasExpressions } from '../utils/expression_utils';
+import { NodeHelpers } from '../core/node_helpers';
 
 /**
  * ExecutionState - Internal state for a single execution run
@@ -106,7 +148,7 @@ export class StackExecutor {
             const startNodeIds = this._findStartNodes(workflow);
 
             if (startNodeIds.length === 0) {
-                throw new Error('No start node found (node with no incoming connections)');
+                throw new Error('No start node found (node with no incoming connections)');     
             }
 
             // Push start nodes to stack
@@ -196,22 +238,31 @@ export class StackExecutor {
         try {
             // Use custom nodeRunner if provided
             if (typeof options.nodeRunner === 'function') {
+                // Create NodeHelpers for n8n-style context injection
+                const helpers = new NodeHelpers({
+                    inputData,
+                    nodeContext: this.state.nodeContext,
+                    nodeId: node.id,
+                    config: resolvedConfig,
+                    expressionContext,
+                    node,
+                });
+
                 const result = await options.nodeRunner(
                     node,
                     resolvedConfig,
                     expressionContext,
-                    this.context
+                    this.context,
+                    helpers  // Pass helpers to node
                 );
                 return this._normalizeResult(result, startTime);
             }
 
             // Handle special node types
+            // NOTE: 'loop' is now handled by LoopNode.execute() with NodeHelpers
             switch (node.type) {
                 case 'if':
                     return await this._executeIfNode(node, inputData, expressionContext, startTime);
-
-                case 'loop':
-                    return await this._executeLoopNode(node, inputData, expressionContext, startTime);
 
                 default:
                     // Default: pass through with single output
@@ -310,88 +361,6 @@ export class StackExecutor {
     }
 
     /**
-     * Execute LOOP node - handles iteration state
-     *
-     * @private
-     */
-    async _executeLoopNode(node, inputData, expressionContext, startTime) {
-        const config = node.config || {};
-
-        // Get or initialize loop context for this node
-        let loopCtx = this.state.nodeContext.get(node.id);
-
-        if (!loopCtx) {
-            // First execution: resolve collection
-            let collection = [];
-
-            const collectionExpr = config.collection || '';
-            if (collectionExpr && hasExpressions(collectionExpr)) {
-                const result = evaluateExpression(collectionExpr, expressionContext);
-                collection = result.error ? [] : result.value;
-            } else if (inputData) {
-                collection = Array.isArray(inputData)
-                    ? inputData
-                    : (inputData.items || inputData.data || []);
-            }
-
-            if (!Array.isArray(collection)) {
-                collection = collection ? [collection] : [];
-            }
-
-            loopCtx = {
-                currentIndex: 0,
-                items: collection,
-                maxIndex: collection.length
-            };
-        }
-
-        // Get current item
-        const currentItem = loopCtx.items[loopCtx.currentIndex];
-
-        // Update ExecutionContext's $loop
-        this.context.pushLoop(loopCtx.items);
-        // Advance to current index
-        for (let i = 0; i < loopCtx.currentIndex; i++) {
-            this.context.advanceLoop();
-        }
-
-        // Prepare for next iteration
-        loopCtx.currentIndex++;
-        this.state.nodeContext.set(node.id, loopCtx);
-
-        // Decide which output to use
-        if (loopCtx.currentIndex < loopCtx.maxIndex) {
-            // More items remain → output to "loop" (index 0)
-            return {
-                outputs: [[currentItem], []],
-                json: currentItem,
-                meta: {
-                    duration: Date.now() - startTime,
-                    executedAt: new Date().toISOString(),
-                    iteration: loopCtx.currentIndex,
-                    total: loopCtx.maxIndex
-                }
-            };
-        } else {
-            // Last item → output to "done" (index 1)
-            // Reset for potential re-execution
-            this.state.nodeContext.delete(node.id);
-            this.context.popLoop();
-
-            return {
-                outputs: [[], [currentItem]],
-                json: currentItem,
-                meta: {
-                    duration: Date.now() - startTime,
-                    executedAt: new Date().toISOString(),
-                    iterations: loopCtx.maxIndex,
-                    completed: true
-                }
-            };
-        }
-    }
-
-    /**
      * Route node outputs to child nodes
      *
      * @private
@@ -426,8 +395,8 @@ export class StackExecutor {
                 // For non-flow-control nodes, also match generic handles
                 if (node.type !== 'loop' && node.type !== 'if' && node.type !== 'switch') {
                     return c.sourceHandle === undefined ||
-                           c.sourceHandle === 'output' ||
-                           c.sourceHandle === 'result';
+                        c.sourceHandle === 'output' ||
+                        c.sourceHandle === 'result';
                 }
 
                 return false;
@@ -451,16 +420,7 @@ export class StackExecutor {
      * @returns {string[]}
      */
     _getOutputSockets(node) {
-        switch (node.type) {
-            case 'if':
-                return ['true', 'false'];
-            case 'loop':
-                return ['loop', 'done'];
-            case 'switch':
-                return ['case0', 'case1', 'case2', 'case3', 'default'];
-            default:
-                return ['output', 'result'];
-        }
+        return Object.keys(node.outputs);
     }
 
     /**

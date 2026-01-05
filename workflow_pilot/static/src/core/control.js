@@ -180,6 +180,23 @@ export class CheckboxControl extends Control {
     }
 }
 
+/**
+ * CodeControl - Code editor (Monaco-based)
+ * For writing JavaScript code with syntax highlighting and autocomplete
+ */
+export class CodeControl extends Control {
+    constructor(key, options = {}) {
+        super(key, options);
+        this.type = 'code';
+        this.language = options.language || 'javascript';
+        this.height = options.height || 200;
+        this.placeholder = options.placeholder || '// Write your code here\nreturn $json;';
+        if (this.value === null) {
+            this.value = options.default || '';
+        }
+    }
+}
+
 // Export control registry
 export const ControlRegistry = {
     text: TextInputControl,
@@ -187,4 +204,6 @@ export const ControlRegistry = {
     keyvalue: KeyValueControl,
     number: NumberControl,
     checkbox: CheckboxControl,
+    code: CodeControl,
 };
+

@@ -1,4 +1,35 @@
 /* ========================================
+   Global Minimalist Scrollbar
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2d33;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f434a;
+  background-clip: content-box;
+}
+
+/* Firefox support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2d33 transparent;
+}
+
+/* ========================================
    Workflow Pilot Dev App Styles
    (Harness / Layout for Development - Dark Mode)
    ======================================== */
@@ -188,7 +219,7 @@
   background: #1e2025;
   border: 1px solid #2a2d33;
   border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: "Consolas", "Monaco", monospace;
   font-size: 0.75rem;
 }
 

@@ -45,6 +45,10 @@ export class NodeConfigPanel extends Component {
             executionResult: null,  // { output, error, meta }
             // Collapsed ancestor sections
             collapsedSections: {},  // { nodeId: true/false }
+            // Panel resize state
+            isExpanded: false,  // Full width mode
+            customWidth: null,  // Custom width from drag (in pixels)
+            isResizing: false,  // Currently dragging to resize
         });
 
         this.panelRef = useRef("panel");
@@ -371,4 +375,71 @@ export class NodeConfigPanel extends Component {
             this.onClose();
         }
     }
+
+    // ============================================
+    // PANEL RESIZE FUNCTIONALITY
+    // ============================================
+
+    /**
+     * Computed style for panel width
+     */
+    get panelStyle() {
+        if (this.state.isExpanded) {
+            return 'width: calc(100vw - 60px);';  // Full width minus small margin
+        }
+        if (this.state.customWidth) {
+            return `width: ${this.state.customWidth}px;`;
+        }
+        return '';  // Use default CSS (50vw)
+    }
+
+    /**
+     * Toggle between expanded (full-width) and default mode
+     */
+    onToggleExpand() {
+        this.state.isExpanded = !this.state.isExpanded;
+        // Reset custom width when toggling
+        if (this.state.isExpanded) {
+            this.state.customWidth = null;
+        }
+    }
+
+    /**
+     * Start drag resize
+     */
+    onResizeStart = (ev) => {
+        ev.preventDefault();
+        this.state.isResizing = true;
+        this.state.isExpanded = false;  // Exit expanded mode when manually resizing
+
+        const startX = ev.clientX;
+        const panel = this.panelRef.el;
+        const startWidth = panel.offsetWidth;
+
+        const onMouseMove = (moveEv) => {
+            // Calculate new width (dragging from left edge)
+            const deltaX = startX - moveEv.clientX;
+            let newWidth = startWidth + deltaX;
+
+            // Clamp width between min and max
+            const minWidth = 500;
+            const maxWidth = window.innerWidth - 60;
+            newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+            this.state.customWidth = newWidth;
+        };
+
+        const onMouseUp = () => {
+            this.state.isResizing = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    };
 }

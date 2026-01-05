@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { BaseNode, DataSocket, ErrorSocket } from '../core/node';
-import { TextInputControl, SelectControl, KeyValueControl } from '../core/control';
+import { TextInputControl, SelectControl, KeyValueControl, CodeControl } from '../core/control';
 import { evaluateExpression, hasExpressions } from '@workflow_pilot/utils/expression_utils';
 
 /**
@@ -400,3 +400,98 @@ export class VariableNode extends BaseNode {
 
 // Register VariableNode
 registry.category("workflow_node_types").add("variable", VariableNode);
+
+/**
+ * CodeNode - Execute custom JavaScript code
+ * 
+ * Allows users to write and run native JS with access to:
+ * - $json / $input: Input data from previous node
+ * - $vars: Workflow variables
+ * - $node: Access to other node outputs
+ */
+export class CodeNode extends BaseNode {
+    static nodeType = 'code';
+    static label = 'Code';
+    static icon = 'fa-code';
+    static category = 'transform';
+    static description = 'Execute custom JavaScript code';
+
+    constructor() {
+        super();
+
+        // Inputs
+        this.addInput('data', DataSocket, 'Input Data');
+
+        // Outputs
+        this.addOutput('output', DataSocket, 'Output');
+
+        // Code editor control
+        this.addControl('code', new CodeControl('code', {
+            label: 'JavaScript Code',
+            height: 250,
+            placeholder: '// Access input data via $json or $input\n// Access variables via $vars\n// Return the output data\n\nreturn {\n    processed: $json,\n    timestamp: new Date().toISOString()\n};',
+        }));
+    }
+
+    /**
+     * Execute user's JavaScript code
+     * @param {Object} inputData - Input from previous node
+     * @param {ExecutionContext} context - ExecutionContext instance
+     * @returns {Object} Output data or error
+     */
+    async execute(inputData = {}, context = null) {
+        const config = this.getConfig();
+        const userCode = config.code || 'return $json;';
+
+        // Build execution context
+        const exprContext = context?.toExpressionContext?.() || context || {};
+        const $json = inputData || {};
+        const $input = $json;
+        const $vars = exprContext.$vars || {};
+        const $node = exprContext.$node || {};
+
+        // Helper function: $(nodeNameOrId) - maps to $node[nodeNameOrId]
+        const $ = (nodeSelector) => {
+            const result = $node[nodeSelector];
+            if (!result) {
+                console.warn(`[CodeNode] Node "${nodeSelector}" not found in context. Check if it has executed.`);
+                return { json: {}, meta: {}, error: "Node not found" };
+            }
+            return result;
+        };
+
+        try {
+            // Create sandboxed function with context variables
+            // Added '$' to the parameters list
+            const fn = new Function(
+                '$json', '$input', '$vars', '$node', '$',
+                `"use strict";\n${userCode}`
+            );
+
+            // Execute the function
+            const result = fn($json, $input, $vars, $node, $);
+
+            // Handle async results
+            const output = result instanceof Promise ? await result : result;
+
+            return {
+                outputs: [[output]],
+                json: output,
+            };
+        } catch (error) {
+            console.error('[CodeNode] Execution error:', error);
+            const errorResult = {
+                error: error.message || String(error),
+                stack: error.stack,
+            };
+            return {
+                outputs: [[errorResult]],
+                json: errorResult,
+                error: error.message,
+            };
+        }
+    }
+}
+
+// Register CodeNode
+registry.category("workflow_node_types").add("code", CodeNode);

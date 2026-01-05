@@ -6,20 +6,28 @@ import { TextInputControl, SelectControl } from '../core/control';
 import { evaluateExpression, hasExpressions } from '@workflow_pilot/utils/expression_utils';
 
 /**
- * LoopNode - Iterates over array items
- * 
- * n8n-style loop: processes items one at a time,
- * outputs "Loop" for each iteration, "Done" when complete.
- * 
- * Inputs: data (array to iterate)
- * Outputs: loop (current item), done (completion signal)
+ * LoopNode - SplitInBatches Pattern (n8n style)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Iterates over array items in batches. Uses NodeHelpers for persistent state.
+ *
+ * Outputs:
+ *   - done [0]: All processed items when complete
+ *   - loop [1]: Current batch for iteration
+ *
+ * Controls:
+ *   - inputItems: Expression to select items (e.g., {{ $json.data.items }})
+ *   - batchSize: Number of items per iteration (default: 1)
+ *   - reset: Reset loop on re-entry
+ *
+ * Reference: n8n/packages/nodes-base/nodes/SplitInBatches/v3/SplitInBatchesV3.node.ts
  */
 export class LoopNode extends BaseNode {
     static nodeType = 'loop';
     static label = 'Loop Over Items';
     static icon = 'fa-repeat';
     static category = 'flow';
-    static description = 'Iterate over array items one at a time';
+    static description = 'Iterate over array items in batches';
 
     constructor() {
         super();
@@ -27,18 +35,23 @@ export class LoopNode extends BaseNode {
         // Inputs
         this.addInput('data', DataSocket, 'Data');
 
-        // Outputs - n8n style dual output
+        // Outputs - n8n order: done=0, loop=1
         this.addOutput('done', DataSocket, 'Done');
         this.addOutput('loop', DataSocket, 'Loop');
 
-        // Controls for collection expression
-        this.addControl('collection', new TextInputControl('collection', {
-            label: 'Collection Expression',
-            placeholder: '{{ $json.items }} or {{ $vars.orderLines }}',
+        // Controls
+        this.addControl('inputItems', new TextInputControl('inputItems', {
+            label: 'Input Items',
+            placeholder: '{{ $json.response.data.items }}',
         }));
 
-        this.addControl('accumulate', new SelectControl('accumulate', {
-            label: 'Accumulate Results',
+        this.addControl('batchSize', new TextInputControl('batchSize', {
+            label: 'Batch Size',
+            placeholder: '1',
+        }));
+
+        this.addControl('reset', new SelectControl('reset', {
+            label: 'Reset',
             options: [
                 { value: 'false', label: 'No' },
                 { value: 'true', label: 'Yes' },
@@ -48,52 +61,127 @@ export class LoopNode extends BaseNode {
     }
 
     /**
-     * Execute loop - resolve collection from expression
-     * Returns n8n-compatible outputs[][] format for stack-based execution.
+     * Execute loop - SplitInBatches pattern
+     *
+     * STATELESS node - uses helpers for:
+     *   - getContext(): persistent state across iterations
+     *   - getNodeParameter(): resolved config values from engine
+     *   - getInputData(): input from previous node
+     *
+     * Engine resolves expressions BEFORE calling execute().
+     * inputItems config contains resolved array (not expression string).
      *
      * @param {Object} inputData - Input from previous node
-     * @param {Object} context - Expression context with $vars, $json, etc.
-     * @param {Object} executionContext - Full ExecutionContext (optional, for nodeContext)
-     * @returns {Object} { outputs: [][], json, collection, accumulate, total, meta }
+     * @param {Object} expressionContext - Expression context (optional, for fallback)
+     * @param {Object} executionContext - Full ExecutionContext
+     * @param {NodeHelpers} helpers - n8n-style context helpers
+     * @returns {Object} { outputs: [[done], [loop]], json, meta }
      */
-    async execute(inputData = {}, context = null, executionContext = null) {
-        const config = this.getConfig();
-        let collection = [];
+    async execute(inputData = {}, expressionContext = null, executionContext = null, helpers = null) {
+        // ═══════════════════════════════════════════════════════════════
+        // Get RESOLVED params from helpers (engine already resolved expressions)
+        // ═══════════════════════════════════════════════════════════════
+        const batchSize = parseInt(helpers?.getNodeParameter('batchSize', 1)) || 1;
+        const shouldReset = helpers?.getNodeParameter('reset', 'false') === 'true';
 
-        // Resolve collection expression
-        const collectionExpr = config.collection || '';
+        // inputItems is ALREADY RESOLVED by engine (array, not expression string)
+        const inputItems = helpers?.getNodeParameter('inputItems', null);
 
-        if (collectionExpr && context) {
-            if (hasExpressions(collectionExpr)) {
-                const result = evaluateExpression(collectionExpr, context);
-                collection = result.error ? [] : result.value;
-            } else {
-                // Try to get from $json or inputData directly
-                collection = inputData.items || inputData.data || inputData;
+        // Get persistent context via helpers
+        const nodeContext = helpers?.getContext('node') ?? {};
+
+        // ═══════════════════════════════════════════════════════════════
+        // PHASE A: First Run or Reset - Initialize State
+        // ═══════════════════════════════════════════════════════════════
+        if (nodeContext.items === undefined || shouldReset) {
+            // Determine items source:
+            // 1. inputItems config (if user specified expression, engine resolved it)
+            // 2. Otherwise use full inputData
+            let items = inputItems ?? inputData;
+
+            // Normalize to array
+            if (!Array.isArray(items)) {
+                if (items && typeof items === 'object') {
+                    // Try common array properties
+                    items = items.items || items.data || items.records || [items];
+                } else {
+                    items = items ? [items] : [];
+                }
             }
-        } else if (inputData) {
-            // Default: use input data as collection
-            collection = Array.isArray(inputData) ? inputData : (inputData.items || inputData.data || []);
+
+            // Initialize context
+            nodeContext.items = [...items];
+            nodeContext.processedItems = [];
+            nodeContext.currentRunIndex = 0;
+            nodeContext.totalItems = items.length;
+            nodeContext.sourceData = inputData;
+
+            // Splice first batch
+            const firstBatch = nodeContext.items.splice(0, batchSize);
+
+            helpers?.log?.('debug', `Loop started: ${nodeContext.totalItems} items, batch=${batchSize}`);
+
+            if (firstBatch.length > 0) {
+                return {
+                    outputs: [[], firstBatch],  // [done=empty, loop=batch]
+                    json: firstBatch.length === 1 ? firstBatch[0] : firstBatch,
+                    meta: {
+                        iteration: 1,
+                        total: Math.ceil(nodeContext.totalItems / batchSize),
+                        executedAt: new Date().toISOString(),
+                    }
+                };
+            }
+
+            // Empty collection → immediate done
+            helpers?.clearContext?.();
+            return {
+                outputs: [[inputData], []],
+                json: inputData,
+                meta: { completed: true, iterations: 0, executedAt: new Date().toISOString() }
+            };
         }
 
-        // Ensure collection is array
-        if (!Array.isArray(collection)) {
-            collection = collection ? [collection] : [];
+        // ═══════════════════════════════════════════════════════════════
+        // PHASE B: Subsequent Runs - Continue Iteration
+        // ═══════════════════════════════════════════════════════════════
+        nodeContext.currentRunIndex++;
+
+        // Accumulate processed items from loop body
+        if (inputData && inputData !== nodeContext.sourceData) {
+            const itemsToAdd = Array.isArray(inputData) ? inputData : [inputData];
+            nodeContext.processedItems.push(...itemsToAdd);
         }
 
-        // For stack-based execution: return first item on loop output
-        // The StackExecutor handles iteration state
-        const firstItem = collection.length > 0 ? collection[0] : null;
+        // Splice next batch
+        const nextBatch = nodeContext.items.splice(0, batchSize);
 
+        // ═══════════════════════════════════════════════════════════════
+        // PHASE C: Routing Decision
+        // ═══════════════════════════════════════════════════════════════
+        if (nextBatch.length === 0) {
+            // All items processed → done output
+            const allResults = [...nodeContext.processedItems];
+            const iterations = nodeContext.currentRunIndex;
+
+            helpers?.log?.('debug', `Loop complete: ${iterations} iterations, ${allResults.length} results`);
+            helpers?.clearContext?.();
+
+            return {
+                outputs: [allResults, []],
+                json: allResults,
+                meta: { completed: true, iterations, executedAt: new Date().toISOString() }
+            };
+        }
+
+        // More items → loop output
         return {
-            // n8n-compatible: outputs[0]=loop, outputs[1]=done
-            outputs: collection.length > 0 ? [[firstItem], []] : [[], [inputData]],
-            json: firstItem || inputData,
-            collection,
-            accumulate: config.accumulate === 'true',
-            total: collection.length,
+            outputs: [[], nextBatch],
+            json: nextBatch.length === 1 ? nextBatch[0] : nextBatch,
             meta: {
-                executedAt: new Date().toISOString()
+                iteration: nodeContext.currentRunIndex + 1,
+                remaining: nodeContext.items.length,
+                executedAt: new Date().toISOString(),
             }
         };
     }
@@ -262,30 +350,6 @@ export class IfNode extends BaseNode {
 }
 
 /**
- * CodeNode - Custom code execution
- * 
- * Allows users to write custom transformation logic.
- * Execution happens in Python backend.
- */
-export class CodeNode extends BaseNode {
-    static nodeType = 'code';
-    static label = 'Code';
-    static icon = 'fa-code';
-    static category = 'transform';
-    static description = 'Execute custom code';
-
-    constructor() {
-        super();
-
-        // Inputs
-        this.addInput('data', DataSocket, 'Input');
-
-        // Outputs
-        this.addOutput('result', DataSocket, 'Result');
-    }
-}
-
-/**
  * NoOpNode - Placeholder / pass-through node
  * Used for debugging or as placeholder in auto-creation
  */
@@ -302,10 +366,22 @@ export class NoOpNode extends BaseNode {
         this.addInput('data', DataSocket, 'Data');
         this.addOutput('result', DataSocket, 'Result');
     }
+
+    /**
+     * Pass through data unchanged
+     * @returns {Object} n8n-compatible outputs format
+     */
+    async execute(inputData = {}) {
+        return {
+            outputs: [[inputData]],
+            json: inputData,
+        };
+    }
 }
 
 // Self-register all flow nodes to Odoo registry
+// NOTE: CodeNode is registered in data_nodes.js (full implementation with Monaco editor)
 registry.category("workflow_node_types").add("loop", LoopNode);
 registry.category("workflow_node_types").add("if", IfNode);
-registry.category("workflow_node_types").add("code", CodeNode);
 registry.category("workflow_node_types").add("noop", NoOpNode);
+
