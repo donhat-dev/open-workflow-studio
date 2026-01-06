@@ -37,11 +37,6 @@ export class WorkflowNode extends Component {
         useExternalListener(document, "mouseup", this.onMouseUp.bind(this));
 
         this.dragState = { startX: 0, startY: 0, initialX: 0, initialY: 0 };
-
-        // Motion.dev entrance animation - DISABLED
-        // onMounted(() => {
-        //     MotionHelpers.animateNodeIn(this.rootRef.el);
-        // });
     }
 
     /**

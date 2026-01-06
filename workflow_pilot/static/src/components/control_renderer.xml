@@ -6,7 +6,7 @@
 			<label t-if="label" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text'">
-				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" onChange="(v) => this.onExpressionChange(v)"/>
+				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" mode="props.mode" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
@@ -30,7 +30,7 @@
 					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
 						<div class="kv-row">
 							<input type="text" class="kv-key" t-att-placeholder="props.control.keyPlaceholder" t-att-value="pair.key" t-on-input="(ev) => this.onKeyChange(pair_index, ev)" />
-							<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" onChange="(v) => this.onValueExpressionChange(pair_index, v)"/>
+							<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairMode(pair.id)" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)"/>
 							<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1">×</button>
 						</div>
 					</t>

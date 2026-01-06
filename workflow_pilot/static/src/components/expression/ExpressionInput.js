@@ -1,13 +1,13 @@
 /** @odoo-module **/
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
-import { hasExpressions, wrapExpression, evaluateExpression } from "@workflow_pilot/utils/expression_utils";
+import { wrapExpression, evaluateExpression } from "@workflow_pilot/utils/expression_utils";
 
 /**
  * ExpressionInput Component
  * 
  * Input field that supports both static values and n8n-style expressions.
- * Automatically detects {{ }} syntax and switches to expression mode.
+ * Mode is controlled by parent; no auto-switching based on value.
  */
 export class ExpressionInput extends Component {
     static template = "workflow_pilot.expression_input";
@@ -19,13 +19,15 @@ export class ExpressionInput extends Component {
         // Expression evaluation context for preview, e.g. { $vars, $node, $json, $loop, $input }
         context: { type: Object, optional: true },
         multiline: { type: Boolean, optional: true },  // Use textarea
+        // Controlled mode: 'fixed' | 'expression'
+        mode: { type: String, optional: true },
+        onModeChange: { type: Function, optional: true },
         onChange: { type: Function },
         onDrop: { type: Function, optional: true },
     };
 
     setup() {
         this.state = useState({
-            isExpressionMode: hasExpressions(this.props.value || ''),
             isFocused: false,
             isDragOver: false,
             // Local value for reactivity - syncs with props
@@ -41,10 +43,6 @@ export class ExpressionInput extends Component {
 
             if (nextValue !== this.state.localValue) {
                 this.state.localValue = nextValue;
-                // Keep expression-mode detection consistent with new value
-                if (hasExpressions(nextValue)) {
-                    this.state.isExpressionMode = true;
-                }
             }
         });
     }
@@ -54,8 +52,16 @@ export class ExpressionInput extends Component {
         return this.state.localValue;
     }
 
+    get mode() {
+        return this.props.mode || 'fixed';
+    }
+
     get isExpression() {
-        return this.state.isExpressionMode || hasExpressions(this.currentValue);
+        return this.mode === 'expression';
+    }
+
+    get textAreaRows() {
+        return this.props.multiline ? 2 : 1;
     }
 
     get previewResult() {
@@ -80,10 +86,18 @@ export class ExpressionInput extends Component {
         }
 
         if (typeof result.value === 'object') {
-            return JSON.stringify(result.value, null, 2);
+            return this._safeStringify(result.value);
         }
 
         return String(result.value);
+    }
+
+    _safeStringify(value) {
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch {
+            return '[Unserializable value]';
+        }
     }
 
     // ============================================
@@ -96,11 +110,6 @@ export class ExpressionInput extends Component {
         // Update local state for reactivity
         this.state.localValue = value;
 
-        // Auto-detect expression mode
-        if (hasExpressions(value)) {
-            this.state.isExpressionMode = true;
-        }
-
         this.props.onChange(value);
     }
 
@@ -112,21 +121,16 @@ export class ExpressionInput extends Component {
         this.state.isFocused = false;
     }
 
-    toggleExpressionMode() {
-        this.state.isExpressionMode = !this.state.isExpressionMode;
+    setMode(mode) {
+        this.props.onModeChange?.(mode);
     }
 
-    /**
-     * Set expression mode explicitly (for toggle buttons)
-     */
-    setMode(isExpression) {
-        this.state.isExpressionMode = isExpression;
+    onClickFixed() {
+        this.setMode('fixed');
+    }
 
-        // If entering expression mode and no templates, wrap existing value
-        if (isExpression && !hasExpressions(this.currentValue)) {
-            // Could optionally convert static value to expression
-            // For now, just toggle mode
-        }
+    onClickExpression() {
+        this.setMode('expression');
     }
 
     // ============================================
@@ -157,25 +161,41 @@ export class ExpressionInput extends Component {
         const expression = ev.dataTransfer.getData('application/x-expression');
         const path = ev.dataTransfer.getData('text/plain');
 
-        console.log('[ExpressionInput] onDrop:', { expression, path });
+        const insertText = expression || (path ? wrapExpression(path) : '');
+        if (!insertText) {
+            return;
+        }
 
-        let newValue = this.currentValue;
+        // Insert at cursor when possible; otherwise append.
+        const el = ev.target;
+        const currentValue = this.currentValue;
+        let newValue = currentValue + insertText;
+        let newCursorPos = newValue.length;
 
-        if (expression) {
-            // Insert expression at cursor or append
-            newValue = newValue + expression;
-        } else if (path) {
-            // Wrap path in expression template
-            const wrapped = wrapExpression(path);
-            newValue = newValue + wrapped;
+        if (el && typeof el.selectionStart === 'number' && typeof el.selectionEnd === 'number') {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            newValue = currentValue.slice(0, start) + insertText + currentValue.slice(end);
+            newCursorPos = start + insertText.length;
         }
 
         // Update local state for immediate UI update
         this.state.localValue = newValue;
-        this.state.isExpressionMode = true;
 
-        // Notify parent of change
+        // Notify parent of change (no mode switching)
         this.props.onChange(newValue);
         this.props.onDrop?.(expression || path);
+
+        // Restore cursor after DOM updates
+        if (el && typeof el.setSelectionRange === 'function') {
+            requestAnimationFrame(() => {
+                try {
+                    el.focus();
+                    el.setSelectionRange(newCursorPos, newCursorPos);
+                } catch {
+                    // ignore
+                }
+            });
+        }
     }
 }

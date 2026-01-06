@@ -114,7 +114,7 @@
 									<div class="node-config-section">
 										<div class="node-config-section-title" t-esc="group.name"/>
 										<t t-foreach="group.controls" t-as="control" t-key="control.key">
-											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext"/>
+											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange"/>
 										</t>
 									</div>
 								</t>

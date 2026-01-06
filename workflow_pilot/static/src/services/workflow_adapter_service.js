@@ -78,6 +78,25 @@ export const workflowAdapterService = {
             },
 
             /**
+             * Get node meta (UI/runtime metadata)
+             * @param {string} nodeId
+             * @returns {Object}
+             */
+            getNodeMeta(nodeId) {
+                return currentAdapter?.getNodeMeta(nodeId) || {};
+            },
+
+            /**
+             * Update node meta (shallow merge + meta.ui merge)
+             * @param {string} nodeId
+             * @param {Object} metaPatch
+             * @returns {boolean}
+             */
+            setNodeMeta(nodeId, metaPatch) {
+                return currentAdapter?.setNodeMeta(nodeId, metaPatch) || false;
+            },
+
+            /**
              * Update a single control value
              * @param {string} nodeId
              * @param {string} controlKey

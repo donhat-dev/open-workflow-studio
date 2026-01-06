@@ -32,6 +32,12 @@ export class ControlRenderer extends Component {
         control: Object,  // Plain object, not Control instance
         onChange: { type: Function },
         inputContext: { type: Object, optional: true },  // { $json: {...} } for expression preview
+        // Controlled expression mode
+        mode: { type: String, optional: true }, // 'fixed' | 'expression'
+        onModeChange: { type: Function, optional: true },
+        // For keyvalue controls: modes per pair id
+        pairModes: { type: Object, optional: true },
+        onPairModeChange: { type: Function, optional: true },
     };
 
     setup() {
@@ -139,6 +145,19 @@ export class ControlRenderer extends Component {
      */
     onExpressionChange(value) {
         this.props.onChange(this.props.control.key, value);
+    }
+
+    onExpressionModeChange(mode) {
+        this.props.onModeChange?.(this.props.control.key, mode);
+    }
+
+    getPairMode(pairId) {
+        const modes = this.props.pairModes || {};
+        return modes[pairId] || 'fixed';
+    }
+
+    onPairValueModeChange(pairId, mode) {
+        this.props.onPairModeChange?.(this.props.control.key, pairId, mode);
     }
 
     /**
