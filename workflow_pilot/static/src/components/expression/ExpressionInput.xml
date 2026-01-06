@@ -13,10 +13,10 @@
 				</label>
 				<!-- Fixed/Expression Toggle (n8n style) -->
 				<div class="expression-input__mode-toggle">
-					<button type="button" class="mode-btn" t-att-class="{ active: !isExpression }" t-on-click="() => this.setMode(false)" title="Fixed value">
+					<button type="button" class="mode-btn" t-att-class="{ active: !isExpression }" t-on-click="onClickFixed" title="Fixed value">
 						Fixed
 					</button>
-					<button type="button" class="mode-btn mode-btn--expression" t-att-class="{ active: isExpression }" t-on-click="() => this.setMode(true)" title="Dynamic expression">
+					<button type="button" class="mode-btn mode-btn--expression" t-att-class="{ active: isExpression }" t-on-click="onClickExpression" title="Dynamic expression">
 						Expression
 					</button>
 				</div>
@@ -25,12 +25,7 @@
 			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
 				<!-- Expression mode prefix -->
 				<span t-if="isExpression" class="expression-input__fx">ƒx</span>
-				<t t-if="props.multiline or isExpression">
-					<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-placeholder="isExpression ? '{{ $json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" rows="2" spellcheck="false"/>
-				</t>
-				<t t-else="">
-					<input type="text" class="expression-input__text" t-att-value="currentValue" t-att-placeholder="props.placeholder || 'Enter value...'" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur"/>
-				</t>
+				<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ $json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" spellcheck="false"/>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
 					<i class="fa fa-plus-circle"/>

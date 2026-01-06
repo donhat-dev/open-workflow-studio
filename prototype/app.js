@@ -620,6 +620,20 @@ class PropertiesPanel extends Component {
                     </div>
                 </t>
 
+                <!-- Code Node -->
+                <t t-if="props.node.nodeType === 'code'">
+                    <div class="form-group">
+                        <label class="form-label">Language</label>
+                        <select class="form-select" t-on-change="(e) => this.updateControl('language', e.target.value)">
+                            <option value="javascript" t-att-selected="getControlValue('language') === 'javascript'">JavaScript</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Code Editor</label>
+                        <div t-ref="monacoContainer" style="height: 400px; border: 3px solid #000; box-shadow: 4px 4px 0 #000;"></div>
+                    </div>
+                </t>
+
                 <!-- Delete Button -->
                 <button class="btn btn--danger mt-md" t-on-click="deleteNode" style="width: 100%;">
                     Delete Node
@@ -630,6 +644,58 @@ class PropertiesPanel extends Component {
 
     static components = { KeyValueEditor };
     static props = ["node", "onDelete"];
+
+    setup() {
+        this.monacoEditor = null;
+        this.monacoContainerRef = useRef("monacoContainer");
+
+        onMounted(() => {
+            this.initMonacoEditor();
+        });
+
+        onWillUnmount(() => {
+            if (this.monacoEditor) {
+                this.monacoEditor.dispose();
+            }
+        });
+    }
+
+    initMonacoEditor() {
+        if (this.props.node?.nodeType !== 'code') return;
+
+        const container = this.monacoContainerRef.el;
+        if (!container) return;
+
+        // Configure Monaco Editor loader
+        require.config({ 
+            paths: { 
+                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' 
+            } 
+        });
+
+        require(['vs/editor/editor.main'], () => {
+            const code = this.getControlValue('code');
+            
+            this.monacoEditor = monaco.editor.create(container, {
+                value: code,
+                language: 'javascript',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 13,
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                renderLineHighlight: 'all',
+                tabSize: 2
+            });
+
+            // Update control value on change
+            this.monacoEditor.onDidChangeModelContent(() => {
+                const newCode = this.monacoEditor.getValue();
+                this.updateControl('code', newCode);
+            });
+        });
+    }
 
     getControlValue(name) {
         const control = this.props.node?.controls?.[name];
@@ -687,6 +753,12 @@ class NodePalette extends Component {
                     draggable="true">
                     <div class="node-palette__icon">⇄</div>
                     <div class="node-palette__label">Data Mapping</div>
+                </div>
+                <div class="node-palette__item node-palette__item--code"
+                    t-on-click="() => this.addNode('code')"
+                    draggable="true">
+                    <div class="node-palette__icon">💻</div>
+                    <div class="node-palette__label">Code</div>
                 </div>
             </div>
         </div>
@@ -797,7 +869,8 @@ class WorkflowApp extends Component {
         const nodeClasses = {
             http: window.WorkflowNodes.HttpRequestNode,
             validation: window.WorkflowNodes.DataValidationNode,
-            mapping: window.WorkflowNodes.DataMappingNode
+            mapping: window.WorkflowNodes.DataMappingNode,
+            code: window.WorkflowNodes.CodeNode
         };
 
         const NodeClass = nodeClasses[type];
