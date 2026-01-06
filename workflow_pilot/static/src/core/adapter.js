@@ -164,6 +164,25 @@ export class WorkflowAdapter {
     }
 
     /**
+     * Get node meta (UI/runtime metadata)
+     * @param {string} nodeId
+     * @returns {Object}
+     */
+    getNodeMeta(nodeId) {
+        return this.editor.getNodeMeta(nodeId);
+    }
+
+    /**
+     * Update node meta (shallow merge + meta.ui merge)
+     * @param {string} nodeId
+     * @param {Object} metaPatch
+     * @returns {boolean}
+     */
+    setNodeMeta(nodeId, metaPatch) {
+        return this.editor.setNodeMeta(nodeId, metaPatch);
+    }
+
+    /**
      * Set node configuration
      * UI calls this instead of accessing _node.setConfig()
      *

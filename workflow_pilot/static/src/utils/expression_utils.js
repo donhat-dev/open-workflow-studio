@@ -44,7 +44,10 @@ export const NAMESPACES = ['$json', '$vars', '$loop', '$node'];
  */
 export function hasExpressions(value) {
     if (typeof value !== 'string') return false;
-    return EXPRESSION_PATTERNS.TEMPLATE.test(value);
+    // IMPORTANT: do not use the global /g TEMPLATE regex with .test(),
+    // as it is stateful (lastIndex) and can intermittently return false.
+    // Use a non-global regex for deterministic checks.
+    return EXPRESSION_PATTERNS.SINGLE_TEMPLATE.test(value);
 }
 
 /**

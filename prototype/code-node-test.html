@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Node - Test Demo</title>
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fafafa;
+        }
+        
+        h1 {
+            border-bottom: 4px solid #000;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .demo-section {
+            background: white;
+            border: 3px solid #000;
+            box-shadow: 4px 4px 0 #000;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        h2 {
+            color: #8b5cf6;
+            margin-bottom: 1rem;
+        }
+        
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border: 3px solid #000;
+            overflow-x: auto;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            background: #8b5cf6;
+            color: white;
+            border: 3px solid #000;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            margin-right: 1rem;
+        }
+        
+        .btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 #000;
+        }
+        
+        .output {
+            background: #f0f9ff;
+            border: 3px solid #3b82f6;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .output.show {
+            display: block;
+        }
+        
+        .error {
+            background: #fee;
+            border-color: #ef4444;
+        }
+        
+        .success {
+            background: #efe;
+            border-color: #10b981;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>💻 Code Node - Test Demo</h1>
+    
+    <div class="demo-section">
+        <h2>Test 1: Basic Execution</h2>
+        <p><strong>Test</strong>: Code Node nhận input và return output đơn giản</p>
+        <pre id="code1">// Input data
+const input = { name: "Odoo", version: 17 };
+
+// Code Node execution
+return {
+  message: "Hello from Code Node!",
+  inputData: data,
+  processed: true
+};</pre>
+        <button class="btn" onclick="runTest1()">▶ Run Test 1</button>
+        <div id="output1" class="output"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>Test 2: Array Transformation</h2>
+        <p><strong>Test</strong>: Filter và transform array data</p>
+        <pre id="code2">// Input: Array of products
+const input = [
+  { id: 1, name: "Product A", price: 100, active: true },
+  { id: 2, name: "Product B", price: 200, active: false },
+  { id: 3, name: "Product C", price: 150, active: true }
+];
+
+// Code Node execution
+return {
+  activeProducts: data.filter(p => p.active),
+  totalProducts: data.length,
+  totalValue: data.reduce((sum, p) => sum + p.price, 0)
+};</pre>
+        <button class="btn" onclick="runTest2()">▶ Run Test 2</button>
+        <div id="output2" class="output"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>Test 3: Async API Call</h2>
+        <p><strong>Test</strong>: Async execution với fetch API</p>
+        <pre id="code3">// Input: API endpoint
+const input = { endpoint: "https://jsonplaceholder.typicode.com/users/1" };
+
+// Code Node execution (async)
+const response = await fetch(data.endpoint);
+const userData = await response.json();
+
+return {
+  success: true,
+  user: {
+    name: userData.name,
+    email: userData.email,
+    company: userData.company.name
+  }
+};</pre>
+        <button class="btn" onclick="runTest3()">▶ Run Test 3</button>
+        <div id="output3" class="output"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h2>Test 4: Error Handling</h2>
+        <p><strong>Test</strong>: Code execution với error</p>
+        <pre id="code4">// Input: Missing required field
+const input = { amount: 100 }; // Missing 'orderId'
+
+// Code Node execution
+if (!data.orderId) {
+  throw new Error('Missing required field: orderId');
+}
+
+return { order: data.orderId };</pre>
+        <button class="btn" onclick="runTest4()">▶ Run Test 4 (Error)</button>
+        <div id="output4" class="output error"></div>
+    </div>
+
+    <!-- Monaco Editor & Rete.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@odoo/owl@2.2.2/dist/owl.iife.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/rete@2.0.3/rete.min.js"></script>
+    
+    <!-- Load CodeNode -->
+    <script src="nodes.js"></script>
+    
+    <script>
+        // Helper: Execute code with input
+        async function executeCode(code, input) {
+            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            const executeFn = new AsyncFunction('data', code);
+            return await executeFn(input);
+        }
+        
+        // Test 1: Basic
+        async function runTest1() {
+            const output = document.getElementById('output1');
+            output.classList.remove('show', 'success', 'error');
+            
+            try {
+                const input = { name: "Odoo", version: 17 };
+                const code = `return {
+  message: "Hello from Code Node!",
+  inputData: data,
+  processed: true
+};`;
+                
+                const result = await executeCode(code, input);
+                output.innerHTML = '<h3>✓ Result:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                output.classList.add('show', 'success');
+            } catch (err) {
+                output.innerHTML = '<h3>✗ Error:</h3><pre>' + err.message + '</pre>';
+                output.classList.add('show', 'error');
+            }
+        }
+        
+        // Test 2: Array
+        async function runTest2() {
+            const output = document.getElementById('output2');
+            output.classList.remove('show', 'success', 'error');
+            
+            try {
+                const input = [
+                    { id: 1, name: "Product A", price: 100, active: true },
+                    { id: 2, name: "Product B", price: 200, active: false },
+                    { id: 3, name: "Product C", price: 150, active: true }
+                ];
+                const code = `return {
+  activeProducts: data.filter(p => p.active),
+  totalProducts: data.length,
+  totalValue: data.reduce((sum, p) => sum + p.price, 0)
+};`;
+                
+                const result = await executeCode(code, input);
+                output.innerHTML = '<h3>✓ Result:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                output.classList.add('show', 'success');
+            } catch (err) {
+                output.innerHTML = '<h3>✗ Error:</h3><pre>' + err.message + '</pre>';
+                output.classList.add('show', 'error');
+            }
+        }
+        
+        // Test 3: Async
+        async function runTest3() {
+            const output = document.getElementById('output3');
+            output.classList.remove('show', 'success', 'error');
+            output.innerHTML = '<p>⏳ Fetching data...</p>';
+            output.classList.add('show');
+            
+            try {
+                const input = { endpoint: "https://jsonplaceholder.typicode.com/users/1" };
+                const code = `const response = await fetch(data.endpoint);
+const userData = await response.json();
+return {
+  success: true,
+  user: {
+    name: userData.name,
+    email: userData.email,
+    company: userData.company.name
+  }
+};`;
+                
+                const result = await executeCode(code, input);
+                output.innerHTML = '<h3>✓ Result:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                output.classList.add('success');
+            } catch (err) {
+                output.innerHTML = '<h3>✗ Error:</h3><pre>' + err.message + '</pre>';
+                output.classList.add('error');
+            }
+        }
+        
+        // Test 4: Error
+        async function runTest4() {
+            const output = document.getElementById('output4');
+            output.classList.remove('show');
+            
+            try {
+                const input = { amount: 100 };
+                const code = `if (!data.orderId) {
+  throw new Error('Missing required field: orderId');
+}
+return { order: data.orderId };`;
+                
+                const result = await executeCode(code, input);
+                output.innerHTML = '<h3>✓ Result:</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                output.classList.add('show', 'success');
+            } catch (err) {
+                output.innerHTML = '<h3>✗ Expected Error Caught:</h3><pre>' + err.message + '\n\nStack:\n' + err.stack + '</pre>';
+                output.classList.add('show');
+            }
+        }
+        
+        console.log('Code Node Test Demo loaded!');
+        console.log('Run tests by clicking the buttons above.');
+    </script>
+</body>
+</html>

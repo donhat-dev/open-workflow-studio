@@ -1,0 +1,1139 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Workflow Pilot — Dependency Diagram</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg0:#f7fbff;
+      --bg1:#f6f2ff;
+      --bg2:#fff7f4;
+      --ink:#101828;
+      --muted:#475467;
+
+      --glass: rgba(255,255,255,.62);
+      --glass2: rgba(255,255,255,.35);
+      --stroke: rgba(16,24,40,.10);
+      --stroke2: rgba(16,24,40,.16);
+      --shadow: 0 24px 80px rgba(16,24,40,.12);
+
+      --ui:#12B76A;         /* UI Components */
+      --svc:#7A5AF8;        /* Services */
+      --adapter:#F79009;    /* Adapter */
+      --core:#2E90FA;       /* Core */
+      --node:#F63D68;       /* Node types */
+      --utils:#FEC84B;      /* Utils */
+      --mocks:#667085;      /* Mocks */
+      --platform:#06AED5;   /* Odoo/Platform */
+
+      --edge:#344054;
+      --edgeSoft: rgba(52,64,84,.45);
+
+      --r: 18px;
+    }
+
+    *{ box-sizing:border-box; }
+
+    html,body{ height:100%; }
+
+    body{
+      margin:0;
+      font-family: 'Outfit', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(1200px 800px at 14% 10%, rgba(46,144,250,.20) 0%, rgba(46,144,250,0) 60%),
+        radial-gradient(900px 600px at 80% 16%, rgba(122,90,248,.18) 0%, rgba(122,90,248,0) 65%),
+        radial-gradient(900px 700px at 65% 86%, rgba(246,61,104,.14) 0%, rgba(246,61,104,0) 60%),
+        radial-gradient(1000px 800px at 22% 90%, rgba(254,200,75,.16) 0%, rgba(254,200,75,0) 55%),
+        linear-gradient(135deg, var(--bg0), var(--bg1) 40%, var(--bg2));
+      overflow:hidden;
+    }
+
+    .page{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      padding:18px;
+    }
+
+    .top{
+      display:flex;
+      align-items:stretch;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+
+    .card{
+      background: var(--glass);
+      border: 1px solid var(--stroke);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .header{
+      flex: 2 1 560px;
+      padding:16px 18px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .header::before{
+      content:"";
+      position:absolute;
+      inset:-2px;
+      background:
+        radial-gradient(380px 220px at 12% 30%, rgba(46,144,250,.20), rgba(46,144,250,0) 70%),
+        radial-gradient(320px 220px at 78% 24%, rgba(122,90,248,.18), rgba(122,90,248,0) 72%),
+        radial-gradient(320px 220px at 65% 92%, rgba(246,61,104,.14), rgba(246,61,104,0) 70%);
+      filter: blur(18px);
+      opacity:.85;
+      pointer-events:none;
+    }
+
+    .header > *{ position:relative; }
+
+    h1{
+      margin:0;
+      font-size:18px;
+      letter-spacing:-.02em;
+    }
+
+    .sub{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
+      max-width: 78ch;
+    }
+
+    .toolbar{
+      flex: 1 1 340px;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      min-height: 92px;
+    }
+
+    .row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.65);
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      font-size: 12px;
+      user-select:none;
+    }
+
+    .dot{
+      width:10px;height:10px;border-radius:999px;
+      background: var(--edge);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.65);
+      border: 1px solid rgba(16,24,40,.12);
+    }
+
+    .dot.ui{ background: var(--ui); }
+    .dot.svc{ background: var(--svc); }
+    .dot.adapter{ background: var(--adapter); }
+    .dot.core{ background: var(--core); }
+    .dot.node{ background: var(--node); }
+    .dot.utils{ background: var(--utils); }
+    .dot.mocks{ background: var(--mocks); }
+    .dot.platform{ background: var(--platform); }
+
+    .search{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.70);
+      border: 1px solid var(--stroke);
+    }
+
+    .search input{
+      width: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font: inherit;
+      color: var(--ink);
+    }
+
+    .search kbd{
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(16,24,40,.06);
+      border: 1px solid rgba(16,24,40,.10);
+      border-bottom-color: rgba(16,24,40,.16);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+
+    .main{
+      flex: 1 1 auto;
+      display:flex;
+      min-height: 0;
+      gap: 14px;
+    }
+
+    .stageWrap{
+      flex: 1 1 auto;
+      position:relative;
+      overflow:auto;
+      padding: 14px;
+    }
+
+    .stage{
+      position:relative;
+      min-width: 1780px;
+      height: 980px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.35);
+      border: 1px solid var(--stroke);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 18px 60px rgba(16,24,40,.10);
+      overflow:hidden;
+    }
+
+    .stage::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 1px 1px, rgba(16,24,40,.12) 1px, rgba(0,0,0,0) 1.6px);
+      background-size: 26px 26px;
+      opacity: .28;
+      pointer-events:none;
+    }
+
+    .cols{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+      gap: 0;
+      opacity: .75;
+    }
+
+    .colLabel{
+      position:absolute;
+      top: 14px;
+      font-size: 12px;
+      color: rgba(71,84,103,.92);
+      letter-spacing: .02em;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.68);
+      border: 1px solid var(--stroke);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Position column labels */
+    .colLabel.ui{ left: 18px; }
+    .colLabel.svc{ left: 370px; }
+    .colLabel.adapter{ left: 720px; }
+    .colLabel.core{ left: 1070px; }
+    .colLabel.nodes{ left: 1420px; }
+
+    .graphSvg{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      pointer-events:none;
+    }
+
+    .node{
+      position:absolute;
+      width: 300px;
+      border-radius: 18px;
+      padding: 12px 12px 10px;
+      background: rgba(255,255,255,.62);
+      border: 1px solid rgba(16,24,40,.12);
+      box-shadow: 0 14px 40px rgba(16,24,40,.10);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      cursor: default;
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+
+    .node:hover{
+      transform: translateY(-2px);
+      box-shadow: 0 20px 60px rgba(16,24,40,.14);
+      border-color: rgba(16,24,40,.18);
+    }
+
+    .node.isDim{ opacity:.30; filter: saturate(.75); }
+    .node.isHit{ outline: 2px solid rgba(46,144,250,.38); outline-offset: 2px; }
+
+    .nodeTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .title{
+      font-weight: 600;
+      letter-spacing: -.01em;
+      font-size: 13px;
+      line-height: 1.25;
+      margin:0;
+    }
+
+    .meta{
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: rgba(71,84,103,.95);
+      line-height: 1.35;
+    }
+
+    .path{
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(16,24,40,.04);
+      border: 1px solid rgba(16,24,40,.08);
+      font-size: 11px;
+      color: rgba(71,84,103,.95);
+      overflow:hidden;
+      white-space:nowrap;
+      text-overflow:ellipsis;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(16,24,40,.10);
+      background: rgba(255,255,255,.72);
+      color: rgba(16,24,40,.86);
+      user-select:none;
+      white-space:nowrap;
+    }
+
+    .sym{
+      width: 20px;
+      height: 20px;
+      border-radius: 8px;
+      display:grid;
+      place-items:center;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      box-shadow: 0 10px 20px rgba(16,24,40,.12);
+    }
+
+    .role-ui .sym{ background: var(--ui); }
+    .role-svc .sym{ background: var(--svc); }
+    .role-adapter .sym{ background: var(--adapter); }
+    .role-core .sym{ background: var(--core); }
+    .role-node .sym{ background: var(--node); }
+    .role-utils .sym{ background: #B54708; }
+    .role-mocks .sym{ background: var(--mocks); }
+    .role-platform .sym{ background: var(--platform); }
+
+    .badge small{
+      color: rgba(71,84,103,.92);
+      font-weight: 500;
+    }
+
+    .side{
+      width: 360px;
+      flex: 0 0 360px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      min-height:0;
+    }
+
+    .panel{
+      padding: 14px;
+      overflow:auto;
+    }
+
+    .panel h2{
+      margin: 0 0 8px;
+      font-size: 13px;
+      letter-spacing: -.01em;
+    }
+
+    .panel p{
+      margin:0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .kv{
+      margin-top: 10px;
+      display:flex;
+      flex-direction:column;
+      gap: 8px;
+    }
+
+    .kvRow{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.60);
+      border: 1px solid var(--stroke);
+    }
+
+    .kvRow b{ font-size: 12px; }
+    .kvRow span{ font-size: 12px; color: var(--muted); text-align:right; }
+
+    .hint{
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 14px;
+      border: 1px dashed rgba(16,24,40,.20);
+      background: rgba(255,255,255,.50);
+      color: rgba(71,84,103,.95);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    /* SVG edges */
+    .edge{ stroke: var(--edgeSoft); stroke-width: 2.2; fill: none; }
+    .edge.isHot{ stroke: rgba(46,144,250,.85); stroke-width: 3; }
+
+    .edge.kind-import{ stroke: rgba(52,64,84,.45); }
+    .edge.kind-service{ stroke: rgba(122,90,248,.60); }
+    .edge.kind-registry{ stroke: rgba(6,174,213,.60); stroke-dasharray: 6 6; }
+    .edge.kind-exec{ stroke: rgba(247,144,9,.62); stroke-dasharray: 10 6; }
+
+    .edgeArrow{ fill: rgba(52,64,84,.60); }
+    .edgeArrow.kind-service{ fill: rgba(122,90,248,.70); }
+    .edgeArrow.kind-registry{ fill: rgba(6,174,213,.80); }
+    .edgeArrow.kind-exec{ fill: rgba(247,144,9,.78); }
+
+    @media (max-width: 980px) {
+      body{ overflow:auto; }
+      .page{ height:auto; }
+      .main{ flex-direction:column; }
+      .side{ width:auto; flex: 0 0 auto; }
+      .stage{ min-width: 1180px; height: 980px; }
+      .colLabel.svc{ left: 320px; }
+      .colLabel.adapter{ left: 600px; }
+      .colLabel.core{ left: 880px; }
+      .colLabel.nodes{ left: 1160px; }
+      .node{ width: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="top">
+      <div class="card header">
+        <h1>Workflow Pilot — sơ đồ phụ thuộc (UI → Services → Adapter → Core → Nodes)</h1>
+        <p class="sub">
+          Trang này tổng quan hoá các thành phần trong <b>workflow_pilot/static/src</b> dưới dạng sơ đồ phụ thuộc (imports + service usage).
+          Di chuột lên một khối để highlight các liên kết liên quan.
+        </p>
+      </div>
+
+      <div class="card toolbar">
+        <div class="search" title="Gõ để tìm module, Enter để tập trung, Esc để xoá">
+          <span class="dot" style="background:rgba(16,24,40,.55)"></span>
+          <input id="q" placeholder="Tìm nhanh… (vd: EditorCanvas, workflowExecutor, StackExecutor)" autocomplete="off" />
+          <kbd>Esc</kbd>
+        </div>
+        <div class="row" aria-label="Legend roles">
+          <span class="pill"><span class="dot ui"></span>UI</span>
+          <span class="pill"><span class="dot svc"></span>Service</span>
+          <span class="pill"><span class="dot adapter"></span>Adapter</span>
+          <span class="pill"><span class="dot core"></span>Core</span>
+          <span class="pill"><span class="dot node"></span>Node Type</span>
+          <span class="pill"><span class="dot utils"></span>Utils</span>
+          <span class="pill"><span class="dot mocks"></span>Mocks</span>
+          <span class="pill"><span class="dot platform"></span>Platform</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="card stageWrap">
+        <div class="stage" id="stage">
+          <div class="colLabel ui">▣ UI Components</div>
+          <div class="colLabel svc">◉ Services</div>
+          <div class="colLabel adapter">⚙ Adapter</div>
+          <div class="colLabel core">⬣ Core</div>
+          <div class="colLabel nodes">◇ Node Types</div>
+
+          <svg class="graphSvg" id="svg" viewBox="0 0 1780 980" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <marker id="arrow-import" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path class="edgeArrow" d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+              <marker id="arrow-service" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path class="edgeArrow kind-service" d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+              <marker id="arrow-registry" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path class="edgeArrow kind-registry" d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+              <marker id="arrow-exec" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path class="edgeArrow kind-exec" d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+            </defs>
+          </svg>
+
+          <!-- Nodes are injected by JS -->
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="card panel" id="info">
+          <h2>Chi tiết</h2>
+          <p>Chọn/hover một khối để xem mô tả và các phụ thuộc trực tiếp.</p>
+          <div class="kv" id="kv"></div>
+          <div class="hint">
+            Edge styles:
+            <br/>• <b>Solid</b> = import/usage trực tiếp
+            <br/>• <b>Dashed</b> = execution/runtime flow
+            <br/>• <b>Dotted</b> = đăng ký/lookup qua registry
+          </div>
+        </div>
+
+        <div class="card panel">
+          <h2>Gợi ý đọc sơ đồ</h2>
+          <p>
+            Luồng kiến trúc chủ đạo (Phase 3):
+            <br/>UI (OWL components) → Services (useService) → Adapter (WorkflowAdapter) → Core (WorkflowEditor/BaseNode) → Node Types.
+            <br/>Execution demo dùng StackExecutor (mocks) để chạy workflow có cycle/branch (loop/if).
+          </p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Notes:
+     * - This is a curated dependency map based on current workspace files.
+     * - Edges represent: import usage, service calls, registry registration, execution flow.
+     */
+
+    const roles = {
+      ui:      { label: 'UI Component', symbol: '▣' },
+      svc:     { label: 'Service',      symbol: '◉' },
+      adapter: { label: 'Adapter',      symbol: '⚙' },
+      core:    { label: 'Core',         symbol: '⬣' },
+      node:    { label: 'Node Type',    symbol: '◇' },
+      utils:   { label: 'Utils',        symbol: '✦' },
+      mocks:   { label: 'Mocks',        symbol: '⟲' },
+      platform:{ label: 'Platform',     symbol: '⬡' },
+    };
+
+    /**
+     * Nodes: position is in stage coordinates (px).
+     * Keep columns aligned with labels: UI~60, Services~410, Adapter~760, Core~1110, Nodes~1460.
+     */
+    const nodes = [
+      // UI
+      {
+        id: 'dev_boot', role: 'ui',
+        title: 'dev_boot.js',
+        desc: 'Mount dev playground (WorkflowPilotDevApp) khi window.__WORKFLOW_PILOT_DEV__ bật.',
+        path: 'workflow_pilot/static/src/dev_boot.js',
+        x: 60, y: 90,
+      },
+      {
+        id: 'dev_app', role: 'ui',
+        title: 'WorkflowPilotDevApp',
+        desc: 'Dev UI shell: quản lý state, history undo/redo, localStorage; set adapter vào workflowAdapter service.',
+        path: 'workflow_pilot/static/src/dev_demo_app.js',
+        x: 60, y: 220,
+      },
+      {
+        id: 'node_palette', role: 'ui',
+        title: 'NodePalette',
+        desc: 'Sidebar node palette: click/drag để add node type.',
+        path: 'workflow_pilot/static/src/components/node_palette.js',
+        x: 60, y: 380,
+      },
+      {
+        id: 'editor_canvas', role: 'ui',
+        title: 'EditorCanvas',
+        desc: 'Canvas chính: pan/zoom, drag node, connect sockets, selection box, tidy-up, node menu, config panel.',
+        path: 'workflow_pilot/static/src/components/editor_canvas.js',
+        x: 60, y: 520,
+      },
+      {
+        id: 'workflow_node', role: 'ui',
+        title: 'WorkflowNode',
+        desc: 'Render node draggable + header/body; hiển thị sockets; double-click mở config.',
+        path: 'workflow_pilot/static/src/components/workflow_node.js',
+        x: 60, y: 720,
+      },
+      {
+        id: 'workflow_socket_ui', role: 'ui',
+        title: 'WorkflowSocket',
+        desc: 'Socket UI: mouse down/up để tạo connection; quick-add mở NodeMenu.',
+        path: 'workflow_pilot/static/src/components/workflow_socket.js',
+        x: 60, y: 865,
+      },
+
+      // Services
+      {
+        id: 'svc_node', role: 'svc',
+        title: 'workflowNode service',
+        desc: 'Tìm kiếm/group node types; recent; dựa trên registry workflow_node_types & workflow_node_categories.',
+        path: 'workflow_pilot/static/src/services/workflow_node_service.js',
+        x: 410, y: 130,
+      },
+      {
+        id: 'svc_adapter', role: 'svc',
+        title: 'workflowAdapter service',
+        desc: 'Wrapper DI cho WorkflowAdapter: config, controls, executeNode; proxy variable context qua workflowVariable.',
+        path: 'workflow_pilot/static/src/services/workflow_adapter_service.js',
+        x: 410, y: 300,
+      },
+      {
+        id: 'svc_variable', role: 'svc',
+        title: 'workflowVariable service',
+        desc: 'Quản lý ExecutionContext ($vars/$node/$json/$loop/$input) và CRUD variables.',
+        path: 'workflow_pilot/static/src/services/variable_service.js',
+        x: 410, y: 470,
+      },
+      {
+        id: 'svc_executor', role: 'svc',
+        title: 'workflowExecutor service',
+        desc: 'Chạy workflow bằng StackExecutor (cycle/branch); lấy config qua workflowAdapter + tạo NodeClass qua workflowNode.',
+        path: 'workflow_pilot/static/src/services/workflow_executor_service.js',
+        x: 410, y: 640,
+      },
+
+      // Adapter
+      {
+        id: 'adapter', role: 'adapter',
+        title: 'WorkflowAdapter',
+        desc: 'Cầu nối UI ↔ Core: translate nodes/connections sang plain objects; lookup NodeClass từ registry.',
+        path: 'workflow_pilot/static/src/core/adapter.js',
+        x: 760, y: 330,
+      },
+
+      // Core
+      {
+        id: 'core_editor', role: 'core',
+        title: 'WorkflowEditor',
+        desc: 'Graph core: Map nodes + connections; event system; add/remove/update; serialization.',
+        path: 'workflow_pilot/static/src/core/editor.js',
+        x: 1110, y: 210,
+      },
+      {
+        id: 'core_node', role: 'core',
+        title: 'BaseNode',
+        desc: 'Abstract node: inputs/outputs/controls; getConfig/setConfig; execute(); toJSON/fromJSON.',
+        path: 'workflow_pilot/static/src/core/node.js',
+        x: 1110, y: 390,
+      },
+      {
+        id: 'core_socket', role: 'core',
+        title: 'Socket',
+        desc: 'Typed sockets (Data/Error/Trigger) + compatibility check.',
+        path: 'workflow_pilot/static/src/core/socket.js',
+        x: 1110, y: 540,
+      },
+      {
+        id: 'core_control', role: 'core',
+        title: 'Control',
+        desc: 'Control model (text/select/keyvalue/number/checkbox) cho config của node.',
+        path: 'workflow_pilot/static/src/core/control.js',
+        x: 1110, y: 690,
+      },
+      {
+        id: 'core_context', role: 'core',
+        title: 'ExecutionContext',
+        desc: 'Runtime context: $vars/$node/$json/$loop/$input; path helpers; serialize.',
+        path: 'workflow_pilot/static/src/core/context.js',
+        x: 1110, y: 840,
+      },
+
+      // Utils
+      {
+        id: 'utils_expr', role: 'utils',
+        title: 'expression_utils',
+        desc: 'n8n-style {{ }} expressions; node selector $("id"); evaluate/resolve.',
+        path: 'workflow_pilot/static/src/utils/expression_utils.js',
+        x: 760, y: 560,
+      },
+      {
+        id: 'utils_graph', role: 'utils',
+        title: 'graph_utils / WorkflowGraph',
+        desc: 'Dagre layout + cycle/back-edge detection + split components.',
+        path: 'workflow_pilot/static/src/utils/graph_utils.js',
+        x: 760, y: 720,
+      },
+
+      // Mocks / Execution engine
+      {
+        id: 'mock_executor', role: 'mocks',
+        title: 'StackExecutor',
+        desc: 'Stack-based execution engine (n8n-like): supports cycles, if/loop branching, outputs[][] routing.',
+        path: 'workflow_pilot/static/src/mocks/stack_executor.js',
+        x: 760, y: 850,
+      },
+
+      // Nodes (types)
+      {
+        id: 'node_http', role: 'node',
+        title: 'HttpRequestNode',
+        desc: 'Integration node: fetch HTTP; controls method/url/headers/body; outputs response/error.',
+        path: 'workflow_pilot/static/src/nodes/http_request.js',
+        x: 1460, y: 160,
+      },
+      {
+        id: 'node_flow', role: 'node',
+        title: 'Flow nodes (Loop/If/Code/NoOp)',
+        desc: 'Flow control + transform stubs; Loop/If hỗ trợ outputs[][] cho executor.',
+        path: 'workflow_pilot/static/src/nodes/flow_nodes.js',
+        x: 1460, y: 350,
+      },
+      {
+        id: 'node_data', role: 'node',
+        title: 'Data nodes (Mapping/Validation)',
+        desc: 'Data transform/validation nodes (đăng ký vào registry tương tự).',
+        path: 'workflow_pilot/static/src/nodes/data_nodes.js',
+        x: 1460, y: 520,
+      },
+
+      // UI subsystems (placed near UI column to keep focus)
+      {
+        id: 'node_menu', role: 'ui',
+        title: 'NodeMenu',
+        desc: 'Context menu (search + categories) để add node; dùng workflowNode service.',
+        path: 'workflow_pilot/static/src/components/node_menu.js',
+        x: 60, y: 610,
+      },
+      {
+        id: 'config_panel', role: 'ui',
+        title: 'NodeConfigPanel',
+        desc: 'Panel config + execute preview; dùng workflowAdapter + workflowExecutor services.',
+        path: 'workflow_pilot/static/src/components/node_config_panel.js',
+        x: 60, y: 810,
+      },
+      {
+        id: 'control_renderer', role: 'ui',
+        title: 'ControlRenderer',
+        desc: 'Render control metadata; ExpressionInput hỗ trợ drag/drop expressions.',
+        path: 'workflow_pilot/static/src/components/control_renderer.js',
+        x: 410, y: 820,
+      },
+
+      // Platform pseudo-node
+      {
+        id: 'odoo_registry', role: 'platform',
+        title: '@web/core/registry',
+        desc: 'Odoo registry: nơi services và node types self-register / lookup.',
+        path: '@web/core/registry',
+        x: 1110, y: 70,
+      },
+    ];
+
+    /**
+     * Edges:
+     * - kind: 'import' | 'service' | 'registry' | 'exec'
+     */
+    const edges = [
+      // dev boot
+      { from: 'dev_boot', to: 'dev_app', kind: 'import', label: 'mount' },
+
+      // dev app dependencies
+      { from: 'dev_app', to: 'node_palette', kind: 'import', label: 'UI' },
+      { from: 'dev_app', to: 'editor_canvas', kind: 'import', label: 'UI' },
+      { from: 'dev_app', to: 'adapter', kind: 'import', label: 'core bridge' },
+      { from: 'dev_app', to: 'svc_adapter', kind: 'service', label: 'useService("workflowAdapter")' },
+      { from: 'dev_app', to: 'svc_variable', kind: 'service', label: '$vars inspector' },
+
+      // editor canvas
+      { from: 'editor_canvas', to: 'workflow_node', kind: 'import', label: 'render nodes' },
+      { from: 'editor_canvas', to: 'workflow_socket_ui', kind: 'import', label: 'socket UI' },
+      { from: 'editor_canvas', to: 'node_menu', kind: 'import', label: 'context menu' },
+      { from: 'editor_canvas', to: 'config_panel', kind: 'import', label: 'panel' },
+      { from: 'editor_canvas', to: 'utils_graph', kind: 'import', label: 'tidyUp' },
+      { from: 'editor_canvas', to: 'core_control', kind: 'import', label: 'dimensions uses control sizing' },
+
+      // workflow node
+      { from: 'workflow_node', to: 'workflow_socket_ui', kind: 'import', label: 'sockets' },
+
+      // NodeMenu
+      { from: 'node_menu', to: 'svc_node', kind: 'service', label: 'useService("workflowNode")' },
+
+      // NodeConfigPanel
+      { from: 'config_panel', to: 'svc_adapter', kind: 'service', label: 'get/set config' },
+      { from: 'config_panel', to: 'svc_executor', kind: 'service', label: 'executeUntil' },
+      { from: 'config_panel', to: 'control_renderer', kind: 'import', label: 'render controls' },
+
+      // services to platform registry
+      { from: 'svc_node', to: 'odoo_registry', kind: 'registry', label: 'registry.category(...)' },
+      { from: 'svc_adapter', to: 'odoo_registry', kind: 'registry', label: 'registry.category("services")' },
+      { from: 'svc_variable', to: 'odoo_registry', kind: 'registry', label: 'registry.category("services")' },
+      { from: 'svc_executor', to: 'odoo_registry', kind: 'registry', label: 'registry.category("services")' },
+
+      // adapter ↔ core
+      { from: 'adapter', to: 'core_editor', kind: 'import', label: 'uses WorkflowEditor' },
+      { from: 'core_editor', to: 'core_node', kind: 'import', label: 'BaseNode' },
+      { from: 'core_node', to: 'core_socket', kind: 'import', label: 'Socket types' },
+      { from: 'core_node', to: 'core_control', kind: 'import', label: 'Controls' },
+
+      // variable service → context
+      { from: 'svc_variable', to: 'core_context', kind: 'import', label: 'wraps ExecutionContext' },
+
+      // expression utils used in nodes and executor
+      { from: 'mock_executor', to: 'core_context', kind: 'import', label: 'ExecutionContext' },
+      { from: 'mock_executor', to: 'utils_expr', kind: 'import', label: 'evaluateExpression' },
+      { from: 'node_flow', to: 'utils_expr', kind: 'import', label: 'evaluateExpression' },
+
+      // executor service
+      { from: 'svc_executor', to: 'mock_executor', kind: 'exec', label: 'stack exec' },
+      { from: 'svc_executor', to: 'svc_node', kind: 'service', label: 'getNodeClass' },
+      { from: 'svc_executor', to: 'svc_adapter', kind: 'service', label: 'getNodeConfig' },
+      { from: 'svc_executor', to: 'svc_variable', kind: 'service', label: 'createContext' },
+
+      // node types register into registry (conceptual)
+      { from: 'node_http', to: 'odoo_registry', kind: 'registry', label: 'register node type' },
+      { from: 'node_flow', to: 'odoo_registry', kind: 'registry', label: 'register node types' },
+      { from: 'node_data', to: 'odoo_registry', kind: 'registry', label: 'register node types' },
+
+      // node type classes depend on core
+      { from: 'node_http', to: 'core_node', kind: 'import', label: 'extends BaseNode' },
+      { from: 'node_flow', to: 'core_node', kind: 'import', label: 'extends BaseNode' },
+      { from: 'node_http', to: 'core_control', kind: 'import', label: 'controls' },
+      { from: 'node_flow', to: 'core_control', kind: 'import', label: 'controls' },
+      { from: 'node_http', to: 'core_socket', kind: 'import', label: 'sockets' },
+      { from: 'node_flow', to: 'core_socket', kind: 'import', label: 'sockets' },
+
+      // EditorCanvas uses dimensions (core)
+      { from: 'editor_canvas', to: 'core_context', kind: 'import', label: 'exec context via services' },
+    ];
+
+    const stage = document.getElementById('stage');
+    const svg = document.getElementById('svg');
+    const q = document.getElementById('q');
+
+    const kv = document.getElementById('kv');
+
+    const nodeElById = new Map();
+    const edgeElByKey = new Map();
+
+    function el(tag, cls, text){
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function renderNodes(){
+      for (const n of nodes) {
+        const role = roles[n.role] || { label: n.role, symbol: '?' };
+        const node = el('div', `node role-${n.role}`);
+        node.dataset.id = n.id;
+        node.style.left = `${n.x}px`;
+        node.style.top = `${n.y}px`;
+
+        const top = el('div','nodeTop');
+
+        const badge = el('div', `badge role-${n.role}`);
+        const sym = el('div', 'sym', role.symbol);
+        badge.appendChild(sym);
+        const badgeText = el('div', '');
+        const b1 = el('div', '', role.label);
+        b1.style.fontWeight = '600';
+        b1.style.fontSize = '11px';
+        const b2 = el('small','', n.role);
+        badgeText.appendChild(b1);
+        badgeText.appendChild(b2);
+        badge.appendChild(badgeText);
+
+        const titleWrap = el('div');
+        const title = el('p', 'title', n.title);
+        const meta = el('p', 'meta', n.desc);
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(meta);
+
+        top.appendChild(titleWrap);
+        top.appendChild(badge);
+
+        const path = el('div','path', n.path);
+        node.appendChild(top);
+        node.appendChild(path);
+
+        node.addEventListener('mouseenter', () => focusNode(n.id));
+        node.addEventListener('mouseleave', () => clearFocus());
+        node.addEventListener('click', () => pinNode(n.id));
+
+        stage.appendChild(node);
+        nodeElById.set(n.id, node);
+      }
+    }
+
+    function getBox(id){
+      const el = nodeElById.get(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const s = stage.getBoundingClientRect();
+      return {
+        x: r.left - s.left,
+        y: r.top - s.top,
+        w: r.width,
+        h: r.height,
+      };
+    }
+
+    function edgeKey(e){
+      return `${e.from}→${e.to}#${e.kind}`;
+    }
+
+    function markerFor(kind){
+      switch (kind) {
+        case 'service': return 'url(#arrow-service)';
+        case 'registry': return 'url(#arrow-registry)';
+        case 'exec': return 'url(#arrow-exec)';
+        default: return 'url(#arrow-import)';
+      }
+    }
+
+    function drawEdges(){
+      // Clear previous
+      for (const [key, path] of edgeElByKey.entries()) {
+        path.remove();
+      }
+      edgeElByKey.clear();
+
+      for (const e of edges) {
+        const a = getBox(e.from);
+        const b = getBox(e.to);
+        if (!a || !b) continue;
+
+        // Start at right center of 'from' and end at left center of 'to'
+        const x1 = a.x + a.w;
+        const y1 = a.y + a.h * 0.5;
+        const x2 = b.x;
+        const y2 = b.y + b.h * 0.5;
+
+        // Curve control points
+        const dx = Math.max(80, Math.abs(x2 - x1) * 0.38);
+        const c1x = x1 + dx;
+        const c1y = y1;
+        const c2x = x2 - dx;
+        const c2y = y2;
+
+        const d = `M ${x1} ${y1} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('class', `edge kind-${e.kind}`);
+        path.setAttribute('marker-end', markerFor(e.kind));
+        svg.appendChild(path);
+
+        edgeElByKey.set(edgeKey(e), path);
+      }
+    }
+
+    let pinnedId = null;
+
+    function pinNode(id){
+      pinnedId = (pinnedId === id) ? null : id;
+      if (pinnedId) {
+        focusNode(pinnedId);
+      } else {
+        clearFocus();
+      }
+    }
+
+    function clearFocus(){
+      if (pinnedId) return;
+      for (const el of nodeElById.values()) {
+        el.classList.remove('isDim','isHit');
+      }
+      for (const p of edgeElByKey.values()) {
+        p.classList.remove('isHot');
+      }
+      renderInfo(null);
+    }
+
+    function focusNode(id){
+      if (!id) return;
+
+      const direct = new Set([id]);
+      for (const e of edges) {
+        if (e.from === id) direct.add(e.to);
+        if (e.to === id) direct.add(e.from);
+      }
+
+      for (const [nid, el] of nodeElById.entries()) {
+        const isHit = direct.has(nid);
+        el.classList.toggle('isDim', !isHit);
+        el.classList.toggle('isHit', isHit && nid !== id);
+      }
+
+      // highlight relevant edges
+      for (const [key, p] of edgeElByKey.entries()) {
+        p.classList.remove('isHot');
+      }
+      for (const e of edges) {
+        if (e.from === id || e.to === id) {
+          const k = edgeKey(e);
+          const p = edgeElByKey.get(k);
+          if (p) p.classList.add('isHot');
+        }
+      }
+
+      renderInfo(id);
+    }
+
+    function renderInfo(id){
+      kv.innerHTML = '';
+      if (!id) {
+        const row = el('div','kvRow');
+        row.appendChild(el('b','', 'Hover/Click'));
+        row.appendChild(el('span','', 'để xem mô tả + deps'));
+        kv.appendChild(row);
+        return;
+      }
+
+      const n = nodes.find(x => x.id === id);
+      if (!n) return;
+
+      const role = roles[n.role] || { label: n.role, symbol: '?' };
+
+      const r1 = el('div','kvRow');
+      r1.appendChild(el('b','', 'Tên'));
+      r1.appendChild(el('span','', n.title));
+      kv.appendChild(r1);
+
+      const r2 = el('div','kvRow');
+      r2.appendChild(el('b','', 'Vai trò'));
+      r2.appendChild(el('span','', `${role.symbol} ${role.label}`));
+      kv.appendChild(r2);
+
+      const r3 = el('div','kvRow');
+      r3.appendChild(el('b','', 'Đường dẫn'));
+      r3.appendChild(el('span','', n.path));
+      kv.appendChild(r3);
+
+      const outgoing = edges.filter(e => e.from === id);
+      const incoming = edges.filter(e => e.to === id);
+
+      const r4 = el('div','kvRow');
+      r4.appendChild(el('b','', 'Deps (out)'));
+      r4.appendChild(el('span','', outgoing.length ? outgoing.map(e => `${e.to} (${e.kind})`).join(', ') : '—'));
+      kv.appendChild(r4);
+
+      const r5 = el('div','kvRow');
+      r5.appendChild(el('b','', 'Used by (in)'));
+      r5.appendChild(el('span','', incoming.length ? incoming.map(e => `${e.from} (${e.kind})`).join(', ') : '—'));
+      kv.appendChild(r5);
+
+      const r6 = el('div','kvRow');
+      r6.appendChild(el('b','', 'Mô tả'));
+      r6.appendChild(el('span','', n.desc));
+      kv.appendChild(r6);
+    }
+
+    function normalize(s){
+      return String(s || '').toLowerCase().trim();
+    }
+
+    function applySearch(text){
+      const query = normalize(text);
+      if (!query) {
+        pinnedId = null;
+        clearFocus();
+        return;
+      }
+
+      // Find best match by title/path/id
+      const hits = nodes
+        .map(n => {
+          const hay = `${n.title} ${n.path} ${n.id} ${n.desc}`.toLowerCase();
+          const score = hay.includes(query) ? 1 : 0;
+          return { n, score };
+        })
+        .filter(x => x.score > 0);
+
+      if (!hits.length) {
+        pinnedId = null;
+        // dim all
+        for (const el of nodeElById.values()) {
+          el.classList.add('isDim');
+          el.classList.remove('isHit');
+        }
+        for (const p of edgeElByKey.values()) p.classList.remove('isHot');
+        renderInfo(null);
+        return;
+      }
+
+      const first = hits[0].n;
+      pinnedId = first.id;
+      focusNode(first.id);
+
+      // ensure visible
+      const el = nodeElById.get(first.id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    }
+
+    // init
+    renderNodes();
+    // Draw edges after layout
+    requestAnimationFrame(() => drawEdges());
+
+    // Recompute edges on resize (font metrics changes) and stage scroll size changes
+    const ro = new ResizeObserver(() => drawEdges());
+    ro.observe(stage);
+
+    window.addEventListener('resize', () => drawEdges());
+
+    // Search interactions
+    q.addEventListener('input', () => applySearch(q.value));
+
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        q.value = '';
+        pinnedId = null;
+        clearFocus();
+        q.blur();
+      }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+        ev.preventDefault();
+        q.focus();
+      }
+    });
+
+    // Initial info
+    renderInfo(null);
+  </script>
+</body>
+</html>

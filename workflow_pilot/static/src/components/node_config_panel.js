@@ -40,6 +40,11 @@ export class NodeConfigPanel extends Component {
             isDirty: false,
             controlValues: {},  // Local copy of control values
             controls: [],  // Control metadata from adapter
+            // Expression UI modes (persisted in node.meta.ui)
+            controlModes: {},  // { [controlKey]: 'fixed' | 'expression' }
+            pairModes: {},  // { [controlKey]: { [pairId]: 'fixed' | 'expression' } }
+            // Execution snapshot for expression preview
+            lastExecutionContext: null, // { $vars, $node, $json, $loop, $input }
             // Execution state
             isExecuting: false,
             executionResult: null,  // { output, error, meta }
@@ -77,7 +82,36 @@ export class NodeConfigPanel extends Component {
         }
         this.state.controlValues = values;
 
-        console.log('[NodeConfigPanel] Initialized from adapter:', values);
+        // Restore UI modes from node meta (persisted)
+        const meta = this.adapterService.getNodeMeta?.(nodeId) || {};
+        const ui = meta.ui || {};
+        const restoredControlModes = ui.controlModes || {};
+        const restoredPairModes = ui.pairModes || {};
+
+        // Ensure every control has a mode (default: fixed)
+        const nextControlModes = { ...restoredControlModes };
+        const nextPairModes = { ...restoredPairModes };
+
+        for (const control of controls) {
+            if (!nextControlModes[control.key]) {
+                nextControlModes[control.key] = 'fixed';
+            }
+            if (control.type === 'keyvalue') {
+                const pairs = Array.isArray(values[control.key]) ? values[control.key] : [];
+                const map = { ...(nextPairModes[control.key] || {}) };
+                for (const p of pairs) {
+                    const id = p?.id;
+                    if (id === undefined || id === null) continue;
+                    if (!map[id]) {
+                        map[id] = 'fixed';
+                    }
+                }
+                nextPairModes[control.key] = map;
+            }
+        }
+
+        this.state.controlModes = nextControlModes;
+        this.state.pairModes = nextPairModes;
     }
 
     /**
@@ -203,11 +237,26 @@ export class NodeConfigPanel extends Component {
      * - $vars/$loop: from workflowVariable service via adapterService.getExpressionContext()
      */
     get expressionPreviewContext() {
+        // Prefer the last execution snapshot for preview (stable, matches executed data flow).
+        if (this.state.lastExecutionContext) {
+            const snap = this.state.lastExecutionContext;
+            const inputJson = snap.$input?.json ?? snap.$input?.item ?? snap.$json ?? {};
+            return {
+                $vars: snap.$vars || {},
+                $loop: snap.$loop || null,
+                $node: snap.$node || {},
+                // For UX, treat $json as the current input item
+                $json: inputJson,
+                $input: snap.$input || { item: inputJson, json: inputJson },
+            };
+        }
+
         const base = this.adapterService.getExpressionContext?.() || {
             $vars: {},
             $node: {},
             $json: {},
             $loop: null,
+            $input: { item: null, json: null },
         };
 
         const workflow = this._getWorkflowFromContext();
@@ -218,7 +267,7 @@ export class NodeConfigPanel extends Component {
                 $loop: base.$loop || null,
                 $node: base.$node || {},
                 $json: json,
-                $input: json,
+                $input: { item: json, json },
             };
         }
 
@@ -231,8 +280,72 @@ export class NodeConfigPanel extends Component {
             // Prefer workflow-scoped node outputs for this node (ancestors)
             $node: wfContext.$node || base.$node || {},
             $json: json,
-            $input: json,
+            $input: { item: json, json },
         };
+    }
+
+    getControlMode(controlKey) {
+        return this.state.controlModes?.[controlKey] || 'fixed';
+    }
+
+    getPairModes(controlKey) {
+        return this.state.pairModes?.[controlKey] || {};
+    }
+
+    onControlModeChange = (controlKey, mode) => {
+        this.state.controlModes = {
+            ...(this.state.controlModes || {}),
+            [controlKey]: mode,
+        };
+        this._persistUiModes();
+    };
+
+    onPairModeChange = (controlKey, pairId, mode) => {
+        const current = this.state.pairModes || {};
+        const map = { ...(current[controlKey] || {}) };
+        map[pairId] = mode;
+        this.state.pairModes = { ...current, [controlKey]: map };
+        this._persistUiModes();
+    };
+
+    _persistUiModes() {
+        const nodeId = this.props.node.id;
+        this.adapterService.setNodeMeta?.(nodeId, {
+            ui: {
+                controlModes: this.state.controlModes || {},
+                pairModes: this.state.pairModes || {},
+            },
+        });
+    }
+
+    _reconcilePairModes(controlKey, pairs) {
+        const safePairs = Array.isArray(pairs) ? pairs : [];
+        const existing = (this.state.pairModes && this.state.pairModes[controlKey]) || {};
+        const next = { ...existing };
+        const ids = new Set(safePairs.map((p) => p?.id).filter((id) => id !== undefined && id !== null));
+
+        let changed = false;
+        for (const id of ids) {
+            if (!next[id]) {
+                next[id] = 'fixed';
+                changed = true;
+            }
+        }
+        for (const key of Object.keys(next)) {
+            const asNum = Number(key);
+            if (!ids.has(key) && !ids.has(asNum)) {
+                delete next[key];
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this.state.pairModes = {
+                ...(this.state.pairModes || {}),
+                [controlKey]: next,
+            };
+            this._persistUiModes();
+        }
     }
 
     /**
@@ -312,6 +425,9 @@ export class NodeConfigPanel extends Component {
             }
             // Notify parent to refresh variable inspector
             this.props.onExecute?.(nodeId, result);
+
+            // Snapshot expression context after execute for stable preview
+            this.state.lastExecutionContext = this.adapterService.getExpressionContext?.() || null;
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
             this.state.executionResult = {
@@ -336,6 +452,9 @@ export class NodeConfigPanel extends Component {
         const control = this.state.controls.find(c => c.key === controlKey);
         if (control) {
             control.value = value;
+            if (control.type === 'keyvalue') {
+                this._reconcilePairModes(controlKey, value);
+            }
         }
     };
 

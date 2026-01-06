@@ -137,6 +137,59 @@ export class WorkflowEditor {
     }
 
     /**
+     * Get node meta (UI/runtime metadata)
+     * @param {string} nodeId
+     * @returns {Object}
+     */
+    getNodeMeta(nodeId) {
+        const node = this.nodes.get(nodeId);
+        return node?.meta || {};
+    }
+
+    /**
+     * Update node meta (shallow merge + special handling for meta.ui)
+     * @param {string} nodeId
+     * @param {Object} metaPatch
+     * @returns {boolean}
+     */
+    setNodeMeta(nodeId, metaPatch = {}) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return false;
+
+        const prev = node.meta || {};
+        const patchUi = metaPatch.ui || null;
+
+        let nextUi = prev.ui;
+        if (patchUi) {
+            const prevUi = prev.ui || {};
+            nextUi = { ...prevUi, ...patchUi };
+
+            if (patchUi.controlModes) {
+                nextUi.controlModes = {
+                    ...(prevUi.controlModes || {}),
+                    ...patchUi.controlModes,
+                };
+            }
+            if (patchUi.pairModes) {
+                nextUi.pairModes = {
+                    ...(prevUi.pairModes || {}),
+                    ...patchUi.pairModes,
+                };
+            }
+        }
+
+        node.meta = {
+            ...prev,
+            ...metaPatch,
+            ...(patchUi ? { ui: nextUi } : {}),
+        };
+
+        // Notify listeners that state changed
+        this._emit('onChange', { event: 'meta', data: { nodeId, meta: node.meta } });
+        return true;
+    }
+
+    /**
      * Get node by ID
      */
     getNode(nodeId) {
