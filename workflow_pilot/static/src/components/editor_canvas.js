@@ -6,7 +6,7 @@ import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
 import { NodeConfigPanel } from "./node_config_panel";
 import { WorkflowGraph } from "../utils/graph_utils";
-import { DimensionConfig, CONNECTION } from "../core/dimensions";
+import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
 
 /**
  * EditorCanvas Component
@@ -470,8 +470,7 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Calculate cubic bezier path between two points
-     * Handles back-edges (source right of target) by routing around bottom
+     * Calculate normal forward bezier curve between two points
      * @param {number} sourceX 
      * @param {number} sourceY 
      * @param {number} targetX 
@@ -479,14 +478,6 @@ export class EditorCanvas extends Component {
      * @returns {string} SVG path d attribute
      */
     getBezierPath(sourceX, sourceY, targetX, targetY) {
-        const HANDLE_SIZE = 20;
-        const isBackEdge = sourceX - HANDLE_SIZE > targetX;
-
-        if (isBackEdge) {
-            return this.getBackEdgePath(sourceX, sourceY, targetX, targetY);
-        }
-
-        // Normal forward bezier curve
         const dx = Math.abs(targetX - sourceX);
         const controlOffset = Math.max(dx * 0.5, 50);
         return `M ${sourceX} ${sourceY} C ${sourceX + controlOffset} ${sourceY}, ${targetX - controlOffset} ${targetY}, ${targetX} ${targetY}`;
@@ -564,6 +555,36 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Calculate connection path(s) based on positions
+     * Unified method used by both renderedConnections and tempConnectionPath
+     * @param {{ x: number, y: number }} sourcePos
+     * @param {{ x: number, y: number }} targetPos
+     * @returns {{ paths: string[], isBackEdge: boolean, isVerticalStack: boolean }}
+     */
+    getConnectionPath(sourcePos, targetPos) {
+        const { isVerticalStack, isBackEdge } = detectConnectionType(sourcePos, targetPos);
+
+        if (isVerticalStack) {
+            const { path1, path2 } = this.getVerticalStackPath(
+                sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
+            );
+            return { paths: [path1, path2], isBackEdge: false, isVerticalStack: true };
+        }
+
+        if (isBackEdge) {
+            const path = this.getBackEdgePath(
+                sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
+            );
+            return { paths: [path], isBackEdge: true, isVerticalStack: false };
+        }
+
+        const path = this.getBezierPath(
+            sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
+        );
+        return { paths: [path], isBackEdge: false, isVerticalStack: false };
+    }
+
+    /**
      * Calculate socket position based on node position and socket type
      * Uses centralized DimensionConfig for consistency
      * @param {Object} node - Node object with x, y
@@ -581,9 +602,6 @@ export class EditorCanvas extends Component {
      * Returns paths as an array to support multi-segment routing
      */
     get renderedConnections() {
-        // Use connection constants from dimensions module
-        const EDGE_DETECTION = CONNECTION;
-
         return this.visibleConnections.map(conn => {
             const sourceNode = this.nodes.find(n => n.id === conn.source);
             const targetNode = this.nodes.find(n => n.id === conn.target);
@@ -592,50 +610,11 @@ export class EditorCanvas extends Component {
                 return { ...conn, paths: [''], isBackEdge: false, isVerticalStack: false };
             }
 
-            const sourcePos = this.getSocketPositionForNode(
-                sourceNode, conn.sourceHandle, 'output'
-            );
-            const targetPos = this.getSocketPositionForNode(
-                targetNode, conn.targetHandle, 'input'
-            );
+            const sourcePos = this.getSocketPositionForNode(sourceNode, conn.sourceHandle, 'output');
+            const targetPos = this.getSocketPositionForNode(targetNode, conn.targetHandle, 'input');
 
-            // Calculate deltas
-            const deltaX = sourcePos.x - targetPos.x;
-            const deltaY = targetPos.y - sourcePos.y;
-
-            // Detect vertical stack using ratio-based approach
-            // S-curve ONLY when: 
-            // 1. Target is to the LEFT of source (backward connection)
-            // 2. Target is significantly below source
-            const isVerticalStack =
-                deltaY > EDGE_DETECTION.MIN_DELTA_Y &&
-                deltaX > 0;
-
-            // Detect back-edge (source right of target) - excludes vertical stack
-            const isBackEdge =
-                sourcePos.x > targetPos.x &&
-                !isVerticalStack;
-
-            // Use S-curve bracket routing for vertically stacked nodes
-            if (isVerticalStack) {
-                const { path1, path2 } = this.getVerticalStackPath(
-                    sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
-                );
-                return {
-                    ...conn,
-                    paths: [path1, path2],
-                    isBackEdge: false,
-                    isVerticalStack: true
-                };
-            }
-
-            // Normal or back-edge single path
-            const path = this.getBezierPath(
-                sourcePos.x, sourcePos.y,
-                targetPos.x, targetPos.y
-            );
-
-            return { ...conn, paths: [path], isBackEdge, isVerticalStack: false };
+            const result = this.getConnectionPath(sourcePos, targetPos);
+            return { ...conn, ...result };
         });
     }
 
@@ -646,6 +625,7 @@ export class EditorCanvas extends Component {
     /**
      * Get temp connection path while drawing
      * Returns empty string if not drawing
+     * Uses unified getConnectionPath for consistency with renderedConnections
      */
     get tempConnectionPath() {
         if (!this.state.isConnecting || !this.state.connectionStart || !this.state.tempLineEndpoint) {
@@ -663,13 +643,12 @@ export class EditorCanvas extends Component {
             ? { x: this.state.snappedSocket.x, y: this.state.snappedSocket.y }
             : this.state.tempLineEndpoint;
 
-        // If starting from output, draw normal direction
-        // If starting from input, reverse the curve
-        if (socketType === 'output') {
-            return this.getBezierPath(startPos.x, startPos.y, endPos.x, endPos.y);
-        } else {
-            return this.getBezierPath(endPos.x, endPos.y, startPos.x, startPos.y);
-        }
+        // Determine source/target based on socket type
+        const sourcePos = socketType === 'output' ? startPos : endPos;
+        const targetPos = socketType === 'output' ? endPos : startPos;
+
+        const { paths } = this.getConnectionPath(sourcePos, targetPos);
+        return paths.join(' ');
     }
 
     /**
@@ -936,6 +915,58 @@ export class EditorCanvas extends Component {
             this.props.onSelectNode(lastNode);
         }
     }
+
+    /**
+     * Handle node execute from toolbar
+     * Opens config panel and triggers execution
+     * @param {string} nodeId 
+     */
+    onNodeExecute(nodeId) {
+        // Open config panel for the node
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        // Show the config panel
+        this.state.configPanel = { visible: true, nodeId };
+
+        // Trigger execute callback if provided
+        if (this.props.onNodeExecute) {
+            this.props.onNodeExecute(nodeId);
+        }
+    }
+
+    /**
+     * Handle node delete from toolbar
+     * @param {string} nodeId 
+     */
+    onNodeDelete(nodeId) {
+        if (this.props.removeNode) {
+            this.props.removeNode(nodeId);
+        }
+        // Clear selection if deleted node was selected
+        if (this.selection.has(nodeId)) {
+            this.selection.delete(nodeId);
+        }
+    }
+
+    /**
+     * Handle node disable/enable toggle from toolbar
+     * @param {string} nodeId 
+     */
+    onNodeToggleDisable(nodeId) {
+        // Find node and toggle disabled state
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        // Toggle the disabled flag (will be handled by updateNode prop if available)
+        // For now, just log - actual implementation depends on parent component
+        console.log(`[EditorCanvas] Toggle disable for node: ${nodeId}, was disabled: ${node.disabled}`);
+
+        // This would typically be handled via props.updateNode callback
+        // For now, we emit a change via the standard position change mechanism
+        // or implement a dedicated onNodeUpdate prop
+    }
+
 
     /**
      * Deselect when clicking on canvas background

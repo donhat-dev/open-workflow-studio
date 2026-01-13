@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
 > **Version**: 1.1.0
-> **Last Updated**: 2025-12-30
+> **Last Updated**: 2026-01-06
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -13,6 +13,7 @@
 | **E1: Core Infrastructure** | P0 | 34 | 95% | Near Complete |
 | **E9: Variable System** | P0 | 19 | 100% | ✅ Done |
 | **E2: Node Execution Engine** | P0 | 55 | 60% | In Progress |
+| **E10: Python Runtime Engine** | P0 | 40 | 0% | Planned |
 | **E3: Node Library** | P0 | 45 | 42% | In Progress |
 | **E4: UI/UX Editor** | P1 | 48 | 80% | In Progress |
 | **E5: Expression System** | P1 | 24 | 50% | In Progress |
@@ -20,6 +21,39 @@
 | **E7: Production Features** | P2 | 34 | 0% | Planned |
 | **E8: Integrations** | P2 | 40 | 0% | Planned |
 | **TOTAL** | | **325** | **50%** | |
+
+> Note (2026-01): E2 (JS StackExecutor) remains a *prototype track* for UX/learning.
+> The production direction is E10: backend-owned execution in Python with a hybrid/feature-flagged integration.
+
+---
+
+## E10: PYTHON RUNTIME ENGINE (NEW)
+> Backend execution engine (Odoo/Python) + UI integration (hybrid flag)
+> Goal: Move execution/state machine/context off the frontend while keeping the editor UI stateless.
+
+| ID | Feature | SP | Priority | % Done | Status | Notes |
+|----|---------|---:|----------|-------:|--------|-------|
+| **E10.1** | **Execution API Contract** | **5** | P0 | **0%** | ❌ Planned | Define request/response schema + error model |
+| E10.1.1 | `execute_until(workflow_id, node_id, input)` RPC | 3 | P0 | 0% | ❌ | Returns per-node outputs + context snapshot |
+| E10.1.2 | Trace/Run IDs + minimal metadata | 2 | P1 | 0% | ❌ | For observability + UI refresh |
+| | | | | | | |
+| **E10.2** | **Python ExecutionContext** | **8** | P0 | **0%** | ❌ Planned | $vars/$node/$json/$input/$loop, snapshot/restore |
+| E10.2.1 | Context object + serialization | 5 | P0 | 0% | ❌ | Deterministic snapshot for UI |
+| E10.2.2 | Loop/branch state primitives | 3 | P0 | 0% | ❌ | Iteration limits, branch routing hooks |
+| | | | | | | |
+| **E10.3** | **Python Stack Executor MVP** | **13** | P0 | **0%** | ❌ Planned | Port core semantics from JS StackExecutor |
+| E10.3.1 | Graph execution loop (executeUntil) | 5 | P0 | 0% | ❌ | Stop at target node |
+| E10.3.2 | Branch routing (If) | 4 | P0 | 0% | ❌ | Multi-output routing |
+| E10.3.3 | Loop routing (Loop) | 4 | P0 | 0% | ❌ | Back-edge revisit with limits |
+| | | | | | | |
+| **E10.4** | **Node Runner Registry (MVP set)** | **8** | P0 | **0%** | ❌ Planned | Start with 2-4 high-value nodes |
+| E10.4.1 | HTTP Request runner | 3 | P0 | 0% | ❌ | With timeout + basic retries (later expand) |
+| E10.4.2 | Variable runner (set/get/append/merge) | 2 | P0 | 0% | ❌ | Mutates $vars |
+| E10.4.3 | Set Data / Mapping runner | 3 | P0 | 0% | ❌ | Expression evaluation parity |
+| | | | | | | |
+| **E10.5** | **Hybrid UI Integration** | **6** | P0 | **0%** | ❌ Planned | Feature flag Python vs JS |
+| E10.5.1 | `workflow_runtime_service` (frontend) | 3 | P0 | 0% | ❌ | Adapter uses RPC when enabled |
+| E10.5.2 | Context snapshot caching for preview | 3 | P0 | 0% | ❌ | UI uses last run snapshot ($json/$input) |
 
 ---
 

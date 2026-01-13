@@ -19,7 +19,10 @@ export class JsonTreeNode extends Component {
         keyName: { type: String, optional: true },  // Key name for display
         onItemClick: { type: Function, optional: true },
         // Force require: if provided, expression paths will be node-scoped: $("nodeId").json...
-        sourceNodeId: { type: String, optional: true },
+        // Can be null for $input nodes
+        sourceNodeId: { type: [String, { value: null }], optional: true },
+        // When true, expression paths use $input.json... prefix instead of node selector
+        isInputNode: { type: Boolean, optional: true },
         // When false, disables drag entirely (readonly tree)
         draggable: { type: Boolean, optional: true },
     };
@@ -108,8 +111,12 @@ export class JsonTreeNode extends Component {
     }
 
     get expressionPath() {
-        // Force require source node for drag/copy semantics.
-        // If sourceNodeId is provided, always generate node-scoped selector.
+        // If isInputNode, use $input prefix (matches CodeNode runtime)
+        if (this.props.isInputNode) {
+            return generateExpressionPath(this.props.path, '$input');
+        }
+
+        // If sourceNodeId is provided, use node-scoped selector
         if (this.props.sourceNodeId) {
             return generateNodeSelectorExpressionPath(this.props.sourceNodeId, this.props.path);
         }
@@ -140,8 +147,8 @@ export class JsonTreeNode extends Component {
     get isDraggable() {
         // Explicitly disabled by parent
         if (this.props.draggable === false) return false;
-        // Force require: only allow drag when data is tied to a concrete source node
-        return Boolean(this.props.sourceNodeId);
+        // Allow drag for $input nodes or node-scoped data
+        return this.props.isInputNode || Boolean(this.props.sourceNodeId);
     }
 
     onDragStart(ev) {

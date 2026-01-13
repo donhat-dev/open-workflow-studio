@@ -34,6 +34,8 @@ export class NodeConfigPanel extends Component {
         this.adapterService = useService("workflowAdapter");
         // Executor service for workflow execution
         this.executorService = useService("workflowExecutor");
+        // Run service for orchestrated execution (Option B refactor)
+        this.runService = useService("workflowRun");
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -112,6 +114,9 @@ export class NodeConfigPanel extends Component {
 
         this.state.controlModes = nextControlModes;
         this.state.pairModes = nextPairModes;
+
+        // Initialize ancestor section collapse state (first node expanded, others collapsed)
+        this._initAncestorCollapseState();
     }
 
     /**
@@ -192,6 +197,7 @@ export class NodeConfigPanel extends Component {
     /**
      * Get aggregated context from all ancestor nodes
      * Shows data from all previously executed nodes
+     * Returns array with isInputNode marker for expression prefix handling
      */
     get leftPanelData() {
         const workflow = this._getWorkflowFromContext();
@@ -203,7 +209,31 @@ export class NodeConfigPanel extends Component {
             this.props.node.id
         );
 
-        return context.$node;
+        const $node = context.$node || {};
+        const entries = Object.entries($node);
+        if (entries.length === 0) return null;
+
+        // Return array with isInputNode marker (first node = $input)
+        return entries.map(([nodeId, data], index) => ({
+            nodeId,
+            data,
+            isInputNode: index === 0,
+        }));
+    }
+
+    /**
+     * Initialize collapse state for ancestor sections
+     * First node ($input) expanded, others collapsed
+     * @private
+     */
+    _initAncestorCollapseState() {
+        const leftData = this.leftPanelData || [];
+        const defaults = { '$vars': true }; // $vars always collapsed
+        for (const item of leftData) {
+            // First node (isInputNode) expanded, others collapsed
+            defaults[item.nodeId] = !item.isInputNode;
+        }
+        this.state.collapsedSections = { ...defaults, ...this.state.collapsedSections };
     }
 
     /**
@@ -379,55 +409,48 @@ export class NodeConfigPanel extends Component {
     /**
      * Execute workflow up to this node
      *
-     * Phase 3 Flow:
-     * 1. Sync current controlValues to Core via adapterService
-     * 2. Execute workflow via executorService
-     * 3. Get results
+     * Phase 3 Flow (Refactored via workflowRunService):
+     * 1. runService handles config sync
+     * 2. runService calls executorService
+     * 3. Results returned to UI
      */
     async onExecute() {
-        if (this.state.isExecuting) return;
+        if (this.runService.isExecuting) return;
 
         const nodeId = this.props.node.id;
-
-        // Phase 3: Sync config to Core layer via adapterService
-        this.adapterService.setNodeConfig(nodeId, this.state.controlValues);
-        console.log('[NodeConfigPanel] Config synced via adapterService');
+        const workflow = this._getWorkflowFromContext();
 
         this.state.isExecuting = true;
         this.state.executionResult = null;
 
         try {
-            const workflow = this._getWorkflowFromContext();
             let result = null;
+
             if (workflow) {
-                // Use executor service for proper data flow
-                await this.executorService.executeUntil(
+                // Use runService for proper orchestration
+                result = await this.runService.runUntilNode(
                     workflow,
                     nodeId,
-                    (executedNodeId, result) => {
-                        console.log(`[NodeConfigPanel] Node ${executedNodeId} executed:`, result);
+                    {
+                        syncConfig: true,
+                        controlValues: this.state.controlValues,
+                        onProgress: (executedNodeId, nodeResult) => {
+                            console.log(`[NodeConfigPanel] Node ${executedNodeId} executed`);
+                        }
                     }
                 );
 
-                // Get result from executor service
-                result = this.executorService.getNodeOutput(nodeId);
-                this.state.executionResult = result
-                    ? { output: result.json, error: result.error, meta: result.meta }
-                    : null;
+                this.state.executionResult = result;
+                this.state.lastExecutionContext = result?.expressionContext || null;
             } else {
-                // Fallback to single node execution via adapterService
-                result = await this.adapterService.executeNode(nodeId, {});
-                this.state.executionResult = {
-                    output: result.json,
-                    error: result.error,
-                    meta: result.meta,
-                };
+                // Fallback to single node execution
+                result = await this.runService.runNode(nodeId, {});
+                this.state.executionResult = result;
             }
+
             // Notify parent to refresh variable inspector
             this.props.onExecute?.(nodeId, result);
 
-            // Snapshot expression context after execute for stable preview
-            this.state.lastExecutionContext = this.adapterService.getExpressionContext?.() || null;
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
             this.state.executionResult = {

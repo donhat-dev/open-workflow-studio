@@ -13,7 +13,7 @@
 			</div>
 			<!-- Quick-add connector: output sockets only, when not connected -->
 			<t t-if="props.type === 'output' and !props.isConnected and props.onQuickAdd">
-				<div class="socket-quick-add-connector">
+				<div class="socket-quick-add-connector" t-on-mousedown.stop.prevent="onQuickAddMouseDown">
 					<span class="socket-quick-add-line"/>
 					<button class="socket-quick-add-btn" t-on-click.stop.prevent="onQuickAddClick" title="Add connection">
 						<i class="fa fa-plus"/>

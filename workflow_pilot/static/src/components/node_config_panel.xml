@@ -34,18 +34,31 @@
 						</div>
 						<div class="left-panel-content">
 							<!-- Show ancestor nodes with their outputs -->
-							<t t-if="leftPanelData and Object.keys(leftPanelData).length > 0">
-								<t t-foreach="Object.entries(leftPanelData)" t-as="entry" t-key="entry[0]">
-									<div class="ancestor-node-section" t-att-class="{ collapsed: isSectionCollapsed(entry[0]) }">
-										<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection(entry[0])">
-											<i t-att-class="'fa ' + (isSectionCollapsed(entry[0]) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
-											<i class="fa fa-cube"/>
-											<span t-esc="entry[1].title"/>
+							<t t-if="leftPanelData and leftPanelData.length > 0">
+								<t t-foreach="leftPanelData" t-as="item" t-key="item.nodeId">
+									<div class="ancestor-node-section" t-att-class="{ collapsed: isSectionCollapsed(item.nodeId) }">
+										<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection(item.nodeId)">
+											<i t-att-class="'fa ' + (isSectionCollapsed(item.nodeId) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
+											<i t-att-class="item.isInputNode ? 'fa fa-sign-in' : 'fa fa-cube'"/>
+											<t t-if="item.isInputNode">
+												<span>$input (
+													
+													
+													
+													<t t-esc="item.data.title"/>)
+												
+												
+												
+												</span>
+											</t>
+											<t t-else="">
+												<span t-esc="item.data.title"/>
+											</t>
 										</div>
-										<div class="ancestor-node-data" t-if="!isSectionCollapsed(entry[0]) and entry[1].json !== undefined">
-											<JsonTreeNode data="entry[1].json" path="[]" sourceNodeId="entry[0]"/>
+										<div class="ancestor-node-data" t-if="!isSectionCollapsed(item.nodeId) and item.data.json !== undefined">
+											<JsonTreeNode data="item.data.json" path="[]" isInputNode="item.isInputNode" sourceNodeId="item.isInputNode ? null : item.nodeId"/>
 										</div>
-										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(entry[0])">
+										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(item.nodeId)">
 											<div class="input-data-empty">
 												<span>No output data</span>
 											</div>
@@ -66,12 +79,6 @@
 									</div>
 								</div>
 							</t>
-							<!-- Fallback: show inputData if no ancestor context -->
-							<t t-elif="inputData">
-								<div class="input-data-tree">
-									<JsonTreeNode data="inputData" path="[]" draggable="false"/>
-								</div>
-							</t>
 							<t t-else="">
 								<div class="input-data-empty">
 									<i class="fa fa-database"/>
@@ -84,11 +91,9 @@
 							<button class="node-execute-btn small" t-on-click="onExecute" t-att-disabled="state.isExecuting or !canExecute" t-att-class="{ executing: state.isExecuting }">
 								<t t-if="state.isExecuting">
 									<i class="fa fa-spinner fa-spin"/> Running...
-								
 								</t>
 								<t t-else="">
 									<i class="fa fa-play"/> Execute
-								
 								</t>
 							</button>
 							<t t-if="state.executionResult">
@@ -108,13 +113,22 @@
 							
 							
 							
+							
+							
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
 								<i class="fa fa-code"/> Output
 							
+							
+							
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
 								<i class="fa fa-cog"/> Settings
+							
+							
+							
 							
 							
 							

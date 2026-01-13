@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+	<t t-name="workflow_pilot.canvas_node_toolbar">
+		<div class="canvas-node-toolbar" t-on-mousedown.stop="" t-on-click.stop="">
+			<div class="canvas-node-toolbar__items">
+				<!-- Execute Button -->
+				<button class="toolbar-btn" t-on-click="onExecuteClick" t-att-disabled="props.isDisabled or props.isExecuting" title="Execute this node">
+					<i t-att-class="props.isExecuting ? 'fa fa-spinner fa-spin' : 'fa fa-play'"/>
+				</button>
+				<!-- Open Config Button -->
+				<button class="toolbar-btn" t-on-click="onConfigClick" title="Open configuration">
+					<i class="fa fa-cog"/>
+				</button>
+				<!-- Disable/Enable Toggle -->
+				<button class="toolbar-btn" t-on-click="onToggleClick" t-att-title="toggleTitle">
+					<i t-att-class="'fa ' + toggleIcon"/>
+				</button>
+				<!-- Delete Button -->
+				<button class="toolbar-btn toolbar-btn--danger" t-on-click="onDeleteClick" title="Delete node">
+					<i class="fa fa-trash"/>
+				</button>
+				<!-- Overflow Menu -->
+				<button class="toolbar-btn" t-if="props.onOpenMenu" t-on-click="onMenuClick" title="More options">
+					<i class="fa fa-ellipsis-v"/>
+				</button>
+			</div>
+		</div>
+	</t>
+</templates>

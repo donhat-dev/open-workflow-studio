@@ -1,0 +1,94 @@
+/**
+ * Canvas Node Toolbar Styles
+ * Floating toolbar above nodes with hover visibility
+ */
+
+.canvas-node-toolbar {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  padding-bottom: 6px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.canvas-node-toolbar__items {
+  display: flex;
+  gap: 2px;
+  background: var(--node-toolbar-bg, rgba(26, 26, 46, 0.95));
+  border: 1px solid var(--node-border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 6px;
+  padding: 4px 6px;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Show on parent hover or selected state */
+.workflow-node:hover .canvas-node-toolbar__items,
+.workflow-node.selected .canvas-node-toolbar__items,
+.workflow-node:focus-within .canvas-node-toolbar__items {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #8888aa);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.1s ease, color 0.1s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--color-text, #ffffff);
+  }
+
+  &:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Execute button - green accent on hover */
+  &:first-child:hover:not(:disabled) {
+    color: var(--color-success, #4ade80);
+  }
+
+  /* Danger button - red accent on hover */
+  &--danger:hover:not(:disabled) {
+    color: var(--color-danger, #f87171);
+    background: rgba(248, 113, 113, 0.15);
+  }
+
+  .fa {
+    font-size: 11px;
+  }
+
+  .fa-spinner {
+    font-size: 10px;
+  }
+}
+
+/* Separator between button groups */
+.toolbar-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 4px 4px;
+}

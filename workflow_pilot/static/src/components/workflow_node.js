@@ -2,6 +2,7 @@
 
 import { Component, useRef, useState, useExternalListener, onMounted } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
+import { CanvasNodeToolbar } from "./canvas_node_toolbar";
 import { MotionHelpers } from "../utils/motion_helpers";
 
 /**
@@ -13,7 +14,7 @@ import { MotionHelpers } from "../utils/motion_helpers";
 export class WorkflowNode extends Component {
     static template = "workflow_pilot.workflow_node";
 
-    static components = { WorkflowSocket };
+    static components = { WorkflowSocket, CanvasNodeToolbar };
     static props = {
         node: Object,
         zoom: { type: Number, optional: true },
@@ -26,6 +27,9 @@ export class WorkflowNode extends Component {
         onSocketMouseUp: { type: Function, optional: true },
         onSocketQuickAdd: { type: Function, optional: true },  // Quick-add button on unconnected sockets
         onDoubleClick: { type: Function, optional: true },  // Double-click to open config
+        onExecute: { type: Function, optional: true },  // Execute node from toolbar
+        onDelete: { type: Function, optional: true },  // Delete node from toolbar
+        onToggleDisable: { type: Function, optional: true },  // Toggle disable from toolbar
         selected: { type: Boolean, optional: true },
     };
 

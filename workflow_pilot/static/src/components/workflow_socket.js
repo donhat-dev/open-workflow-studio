@@ -65,5 +65,23 @@ export class WorkflowSocket extends Component {
             event: ev,
         });
     }
+
+    /**
+     * Handle mouse down on quick-add button - start connection drag from this socket
+     * This allows users to drag from the + button to create connections
+     * @param {MouseEvent} ev 
+     */
+    onQuickAddMouseDown(ev) {
+        // Only left click starts connection
+        if (ev.button !== 0) return;
+
+        // Trigger the same flow as socket point mousedown
+        this.props.onMouseDown?.({
+            nodeId: this.props.nodeId,
+            socketKey: this.props.name,
+            socketType: this.props.type,
+            event: ev
+        });
+    }
 }
 

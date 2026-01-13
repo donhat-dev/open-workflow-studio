@@ -48,6 +48,7 @@ Legend: ✓ Done  ◐ In Progress  ○ Not Started
 | **M1.3** Flow Control | E2.2, E3.2 | 32 | 5% ○ |
 | **M1.4** Canvas & UI | E4.1-E4.3 | 28 | 100% ✓ |
 | **M1.5** Expressions | E5.1-E5.2 | 13 | 75% ◐ |
+| **M1.6** Python Engine MVP (Hybrid) | E10.1-E10.4 | 24 | 0% ○ |
 
 ### MVP Checklist
 
@@ -57,6 +58,8 @@ Legend: ✓ Done  ◐ In Progress  ○ Not Started
 - [x] Execute HTTP requests
 - [x] Data validation & mapping
 - [x] Basic {{ }} expressions
+- [ ] Python executeUntil RPC (hybrid flag)
+- [ ] Backend returns context snapshot ($vars/$node/$json/$input/$loop)
 - [ ] If/Loop node execution
 - [ ] Branch/back-edge routing
 - [ ] Queue-based executor
@@ -150,8 +153,8 @@ Sprint | Phase   | Focus                        | Target SP
 -------|---------|------------------------------|----------
 1      | MVP     | Flow Control Nodes           | 20
 2      | MVP     | Queue Executor               | 15
-3      | MVP     | Triggers + Validation        | 13
-4      | MVP     | Buffer / Polish              | 10
+3      | MVP     | Python Engine MVP + RPC      | 18
+4      | MVP     | Hybrid integration + parity  | 12
 -------|---------|------------------------------|----------
 5      | Beta    | Backend Storage              | 15
 6      | Beta    | Odoo Integration             | 15

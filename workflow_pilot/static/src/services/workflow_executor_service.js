@@ -250,6 +250,128 @@ export const workflowExecutorService = {
             },
 
             /**
+             * Execute entire workflow (all nodes from start to end)
+             * Finds all end nodes (nodes with no outgoing connections) and executes full flow
+             *
+             * @param {Object} workflow - { nodes: [], connections: [] }
+             * @param {Function} onNodeComplete - Callback(nodeId, result)
+             * @returns {Promise<Map>} nodeOutputs map
+             */
+            async executeAll(workflow, onNodeComplete = null) {
+                if (isExecuting) {
+                    throw new Error("Workflow execution already in progress");
+                }
+
+                // Find all end nodes (nodes with no outgoing connections)
+                const nodesWithOutput = new Set(workflow.connections.map(c => c.source));
+                const endNodes = workflow.nodes.filter(n => !nodesWithOutput.has(n.id));
+
+                if (endNodes.length === 0) {
+                    // If no end nodes found, execute last node in list
+                    console.warn('[WorkflowExecutor] No end nodes found, executing last node');
+                    const lastNode = workflow.nodes[workflow.nodes.length - 1];
+                    if (lastNode) {
+                        return this.executeUntil(workflow, lastNode.id, onNodeComplete);
+                    }
+                    return new Map();
+                }
+
+                console.log(`[WorkflowExecutor] Executing full workflow with ${endNodes.length} end node(s):`,
+                    endNodes.map(n => n.id));
+
+                isExecuting = true;
+                currentWorkflow = workflow;
+
+                // Clear previous results
+                nodeOutputs.clear();
+                executor.reset();
+
+                // Create fresh execution context
+                const execContext = workflowVariable.createContext(workflow?.id || null);
+
+                // Create workflow view with resolved config
+                const workflowWithConfig = {
+                    ...workflow,
+                    nodes: (workflow.nodes || []).map((n) => ({
+                        ...n,
+                        config: workflowAdapter.getNodeConfig(n.id) || n.config || {},
+                    })),
+                };
+
+                try {
+                    // Execute to each end node (StackExecutor reuses cached results)
+                    for (const endNode of endNodes) {
+                        console.log(`[WorkflowExecutor] Executing path to end node: ${endNode.id}`);
+
+                        await executor.executeUntil(workflowWithConfig, endNode.id, {
+                            context: execContext,
+                            nodeRunner: async (node, resolvedConfig, exprCtx, context, helpers) => {
+                                const nodeId = node.id;
+                                const startTime = Date.now();
+
+                                try {
+                                    const NodeClass = workflowNode.getNodeClass(node.type);
+                                    if (!NodeClass) {
+                                        return {
+                                            outputs: [],
+                                            json: null,
+                                            error: `Unknown node type: ${node.type}`,
+                                            meta: {},
+                                        };
+                                    }
+
+                                    const instance = new NodeClass();
+                                    instance.setConfig(resolvedConfig || {});
+                                    const inputData = context?.$json || {};
+                                    const output = await instance.execute(inputData, exprCtx, context, helpers);
+
+                                    return {
+                                        outputs: output.outputs || [[output.json || output]],
+                                        json: output.json || output,
+                                        branch: output.branch,
+                                        error: null,
+                                        meta: {
+                                            duration: Date.now() - startTime,
+                                            executedAt: new Date().toISOString(),
+                                            ...output.meta,
+                                        },
+                                    };
+                                } catch (error) {
+                                    console.error(`[WorkflowExecutor] Node ${nodeId} error:`, error);
+                                    return {
+                                        outputs: [],
+                                        json: null,
+                                        error: error?.message || String(error),
+                                        meta: {
+                                            duration: Date.now() - startTime,
+                                            executedAt: new Date().toISOString(),
+                                        },
+                                    };
+                                }
+                            },
+                            onNodeStart: (nodeId, node) => {
+                                console.log(`[WorkflowExecutor] Starting: ${nodeId} (${node.type})`);
+                            },
+                            onNodeComplete: (nodeId, result) => {
+                                if (!nodeOutputs.has(nodeId)) {
+                                    nodeOutputs.set(nodeId, result);
+                                    console.log(`[WorkflowExecutor] Completed: ${nodeId}`);
+                                    onNodeComplete?.(nodeId, result);
+                                }
+                            },
+                            onError: (error) => {
+                                console.error(`[WorkflowExecutor] Execution error:`, error);
+                            },
+                        });
+                    }
+
+                    return nodeOutputs;
+                } finally {
+                    isExecuting = false;
+                }
+            },
+
+            /**
              * Get execution state
              */
             isExecuting() {

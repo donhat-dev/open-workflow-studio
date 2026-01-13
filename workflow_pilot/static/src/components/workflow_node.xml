@@ -2,6 +2,8 @@
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_pilot.workflow_node">
 		<div class="workflow-node" t-ref="root" t-att-class="nodeTypeClass + (state.isDragging ? ' dragging' : '') + (props.selected ? ' selected' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick">
+			<!-- Toolbar (shows on hover) -->
+			<CanvasNodeToolbar nodeId="props.node.id" isDisabled="props.node.disabled" onExecute="props.onExecute" onDelete="props.onDelete" onToggleDisable="props.onToggleDisable" onOpenConfig="props.onDoubleClick" />
 			<!-- Header: Drag Handle -->
 			<div class="workflow-node__header" t-on-mousedown="onHeaderMouseDown">
 				<span class="workflow-node__icon">

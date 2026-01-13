@@ -140,3 +140,28 @@ export class DimensionConfig {
 
 // Default instance for convenience
 export const defaultDimensions = new DimensionConfig();
+
+// =========================================
+// Connection Path Helpers
+// =========================================
+
+/**
+ * Detect connection type based on source/target positions
+ * Centralizes the detection logic used by both renderedConnections and tempConnectionPath
+ * 
+ * @param {{ x: number, y: number }} sourcePos - Source socket position
+ * @param {{ x: number, y: number }} targetPos - Target socket position
+ * @returns {{ isVerticalStack: boolean, isBackEdge: boolean }}
+ */
+export function detectConnectionType(sourcePos, targetPos) {
+    const deltaX = sourcePos.x - targetPos.x;
+    const deltaY = targetPos.y - sourcePos.y;
+
+    // S-curve (vertical stack): target LEFT of source AND significantly below
+    const isVerticalStack = deltaY > CONNECTION.MIN_DELTA_Y && deltaX > 0;
+
+    // Back-edge: source right of target (with buffer), NOT vertical stack
+    const isBackEdge = deltaX > CONNECTION.HANDLE_SIZE && !isVerticalStack;
+
+    return { isVerticalStack, isBackEdge };
+}
