@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, reactive, onMounted } from "@odoo/owl";
+import { Component, useRef, useState, useExternalListener, reactive, onMounted, useEnv } from "@odoo/owl";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
@@ -13,28 +13,13 @@ import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimen
  * 
  * Main canvas for the workflow editor. Manages node positions, selection,
  * and drag-drop from palette.
- * 
- * Uses props.nodes directly (controlled component pattern).
+ * Reads graph state from workflowEditor service via env.
  */
 export class EditorCanvas extends Component {
     static template = "workflow_pilot.editor_canvas";
     static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel };
 
     static props = {
-        nodes: { type: Array, optional: true },
-        connections: { type: Array, optional: true },
-        onDropNode: { type: Function, optional: true },
-        onSelectNode: { type: Function },
-        onNodePositionChange: { type: Function },
-        onConnectionCreate: { type: Function },
-        removeNode: { type: Function },
-        removeConnection: { type: Function },
-        onPasteNode: { type: Function },
-        undo: { type: Function, optional: true },
-        redo: { type: Function, optional: true },
-        onBeginBatch: { type: Function, optional: true },
-        onEndBatch: { type: Function, optional: true },
-        onNodeExecute: { type: Function, optional: true },  // Callback when node is executed
         // Dimension configuration for node sizing
         dimensionConfig: { type: Object, optional: true },
     };
@@ -43,6 +28,10 @@ export class EditorCanvas extends Component {
         this.rootRef = useRef("root");
         this.svgRef = useRef("svgConnections");
         this.contentRef = useRef("content");
+        this.env = useEnv();
+        this.editor = this.env.workflowEditor;
+        // Bind component to service state reactivity
+        this.editorState = useState(this.editor.state);
 
         this.state = useState({
             isConnecting: false,
@@ -56,8 +45,8 @@ export class EditorCanvas extends Component {
             },
             isSelecting: false,
             selectionBox: null,
-            // Nodes selection is managed by this.selection (Reactive Set)
-            // selectedNodeIds removed in favor of Set
+            // Selected connection IDs (Still managed locally for now, 
+            // as they are primarily used for rendering connections in this component)
             selectedConnectionIds: [],
             // Dimension configuration (reactive for runtime updates)
             dimensionConfig: this.props.dimensionConfig || {},
@@ -97,14 +86,56 @@ export class EditorCanvas extends Component {
         this._panStart = null;
         this._panInitial = null;
 
-        // Performance: Reactive Set for node selection
-        // Automatically handles reactivity for has/add/delete
-        this.selection = reactive(new Set());
-
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
         useExternalListener(document, "keydown", this.onKeyDown.bind(this));
+
+        this.editor.bus.addEventListener("NODE:EXECUTE", async (ev) => {
+            const { nodeId } = ev.detail;
+            // Execute up to this node via workflowRun service
+            const runService = this.env.services.workflowRun;
+            const adapter = this.env.services.workflowAdapter;
+
+            if (!runService || !adapter) {
+                console.error('[EditorCanvas] Missing workflowRun or workflowAdapter service');
+                return;
+            }
+
+            const workflow = {
+                nodes: adapter.state.nodes,
+                connections: adapter.state.connections,
+            };
+
+            console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
+            await runService.runUntilNode(workflow, nodeId);
+        });
+        this.editor.bus.addEventListener("NODE:TOGGLE_DISABLE", (ev) => {
+            const { nodeId } = ev.detail;
+            this.editor.actions.toggleDisable(nodeId);
+        });
+        // Config panel sync from service
+        this.editor.bus.addEventListener("PANEL:CONFIG_OPENED", (ev) => {
+            const { nodeId } = ev.detail;
+            this.state.configPanel = { visible: true, nodeId };
+        });
+        this.editor.bus.addEventListener("PANEL:CONFIG_CLOSED", () => {
+            this.state.configPanel = { visible: false, nodeId: null };
+        });
+        // Socket events from WorkflowNode (t-props pattern via bus)
+        this.editor.bus.addEventListener("SOCKET:MOUSE_DOWN", (ev) => {
+            this.onSocketMouseDown(ev.detail);
+        });
+        this.editor.bus.addEventListener("SOCKET:MOUSE_UP", (ev) => {
+            this.onSocketMouseUp(ev.detail);
+        });
+        this.editor.bus.addEventListener("SOCKET:QUICK_ADD", (ev) => {
+            this.onSocketQuickAdd(ev.detail);
+        });
+        // Menu node selection spawning
+        this.editor.bus.addEventListener("MENU:NODE_SELECTED", (ev) => {
+            this.onNodeMenuSelect(ev.detail.nodeType, ev.detail.connectionContext);
+        });
 
         window.canvas = this;
     }
@@ -126,17 +157,24 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Get nodes from props
+     * Get nodes from editor service state
      */
     get nodes() {
-        return this.props.nodes || [];
+        return this.editorState.graph.nodes || [];
     }
 
     /**
-     * Get connections from props
+     * Get connections from editor service state
      */
     get connections() {
-        return this.props.connections || [];
+        return this.editorState.graph.connections || [];
+    }
+
+    /**
+     * Get a Set of selected node IDs for efficient lookups
+     */
+    get selectionSet() {
+        return new Set(this.editorState.ui.selection.nodeIds || []);
     }
 
     /**
@@ -404,12 +442,8 @@ export class EditorCanvas extends Component {
                 node.x = pos.x;
                 node.y = pos.y;
 
-                // Sync with Core layer
-                this.props.onNodePositionChange({
-                    nodeId: node.id,
-                    x: pos.x,
-                    y: pos.y,
-                });
+                // Sync with Core layer via service action
+                this.editor.actions.moveNode(node.id, { x: pos.x, y: pos.y });
             }
         }
     }
@@ -452,8 +486,11 @@ export class EditorCanvas extends Component {
         });
 
         // Clear and add to reactive Set
-        this.selection.clear();
-        selected.forEach(n => this.selection.add(n.id));
+        if (selected.length > 0) {
+            this.editor.actions.select(selected.map(n => n.id));
+        } else {
+            this.editor.actions.select([]);
+        }
 
         // Flag to prevent onCanvasClick from clearing selection
         // (click event fires after mouseup)
@@ -465,7 +502,7 @@ export class EditorCanvas extends Component {
      * Clear all node/connection selections
      */
     clearSelection() {
-        this.selection.clear();
+        this.editor.actions.select([]);
         this.state.selectedConnectionIds = [];
     }
 
@@ -768,12 +805,12 @@ export class EditorCanvas extends Component {
         if (this.state.snappedSocket) {
             const start = this.state.connectionStart;
             if (start && start.socketType === 'output') {
-                this.props.onConnectionCreate({
-                    source: start.nodeId,
-                    sourceHandle: start.socketKey,
-                    target: this.state.snappedSocket.nodeId,
-                    targetHandle: this.state.snappedSocket.socketKey,
-                });
+                this.editor.actions.addConnection(
+                    start.nodeId,
+                    start.socketKey,
+                    this.state.snappedSocket.nodeId,
+                    this.state.snappedSocket.socketKey
+                );
             }
             this.cancelConnection();
             return;
@@ -810,12 +847,12 @@ export class EditorCanvas extends Component {
         // Output to input only
         if (start.socketType === 'output' && socketType === 'input' && start.nodeId !== nodeId) {
             // Create connection
-            this.props.onConnectionCreate({
-                source: start.nodeId,
-                sourceHandle: start.socketKey,
-                target: nodeId,
-                targetHandle: socketKey,
-            });
+            this.editor.actions.addConnection(
+                start.nodeId,
+                start.socketKey,
+                nodeId,
+                socketKey
+            );
         }
 
         this.cancelConnection();
@@ -853,8 +890,8 @@ export class EditorCanvas extends Component {
         const position = this.getCanvasPosition(ev);
         position.x = Math.round(position.x);
         position.y = Math.round(position.y);
-
-        this.props.onDropNode({ type, position });
+        // Add node via service action
+        this.editor.actions.addNode(type, position);
     }
 
     /**
@@ -869,11 +906,10 @@ export class EditorCanvas extends Component {
             node.x = x;
             node.y = y;
 
-            // Throttle propagation to parent/core to 60fps (16ms)
-            // This prevents flooding the undo stack and core logic during rapid drags
+            // Throttle propagation to 60fps (16ms) to prevent flooding undo stack
             if (this._throttleMove) return;
             this._throttleMove = setTimeout(() => {
-                this.props.onNodePositionChange({ nodeId, x, y });
+                this.editor.actions.moveNode(nodeId, { x, y });
                 this._throttleMove = null;
             }, 16);
         }
@@ -887,65 +923,40 @@ export class EditorCanvas extends Component {
      */
     onNodeSelect(node, event) {
         const isCtrlHeld = event?.ctrlKey || event?.metaKey;
+        const currentSelection = this.editor.state.ui.selection.nodeIds || [];
 
         if (isCtrlHeld) {
             // Ctrl+click: Toggle node in selection
-            if (this.selection.has(node.id)) {
-                this.selection.delete(node.id);
+            if (currentSelection.includes(node.id)) {
+                this.editor.actions.select(
+                    currentSelection.filter(id => id !== node.id)
+                );
             } else {
-                this.selection.add(node.id);
+                this.editor.actions.select([...currentSelection, node.id]);
             }
         } else {
             // Normal click: Clear and add single
-            this.selection.clear();
-            this.selection.add(node.id);
+            this.editor.actions.select([node.id]);
         }
 
-        this.state.selectedConnectionIds = []; // Clear connection selection
-
-        // Notify parent of the most recently selected node (primary selection)
-        // If node was deselected, fallback to arbitrary one or null
-        if (this.selection.has(node.id)) {
-            this.props.onSelectNode(node);
-        } else {
-            // Get last item from Set (if any)
-            const ids = Array.from(this.selection);
-            const lastId = ids.length > 0 ? ids[ids.length - 1] : null;
-            const lastNode = lastId ? this.nodes.find(n => n.id === lastId) : null;
-            this.props.onSelectNode(lastNode);
-        }
+        // Clear connection selection when a node is selected
+        this.state.selectedConnectionIds = [];
     }
 
-    /**
-     * Handle node execute from toolbar
-     * Opens config panel and triggers execution
-     * @param {string} nodeId 
-     */
     onNodeExecute(nodeId) {
-        // Open config panel for the node
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
 
-        // Show the config panel
-        this.state.configPanel = { visible: true, nodeId };
-
-        // Trigger execute callback if provided
-        if (this.props.onNodeExecute) {
-            this.props.onNodeExecute(nodeId);
-        }
+        // Open config panel via service
+        this.editor.actions.openPanel("config", { nodeId });
     }
 
-    /**
-     * Handle node delete from toolbar
-     * @param {string} nodeId 
-     */
     onNodeDelete(nodeId) {
-        if (this.props.removeNode) {
-            this.props.removeNode(nodeId);
-        }
-        // Clear selection if deleted node was selected
-        if (this.selection.has(nodeId)) {
-            this.selection.delete(nodeId);
+        this.editor.actions.removeNode(nodeId);
+        // Deselect if it was the only one or among selected
+        const current = this.editor.state.ui.selection.nodeIds;
+        if (current.includes(nodeId)) {
+            this.editor.actions.select(current.filter(id => id !== nodeId));
         }
     }
 
@@ -980,7 +991,7 @@ export class EditorCanvas extends Component {
         // Check if clicking on background (including specific elements that are part of background)
         if (ev.target === this.rootRef.el || ev.target.classList?.contains('workflow-editor-canvas__content')) {
             this.clearSelection();
-            this.props.onSelectNode(null);
+            this.editor.actions.select([]);
         }
     }
 
@@ -990,7 +1001,7 @@ export class EditorCanvas extends Component {
      */
     onConnectionSelect(connId) {
         this.state.selectedConnectionIds = [connId];
-        this.selection.clear();
+        this.editor.actions.select([]);
     }
 
     /**
@@ -1011,18 +1022,18 @@ export class EditorCanvas extends Component {
         // =========================================
         if (ev.key === 'Delete' || ev.key === 'Backspace') {
             // Delete nodes (All selected)
-            if (this.selection.size > 0) {
-                // Create copy to iterate safely
-                [...this.selection].forEach(id => {
-                    this.props.removeNode(id);
+            const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
+            if (selectedNodeIds.length > 0) {
+                [...selectedNodeIds].forEach(id => {
+                    this.editor.actions.removeNode(id);
                 });
-                this.selection.clear();
+                this.editor.actions.select([]);
             }
 
             // Delete connection
             if (this.state.selectedConnectionIds.length > 0) {
                 [...this.state.selectedConnectionIds].forEach(id => {
-                    this.props.removeConnection(id);
+                    this.editor.actions.removeConnection(id);
                 });
                 this.state.selectedConnectionIds = [];
             }
@@ -1046,11 +1057,11 @@ export class EditorCanvas extends Component {
 
             // Move selected node(s)
 
-            this.selection.forEach(nodeId => {
+            const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
+            selectedNodeIds.forEach(nodeId => {
                 const node = this.nodes.find(n => n.id === nodeId);
                 if (node) {
-                    this.props.onNodePositionChange?.({
-                        nodeId,
+                    this.editor.actions.moveNode(nodeId, {
                         x: (node.x || 0) + dx,
                         y: (node.y || 0) + dy,
                     });
@@ -1078,22 +1089,18 @@ export class EditorCanvas extends Component {
         // Undo/Redo (Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z)
         // =========================================
         if (ctrl && ev.key.toLowerCase() === 'z') {
-            console.log('[EditorCanvas] Ctrl+Z detected');
             ev.preventDefault();
             if (ev.shiftKey) {
-                console.log('[EditorCanvas] Redo (Shift+Ctrl+Z)');
-                this.props.redo();
+                this.editor.actions.redo();
             } else {
-                console.log('[EditorCanvas] Undo');
-                this.props.undo();
+                this.editor.actions.undo();
             }
             return;
         }
 
         if (ctrl && ev.key.toLowerCase() === 'y') {
-            console.log('[EditorCanvas] Ctrl+Y detected');
             ev.preventDefault();
-            this.props.redo();
+            this.editor.actions.redo();
             return;
         }
     }
@@ -1104,15 +1111,15 @@ export class EditorCanvas extends Component {
 
     /**
      * Copy selected nodes to system clipboard
-     * Phase 3: Uses adapterService to get config (no _node access)
      */
     async copySelectedNodes() {
         // Prioritize multiple selection list
-        if (this.selection.size === 0) return;
+        const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
+        if (selectedNodeIds.length === 0) return;
 
-        const nodesToCopy = this.nodes.filter(n => this.selection.has(n.id));
+        const nodesToCopy = this.nodes.filter(n => selectedNodeIds.includes(n.id));
         const connectionsToCopy = this.connections.filter(
-            c => this.selection.has(c.source) && this.selection.has(c.target)
+            c => selectedNodeIds.includes(c.source) && selectedNodeIds.includes(c.target)
         );
 
         // Use adapterService to get config for each node
@@ -1139,62 +1146,56 @@ export class EditorCanvas extends Component {
         }
     }
 
-    /**
-     * Paste nodes from system clipboard
-     */
     async pasteNodes() {
-        console.log('[EditorCanvas] pasteNodes start');
         try {
             const text = await navigator.clipboard.readText();
             const data = JSON.parse(text);
 
             if (!data.nodes || !Array.isArray(data.nodes)) {
-                console.warn('[EditorCanvas] Invalid clipboard data');
                 return;
             }
 
-            // Start history batch
-            this.props.onBeginBatch('Paste nodes');
+            // Start history batch via service
+            this.editor.actions.beginBatch();
 
             const PASTE_OFFSET_X = 50;
             const PASTE_OFFSET_Y = 50;
             const idMap = {};
+            const adapterService = this.env.services.workflowAdapter;
 
             // Create new nodes with offset
             data.nodes.forEach(nodeData => {
-                // Use props callback to create node (handled by dev_demo_app)
-                const newId = this.props.onPasteNode({
-                    type: nodeData.type,
-                    position: {
-                        x: (nodeData.x || 0) + PASTE_OFFSET_X,
-                        y: (nodeData.y || 0) + PASTE_OFFSET_Y,
-                    },
-                    config: nodeData.config,
-                });
+                const position = {
+                    x: (nodeData.x || 0) + PASTE_OFFSET_X,
+                    y: (nodeData.y || 0) + PASTE_OFFSET_Y,
+                };
+                const newId = this.editor.actions.addNode(nodeData.type, position);
                 if (newId) {
                     idMap[nodeData.id] = newId;
+                    // Apply config if available
+                    if (nodeData.config && adapterService) {
+                        adapterService.setNodeConfig(newId, nodeData.config);
+                    }
                 }
             });
 
             // Recreate connections between pasted nodes
             (data.connections || []).forEach(conn => {
                 if (idMap[conn.source] && idMap[conn.target]) {
-                    this.props.onConnectionCreate({
-                        source: idMap[conn.source],
-                        sourceHandle: conn.sourceHandle,
-                        target: idMap[conn.target],
-                        targetHandle: conn.targetHandle,
-                    });
+                    this.editor.actions.addConnection(
+                        idMap[conn.source],
+                        conn.sourceHandle,
+                        idMap[conn.target],
+                        conn.targetHandle
+                    );
                 }
             });
 
             // End history batch
-            this.props.onEndBatch('Paste nodes');
-
-            console.log(`[EditorCanvas] Pasted ${data.nodes.length} nodes`);
+            this.editor.actions.endBatch('Paste nodes');
         } catch (e) {
-            this.props.onEndBatch(); // Clean up on error
-            console.warn('[EditorCanvas] Failed to paste from clipboard:', e);
+            this.editor.actions.endBatch();
+            console.warn('[EditorCanvas] Failed to paste:', e);
         }
     }
 
@@ -1206,7 +1207,7 @@ export class EditorCanvas extends Component {
      * @returns {boolean}
      */
     isNodeSelected(node) {
-        return this.selection.has(node.id);
+        return this.selectionSet.has(node.id);
     }
 
     /**
@@ -1295,7 +1296,7 @@ export class EditorCanvas extends Component {
         if (connectionContext?.type === 'quickAdd') {
             // Quick-add from socket: create node and auto-connect
             const { sourceNodeId, sourceSocketKey } = connectionContext;
-            const newNodeId = this.props.onDropNode({ type: nodeType, position });
+            const newNodeId = this.editor.actions.addNode(nodeType, position);
 
             if (newNodeId) {
                 // Use setTimeout to ensure node is in state
@@ -1304,12 +1305,12 @@ export class EditorCanvas extends Component {
                     const firstInputKey = Object.keys(newNode?.inputs || {})[0];
 
                     if (firstInputKey) {
-                        this.props.onConnectionCreate({
-                            source: sourceNodeId,
-                            sourceHandle: sourceSocketKey,
-                            target: newNodeId,
-                            targetHandle: firstInputKey,
-                        });
+                        this.editor.actions.addConnection(
+                            sourceNodeId,
+                            sourceSocketKey,
+                            newNodeId,
+                            firstInputKey
+                        );
                     }
                 }, 0);
             }
@@ -1318,7 +1319,7 @@ export class EditorCanvas extends Component {
             this._insertNodeIntoConnection(nodeType, { connectionId: connectionContext.connectionId, position });
         } else {
             // Adding new node at position
-            this.props.onDropNode({ type: nodeType, position });
+            this.editor.actions.addNode(nodeType, position);
         }
     }
 
@@ -1441,47 +1442,38 @@ export class EditorCanvas extends Component {
         const originalTargetHandle = conn.targetHandle;
 
         // 1. Create new node at position
-        const newNodeId = this.props.onDropNode({ type: nodeType, position });
+        const newNodeId = this.editor.actions.addNode(nodeType, position);
         if (!newNodeId) return;
 
         // 2. Remove old connection A→B
-        this.props.removeConnection(connectionId);
+        this.editor.actions.removeConnection(connectionId);
 
         // 3. Use setTimeout to ensure the new node is available in state
-        // This handles the async nature of reactive state updates
         setTimeout(() => {
             const newNode = this.nodes.find(n => n.id === newNodeId);
-            if (!newNode) {
-                console.warn('[EditorCanvas] New node not found after insert:', newNodeId);
-                return;
-            }
+            if (!newNode) return;
 
-            // Get first input socket of new node (for incoming connection)
             const newNodeInputKey = Object.keys(newNode.inputs || {})[0];
-            // Get first output socket of new node (for outgoing connection)
             const newNodeOutputKey = Object.keys(newNode.outputs || {})[0];
 
-            if (!newNodeInputKey) {
-                console.warn('[EditorCanvas] New node has no input sockets');
-                return;
-            }
+            if (!newNodeInputKey) return;
 
             // 3. Create connection from old source to new node (A→C)
-            this.props.onConnectionCreate({
-                source: originalSource,
-                sourceHandle: originalSourceHandle,
-                target: newNodeId,
-                targetHandle: newNodeInputKey,
-            });
+            this.editor.actions.addConnection(
+                originalSource,
+                originalSourceHandle,
+                newNodeId,
+                newNodeInputKey
+            );
 
             // 4. Create connection from new node to original target (C→B)
             if (newNodeOutputKey) {
-                this.props.onConnectionCreate({
-                    source: newNodeId,
-                    sourceHandle: newNodeOutputKey,
-                    target: originalTarget,
-                    targetHandle: originalTargetHandle,
-                });
+                this.editor.actions.addConnection(
+                    newNodeId,
+                    newNodeOutputKey,
+                    originalTarget,
+                    originalTargetHandle
+                );
             }
         }, 0);
     }
@@ -1507,7 +1499,7 @@ export class EditorCanvas extends Component {
      * Remove connection by ID (used by ConnectionToolbar)
      */
     removeConnectionById(connectionId) {
-        this.props.removeConnection(connectionId);
+        this.editor.actions.removeConnection(connectionId);
         this.state.hoveredConnection = {
             id: null,
             midpoint: { x: 0, y: 0 },
@@ -1613,22 +1605,6 @@ export class EditorCanvas extends Component {
     onConfigPanelSave = (values) => {
         const nodeId = this.state.configPanel.nodeId;
         if (!nodeId) return;
-
-        // adapterService handles config persistence to Core layer
-        // NodeConfigPanel already syncs config when saving
-        console.log('[EditorCanvas] Config panel saved for node:', nodeId);
-
         this.onConfigPanelClose();
     };
-
-    /**
-     * Handle node execution callback
-     * Passes to parent for variable inspector refresh
-     */
-    onConfigPanelExecute = (nodeId, result) => {
-        console.log('[EditorCanvas] Node executed:', nodeId);
-        this.props.onNodeExecute?.(nodeId, result);
-    };
 }
-
-

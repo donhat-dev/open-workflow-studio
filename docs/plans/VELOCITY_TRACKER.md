@@ -50,12 +50,13 @@ Legend: ████ Completed   ░░░░ Committed (not done)
 
 ## Sprint Velocity History
 
-| Sprint | Committed | Completed | Velocity | Trend |
-|--------|----------:|----------:|---------:|-------|
-| Pre-Sprint | - | 110 | - | Baseline |
-| Sprint 1 | 22 | 22 | 22 | ✅ Above target |
-| Sprint 2 | 22 | 22 | 22 | ✅ Above target |
-| Sprint 3 | - | - | - | Planned |
+| Sprint | Committed | Completed | Velocity | Focus | Trend |
+|--------|----------:|----------:|---------:|-------|-------|
+| Pre-Sprint | - | 110 | - | Infrastructure baseline | Baseline |
+| Sprint 1 | 22 | 22 | 22 | Flow Control + Variable System | ✅ Above target |
+| Sprint 2 | 22 | 22 | 22 | StackExecutor + Loop enhancement | ✅ Above target |
+| Sprint 3 | 32 | - | - | E4.6: Editor State Architecture Refactor | Planned |
+| Sprint 4 | 30 | - | - | E10: Python Engine MVP | Planned |
 
 ### Velocity Trend
 - **Average Velocity**: 22 SP/sprint

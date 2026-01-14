@@ -8,6 +8,11 @@ settings.json
 settings.local.json
 .github/
 
+AGENTS.md
+opencode.json
+stock_barcode/
+lf_web_studio/
+.agent/
 # C extensions
 *.so
 

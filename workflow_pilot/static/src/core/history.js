@@ -186,10 +186,7 @@ export function createAddNodeAction(adapter, nodeData) {
         description: `Add ${nodeData.type} node`,
         undo: () => adapter.removeNode(nodeData.id),
         redo: () => {
-            const node = adapter.addNode(nodeData.type, nodeData.position);
-            if (node && nodeData.config) {
-                node.setConfig(nodeData.config);
-            }
+            adapter.addNodeWithId(nodeData.type, nodeData.position, nodeData.id, nodeData.config);
         },
     };
 }
@@ -201,14 +198,7 @@ export function createRemoveNodeAction(adapter, nodeData, relatedConnections) {
     return {
         description: `Remove ${nodeData.type} node`,
         undo: () => {
-            const node = adapter.addNode(nodeData.type, nodeData.position);
-            // Restore ID
-            adapter.editor.nodes.delete(node.id);
-            node.id = nodeData.id;
-            adapter.editor.nodes.set(node.id, node);
-            if (nodeData.config) {
-                node.setConfig(nodeData.config);
-            }
+            adapter.addNodeWithId(nodeData.type, nodeData.position, nodeData.id, nodeData.config);
             // Restore connections
             relatedConnections.forEach(c => {
                 adapter.addConnection(c.source, c.sourceHandle, c.target, c.targetHandle);

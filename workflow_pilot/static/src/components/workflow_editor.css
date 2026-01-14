@@ -250,6 +250,25 @@
   cursor: grabbing;
 }
 
+/* Disabled Node State */
+.workflow-node.disabled {
+  opacity: 0.5;
+  filter: grayscale(40%);
+  border-style: dashed;
+  border-color: #555;
+}
+
+.workflow-node.disabled .workflow-node__header::before {
+  opacity: 0.3;
+}
+
+.workflow-node.disabled .workflow-node__title::after {
+  content: " (disabled)";
+  font-size: 0.7rem;
+  color: #71717a;
+  font-weight: 400;
+}
+
 /* Node Header */
 .workflow-node__header {
   display: flex;

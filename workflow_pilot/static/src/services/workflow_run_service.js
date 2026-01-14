@@ -115,7 +115,7 @@ export const workflowRunService = {
                     });
 
                     // 4. Snapshot expression context
-                    const expressionContext = workflowAdapter.getExpressionContext?.() || null;
+                    const expressionContext = workflowAdapter.getExpressionContext();
 
                     return {
                         ...executionState.result,
@@ -248,7 +248,7 @@ export const workflowRunService = {
                         results,
                         errors,
                         executedNodes,
-                        expressionContext: workflowAdapter.getExpressionContext?.() || null,
+                        expressionContext: workflowAdapter.getExpressionContext(),
                     };
 
                     setState({

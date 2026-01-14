@@ -145,10 +145,10 @@ export class StackExecutor {
 
         try {
             // Find start node(s) - nodes with no incoming connections
-            const startNodeIds = this._findStartNodes(workflow);
+            const startNodeIds = this._findStartNodes(workflow, targetNodeId);
 
             if (startNodeIds.length === 0) {
-                throw new Error('No start node found (node with no incoming connections)');     
+                throw new Error('No start node found (node with no incoming connections)');
             }
 
             // Push start nodes to stack
@@ -424,20 +424,133 @@ export class StackExecutor {
     }
 
     /**
-     * Find start nodes (no incoming connections)
+     * Find start nodes (no incoming connections) that lead to targetNodeId
+     * If targetNodeId is provided, only returns start nodes that have a path to it
      *
      * @private
      * @param {Object} workflow
+     * @param {string|null} targetNodeId - Optional target to filter start nodes
      * @returns {string[]}
      */
-    _findStartNodes(workflow) {
+    _findStartNodes(workflow, targetNodeId = null) {
         const nodesWithIncoming = new Set(
             workflow.connections.map(c => c.target)
         );
 
-        return workflow.nodes
+        // Get all start nodes (nodes with no incoming connections)
+        let startNodes = workflow.nodes
             .filter(n => !nodesWithIncoming.has(n.id))
+            .sort((a, b) => (a.y - b.y) || (a.x - b.x))
             .map(n => n.id);
+
+        // If no targetNodeId, return all start nodes
+        if (!targetNodeId) {
+            return startNodes;
+        }
+
+        // Find all ancestors of targetNodeId (nodes that lead to it)
+        const ancestorIds = this._getNodeAncestors(workflow, targetNodeId);
+        ancestorIds.add(targetNodeId);  // Include target itself
+
+        // Filter start nodes to only those that are in the ancestor chain
+        const filteredStartNodes = startNodes.filter(startId =>
+            ancestorIds.has(startId) || this._hasPathToNode(workflow, startId, targetNodeId)
+        );
+
+        // If no filtered start nodes found, fall back to all start nodes
+        // (edge case: targetNodeId might be a start node itself)
+        if (filteredStartNodes.length === 0) {
+            // Check if target itself is a start node
+            if (startNodes.includes(targetNodeId)) {
+                return [targetNodeId];
+            }
+            return startNodes;
+        }
+
+        return filteredStartNodes;
+    }
+
+    /**
+     * Get all ancestor node IDs of a target node (BFS backwards traversal)
+     * 
+     * @private
+     * @param {Object} workflow
+     * @param {string} targetNodeId
+     * @returns {Set<string>}
+     */
+    _getNodeAncestors(workflow, targetNodeId) {
+        const ancestors = new Set();
+        const visited = new Set();
+        const queue = [targetNodeId];
+
+        // Build reverse adjacency list (target -> sources)
+        const reverseAdj = {};
+        for (const conn of workflow.connections) {
+            if (!reverseAdj[conn.target]) {
+                reverseAdj[conn.target] = [];
+            }
+            reverseAdj[conn.target].push(conn.source);
+        }
+
+        // BFS backwards from target
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const parents = reverseAdj[current] || [];
+
+            for (const parent of parents) {
+                if (!visited.has(parent)) {
+                    visited.add(parent);
+                    ancestors.add(parent);
+                    queue.push(parent);
+                }
+            }
+        }
+
+        return ancestors;
+    }
+
+    /**
+     * Check if there's a path from sourceNodeId to targetNodeId
+     * 
+     * @private
+     * @param {Object} workflow
+     * @param {string} sourceNodeId
+     * @param {string} targetNodeId
+     * @returns {boolean}
+     */
+    _hasPathToNode(workflow, sourceNodeId, targetNodeId) {
+        const visited = new Set();
+        const queue = [sourceNodeId];
+
+        // Build forward adjacency list (source -> targets)
+        const forwardAdj = {};
+        for (const conn of workflow.connections) {
+            if (!forwardAdj[conn.source]) {
+                forwardAdj[conn.source] = [];
+            }
+            forwardAdj[conn.source].push(conn.target);
+        }
+
+        // BFS forward from source
+        while (queue.length > 0) {
+            const current = queue.shift();
+
+            if (current === targetNodeId) {
+                return true;
+            }
+
+            if (visited.has(current)) continue;
+            visited.add(current);
+
+            const children = forwardAdj[current] || [];
+            for (const child of children) {
+                if (!visited.has(child)) {
+                    queue.push(child);
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

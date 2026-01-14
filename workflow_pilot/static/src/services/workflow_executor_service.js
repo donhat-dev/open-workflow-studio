@@ -182,6 +182,23 @@ export const workflowExecutorService = {
                             const nodeId = node.id;
                             const startTime = Date.now();
 
+                            // Check if node is disabled - skip execution
+                            const nodeMeta = workflowAdapter.getNodeMeta(nodeId);
+                            if (nodeMeta?.disabled) {
+                                console.log(`[WorkflowExecutor] Skipping disabled node: ${nodeId}`);
+                                return {
+                                    outputs: [[]],  // Empty output for downstream
+                                    json: null,
+                                    error: null,
+                                    skipped: true,
+                                    meta: {
+                                        skipped: true,
+                                        reason: 'Node disabled',
+                                        executedAt: new Date().toISOString(),
+                                    },
+                                };
+                            }
+
                             try {
                                 const NodeClass = workflowNode.getNodeClass(node.type);
                                 if (!NodeClass) {
@@ -308,6 +325,23 @@ export const workflowExecutorService = {
                             nodeRunner: async (node, resolvedConfig, exprCtx, context, helpers) => {
                                 const nodeId = node.id;
                                 const startTime = Date.now();
+
+                                // Check if node is disabled - skip execution
+                                const nodeMeta = workflowAdapter.getNodeMeta(nodeId);
+                                if (nodeMeta?.disabled) {
+                                    console.log(`[WorkflowExecutor] Skipping disabled node: ${nodeId}`);
+                                    return {
+                                        outputs: [[]],  // Empty output for downstream
+                                        json: null,
+                                        error: null,
+                                        skipped: true,
+                                        meta: {
+                                            skipped: true,
+                                            reason: 'Node disabled',
+                                            executedAt: new Date().toISOString(),
+                                        },
+                                    };
+                                }
 
                                 try {
                                     const NodeClass = workflowNode.getNodeClass(node.type);

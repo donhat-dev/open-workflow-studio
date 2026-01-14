@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted } from "@odoo/owl";
+import { Component, useState, useRef, onMounted, useEnv } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
@@ -8,14 +8,9 @@ import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 /**
  * NodeConfigPanel Component
  *
- * Phase 3 Architecture:
- * - Uses adapterService for ALL config operations
- * - NO direct _node access
- * - Clean separation between UI and Core layer
- *
- * Data Flow:
- *   UI (controlValues) → adapterService.setNodeConfig() → Core layer
- *   Core layer → adapterService.getNodeConfig() → UI (init)
+ * Provides a configuration interface for a selected workflow node.
+ * Uses adapterService for configuration operations and 
+ * runService for node/workflow execution.
  */
 export class NodeConfigPanel extends Component {
     static template = "workflow_pilot.node_config_panel";
@@ -30,12 +25,13 @@ export class NodeConfigPanel extends Component {
     };
 
     setup() {
-        // Phase 3: Use adapterService for config operations
+        // Use adapterService for config operations
         this.adapterService = useService("workflowAdapter");
         // Executor service for workflow execution
         this.executorService = useService("workflowExecutor");
-        // Run service for orchestrated execution (Option B refactor)
+        // Run service for orchestrated execution
         this.runService = useService("workflowRun");
+        this.editor = this.env.workflowEditor;
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -68,7 +64,6 @@ export class NodeConfigPanel extends Component {
 
     /**
      * Initialize control values from Core layer via adapterService
-     * Phase 3: No _node access, uses adapter.getNodeControls()
      */
     initControlValues() {
         const nodeId = this.props.node.id;
@@ -85,7 +80,7 @@ export class NodeConfigPanel extends Component {
         this.state.controlValues = values;
 
         // Restore UI modes from node meta (persisted)
-        const meta = this.adapterService.getNodeMeta?.(nodeId) || {};
+        const meta = this.adapterService.getNodeMeta(nodeId);
         const ui = meta.ui || {};
         const restoredControlModes = ui.controlModes || {};
         const restoredPairModes = ui.pairModes || {};
@@ -281,7 +276,7 @@ export class NodeConfigPanel extends Component {
             };
         }
 
-        const base = this.adapterService.getExpressionContext?.() || {
+        const base = this.adapterService.getExpressionContext() || {
             $vars: {},
             $node: {},
             $json: {},
@@ -340,7 +335,7 @@ export class NodeConfigPanel extends Component {
 
     _persistUiModes() {
         const nodeId = this.props.node.id;
-        this.adapterService.setNodeMeta?.(nodeId, {
+        this.adapterService.setNodeMeta(nodeId, {
             ui: {
                 controlModes: this.state.controlModes || {},
                 pairModes: this.state.pairModes || {},
@@ -383,7 +378,7 @@ export class NodeConfigPanel extends Component {
      * This allows users to see and drag $vars expressions
      */
     get workflowVariables() {
-        const expressionContext = this.adapterService.getExpressionContext?.();
+        const expressionContext = this.adapterService.getExpressionContext();
         return expressionContext?.$vars || {};
     }
 
@@ -508,7 +503,7 @@ export class NodeConfigPanel extends Component {
     }
 
     onClose() {
-        this.props.onClose();
+        this.editor.actions.closePanel("config");
     }
 
     onBackdropClick(ev) {

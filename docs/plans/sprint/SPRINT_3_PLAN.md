@@ -1,79 +1,133 @@
 # SPRINT 3 PLANNING
-> **Focus**: Python Engine MVP (executeUntil) + Hybrid UI Integration + Stateless Node Definitions
+> **Focus**: Editor State Architecture Refactor (Studio-like patterns)
 > **Duration**: 2 Weeks
-> **Status**: 🟡 PLANNED
-> **Created**: 2026-01-06
+> **Status**: 🟢 IN PROGRESS (50%)
+> **Created**: 2026-01-13
+> **Related**: E4.6 refactor epic
 
 ---
 
 ## GOALS
-1. **Python executeUntil MVP**: backend executes workflow up to a target node and returns outputs + context snapshot.
-2. **Hybrid feature flag**: UI can switch between JS prototype executor and Python executor.
-3. **Stateless UI nodes**: node definitions become schema-only (no frontend `.execute()` coupling).
+1. **Canonical editor state service**: workflowEditor as single source of truth for graph and UI state.
+2. **Service-driven architecture**: All mutations via service actions; UI is thin and reactive.
+3. **Studio-like patterns**: useSubEnv for editor scoping, behavior hooks for DOM, pure utils for logic.
+4. **Event bus as intent-only**: Bus carries drag/connect/key events; listeners call service actions, never mutate state directly.
 
 ---
 
 ## SCOPE (Committed)
 
-### P0 — Backend Runtime MVP
+### P0 — Service Foundation (E4.6.1)
 
-| Task ID | Description | SP | Priority | Status |
-|---------|-------------|---:|----------|--------|
-| **E10.1.1** | Define RPC contract: `execute_until(workflow_id, node_id, input_data)` | 3 | P0 | 🟡 Planned |
-| **E10.2.1** | Python ExecutionContext + snapshot serialization | 5 | P0 | 🟡 Planned |
-| **E10.3.1** | Python StackExecutor: executeUntil loop + stop at target | 5 | P0 | 🟡 Planned |
+| Task ID      | Description                                                                                                                 |   SP | Priority | Status |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------- | ---: | -------- | ------ |
+| **E4.6.1.1** | Create `workflow_editor_service.js` as authoritative graph/UI store; wrap adapter graph to avoid dual sources               |    4 | P0       | ✅ Done |
+| **E4.6.1.2** | Implement service actions (add/move/remove node, add/remove connection, select, set viewport) that delegate through adapter |    3 | P0       | ✅ Done |
+| **E4.6.1.3** | Integrate history (undo/redo batching) bridging service actions with existing HistoryManager/adapter                        |    1 | P0       | ✅ Done |
+| **E4.6.1.4** | Scaffold per-editor env & editorBus minimally                                                                               |    1 | P0       | ✅ Done |
 
-### P0 — Node Runners (Minimum Set)
+### P0 — Per-Editor Scoping (E4.6.2)
 
-| Task ID | Description | SP | Priority | Status |
-|---------|-------------|---:|----------|--------|
-| **E10.4.1** | HTTP Request runner (timeout + basic errors) | 3 | P0 | 🟡 Planned |
-| **E10.4.2** | Variable runner (set/get/append/merge) | 2 | P0 | 🟡 Planned |
-| **E10.4.3** | Set Data / Mapping runner (expressions parity) | 3 | P0 | 🟡 Planned |
+| Task ID      | Description                                                            |   SP | Priority | Status    |
+| ------------ | ---------------------------------------------------------------------- | ---: | -------- | --------- |
+| **E4.6.2.1** | Use useSubEnv to inject workflowEditor + editorBus per editor instance |    3 | P0       | ✅ Done    |
+| **E4.6.2.2** | Ensure dev playground supports multiple editors in future              |    2 | P0       | 🟡 Planned |
+| **E4.6.2.3** | editorBus: lightweight intent/lifecycle events                         |    1 | P0       | ✅ Done    |
 
-### P1 — Hybrid UI wiring
+### P0 — EditorCanvas Refactor (E4.6.3)
 
-| Task ID | Description | SP | Priority | Status |
-|---------|-------------|---:|----------|--------|
-| **E10.5.1** | Frontend `workflow_runtime_service` calling RPC | 3 | P1 | 🟡 Planned |
-| **E10.5.2** | Use backend context snapshot for Expression preview + Input panel | 3 | P1 | 🟡 Planned |
+| Task ID      | Description                                                           |   SP | Priority | Status    |
+| ------------ | --------------------------------------------------------------------- | ---: | -------- | --------- |
+| **E4.6.3.1** | Remove nodes/connections callback props; read from service state      |    2 | P0       | ✅ Done    |
+| **E4.6.3.2** | Move pan/zoom/selection logic to service actions                      |    2 | P0       | 🟡 Planned |
+| **E4.6.3.3** | Refactor drag/connect workflows to emit bus intents → service actions |    2 | P0       | 🟡 Planned |
 
-### P1 — Stateless Node Definitions
+### P0 — Panels & Menu Refactor (E4.6.4)
 
-| Task ID | Description | SP | Priority | Status |
-|---------|-------------|---:|----------|--------|
-| **S3.1** | Remove/disable frontend `.execute()` in node definitions (schema-only) | 5 | P1 | 🟡 Planned |
-| **S3.2** | Adapter `executeNode` routes to runtime service (no coreNode.execute) | 3 | P1 | 🟡 Planned |
+| Task ID      | Description                                                                    |   SP | Priority | Status    |
+| ------------ | ------------------------------------------------------------------------------ | ---: | -------- | --------- |
+| **E4.6.4.1** | NodeConfigPanel: read node config from service, emit config changes as actions |    2 | P0       | ✅ Done    |
+| **E4.6.4.2** | NodeMenu: read visibility from service, emit selection/open/close as actions   |    2 | P0       | ✅ Done    |
+| **E4.6.4.3** | ConnectionToolbar: thin UI, all state from service                             |    2 | P0       | 🟡 Planned |
+
+### P0 — Hooks & Utils (E4.6.5)
+
+| Task ID      | Description                                                                                        |   SP | Priority | Status    |
+| ------------ | -------------------------------------------------------------------------------------------------- | ---: | -------- | --------- |
+| **E4.6.5.1** | Extract Studio-like behavior hooks: useNodeDrag, useConnection, useViewport (attach DOM listeners) |    2 | P0       | 🟡 Planned |
+| **E4.6.5.2** | Pure utils: geometry (distance, bbox), selection (multiSelect), drag (throttle move)               |    2 | P0       | 🟡 Planned |
+
+### P1 — History & Feedback (E4.6.6)
+
+| Task ID      | Description                                                          |   SP | Priority | Status    |
+| ------------ | -------------------------------------------------------------------- | ---: | -------- | --------- |
+| **E4.6.6.1** | Service batch operations: beginBatch/endBatch for undo/redo grouping |    1 | P1       | 🟡 Planned |
+| **E4.6.6.2** | UI feedback: undo/redo buttons tied to service history state         |    1 | P1       | 🟡 Planned |
 
 ---
 
 ## OUT OF SCOPE (Defer)
-- Full queue workers / retries / rate limit (Production features)
-- Full connector library (Shopee/TikTok/Carriers)
-- Multi-input join semantics
+- Minimap / advanced UI polish
+- Performance optimization (virtualization, etc.)
+- Multi-tab editor support (architecture prepared, not implemented)
 
 ---
 
 ## DELIVERABLES
-- Backend endpoint executes workflow up to node and returns:
-  - `node_outputs` (by node id)
-  - `context_snapshot` (`$vars`, `$node`, `$json`, `$input`, `$loop`)
-  - `meta` (duration, executedAt, run_id)
-- UI can toggle Python executor without breaking the editor.
-- Node registry becomes schema-only (execution moved to Python runners).
+- `workflow_editor_service.js` registered with Odoo registry, fully reactive
+- EditorCanvas + all panels using service state instead of props/callbacks
+- Dev playground (dev.html?debug=assets) functional with service-driven architecture
+- Clean ADR documenting architectural decisions
 
 ---
 
 ## SUCCESS CRITERIA
-- Execute from NodeConfigPanel returns consistent output and populates preview snapshot.
-- Drag/drop expressions still work and preview uses last backend snapshot.
-- Parity check: for the MVP node set, Python output matches JS prototype for same workflow.
+- All node mutations (add/move/remove) go through service actions
+- All UI state (selection/viewport/panels) managed by service
+- Undo/redo working with proper batching
+- Dev playground maintains same visual behavior as before refactor
+- No prop-based callbacks; all communication via service actions + bus intents
+
+---
+
+## PHASES
+
+### Phase 1: Service Implementation (Done)
+- Create workflowEditor service as authoritative store (graph/UI)
+- Implement actions delegating through adapter; history integration
+- Scaffold per-editor env + editorBus (bus now injected via dev_demo_app)
+
+### Phase 2: EditorCanvas & Scoping (In Progress)
+- useSubEnv injection in main app (Done)
+- Refactor WorkflowNode to read/write via service (Done)
+- Complete EditorCanvas cleanup (callback removal)
+
+### Phase 3: Panels & Hooks (Partially Started)
+- Refactor NodeConfigPanel, NodeMenu (Done)
+- Refactor ConnectionToolbar
+- Extract behavior hooks (useNodeDrag, etc.)
+- Extract pure utils (geometry, selection)
+
+### Phase 4 (Days 9-10): Polish & Testing
+- End-to-end testing on dev playground
+- Undo/redo validation
+- Documentation + ADR
 
 ---
 
 ## RISKS
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Output parity differences (JS vs Python) | High | Start with small node set + golden workflows |
-| Expression evaluation mismatch | Medium | Define canonical expression semantics early |
-| Odoo RPC latency affects UX | Medium | Cache snapshots + show run status |
+| Risk                                  | Impact | Mitigation                                          |
+| ------------------------------------- | ------ | --------------------------------------------------- |
+| Breaking existing UI during refactor  | High   | Incremental refactoring + frequent test on dev.html |
+| Service performance with large graphs | Medium | Avoid deep reactivity; use computed selectors       |
+| Bus event listener explosion          | Medium | Enforce "bus → action" pattern; lint rules          |
+
+---
+
+## DISCIPLINE RULES (AGENTS.md Update)
+- ✋ **No prop callbacks**: Components emit bus intents or call service actions; never introduce callback props
+- 📍 **Service is source of truth**: All graph/UI state lives in workflowEditor; components read from it
+- 🚌 **Bus is intent-only**: Bus carries user actions (drag, connect, keys); listeners translate to service actions
+- 🧮 **Pure utils**: Geometry, selection, drag logic in separate utils/ files; no component coupling
+- 🪝 **Behavior hooks**: useNodeDrag, useConnection etc. handle DOM setup/cleanup; no inline listeners
+

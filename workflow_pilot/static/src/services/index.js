@@ -13,3 +13,4 @@ export { workflowLibService } from "./workflow_lib_service";
 export { workflowExecutorService } from "./workflow_executor_service";
 export { workflowAdapterService } from "./workflow_adapter_service";
 export { workflowVariableService } from "./variable_service";
+export { workflowEditorService } from "./workflow_editor_service";

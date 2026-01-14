@@ -16,7 +16,7 @@
  * @odoo-dependency - Uses useService for workflowNode service
  */
 
-import { Component, xml, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, xml, useState, useRef, onMounted, onWillUnmount, useEnv } from "@odoo/owl";
 // @odoo-dependency - useService hook
 import { useService } from "@web/core/utils/hooks";
 import { MotionHelpers } from "../utils/motion_helpers";
@@ -91,9 +91,9 @@ export class NodeMenu extends Component {
     setup() {
         this.menuRef = useRef("menuRoot");
         this.searchInputRef = useRef("searchInput");
-
-        // @odoo-dependency - Access workflowNode service
         this.nodeService = useService("workflowNode");
+        this.env = useEnv();
+        this.editor = this.env.workflowEditor;
 
         this.state = useState({
             searchQuery: "",
@@ -191,8 +191,9 @@ export class NodeMenu extends Component {
     onSelectNode(nodeType) {
         // Track usage for "recent" feature
         this.nodeService.trackUsage(nodeType);
-
+        // Call parent callback (EditorCanvas.onNodeMenuSelect)
         this.props.onSelect(nodeType, this.props.connectionContext);
+        // Close the menu
         this.props.onClose();
     }
 

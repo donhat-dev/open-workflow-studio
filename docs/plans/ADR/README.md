@@ -12,6 +12,7 @@
 | [ADR-001](./001-execution-engine.md)    | Stack-Based State Machine Execution     | **Accepted ✅** | 2026-01-05 |
 | [ADR-002](./002-node-output-format.md)  | Node Output Format - 2D Array Structure | **Accepted ✅** | 2026-01-05 |
 | [ADR-003](./003-loop-node-mechanism.md) | Loop Node - SplitInBatches Pattern      | **Accepted ✅** | 2026-01-05 |
+| [ADR-004](./004-editor-state-architecture.md) | Editor State Architecture (Studio-like Patterns) | **Proposed 🟡** | 2026-01-13 |
 
 ---
 

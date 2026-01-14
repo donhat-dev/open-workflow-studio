@@ -38,14 +38,16 @@
 					<!-- Temp connection line while drawing -->
 					<path t-if="state.isConnecting" t-att-d="tempConnectionPath" class="workflow-connection workflow-connection--temp" stroke-width="2" fill="none"/>
 				</svg>
-				<!-- Empty state hint -->
 				<div class="workflow-editor-canvas__hint" t-if="nodes.length === 0">
 					Drop nodes here (or click in the palette)
 				</div>
-				<!-- Render WorkflowNode components with zoom and snapped socket props -->
-				<!-- Render WorkflowNode components (Viewport Culling: only visible nodes) -->
 				<t t-foreach="visibleNodes" t-as="node" t-key="node.id">
-					<WorkflowNode node="node" zoom="state.viewport.zoom" selected="isNodeSelected(node)" snappedSocketKey="state.snappedSocket and state.snappedSocket.nodeId === node.id ? state.snappedSocket.socketKey : null" connectedOutputsSet="connectedOutputsSet" dimensionConfig="dimensions" onMove.bind="onNodeMove" onSelect.bind="onNodeSelect" onSocketMouseDown="onSocketMouseDown" onSocketMouseUp="onSocketMouseUp" onSocketQuickAdd="onSocketQuickAdd" onDoubleClick="onNodeDoubleClick" onExecute.bind="onNodeExecute" onDelete.bind="onNodeDelete" onToggleDisable.bind="onNodeToggleDisable"/>
+					<WorkflowNode node="node" 
+					zoom="state.viewport.zoom" 
+					selected="isNodeSelected(node)" 
+					snappedSocketKey="state.snappedSocket and state.snappedSocket.nodeId === node.	id ? state.snappedSocket.socketKey : null" 
+					connectedOutputsSet="connectedOutputsSet" 
+					dimensionConfig="dimensions"/>
 				</t>
 				<!-- Selection box -->
 				<div t-if="state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/></div>

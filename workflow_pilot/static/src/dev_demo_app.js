@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, xml, onPatched, onMounted } from "@odoo/owl";
+import { Component, useState, xml, onPatched, onMounted, useSubEnv } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 import { NodePalette } from "./components/node_palette";
@@ -14,11 +14,6 @@ const STORAGE_KEY = 'workflow_pilot_state';
 
 /**
  * WorkflowPilotDevApp - Development Demo Application
- *
- * Architecture (Phase 3 - Full Separation):
- * - Adapter is the bridge between UI and Core
- * - UI components use adapterService for config/execution
- * - No _node reference exposed to UI layer
  */
 export class WorkflowPilotDevApp extends Component {
     static template = xml`
@@ -55,22 +50,7 @@ export class WorkflowPilotDevApp extends Component {
                     <button class="workflow-pilot-dev__btn" t-on-click="clear">Clear All</button>
                 </div>
 
-                <EditorCanvas
-                    nodes="state.nodes"
-                    connections="state.connections"
-                    dimensionConfig="dimensionConfig"
-                    onDropNode="onDropNode"
-                    onSelectNode="onSelectNode"
-                    removeNode.bind="removeNode"
-                    removeConnection.bind="removeConnection"
-                    onNodePositionChange="onNodePositionChange"
-                    onConnectionCreate="onConnectionCreate"
-                    onPasteNode="onPasteNode"
-                    undo.bind="undo"
-                    redo.bind="redo"
-                    onBeginBatch.bind="onBeginBatch"
-                    onEndBatch.bind="onEndBatch"
-                    onNodeExecute="onNodeExecute"/>
+                <EditorCanvas dimensionConfig="dimensionConfig"/>
             </div>
         </div>
     `;
@@ -85,6 +65,14 @@ export class WorkflowPilotDevApp extends Component {
         // This allows NodeConfigPanel to access adapter methods via useService
         this.adapterService = useService("workflowAdapter");
         this.adapterService.setAdapter(this.adapter);
+
+        // Get workflowEditor service (centralized state + actions)
+        this.editorService = useService("workflowEditor");
+
+        useSubEnv({
+            bus: this.editorService.bus,
+            workflowEditor: this.editorService,
+        });
 
         // Initialize history manager for undo/redo
         this.history = new HistoryManager();
@@ -413,7 +401,7 @@ export class WorkflowPilotDevApp extends Component {
      */
     onNodeExecute = (nodeId, result) => {
         console.log('[DevApp] Node executed:', nodeId, result);
-        
+
         // Refresh variable inspector from current context
         const context = this.adapterService.getExpressionContext?.() || {};
         this.variableState.vars = { ...(context.$vars || {}) };

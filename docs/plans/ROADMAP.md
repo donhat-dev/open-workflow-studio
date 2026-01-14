@@ -20,9 +20,10 @@
   • Basic Execution ◐        • Webhook Triggers        • Carrier Integrations
   • Node Library ◐           • Pre-run Validation      • Queue Workers
   • UI/UX Editor ◐           • Odoo Integration        • Rate Limiting
-  • Expression System ◐                                • Monitoring Dashboard
+  • Editor Refactor ◯        • Python Engine           • Monitoring Dashboard
+  • Expression System ◐      
 
-  Est: 6-8 weeks             Est: 6 weeks             Est: 8-10 weeks
+  Est: 8-10 weeks            Est: 6 weeks             Est: 8-10 weeks
   ───────────────            ────────────             ─────────────────────
   Sprint 1-4                 Sprint 5-7               Sprint 8-12
 
@@ -48,7 +49,8 @@ Legend: ✓ Done  ◐ In Progress  ○ Not Started
 | **M1.3** Flow Control | E2.2, E3.2 | 32 | 5% ○ |
 | **M1.4** Canvas & UI | E4.1-E4.3 | 28 | 100% ✓ |
 | **M1.5** Expressions | E5.1-E5.2 | 13 | 75% ◐ |
-| **M1.6** Python Engine MVP (Hybrid) | E10.1-E10.4 | 24 | 0% ○ |
+| **M1.6** Editor State Refactor | E4.6 | 32 | 0% ○ |
+| **M1.7** Python Engine MVP (Hybrid) | E10.1-E10.4 | 24 | 0% ○ |
 
 ### MVP Checklist
 
@@ -149,18 +151,18 @@ Legend: ✓ Done  ◐ In Progress  ○ Not Started
 ## Timeline Projection
 
 ```
-Sprint | Phase   | Focus                        | Target SP
--------|---------|------------------------------|----------
-1      | MVP     | Flow Control Nodes           | 20
-2      | MVP     | Queue Executor               | 15
-3      | MVP     | Python Engine MVP + RPC      | 18
-4      | MVP     | Hybrid integration + parity  | 12
--------|---------|------------------------------|----------
-5      | Beta    | Backend Storage              | 15
-6      | Beta    | Odoo Integration             | 15
-7      | Beta    | Testing + Stabilization      | 10
--------|---------|------------------------------|----------
-8-12   | Prod    | Integrations + Scaling       | 60-80
+Sprint | Phase   | Focus                                 | Target SP
+-------|---------|---------------------------------------|----------
+1      | MVP     | Flow Control Nodes                    | 20
+2      | MVP     | StackExecutor + Loop enhancement      | 22
+3      | MVP     | E4.6: Editor State Architecture       | 32
+4      | MVP     | E10: Python Engine MVP + Hybrid       | 30
+-------|---------|---------------------------------------|----------
+5      | Beta    | Backend Storage + Odoo Integration    | 15
+6      | Beta    | Webhook Triggers + Validation         | 15
+7      | Beta    | Testing + Stabilization               | 10
+-------|---------|---------------------------------------|----------
+8-12   | Prod    | Integrations + Scaling                | 60-80
 ```
 
 ---

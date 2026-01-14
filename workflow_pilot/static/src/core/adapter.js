@@ -119,6 +119,41 @@ export class WorkflowAdapter {
     }
 
     /**
+     * Add node with a fixed ID (used by history/restore flows).
+     *
+     * This keeps undo/redo deterministic by preserving node IDs.
+     *
+     * @param {string} type
+     * @param {{x:number,y:number}} position
+     * @param {string} forcedId
+     * @param {Object} [config]
+     * @returns {string|null} nodeId
+     */
+    addNodeWithId(type, position, forcedId, config) {
+        const NodeClass = this.getNodeClass(type);
+        if (!NodeClass) {
+            console.warn(`[Adapter] Unknown node type: ${type}`);
+            return null;
+        }
+
+        const node = new NodeClass();
+        node.id = forcedId;
+        if (config) {
+            node.setConfig(config);
+        }
+
+        this.editor.addNode(node, position);
+
+        // Keep internal counter ahead of restored IDs to avoid collisions.
+        const numeric = parseInt(String(forcedId).replace(/\D/g, ""), 10);
+        if (!Number.isNaN(numeric)) {
+            this.editor._idCounter = Math.max(this.editor._idCounter, numeric);
+        }
+
+        return forcedId;
+    }
+
+    /**
      * Remove node
      */
     removeNode(nodeId) {

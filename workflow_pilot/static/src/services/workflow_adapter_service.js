@@ -55,7 +55,7 @@ export const workflowAdapterService = {
              * @returns {Object}
              */
             getNodeConfig(nodeId) {
-                return currentAdapter?.getNodeConfig(nodeId) || {};
+                return currentAdapter.getNodeConfig(nodeId);
             },
 
             /**
@@ -65,7 +65,7 @@ export const workflowAdapterService = {
              * @returns {boolean}
              */
             setNodeConfig(nodeId, config) {
-                return currentAdapter?.setNodeConfig(nodeId, config) || false;
+                return currentAdapter.setNodeConfig(nodeId, config);
             },
 
             /**
@@ -74,7 +74,7 @@ export const workflowAdapterService = {
              * @returns {Array}
              */
             getNodeControls(nodeId) {
-                return currentAdapter?.getNodeControls(nodeId) || [];
+                return currentAdapter.getNodeControls(nodeId);
             },
 
             /**
@@ -83,7 +83,7 @@ export const workflowAdapterService = {
              * @returns {Object}
              */
             getNodeMeta(nodeId) {
-                return currentAdapter?.getNodeMeta(nodeId) || {};
+                return currentAdapter.getNodeMeta(nodeId);
             },
 
             /**
@@ -93,7 +93,7 @@ export const workflowAdapterService = {
              * @returns {boolean}
              */
             setNodeMeta(nodeId, metaPatch) {
-                return currentAdapter?.setNodeMeta(nodeId, metaPatch) || false;
+                return currentAdapter.setNodeMeta(nodeId, metaPatch);
             },
 
             /**
@@ -104,12 +104,70 @@ export const workflowAdapterService = {
              * @returns {boolean}
              */
             setControlValue(nodeId, controlKey, value) {
-                return currentAdapter?.setControlValue(nodeId, controlKey, value) || false;
+                return currentAdapter.setControlValue(nodeId, controlKey, value);
             },
 
             // ============================================
-            // EXECUTION (Proxy to Adapter)
+            // GRAPH MUTATIONS (Proxy to Adapter)
             // ============================================
+
+            /**
+             * Update node position
+             * @param {string} nodeId
+             * @param {{x: number, y: number}} position
+             */
+            updatePosition(nodeId, position) {
+                return currentAdapter.updatePosition(nodeId, position);
+            },
+
+            /**
+             * Remove node
+             * @param {string} nodeId
+             */
+            removeNode(nodeId) {
+                return currentAdapter.removeNode(nodeId);
+            },
+
+            /**
+             * Add node
+             * @param {string} type
+             * @param {{x: number, y: number}} position
+             * @returns {string|null} nodeId
+             */
+            addNode(type, position) {
+                return currentAdapter.addNode(type, position);
+            },
+
+            /**
+             * Add connection
+             * @param {string} source
+             * @param {string} sourceHandle
+             * @param {string} target
+             * @param {string} targetHandle
+             * @returns {Object|null} connection
+             */
+            addConnection(source, sourceHandle, target, targetHandle) {
+                return currentAdapter.addConnection(source, sourceHandle, target, targetHandle);
+            },
+
+            /**
+             * Remove connection
+             * @param {string} connectionId
+             */
+            removeConnection(connectionId) {
+                return currentAdapter.removeConnection(connectionId);
+            },
+
+            /**
+             * Get reactive state from adapter
+             * @returns {Object} { nodes, connections }
+             */
+            get state() {
+                if (!currentAdapter) {
+                    return { nodes: [], connections: [] };
+                }
+                return currentAdapter.state;
+            },
 
             /**
              * Execute a single node with context
@@ -122,19 +180,19 @@ export const workflowAdapterService = {
                 if (!currentAdapter) {
                     return { json: null, error: 'No adapter', meta: {} };
                 }
-                
+
                 // Get current ExecutionContext from variable service
                 // This is the actual context instance (with methods), not just the plain object
                 let context = workflowVariable.getContext();
-                
+
                 // Auto-create context if not exists
                 if (!context) {
                     context = workflowVariable.createContext();
                 }
-                
+
                 // Execute node with full ExecutionContext
                 const result = await currentAdapter.executeNode(nodeId, inputData, context);
-                
+
                 return result;
             },
 
@@ -144,7 +202,7 @@ export const workflowAdapterService = {
              * @returns {Function|null}
              */
             getNodeClass(type) {
-                return currentAdapter?.getNodeClass(type) || null;
+                return currentAdapter.getNodeClass(type);
             },
 
             // ============================================
