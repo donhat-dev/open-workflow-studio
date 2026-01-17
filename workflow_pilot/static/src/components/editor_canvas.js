@@ -34,17 +34,16 @@ export class EditorCanvas extends Component {
         this.editorState = useState(this.editor.state);
 
         this.state = useState({
+            // Transient connection drawing state
             isConnecting: false,
             connectionStart: null,
             tempLineEndpoint: null,
             snappedSocket: null,  // { nodeId, socketKey, x, y } - for smart snapping
-            viewport: {
-                zoom: 1,
-                panX: 0,
-                panY: 0,
-            },
+            // Transient selection state (box select gesture)
             isSelecting: false,
             selectionBox: null,
+            // Transient panning state
+            isPanning: false,
             // Selected connection IDs (Still managed locally for now, 
             // as they are primarily used for rendering connections in this component)
             selectedConnectionIds: [],
@@ -201,11 +200,25 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Get viewport from service state (provides compatible panX/panY/zoom format)
+     * Uses editorState (wrapped in useState) for OWL reactivity
+     * @returns {{ zoom: number, panX: number, panY: number }}
+     */
+    get viewport() {
+        const { pan, zoom } = this.editorState.ui.viewport;
+        return {
+            zoom,
+            panX: pan.x,
+            panY: pan.y,
+        };
+    }
+
+    /**
      * Calculate viewport transform style
      * ESSENTIAL for pan/zoom - this is not an animation, it's the viewport positioning
      */
     get viewportTransformStyle() {
-        const { panX, panY, zoom } = this.state.viewport;
+        const { panX, panY, zoom } = this.viewport;
         return `transform: translate(${panX}px, ${panY}px) scale(${zoom}); transform-origin: 0 0;`;
     }
 
@@ -214,7 +227,8 @@ export class EditorCanvas extends Component {
      * This ensures the grid stays visible and correctly sized when zooming/panning
      */
     get canvasBackgroundStyle() {
-        const { panX, panY, zoom } = this.state.viewport;
+        const { panX, panY, zoom } = this.viewport;
+
         const size = 20 * zoom;
         // Background position should stay in sync with panning
         return `background-size: ${size}px ${size}px; background-position: ${panX}px ${panY}px;`;
@@ -227,7 +241,7 @@ export class EditorCanvas extends Component {
      */
     getCanvasPosition(ev) {
         const rect = this.rootRef.el.getBoundingClientRect();
-        const { zoom, panX, panY } = this.state.viewport;
+        const { zoom, panX, panY } = this.viewport;
         return {
             x: (ev.clientX - rect.left - panX) / zoom,
             y: (ev.clientY - rect.top - panY) / zoom
@@ -242,7 +256,7 @@ export class EditorCanvas extends Component {
      * @returns {{ x: number, y: number }}
      */
     getScreenPosition(canvasX, canvasY) {
-        const { zoom, panX, panY } = this.state.viewport;
+        const { zoom, panX, panY } = this.viewport;
         return {
             x: canvasX * zoom + panX,
             y: canvasY * zoom + panY
@@ -256,7 +270,7 @@ export class EditorCanvas extends Component {
     updateViewRect() {
         if (!this.rootRef.el) return;
         const rect = this.rootRef.el.getBoundingClientRect();
-        const { zoom, panX, panY } = this.state.viewport;
+        const { zoom, panX, panY } = this.viewport;
 
         // Add 300px buffer for smooth scrolling/panning
         const BUFFER = 300;
@@ -319,8 +333,9 @@ export class EditorCanvas extends Component {
 
         this._scrollFrame = requestAnimationFrame(() => {
             this._scrollFrame = null;
+            const { zoom, panX, panY } = this.viewport;
             const delta = ev.deltaY > 0 ? 0.9 : 1.1;
-            const newZoom = Math.min(Math.max(this.state.viewport.zoom * delta, 0.25), 2);
+            const newZoom = Math.min(Math.max(zoom * delta, 0.25), 2);
 
             // Zoom towards cursor position
             const rect = this.rootRef.el.getBoundingClientRect();
@@ -328,10 +343,15 @@ export class EditorCanvas extends Component {
             const mouseY = ev.clientY - rect.top;
 
             // Adjust pan to zoom towards cursor
-            const factor = newZoom / this.state.viewport.zoom;
-            this.state.viewport.panX = mouseX - (mouseX - this.state.viewport.panX) * factor;
-            this.state.viewport.panY = mouseY - (mouseY - this.state.viewport.panY) * factor;
-            this.state.viewport.zoom = newZoom;
+            const factor = newZoom / zoom;
+            const newPanX = mouseX - (mouseX - panX) * factor;
+            const newPanY = mouseY - (mouseY - panY) * factor;
+
+            // Update via service action
+            this.editor.actions.setViewport({
+                pan: { x: newPanX, y: newPanY },
+                zoom: newZoom,
+            });
 
             this.updateViewRect();
         });
@@ -341,32 +361,34 @@ export class EditorCanvas extends Component {
      * Get zoom percentage for display
      */
     get zoomPercentage() {
-        return Math.round(this.state.viewport.zoom * 100);
+        return Math.round(this.viewport.zoom * 100);
     }
 
     /**
-     * Zoom in by 10%
+     * Zoom in by 10% (fixed step)
      */
     zoomIn() {
-        const newZoom = Math.min(this.state.viewport.zoom * 1.1, 2);
-        this.state.viewport.zoom = newZoom;
+        const currentZoom = this.viewport.zoom;
+        // Round to nearest 0.1 to avoid floating point drift
+        const newZoom = Math.min(Math.round((currentZoom + 0.1) * 10) / 10, 2);
+        this.editor.actions.zoomTo(newZoom);
     }
 
     /**
-     * Zoom out by 10%
+     * Zoom out by 10% (fixed step)
      */
     zoomOut() {
-        const newZoom = Math.max(this.state.viewport.zoom * 0.9, 0.25);
-        this.state.viewport.zoom = newZoom;
+        const currentZoom = this.viewport.zoom;
+        // Round to nearest 0.1 to avoid floating point drift  
+        const newZoom = Math.max(Math.round((currentZoom - 0.1) * 10) / 10, 0.25);
+        this.editor.actions.zoomTo(newZoom);
     }
 
     /**
      * Reset zoom to 100% and pan to origin
      */
     resetZoom() {
-        this.state.viewport.zoom = 1;
-        this.state.viewport.panX = 0;
-        this.state.viewport.panY = 0;
+        this.editor.actions.resetViewport();
     }
 
     /**
@@ -411,7 +433,11 @@ export class EditorCanvas extends Component {
         const panX = -bounds.minX + PADDING + (rect.width / zoom - contentWidth) / 2;
         const panY = -bounds.minY + PADDING + (rect.height / zoom - contentHeight) / 2;
 
-        this.state.viewport = { zoom, panX, panY };
+        // Update via service action
+        this.editor.actions.setViewport({
+            pan: { x: panX, y: panY },
+            zoom,
+        });
     }
 
     // =========================================
@@ -751,8 +777,11 @@ export class EditorCanvas extends Component {
 
             // Phase 5: Panning
             if (this.state.isPanning && this._panStart) {
-                this.state.viewport.panX = this._panInitial.x + (ev.clientX - this._panStart.x);
-                this.state.viewport.panY = this._panInitial.y + (ev.clientY - this._panStart.y);
+                const newPanX = this._panInitial.x + (ev.clientX - this._panStart.x);
+                const newPanY = this._panInitial.y + (ev.clientY - this._panStart.y);
+                this.editor.actions.setViewport({
+                    pan: { x: newPanX, y: newPanY },
+                });
                 this.updateViewRect();
                 return;
             }
@@ -823,6 +852,39 @@ export class EditorCanvas extends Component {
 
         if (isSocket && socketType === 'input') {
             return; // Will be handled by onSocketMouseUp
+        }
+
+        // FEATURE: Spawn NodeMenu when dropping connection on empty canvas
+        // Only for output socket drags (input sockets don't create connections)
+        const start = this.state.connectionStart;
+        if (start && start.socketType === 'output') {
+            const canvasPos = this.getCanvasPosition(ev);
+            const canvasRect = this.rootRef.el?.getBoundingClientRect() || { left: 0, top: 0 };
+
+            // Screen position relative to canvas container
+            const screenX = ev.clientX - canvasRect.left;
+            const screenY = ev.clientY - canvasRect.top;
+
+            this.state.nodeMenu = {
+                visible: true,
+                x: screenX,
+                y: screenY,
+                canvasX: canvasPos.x,
+                canvasY: canvasPos.y,
+                variant: 'default',
+                connectionContext: {
+                    type: 'dragConnect',
+                    sourceNodeId: start.nodeId,
+                    sourceSocketKey: start.socketKey,
+                },
+            };
+
+            // Clear connection drawing state but keep context in nodeMenu
+            this.state.isConnecting = false;
+            this.state.tempLineEndpoint = null;
+            this.state.snappedSocket = null;
+            // Note: connectionStart cleared when menu closes
+            return;
         }
 
         this.cancelConnection();
@@ -1226,8 +1288,8 @@ export class EditorCanvas extends Component {
             this.state.isPanning = true;
             this._panStart = { x: ev.clientX, y: ev.clientY };
             this._panInitial = {
-                x: this.state.viewport.panX,
-                y: this.state.viewport.panY
+                x: this.viewport.panX,
+                y: this.viewport.panY
             };
             return;
         }
@@ -1293,8 +1355,9 @@ export class EditorCanvas extends Component {
             y: canvasY
         };
 
-        if (connectionContext?.type === 'quickAdd') {
-            // Quick-add from socket: create node and auto-connect
+        if (connectionContext?.type === 'quickAdd' || connectionContext?.type === 'dragConnect') {
+            // Quick-add from socket OR drag-connect from canvas:
+            // Create node and auto-connect from source socket
             const { sourceNodeId, sourceSocketKey } = connectionContext;
             const newNodeId = this.editor.actions.addNode(nodeType, position);
 
@@ -1327,6 +1390,9 @@ export class EditorCanvas extends Component {
      * Close NodeMenu
      */
     onNodeMenuClose() {
+        // Clear any pending connection state from drag-connect flow
+        this.state.connectionStart = null;
+
         this.state.nodeMenu = {
             visible: false,
             x: 0,

@@ -14,6 +14,7 @@
         # Core libs bundle - can be lazy-loaded or included separately
         'workflow_pilot.assets_libs': [
             'workflow_pilot/static/lib/dagre.js/dagre.min.js',
+            'workflow_pilot/static/lib/lucide/lucide.min.js',
             'workflow_pilot/static/lib/motion/**/*',
         ],
         'web.assets_backend': [

@@ -3,6 +3,7 @@
 import { Component, useRef, useState, useExternalListener, useEnv } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
 import { CanvasNodeToolbar } from "./canvas_node_toolbar";
+import { LucideIcon } from "./common/lucide_icon";
 
 /**
  * WorkflowNode Component
@@ -13,7 +14,7 @@ import { CanvasNodeToolbar } from "./canvas_node_toolbar";
 export class WorkflowNode extends Component {
     static template = "workflow_pilot.workflow_node";
 
-    static components = { WorkflowSocket, CanvasNodeToolbar };
+    static components = { WorkflowSocket, CanvasNodeToolbar, LucideIcon };
     static props = {
         node: Object,
         zoom: { type: Number, optional: true },

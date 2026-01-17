@@ -198,7 +198,7 @@ export class LoopNode extends BaseNode {
 export class IfNode extends BaseNode {
     static nodeType = 'if';
     static label = 'If';
-    static icon = 'fa-code-branch';
+    static icon = 'split';
     static category = 'flow';
     static description = 'Route data based on condition';
 

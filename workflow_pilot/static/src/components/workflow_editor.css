@@ -732,8 +732,8 @@
   border: 1px solid #32353b;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  transform: translate(-50%, -50%);
-  /* animation: toolbarFadeIn 0.1s ease-out; DISABLED */
+  /* transform is set dynamically via JS for zoom scaling */
+  transform-origin: center center;
 }
 
 /* @keyframes toolbarFadeIn DISABLED

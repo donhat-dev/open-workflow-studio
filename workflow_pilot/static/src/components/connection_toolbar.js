@@ -6,6 +6,7 @@ import { Component, xml } from "@odoo/owl";
  * 
  * A floating toolbar that appears on connection hover.
  * Provides quick actions: Add node (insert into connection) and Delete connection.
+ * Scales with zoom to maintain visual proportion with the canvas.
  */
 export class ConnectionToolbar extends Component {
     static template = xml`
@@ -32,17 +33,22 @@ export class ConnectionToolbar extends Component {
     static props = {
         position: { type: Object },      // { x, y } - midpoint in canvas coordinates
         connectionId: { type: String },
+        zoom: { type: Number, optional: true },  // Current zoom level for scaling
         onAddNode: { type: Function },   // (connectionId, position) => void
         onDelete: { type: Function },    // (connectionId) => void
         onHoverChange: { type: Function, optional: true }, // (isHovering) => void
     };
 
     /**
-     * Toolbar positioning style
+     * Toolbar positioning style with zoom-based scaling
      */
     get toolbarStyle() {
         const { x, y } = this.props.position || { x: 0, y: 0 };
-        return `left: ${x}px; top: ${y}px;`;
+        const zoom = this.props.zoom || 1;
+
+        // Scale toolbar with zoom for visual consistency
+        // translate(-50%, -50%) is already in CSS, we add scale here
+        return `left: ${x}px; top: ${y}px; transform: translate(-50%, -50%) scale(${zoom});`;
     }
 
     /**

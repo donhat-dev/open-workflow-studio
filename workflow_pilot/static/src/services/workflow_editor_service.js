@@ -165,6 +165,41 @@ export const workflowEditorService = {
                 state.ui.viewport = { pan: { ...nextPan }, zoom: nextZoom };
             },
 
+            /**
+             * Zoom to a specific level (clamped to 0.1 - 2.0)
+             * @param {number} level - Target zoom level
+             */
+            zoomTo(level) {
+                const clamped = Math.max(0.1, Math.min(2, level));
+                state.ui.viewport.zoom = clamped;
+            },
+
+            /**
+             * Zoom by a delta amount
+             * @param {number} delta - Amount to add to current zoom
+             */
+            zoomBy(delta) {
+                const newZoom = Math.max(0.1, Math.min(2, state.ui.viewport.zoom + delta));
+                state.ui.viewport.zoom = newZoom;
+            },
+
+            /**
+             * Pan by delta amounts
+             * @param {number} deltaX 
+             * @param {number} deltaY 
+             */
+            panBy(deltaX, deltaY) {
+                state.ui.viewport.pan.x += deltaX;
+                state.ui.viewport.pan.y += deltaY;
+            },
+
+            /**
+             * Reset viewport to default (100% zoom, origin pan)
+             */
+            resetViewport() {
+                state.ui.viewport = { pan: { x: 0, y: 0 }, zoom: 1 };
+            },
+
             openPanel(panelType, context = {}) {
                 if (panelType === "config") {
                     state.ui.panels.configOpen = true;
@@ -255,6 +290,7 @@ export const workflowEditorService = {
                 getConnections: () => state.graph.connections,
             },
         };
+
     },
 };
 

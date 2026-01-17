@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, xml, onPatched, onMounted, useSubEnv } from "@odoo/owl";
+import { Component, useState, xml, onMounted, useSubEnv, useEffect } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 import { NodePalette } from "./components/node_palette";
@@ -107,8 +107,16 @@ export class WorkflowPilotDevApp extends Component {
         // Load from localStorage
         this._loadFromStorage();
 
-        // Auto-save on state changes
-        onPatched(() => this._autoSave());
+        // Bind editorState for useEffect to track
+        this.editorState = useState(this.editorService.state);
+
+        // Auto-save when graph state changes (useEffect pattern)
+        useEffect(
+            () => {
+                this._autoSave();
+            },
+            () => [this.editorState.graph.nodes.length, this.editorState.graph.connections.length]
+        );
 
         this._offset = { x: 40, y: 40 };
         window.app = this; // For debugging

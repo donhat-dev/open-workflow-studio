@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates id="template" xml:space="preserve">
+	<t t-name="workflow_pilot.lucide_icon">
+		<t t-if="shouldUseFontAwesome">
+			<!-- FontAwesome fallback -->
+			<i t-attf-class="fa {{props.name}} {{props.class}}" t-att-style="'font-size: ' + props.size + 'px'"/>
+		</t>
+		<t t-else="">
+			<!-- Lucide SVG container -->
+			<span t-ref="iconContainer" t-att-class="'lucide-icon ' + (props.class || '')" t-att-style="'display: inline-flex; align-items: center; justify-content: center; width: ' + props.size + 'px; height: ' + props.size + 'px'"/>
+		</t>
+	</t>
+</templates>

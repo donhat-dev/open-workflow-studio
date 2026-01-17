@@ -5,7 +5,7 @@
 			<CanvasNodeToolbar t-props="toolbarProps"/>
 			<div class="workflow-node__header" t-on-mousedown="onHeaderMouseDown">
 				<span class="workflow-node__icon">
-					<i t-att-class="'fa ' + nodeIcon"/>
+					<LucideIcon t-props="{ name: nodeIcon, size: 16 }"/>
 				</span>
 				<span class="workflow-node__title">
 					<t t-esc="props.node.title || props.node.type"/>
