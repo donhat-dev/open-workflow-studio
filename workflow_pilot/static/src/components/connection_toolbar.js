@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, xml } from "@odoo/owl";
+import { Component, xml, useEnv } from "@odoo/owl";
 
 /**
  * ConnectionToolbar Component
@@ -7,6 +7,8 @@ import { Component, xml } from "@odoo/owl";
  * A floating toolbar that appears on connection hover.
  * Provides quick actions: Add node (insert into connection) and Delete connection.
  * Scales with zoom to maintain visual proportion with the canvas.
+ * 
+ * Uses workflowEditor service for actions (thin UI pattern).
  */
 export class ConnectionToolbar extends Component {
     static template = xml`
@@ -33,11 +35,15 @@ export class ConnectionToolbar extends Component {
     static props = {
         position: { type: Object },      // { x, y } - midpoint in canvas coordinates
         connectionId: { type: String },
-        zoom: { type: Number, optional: true },  // Current zoom level for scaling
-        onAddNode: { type: Function },   // (connectionId, position) => void
-        onDelete: { type: Function },    // (connectionId) => void
-        onHoverChange: { type: Function, optional: true }, // (isHovering) => void
+        zoom: { type: Number, optional: true },
+        // Hover callback kept for parent to manage toolbar visibility
+        onHoverChange: { type: Function, optional: true },
     };
+
+    setup() {
+        this.env = useEnv();
+        this.editor = this.env.workflowEditor;
+    }
 
     /**
      * Toolbar positioning style with zoom-based scaling
@@ -45,24 +51,25 @@ export class ConnectionToolbar extends Component {
     get toolbarStyle() {
         const { x, y } = this.props.position || { x: 0, y: 0 };
         const zoom = this.props.zoom || 1;
-
-        // Scale toolbar with zoom for visual consistency
-        // translate(-50%, -50%) is already in CSS, we add scale here
         return `left: ${x}px; top: ${y}px; transform: translate(-50%, -50%) scale(${zoom});`;
     }
 
     /**
-     * Handle Add button click - opens NodeMenu at this position
+     * Handle Add button click - opens NodeMenu via service
      */
     onAddClick() {
-        this.props.onAddNode(this.props.connectionId, this.props.position);
+        // Trigger bus event for EditorCanvas to open NodeMenu with connection context
+        this.editor.bus.trigger('CONNECTION:INSERT_NODE', {
+            connectionId: this.props.connectionId,
+            position: this.props.position,
+        });
     }
 
     /**
-     * Handle Delete button click - removes the connection
+     * Handle Delete button click - removes connection via service
      */
     onDeleteClick() {
-        this.props.onDelete(this.props.connectionId);
+        this.editor.actions.removeConnection(this.props.connectionId);
     }
 
     /**

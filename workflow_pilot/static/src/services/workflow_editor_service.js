@@ -204,12 +204,10 @@ export const workflowEditorService = {
                 if (panelType === "config") {
                     state.ui.panels.configOpen = true;
                     state.ui.panels.configNodeId = context.nodeId || null;
-                    // [STUDIO PATTERN] Notify via bus so EditorCanvas can sync
-                    editorBus.trigger("PANEL:CONFIG_OPENED", { nodeId: context.nodeId });
+                    // State is read directly by EditorCanvas via isConfigPanelOpen getter
                 }
                 if (panelType === "menu") {
                     state.ui.panels.menuOpen = true;
-                    editorBus.trigger("PANEL:MENU_OPENED", {});
                 }
             },
 
@@ -217,11 +215,10 @@ export const workflowEditorService = {
                 if (panelType === "config") {
                     state.ui.panels.configOpen = false;
                     state.ui.panels.configNodeId = null;
-                    editorBus.trigger("PANEL:CONFIG_CLOSED", {});
+                    // State is read directly by EditorCanvas via isConfigPanelOpen getter
                 }
                 if (panelType === "menu") {
                     state.ui.panels.menuOpen = false;
-                    editorBus.trigger("PANEL:MENU_CLOSED", {});
                 }
             },
 

@@ -20,6 +20,7 @@ import { Component, xml, useState, useRef, onMounted, onWillUnmount, useEnv } fr
 // @odoo-dependency - useService hook
 import { useService } from "@web/core/utils/hooks";
 import { MotionHelpers } from "../utils/motion_helpers";
+import { LucideIcon } from "./common/lucide_icon";
 
 export class NodeMenu extends Component {
     static template = xml`
@@ -44,9 +45,7 @@ export class NodeMenu extends Component {
                 <t t-foreach="filteredCategories" t-as="category" t-key="category.key">
                     <div class="node-menu__category">
                         <div class="node-menu__category-title">
-                            <i t-if="category.icon and category.icon.startsWith('fa-')" 
-                               t-attf-class="fa {{category.icon}} node-menu__category-icon"/>
-                            <span t-else="" class="node-menu__category-icon" t-esc="category.icon"/>
+                            <LucideIcon t-if="category.icon" name="category.icon" size="14" class="'node-menu__category-icon'"/>
                             <t t-esc="category.name"/>
                         </div>
                         <t t-foreach="category.items" t-as="item" t-key="item.key">
@@ -54,9 +53,7 @@ export class NodeMenu extends Component {
                                  t-att-data-node-type="item.key"
                                  t-on-click="onItemClick">
                                 <div class="node-menu__item-icon">
-                                    <i t-if="item.icon and item.icon.startsWith('fa-')" 
-                                       t-attf-class="fa {{item.icon}}"/>
-                                    <t t-else="" t-esc="item.icon or '📦'"/>
+                                    <LucideIcon name="item.icon" size="18"/>
                                 </div>
                                 <div class="node-menu__item-info">
                                     <div class="node-menu__item-title">
@@ -78,6 +75,8 @@ export class NodeMenu extends Component {
             </div>
         </div>
     `;
+
+    static components = { LucideIcon };
 
     static props = {
         position: { type: Object },  // { x, y } - screen coordinates

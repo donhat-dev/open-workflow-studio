@@ -152,8 +152,13 @@ export class LucideIcon extends Component {
     /**
      * Convert kebab-case or snake_case to PascalCase
      * e.g., "arrow-right-left" -> "ArrowRightLeft", "git_branch" -> "GitBranch"
+     * Preserves existing PascalCase: "GitBranch" -> "GitBranch"
      */
     toPascalCase(str) {
+        // If already PascalCase (no separators and starts with uppercase), return as-is
+        if (/^[A-Z][a-zA-Z0-9]*$/.test(str) && !str.includes('-') && !str.includes('_')) {
+            return str;
+        }
         return str
             .split(/[-_\s]+/)
             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())

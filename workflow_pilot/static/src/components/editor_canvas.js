@@ -47,9 +47,6 @@ export class EditorCanvas extends Component {
             connectionStart: null,
             tempLineEndpoint: null,
             snappedSocket: null,  // { nodeId, socketKey, x, y } - for smart snapping
-            // Selected connection IDs (Still managed locally for now, 
-            // as they are primarily used for rendering connections in this component)
-            selectedConnectionIds: [],
             // Dimension configuration (reactive for runtime updates)
             dimensionConfig: this.props.dimensionConfig || {},
             nodeMenu: {
@@ -68,11 +65,7 @@ export class EditorCanvas extends Component {
             },
             // Viewport tracking for culling
             viewRect: { x: 0, y: 0, w: 0, h: 0 },
-            // Config panel state
-            configPanel: {
-                visible: false,
-                nodeId: null,
-            },
+            // Config panel state - now read from service via getter isConfigPanelOpen
         });
 
         // Initialize Canvas Gestures Hook (pan/selection box)
@@ -98,6 +91,12 @@ export class EditorCanvas extends Component {
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
         useExternalListener(document, "keydown", this.onKeyDown.bind(this));
 
+        // Bus listener: ConnectionToolbar "Add Node" button
+        this.editor.bus.addEventListener("CONNECTION:INSERT_NODE", (ev) => {
+            const { connectionId, position } = ev.detail;
+            this.onConnectionAddNode(connectionId, position);
+        });
+
         this.editor.bus.addEventListener("NODE:EXECUTE", async (ev) => {
             const { nodeId } = ev.detail;
             // Execute up to this node via workflowRun service
@@ -117,19 +116,6 @@ export class EditorCanvas extends Component {
             console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
             await runService.runUntilNode(workflow, nodeId);
         });
-        this.editor.bus.addEventListener("NODE:TOGGLE_DISABLE", (ev) => {
-            const { nodeId } = ev.detail;
-            this.editor.actions.toggleDisable(nodeId);
-        });
-        // Config panel sync from service
-        this.editor.bus.addEventListener("PANEL:CONFIG_OPENED", (ev) => {
-            const { nodeId } = ev.detail;
-            this.state.configPanel = { visible: true, nodeId };
-        });
-        this.editor.bus.addEventListener("PANEL:CONFIG_CLOSED", () => {
-            this.state.configPanel = { visible: false, nodeId: null };
-        });
-        // Socket events from WorkflowNode (t-props pattern via bus)
         this.editor.bus.addEventListener("SOCKET:MOUSE_DOWN", (ev) => {
             this.onSocketMouseDown(ev.detail);
         });
@@ -182,6 +168,13 @@ export class EditorCanvas extends Component {
      */
     get selectionSet() {
         return new Set(this.editorState.ui.selection.nodeIds || []);
+    }
+
+    /**
+     * Get selected connection IDs from service state (for template binding)
+     */
+    get selectedConnectionIds() {
+        return this.editorState.ui.selection.connectionIds || [];
     }
 
     /**
@@ -454,21 +447,12 @@ export class EditorCanvas extends Component {
 
     /**
      * Auto-arrange nodes using Dagre.js layout algorithm
-     * Supports cyclic graphs (loop nodes) via back-edge detection
-     * Uses n8n-style subgraph splitting for disconnected components
      */
     tidyUp() {
         if (this.nodes.length === 0) return;
-
         // Create graph from current nodes and connections
         const graph = WorkflowGraph.fromNodes(this.nodes, this.connections);
-
-        // Run Dagre layout with subgraph splitting (n8n-style)
-        // Handles cycles automatically, splits disconnected components
         const positions = graph.layoutWithSplitting();
-
-        // Apply new positions to nodes and notify parent of each change
-        // This ensures Core layer (WorkflowEditor) is synced
         for (const node of this.nodes) {
             const pos = positions[node.id];
             if (pos) {
@@ -493,8 +477,7 @@ export class EditorCanvas extends Component {
      * Clear all node/connection selections
      */
     clearSelection() {
-        this.editor.actions.select([]);
-        this.state.selectedConnectionIds = [];
+        this.editor.actions.select([], []);
     }
 
     /**
@@ -542,11 +525,6 @@ export class EditorCanvas extends Component {
             return { ...conn, ...result };
         });
     }
-
-    // =========================================
-    // Phase 4: Interactive Connection Drawing
-    // =========================================
-
     /**
      * Get temp connection path while drawing
      * Returns empty string if not drawing
@@ -577,7 +555,6 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Task 4.2: Handle socket mousedown - start drawing connection
      * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
      */
     onSocketMouseDown = (data) => {
@@ -655,7 +632,6 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Task 4.5: Cancel connection if mouse released outside socket
      * @param {MouseEvent} ev
      */
     onDocumentMouseUp(ev) {
@@ -670,7 +646,6 @@ export class EditorCanvas extends Component {
             return;
         }
 
-        // Phase 4: Connection drawing
         if (!this.state.isConnecting) return;
 
         // Smart snapping: if snapped to a socket, create connection
@@ -734,7 +709,6 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Task 4.4: Handle socket mouseup - complete connection
      * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
      */
     onSocketMouseUp = (data) => {
@@ -801,7 +775,6 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle node position change during drag
-     * Task 3.6: Connections auto-update via OWL reactivity
      * @param {{ nodeId: string, x: number, y: number }} param
      */
     onNodeMove({ nodeId, x, y }) {
@@ -844,8 +817,7 @@ export class EditorCanvas extends Component {
             this.editor.actions.select([node.id]);
         }
 
-        // Clear connection selection when a node is selected
-        this.state.selectedConnectionIds = [];
+        // Connection selection is cleared by select() action via service
     }
 
     onNodeExecute(nodeId) {
@@ -905,8 +877,8 @@ export class EditorCanvas extends Component {
      * @param {string} connId 
      */
     onConnectionSelect(connId) {
-        this.state.selectedConnectionIds = [connId];
-        this.editor.actions.select([]);
+        // Select only this connection (clear node selection)
+        this.editor.actions.select([], [connId]);
     }
 
     /**
@@ -936,11 +908,12 @@ export class EditorCanvas extends Component {
             }
 
             // Delete connection
-            if (this.state.selectedConnectionIds.length > 0) {
-                [...this.state.selectedConnectionIds].forEach(id => {
+            const selectedConnIds = this.editorState.ui.selection.connectionIds || [];
+            if (selectedConnIds.length > 0) {
+                [...selectedConnIds].forEach(id => {
                     this.editor.actions.removeConnection(id);
                 });
-                this.state.selectedConnectionIds = [];
+                this.editor.actions.select([], []);
             }
             return;
         }
@@ -1122,10 +1095,6 @@ export class EditorCanvas extends Component {
     onCanvasMouseDown(ev) {
         this.gestures.onCanvasMouseDown(ev);
     }
-
-    // =========================================
-    // Phase 4: NodeMenu & ConnectionToolbar
-    // =========================================
 
     /**
      * Handle right-click on canvas to open NodeMenu
@@ -1438,42 +1407,40 @@ export class EditorCanvas extends Component {
     // ============================================
 
     /**
-     * Handle double-click on node to open config panel
+     * Handle double-click on node to open config panel (via service action)
      */
     onNodeDoubleClick = (nodeId) => {
-        this.state.configPanel = {
-            visible: true,
-            nodeId: nodeId,
-            node: this.nodes.find(n => n.id === nodeId),
-        };
+        this.editor.actions.openPanel("config", { nodeId });
     };
 
     /**
-     * Get the node currently being configured
+     * Check if config panel is open (reads from service state)
      */
-    get configPanelNode() {
-        if (!this.state.configPanel.nodeId) return null;
-        return this.nodes.find(n => n.id === this.state.configPanel.nodeId) || null;
+    get isConfigPanelOpen() {
+        return this.editorState.ui.panels.configOpen;
     }
 
     /**
-     * Close config panel
+     * Get the node currently being configured (from service state)
+     */
+    get configPanelNode() {
+        const nodeId = this.editorState.ui.panels.configNodeId;
+        if (!nodeId) return null;
+        return this.nodes.find(n => n.id === nodeId) || null;
+    }
+
+    /**
+     * Close config panel (via service action)
      */
     onConfigPanelClose = () => {
-        this.state.configPanel = {
-            visible: false,
-            nodeId: null,
-        };
+        this.editor.actions.closePanel("config");
     };
 
     /**
      * Save config panel changes
-     *
-     * Phase 3: Config is saved via adapterService
-     * No direct _node access needed
      */
     onConfigPanelSave = (values) => {
-        const nodeId = this.state.configPanel.nodeId;
+        const nodeId = this.editorState.ui.panels.configNodeId;
         if (!nodeId) return;
         this.onConfigPanelClose();
     };

@@ -143,7 +143,7 @@ export class WorkflowNode extends Component {
      * Handle toggle disable from toolbar
      */
     onToggleDisable() {
-        this.editor.bus.trigger("NODE:TOGGLE_DISABLE", { nodeId: this.props.node.id });
+        this.editor.actions.toggleDisable(this.props.node.id);
     }
 
     get nodeIcon() {

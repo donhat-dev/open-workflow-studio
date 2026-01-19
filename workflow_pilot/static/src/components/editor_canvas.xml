@@ -36,7 +36,7 @@
 					</defs>
 					<!-- Render connection paths -->
 					<t t-foreach="renderedConnections" t-as="conn" t-key="conn.id">
-						<g class="workflow-connection-group" t-att-class="{ 'selected': state.selectedConnectionIds.includes(conn.id), 'vertical-stack': conn.isVerticalStack }" t-on-click.stop="() => this.onConnectionSelect(conn.id)" t-on-mouseenter="(ev) => this.handleConnectionEnter(ev, conn)" t-on-mouseleave="onConnectionMouseLeave">
+						<g class="workflow-connection-group" t-att-class="{ 'selected': selectedConnectionIds.includes(conn.id), 'vertical-stack': conn.isVerticalStack }" t-on-click.stop="() => this.onConnectionSelect(conn.id)" t-on-mouseenter="(ev) => this.handleConnectionEnter(ev, conn)" t-on-mouseleave="onConnectionMouseLeave">
 							<t t-foreach="conn.paths" t-as="pathD" t-key="pathD_index">
 								<!-- Thicker invisible path for easier clicking -->
 								<path t-att-d="pathD" class="workflow-connection-hitarea" stroke="transparent" stroke-width="12" fill="none" />
@@ -59,11 +59,11 @@
 			<!-- Fixed-size overlays (independent of zoom/pan) -->
 			<div class="workflow-editor-canvas__overlays">
 				<!-- Connection Toolbar (on hover) -->
-				<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" zoom="viewport.zoom" onAddNode.bind="onConnectionAddNode" onDelete.bind="removeConnectionById" onHoverChange.bind="onToolbarHoverChange"/>
+				<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" zoom="viewport.zoom" onHoverChange.bind="onToolbarHoverChange"/>
 				<!-- Node Menu (context menu) -->
 				<NodeMenu t-if="state.nodeMenu.visible" position="{ x: state.nodeMenu.x, y: state.nodeMenu.y }" variant="state.nodeMenu.variant" connectionContext="state.nodeMenu.connectionContext" onSelect.bind="onNodeMenuSelect" onClose.bind="onNodeMenuClose"/>
 				<!-- Node Config Panel -->
-				<NodeConfigPanel t-if="state.configPanel.visible and configPanelNode" node="configPanelNode" workflow="workflowData" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
+				<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 			</div>
 		</div>
 	</t>

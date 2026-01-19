@@ -2,6 +2,7 @@
 import { _t } from "@web/core/l10n/translation";
 
 import { Component, xml } from "@odoo/owl";
+import { LucideIcon } from "./common/lucide_icon";
 
 export class NodePaletteItem extends Component {
     static template = xml`
@@ -10,10 +11,14 @@ export class NodePaletteItem extends Component {
             t-on-click="onClick"
             t-on-dragstart="onDragStart"
             draggable="true">
-            <div class="node-palette__icon"><t t-esc="props.icon"/></div>
+            <div class="node-palette__icon">
+                <LucideIcon name="props.icon" size="18"/>
+            </div>
             <div class="node-palette__label"><t t-esc="props.title || ('Node')"/></div>
         </div>
     `;
+
+    static components = { LucideIcon };
 
     static props = {
         name: String,
@@ -63,13 +68,13 @@ class NodePalette extends Component {
 
     get items() {
         return [
-            { name: "http", title: ("HTTP Request"), icon: "🌐", className: "node-palette__item--http" },
-            { name: "variable", title: ("Set Variable"), icon: "📦", className: "node-palette__item--variable" },
-            { name: "validation", title: ("Data Validation"), icon: "✓", className: "node-palette__item--validation" },
-            { name: "mapping", title: ("Data Mapping"), icon: "⇄", className: "node-palette__item--mapping" },
-            { name: "loop", title: ("Loop Over Items"), icon: "🔄", className: "node-palette__item--loop" },
-            { name: "if", title: ("If"), icon: "⬖", className: "node-palette__item--if" },
-            { name: "code", title: ("Code"), icon: "🐍", className: "node-palette__item--code" },
+            { name: "http", title: ("HTTP Request"), icon: "Globe", className: "node-palette__item--http" },
+            { name: "variable", title: ("Set Variable"), icon: "Box", className: "node-palette__item--variable" },
+            { name: "validation", title: ("Data Validation"), icon: "CheckCircle", className: "node-palette__item--validation" },
+            { name: "mapping", title: ("Data Mapping"), icon: "ArrowRightLeft", className: "node-palette__item--mapping" },
+            { name: "loop", title: ("Loop Over Items"), icon: "Repeat", className: "node-palette__item--loop" },
+            { name: "if", title: ("If"), icon: "GitBranch", className: "node-palette__item--if" },
+            { name: "code", title: ("Code"), icon: "Code", className: "node-palette__item--code" },
         ];
     }
 }
