@@ -7,6 +7,14 @@ import { ConnectionToolbar } from "./connection_toolbar";
 import { NodeConfigPanel } from "./node_config_panel";
 import { WorkflowGraph } from "../utils/graph_utils";
 import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
+import {
+    getBezierPath,
+    getBackEdgePath,
+    getVerticalStackPath,
+    getConnectionPath as calculateConnectionPath
+} from "./editor_canvas/utils/connection_path";
+import { useCanvasGestures } from "./editor_canvas/hooks";
+import { LucideIcon } from "./common/lucide_icon";
 
 /**
  * EditorCanvas Component
@@ -17,7 +25,7 @@ import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimen
  */
 export class EditorCanvas extends Component {
     static template = "workflow_pilot.editor_canvas";
-    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel };
+    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel, LucideIcon };
 
     static props = {
         // Dimension configuration for node sizing
@@ -39,11 +47,6 @@ export class EditorCanvas extends Component {
             connectionStart: null,
             tempLineEndpoint: null,
             snappedSocket: null,  // { nodeId, socketKey, x, y } - for smart snapping
-            // Transient selection state (box select gesture)
-            isSelecting: false,
-            selectionBox: null,
-            // Transient panning state
-            isPanning: false,
             // Selected connection IDs (Still managed locally for now, 
             // as they are primarily used for rendering connections in this component)
             selectedConnectionIds: [],
@@ -72,6 +75,15 @@ export class EditorCanvas extends Component {
             },
         });
 
+        // Initialize Canvas Gestures Hook (pan/selection box)
+        this.gestures = useCanvasGestures({
+            editor: this.editor,
+            rootRef: this.rootRef,
+            getViewport: () => this.viewport,
+            getCanvasPosition: (ev) => this.getCanvasPosition(ev),
+            onViewRectUpdate: () => this.updateViewRect(),
+        });
+
         // Resize observer to update viewport on window resize
         this._resizeObserver = new ResizeObserver(() => this.updateViewRect());
         onMounted(() => {
@@ -80,10 +92,6 @@ export class EditorCanvas extends Component {
                 this.updateViewRect();
             }
         });
-
-        // Pan/drag tracking (non-reactive)
-        this._panStart = null;
-        this._panInitial = null;
 
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
@@ -475,53 +483,10 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Get CSS style for selection box
+     * Get CSS style for selection box (delegates to gestures hook)
      */
     get selectionBoxStyle() {
-        const box = this.state.selectionBox;
-        if (!box) return '';
-
-        const x = Math.min(box.startX, box.endX);
-        const y = Math.min(box.startY, box.endY);
-        const w = Math.abs(box.endX - box.startX);
-        const h = Math.abs(box.endY - box.startY);
-
-        return `left:${x}px; top:${y}px; width:${w}px; height:${h}px;`;
-    }
-
-    /**
-     * Complete selection - find nodes within selection box
-     */
-    completeSelection() {
-        const box = this.state.selectionBox;
-        if (!box) return;
-
-        const minX = Math.min(box.startX, box.endX);
-        const maxX = Math.max(box.startX, box.endX);
-        const minY = Math.min(box.startY, box.endY);
-        const maxY = Math.max(box.startY, box.endY);
-
-        const NODE_WIDTH = 180;
-        const NODE_HEIGHT = 80;
-
-        const selected = this.nodes.filter(node => {
-            const nodeRight = node.x + NODE_WIDTH;
-            const nodeBottom = node.y + NODE_HEIGHT;
-            return node.x < maxX && nodeRight > minX &&
-                node.y < maxY && nodeBottom > minY;
-        });
-
-        // Clear and add to reactive Set
-        if (selected.length > 0) {
-            this.editor.actions.select(selected.map(n => n.id));
-        } else {
-            this.editor.actions.select([]);
-        }
-
-        // Flag to prevent onCanvasClick from clearing selection
-        // (click event fires after mouseup)
-        this._justCompletedSelection = true;
-        setTimeout(() => { this._justCompletedSelection = false; }, 0);
+        return this.gestures.getSelectionBoxStyle();
     }
 
     /**
@@ -533,91 +498,6 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Calculate normal forward bezier curve between two points
-     * @param {number} sourceX 
-     * @param {number} sourceY 
-     * @param {number} targetX 
-     * @param {number} targetY 
-     * @returns {string} SVG path d attribute
-     */
-    getBezierPath(sourceX, sourceY, targetX, targetY) {
-        const dx = Math.abs(targetX - sourceX);
-        const controlOffset = Math.max(dx * 0.5, 50);
-        return `M ${sourceX} ${sourceY} C ${sourceX + controlOffset} ${sourceY}, ${targetX - controlOffset} ${targetY}, ${targetX} ${targetY}`;
-    }
-
-    /**
-     * Calculate path for back-edges (connections going right-to-left)
-     * Routes around the bottom of both nodes to avoid overlapping
-     * Uses rounded corners at all 4 corners (like a rounded rectangle)
-     * @param {number} sourceX 
-     * @param {number} sourceY 
-     * @param {number} targetX 
-     * @param {number} targetY 
-     * @returns {string} SVG path d attribute
-     */
-    getBackEdgePath(sourceX, sourceY, targetX, targetY) {
-        const EDGE_PADDING_BOTTOM = 80;   // How far below to route
-        const CORNER_RADIUS = 20;         // Radius for rounded corners
-
-        // Calculate key positions
-        const rightX = sourceX + CORNER_RADIUS;  // Right side vertical line
-        const leftX = targetX - CORNER_RADIUS;   // Left side vertical line
-        const bottomY = Math.max(sourceY, targetY) + EDGE_PADDING_BOTTOM;
-
-        // Build path with 4 rounded corners (like rounded rectangle)
-        // Path: source → right → corner1 → down → corner2 → left → corner3 → up → corner4 → target
-        return `M ${sourceX} ${sourceY}
-                L ${rightX} ${sourceY}
-                Q ${rightX + CORNER_RADIUS} ${sourceY}, ${rightX + CORNER_RADIUS} ${sourceY + CORNER_RADIUS}
-                L ${rightX + CORNER_RADIUS} ${bottomY - CORNER_RADIUS}
-                Q ${rightX + CORNER_RADIUS} ${bottomY}, ${rightX} ${bottomY}
-                L ${leftX} ${bottomY}
-                Q ${leftX - CORNER_RADIUS} ${bottomY}, ${leftX - CORNER_RADIUS} ${bottomY - CORNER_RADIUS}
-                L ${leftX - CORNER_RADIUS} ${targetY + CORNER_RADIUS}
-                Q ${leftX - CORNER_RADIUS} ${targetY}, ${leftX} ${targetY}
-                L ${targetX} ${targetY}`;
-    }
-
-    /**
-     * Calculate paths for vertically stacked nodes (S-curve bracket routing)
-     * Creates two bracket segments: "_]" and "[_" that form an S-shape
-     * @param {number} sourceX 
-     * @param {number} sourceY 
-     * @param {number} targetX 
-     * @param {number} targetY 
-     * @returns {{ path1: string, path2: string }}
-     */
-    getVerticalStackPath(sourceX, sourceY, targetX, targetY) {
-        const CORNER_RADIUS = 16;
-        const EDGE_OFFSET_X = 60;  // Horizontal extension beyond nodes
-
-        // Midpoint (junction between two segments)
-        const midX = (sourceX + targetX) / 2;
-        const midY = (sourceY + targetY) / 2;
-
-        // Segment 1: Source → right → down → midpoint ("_]" shape)
-        const rightX = Math.max(sourceX, targetX) + EDGE_OFFSET_X;
-        const path1 = `M ${sourceX} ${sourceY}
-            L ${rightX - CORNER_RADIUS} ${sourceY}
-            Q ${rightX} ${sourceY}, ${rightX} ${sourceY + CORNER_RADIUS}
-            L ${rightX} ${midY - CORNER_RADIUS}
-            Q ${rightX} ${midY}, ${rightX - CORNER_RADIUS} ${midY}
-            L ${midX} ${midY}`;
-
-        // Segment 2: Midpoint → left → down → target ("[_" shape)
-        const leftX = Math.min(sourceX, targetX) - EDGE_OFFSET_X;
-        const path2 = `M ${midX} ${midY}
-            L ${leftX + CORNER_RADIUS} ${midY}
-            Q ${leftX} ${midY}, ${leftX} ${midY + CORNER_RADIUS}
-            L ${leftX} ${targetY - CORNER_RADIUS}
-            Q ${leftX} ${targetY}, ${leftX + CORNER_RADIUS} ${targetY}
-            L ${targetX} ${targetY}`;
-
-        return { path1, path2 };
-    }
-
-    /**
      * Calculate connection path(s) based on positions
      * Unified method used by both renderedConnections and tempConnectionPath
      * @param {{ x: number, y: number }} sourcePos
@@ -625,26 +505,8 @@ export class EditorCanvas extends Component {
      * @returns {{ paths: string[], isBackEdge: boolean, isVerticalStack: boolean }}
      */
     getConnectionPath(sourcePos, targetPos) {
-        const { isVerticalStack, isBackEdge } = detectConnectionType(sourcePos, targetPos);
-
-        if (isVerticalStack) {
-            const { path1, path2 } = this.getVerticalStackPath(
-                sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
-            );
-            return { paths: [path1, path2], isBackEdge: false, isVerticalStack: true };
-        }
-
-        if (isBackEdge) {
-            const path = this.getBackEdgePath(
-                sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
-            );
-            return { paths: [path], isBackEdge: true, isVerticalStack: false };
-        }
-
-        const path = this.getBezierPath(
-            sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
-        );
-        return { paths: [path], isBackEdge: false, isVerticalStack: false };
+        const connectionType = detectConnectionType(sourcePos, targetPos);
+        return calculateConnectionPath(sourcePos, targetPos, connectionType);
     }
 
     /**
@@ -775,26 +637,12 @@ export class EditorCanvas extends Component {
         this._mouseMoveFrame = requestAnimationFrame(() => {
             this._mouseMoveFrame = null;
 
-            // Phase 5: Panning
-            if (this.state.isPanning && this._panStart) {
-                const newPanX = this._panInitial.x + (ev.clientX - this._panStart.x);
-                const newPanY = this._panInitial.y + (ev.clientY - this._panStart.y);
-                this.editor.actions.setViewport({
-                    pan: { x: newPanX, y: newPanY },
-                });
-                this.updateViewRect();
+            // Delegate pan/selection to gestures hook
+            if (this.gestures.handleMouseMove(ev)) {
                 return;
             }
 
-            // Phase 6: Selection box
-            if (this.state.isSelecting && this.state.selectionBox) {
-                const pos = this.getCanvasPosition(ev);
-                this.state.selectionBox.endX = pos.x;
-                this.state.selectionBox.endY = pos.y;
-                return;
-            }
-
-            // Phase 4: Connection drawing
+            // Connection drawing
             if (!this.state.isConnecting) return;
 
             const pos = this.getCanvasPosition(ev);
@@ -811,19 +659,14 @@ export class EditorCanvas extends Component {
      * @param {MouseEvent} ev
      */
     onDocumentMouseUp(ev) {
-        // Phase 5: End panning
-        if (this.state.isPanning) {
-            this.state.isPanning = false;
-            this._panStart = null;
-            this._panInitial = null;
-            return;
-        }
-
-        // Phase 6: End selection
-        if (this.state.isSelecting) {
-            this.completeSelection();
-            this.state.isSelecting = false;
-            this.state.selectionBox = null;
+        // Delegate pan/selection end to gestures hook
+        const gestureType = this.gestures.handleMouseUp(ev);
+        if (gestureType) {
+            // If selection box just completed, set flag to prevent click from clearing
+            if (gestureType === 'selection') {
+                this._justCompletedSelection = true;
+                setTimeout(() => { this._justCompletedSelection = false; }, 0);
+            }
             return;
         }
 
@@ -1273,50 +1116,11 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Handle canvas mousedown - start pan or selection
+     * Handle canvas mousedown - start pan or selection (delegates to gestures hook)
      * @param {MouseEvent} ev
      */
     onCanvasMouseDown(ev) {
-        // Ignore clicks inside UI overlays (NodeMenu, Toolbar, etc.)
-        if (ev.target.closest('.node-menu') || ev.target.closest('.connection-toolbar') || ev.target.closest('.workflow-editor-canvas__controls')) {
-            return;
-        }
-
-        // Middle mouse = pan
-        if (ev.button === 1) {
-            ev.preventDefault();
-            this.state.isPanning = true;
-            this._panStart = { x: ev.clientX, y: ev.clientY };
-            this._panInitial = {
-                x: this.viewport.panX,
-                y: this.viewport.panY
-            };
-            return;
-        }
-
-        // Left click on empty canvas = start selection
-        // Check if clicking on canvas background, not on a node
-        const isCanvasBackground =
-            ev.target === this.rootRef.el ||
-            ev.target === this.contentRef.el ||
-            ev.target.classList?.contains('workflow-editor-canvas__content') ||
-            ev.target.classList?.contains('workflow-connections') ||
-            ev.target.classList?.contains('workflow-editor-canvas');
-
-        const isOnNode = ev.target.closest?.('.workflow-node');
-
-        if (ev.button === 0 && isCanvasBackground && !isOnNode) {
-            const pos = this.getCanvasPosition(ev);
-            this.state.isSelecting = true;
-            this.state.selectionBox = {
-                startX: pos.x,
-                startY: pos.y,
-                endX: pos.x,
-                endY: pos.y,
-            };
-            // Clear previous selection
-            this.clearSelection();
-        }
+        this.gestures.onCanvasMouseDown(ev);
     }
 
     // =========================================

@@ -4,18 +4,26 @@
 		<div class="workflow-editor-canvas" t-ref="root" t-att-style="canvasBackgroundStyle" t-on-dragover="onDragOver" t-on-drop="onDrop" t-on-click="onCanvasClick" t-on-mousedown="onCanvasMouseDown" t-on-wheel="onWheel" t-on-contextmenu="onCanvasContextMenu">
 			<!-- Controls Bar (Top-Left) -->
 			<div class="workflow-editor-canvas__controls">
-				<button class="canvas-btn" t-on-click="tidyUp" title="Tidy Up">✨</button>
+				<button class="canvas-btn" t-on-click="tidyUp" title="Tidy Up">
+					<LucideIcon t-props="{ name: 'Sparkles', size: 16 }"/>
+				</button>
 				<button class="canvas-btn add-node-btn" t-on-click="(ev) => this.onAddNodeClick(ev)" title="Add Node">+ Node</button>
-				<button class="canvas-btn" t-on-click="fitToView" title="Fit to View">⊡</button>
+				<button class="canvas-btn" t-on-click="fitToView" title="Fit to View">
+					<LucideIcon t-props="{ name: 'Maximize', size: 16 }"/>
+				</button>
 				<div class="controls-divider"/>
-				<button class="canvas-btn" t-on-click="zoomOut" title="Zoom Out">−</button>
+				<button class="canvas-btn" t-on-click="zoomOut" title="Zoom Out">
+					<LucideIcon t-props="{ name: 'Minus', size: 16 }"/>
+				</button>
 				<span class="zoom-label">
 					<t t-esc="zoomPercentage"/>%
-				
-				
 				</span>
-				<button class="canvas-btn" t-on-click="zoomIn" title="Zoom In">+</button>
-				<button class="canvas-btn" t-on-click="resetZoom" title="Reset View">⟲</button>
+				<button class="canvas-btn" t-on-click="zoomIn" title="Zoom In">
+					<LucideIcon t-props="{ name: 'Plus', size: 16 }"/>
+				</button>
+				<button class="canvas-btn" t-on-click="resetZoom" title="Reset View">
+					<LucideIcon t-props="{ name: 'RefreshCw', size: 16 }"/>
+				</button>
 			</div>
 			<!-- Transformable content wrapper -->
 			<div class="workflow-editor-canvas__content" t-att-style="viewportTransformStyle" t-ref="content">
@@ -47,7 +55,7 @@
 					<WorkflowNode node="node" zoom="viewport.zoom" selected="isNodeSelected(node)" snappedSocketKey="state.snappedSocket and state.snappedSocket.nodeId === node.	id ? state.snappedSocket.socketKey : null" connectedOutputsSet="connectedOutputsSet" dimensionConfig="dimensions"/>
 				</t>
 				<!-- Selection box -->
-				<div t-if="state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/></div>
+				<div t-if="gestures.state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/></div>
 			<!-- Fixed-size overlays (independent of zoom/pan) -->
 			<div class="workflow-editor-canvas__overlays">
 				<!-- Connection Toolbar (on hover) -->
