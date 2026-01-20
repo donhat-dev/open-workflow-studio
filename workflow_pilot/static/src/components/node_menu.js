@@ -16,7 +16,7 @@
  * @odoo-dependency - Uses useService for workflowNode service
  */
 
-import { Component, xml, useState, useRef, onMounted, onWillUnmount, useEnv } from "@odoo/owl";
+import { Component, xml, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
 // @odoo-dependency - useService hook
 import { useService } from "@web/core/utils/hooks";
 import { MotionHelpers } from "../utils/motion_helpers";
@@ -80,18 +80,16 @@ export class NodeMenu extends Component {
 
     static props = {
         position: { type: Object },  // { x, y } - screen coordinates
-        // Callbacks removed in favor of bus/service actions
         variant: { type: String, optional: true }, // 'default' or 'large'
-        // Optional: for inserting node into a connection (can be null)
         connectionContext: { type: [Object, { value: null }], optional: true },
+        onNodeSelected: { type: Function },  // (nodeType, connectionContext) => void
+        onClose: { type: Function },         // () => void
     };
 
     setup() {
         this.menuRef = useRef("menuRoot");
         this.searchInputRef = useRef("searchInput");
         this.nodeService = useService("workflowNode");
-        this.env = useEnv();
-        this.editor = this.env.workflowEditor;
 
         this._onClickOutside = this._onClickOutside.bind(this);
 
@@ -107,11 +105,6 @@ export class NodeMenu extends Component {
             }
             inputEl.focus();
             document.addEventListener("mousedown", this._onClickOutside);
-
-            // Animation DISABLED
-            // if (this.props.variant === 'large' && this.menuRef.el) {
-            //     MotionHelpers.animateDropdownIn(this.menuRef.el);
-            // }
         });
 
         onWillUnmount(() => {
@@ -193,15 +186,8 @@ export class NodeMenu extends Component {
     onSelectNode(nodeType) {
         // Track usage for "recent" feature
         this.nodeService.trackUsage(nodeType);
-
-        // Trigger bus event for EditorCanvas to handle
-        this.editor.bus.trigger("MENU:NODE_SELECTED", {
-            nodeType,
-            connectionContext: this.props.connectionContext
-        });
-
-        // Close request via bus
-        this.editor.bus.trigger("MENU:CLOSE");
+        this.props.onNodeSelected(nodeType, this.props.connectionContext);
+        this.props.onClose();
     }
 
     /**
@@ -210,7 +196,7 @@ export class NodeMenu extends Component {
     onKeyDown(ev) {
         if (ev.key === "Escape") {
             ev.preventDefault();
-            this.editor.bus.trigger("MENU:CLOSE");
+            this.props.onClose();
         }
     }
 
@@ -226,7 +212,7 @@ export class NodeMenu extends Component {
      */
     _onClickOutside(ev) {
         if (this.menuRef.el && !this.menuRef.el.contains(ev.target)) {
-            this.editor.bus.trigger("MENU:CLOSE");
+            this.props.onClose();
         }
     }
 }

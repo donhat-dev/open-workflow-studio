@@ -151,64 +151,95 @@ export class EditorCanvas extends Component {
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
 
-
-        // Bus listener: ConnectionToolbar "Add Node" button
-        this.editor.bus.addEventListener("CONNECTION:INSERT_NODE", (ev) => {
-            const { connectionId, position } = ev.detail;
-            this.onConnectionAddNode(connectionId, position);
-        });
-
-        this.editor.bus.addEventListener("CONNECTION:TOOLBAR_HOVER", (ev) => {
-            const { isHovering } = ev.detail;
-            this.onToolbarHoverChange(isHovering);
-        });
-
-        this.editor.bus.addEventListener("NODE:EXECUTE", async (ev) => {
-            const { nodeId } = ev.detail;
-            // Execute up to this node via workflowRun service
-            const runService = this.env.services.workflowRun;
-            const adapter = this.env.services.workflowAdapter;
-
-            if (!runService || !adapter) {
-                console.error('[EditorCanvas] Missing workflowRun or workflowAdapter service');
-                return;
-            }
-
-            const workflow = {
-                nodes: adapter.state.nodes,
-                connections: adapter.state.connections,
-            };
-
-            console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
-            await runService.runUntilNode(workflow, nodeId);
-        });
-        // Socket events - delegate to connectionDrawing hook
-        this.editor.bus.addEventListener("SOCKET:MOUSE_DOWN", (ev) => {
-            this.connectionDrawing.onSocketMouseDown(ev.detail);
-        });
-        this.editor.bus.addEventListener("SOCKET:MOUSE_UP", (ev) => {
-            this.connectionDrawing.onSocketMouseUp(ev.detail);
-        });
-        this.editor.bus.addEventListener("SOCKET:QUICK_ADD", (ev) => {
-            this.onSocketQuickAdd(ev.detail);
-        });
-
-        // Menu events
-        this.editor.bus.addEventListener("MENU:NODE_SELECTED", (ev) => {
-            const { nodeType, connectionContext } = ev.detail;
-            this.onNodeMenuSelect(nodeType, connectionContext);
-        });
-
-        this.editor.bus.addEventListener("MENU:CLOSE", () => {
-            this.onNodeMenuClose();
-        });
-
-        // Node events
-        this.editor.bus.addEventListener("NODE:DRAG_START", (ev) => {
-            this.multiNodeDrag.onNodeDragStart(ev.detail);
-        });
+        // Note: Parent->child callbacks are now passed directly via props/t-props:
+        // - ConnectionToolbar: onInsertNode, onHoverChange
+        // - NodeMenu: onNodeSelected, onClose
+        // - WorkflowNode: nodeActions (onDragStart, onExecute, onSocket*)
 
         window.canvas = this;
+    }
+
+    // ========================================
+    // PROPS GETTERS (t-props pattern)
+    // ========================================
+
+    /**
+     * Get callback props for ConnectionToolbar
+     * @returns {Object} { onInsertNode, onHoverChange }
+     */
+    get connectionToolbarProps() {
+        return {
+            onInsertNode: (connectionId, position) => {
+                this.onConnectionAddNode(connectionId, position);
+            },
+            onHoverChange: (isHovering) => {
+                this.onToolbarHoverChange(isHovering);
+            },
+        };
+    }
+
+    /**
+     * Get callback props for NodeMenu
+     * @returns {Object} { onNodeSelected, onClose }
+     */
+    get nodeMenuProps() {
+        return {
+            onNodeSelected: (nodeType, connectionContext) => {
+                this.onNodeMenuSelect(nodeType, connectionContext);
+            },
+            onClose: () => {
+                this.onNodeMenuClose();
+            },
+        };
+    }
+
+    /**
+     * Get all props for WorkflowNode component (t-props pattern)
+     * @param {Object} node - Node data object
+     * @returns {Object} Complete props for WorkflowNode
+     */
+    getWorkflowNodeProps(node) {
+        const snappedSocket = this.connectionDrawing.state.snappedSocket;
+        return {
+            node,
+            zoom: this.viewport.zoom,
+            selected: this.selectionSet.has(node.id),
+            snappedSocketKey: snappedSocket && snappedSocket.nodeId === node.id
+                ? snappedSocket.socketKey
+                : null,
+            connectedOutputsSet: this.connectedOutputsSet,
+            dimensionConfig: this.dimensions,
+            // Callbacks
+            onDragStart: (nodeId, event) => {
+                this.multiNodeDrag.onNodeDragStart({ nodeId, event });
+            },
+            onExecute: async (nodeId) => {
+                const runService = this.env.services.workflowRun;
+                const adapter = this.env.services.workflowAdapter;
+
+                if (!runService || !adapter) {
+                    console.error('[EditorCanvas] Missing workflowRun or workflowAdapter service');
+                    return;
+                }
+
+                const workflow = {
+                    nodes: adapter.state.nodes,
+                    connections: adapter.state.connections,
+                };
+
+                console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
+                await runService.runUntilNode(workflow, nodeId);
+            },
+            onSocketMouseDown: (data) => {
+                this.connectionDrawing.onSocketMouseDown(data);
+            },
+            onSocketMouseUp: (data) => {
+                this.connectionDrawing.onSocketMouseUp(data);
+            },
+            onSocketQuickAdd: (data) => {
+                this.onSocketQuickAdd(data);
+            },
+        };
     }
 
     /**

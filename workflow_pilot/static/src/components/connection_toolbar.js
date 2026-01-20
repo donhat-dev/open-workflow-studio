@@ -36,6 +36,8 @@ export class ConnectionToolbar extends Component {
         position: { type: Object },      // { x, y } - midpoint in canvas coordinates
         connectionId: { type: String },
         zoom: { type: Number, optional: true },
+        onInsertNode: { type: Function },   // (connectionId, position) => void
+        onHoverChange: { type: Function },  // (isHovering) => void
     };
 
     setup() {
@@ -53,14 +55,10 @@ export class ConnectionToolbar extends Component {
     }
 
     /**
-     * Handle Add button click - opens NodeMenu via service
+     * Handle Add button click - opens NodeMenu via callback
      */
     onAddClick() {
-        // Trigger bus event for EditorCanvas to open NodeMenu with connection context
-        this.editor.bus.trigger('CONNECTION:INSERT_NODE', {
-            connectionId: this.props.connectionId,
-            position: this.props.position,
-        });
+        this.props.onInsertNode(this.props.connectionId, this.props.position);
     }
 
     /**
@@ -74,16 +72,10 @@ export class ConnectionToolbar extends Component {
      * Keep toolbar visible while hovering over it
      */
     onMouseEnter() {
-        this.editor.bus.trigger("CONNECTION:TOOLBAR_HOVER", {
-            connectionId: this.props.connectionId,
-            isHovering: true,
-        });
+        this.props.onHoverChange(true);
     }
 
     onMouseLeave() {
-        this.editor.bus.trigger("CONNECTION:TOOLBAR_HOVER", {
-            connectionId: this.props.connectionId,
-            isHovering: false,
-        });
+        this.props.onHoverChange(false);
     }
 }

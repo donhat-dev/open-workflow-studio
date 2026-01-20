@@ -56,16 +56,16 @@
 					Drop nodes here (or click in the palette)
 				</div>
 				<t t-foreach="visibleNodes" t-as="node" t-key="node.id">
-					<WorkflowNode node="node" zoom="viewport.zoom" selected="isNodeSelected(node)" snappedSocketKey="connectionDrawing.state.snappedSocket and connectionDrawing.state.snappedSocket.nodeId === node.id ? connectionDrawing.state.snappedSocket.socketKey : null" connectedOutputsSet="connectedOutputsSet" dimensionConfig="dimensions"/>
+					<WorkflowNode t-props="getWorkflowNodeProps(node)"/>
 				</t>
 				<!-- Selection box -->
 				<div t-if="gestures.state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/>
 				<!-- Fixed-size overlays (independent of zoom/pan) -->
 				<div class="workflow-editor-canvas__overlays">
 					<!-- Connection Toolbar (on hover) -->
-					<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" zoom="viewport.zoom"/>
+					<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
 					<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
-					<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext"/>
+					<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 					<!-- Node Config Panel -->
 					<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 				</div>

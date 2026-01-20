@@ -22,7 +22,12 @@ export class WorkflowNode extends Component {
         connectedOutputsSet: { type: Object, optional: true },
         dimensionConfig: { type: Object },
         selected: { type: Boolean, optional: true },
-        // Socket callbacks removed - now use bus events via t-props pattern
+        // Parent->child callbacks (flat props, bundled via t-props in parent)
+        onDragStart: Function,       // (nodeId, event) => void
+        onExecute: Function,         // (nodeId) => void
+        onSocketMouseDown: Function, // (data) => void
+        onSocketMouseUp: Function,   // (data) => void
+        onSocketQuickAdd: Function,  // (data) => void
     };
 
     setup() {
@@ -60,8 +65,8 @@ export class WorkflowNode extends Component {
             }
         }
 
-        // Trigger drag start
-        this.editor.bus.trigger("NODE:DRAG_START", { nodeId: this.props.node.id, event: ev });
+        // Trigger drag start via callback
+        this.props.onDragStart(this.props.node.id, ev);
     }
 
     /**
@@ -91,8 +96,8 @@ export class WorkflowNode extends Component {
      * Handle execute from toolbar
      */
     onExecuteNode() {
-        // Trigger via bus for executor service to handle
-        this.editor.bus.trigger("NODE:EXECUTE", { nodeId: this.props.node.id });
+        // Trigger via callback for executor service to handle
+        this.props.onExecute(this.props.node.id);
     }
 
     /**
@@ -168,10 +173,10 @@ export class WorkflowNode extends Component {
             nodeId: this.props.node.id,
             isSnapped: this.props.snappedSocketKey === socketKey,
             onMouseDown: (data) => {
-                this.editor.bus.trigger("SOCKET:MOUSE_DOWN", data);
+                this.props.onSocketMouseDown(data);
             },
             onMouseUp: (data) => {
-                this.editor.bus.trigger("SOCKET:MOUSE_UP", data);
+                this.props.onSocketMouseUp(data);
             },
         };
     }
@@ -190,13 +195,13 @@ export class WorkflowNode extends Component {
             nodeId: this.props.node.id,
             isConnected: this.isOutputConnected(socketKey),
             onMouseDown: (data) => {
-                this.editor.bus.trigger("SOCKET:MOUSE_DOWN", data);
+                this.props.onSocketMouseDown(data);
             },
             onMouseUp: (data) => {
-                this.editor.bus.trigger("SOCKET:MOUSE_UP", data);
+                this.props.onSocketMouseUp(data);
             },
             onQuickAdd: (data) => {
-                this.editor.bus.trigger("SOCKET:QUICK_ADD", data);
+                this.props.onSocketQuickAdd(data);
             },
         };
     }
