@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_pilot.workflow_node">
-		<div class="workflow-node" t-ref="root" t-att-class="nodeTypeClass + (state.isDragging ? ' dragging' : '') + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick">
+		<div class="workflow-node" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick">
 			<CanvasNodeToolbar t-props="toolbarProps"/>
 			<div class="workflow-node__header" t-on-mousedown="onHeaderMouseDown">
 				<span class="workflow-node__icon">

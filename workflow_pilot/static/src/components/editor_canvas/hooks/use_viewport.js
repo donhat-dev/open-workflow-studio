@@ -2,6 +2,7 @@
 
 import { useState, useRef, onMounted } from "@odoo/owl";
 import { screenToCanvas, canvasToScreen, clamp } from "../utils/geometry";
+import { calculateFitView } from "../utils/view_utils";
 
 /**
  * useViewport Hook
@@ -11,7 +12,7 @@ import { screenToCanvas, canvasToScreen, clamp } from "../utils/geometry";
  * @param {{ editor: Object, rootRef: { el: HTMLElement } }} params
  * @returns {Object} Viewport state and methods
  */
-export function useViewport({ editor, rootRef }) {
+export function useViewport({ editor, rootRef, getDimensions }) {
     // RAF frame for throttling wheel zoom
     let scrollFrame = null;
 
@@ -37,10 +38,11 @@ export function useViewport({ editor, rootRef }) {
 
     /**
      * Calculate viewport transform style for CSS
+     * Includes transform-origin for proper scaling
      */
     function getViewportTransformStyle() {
         const viewport = getViewport();
-        return `transform: translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`;
+        return `transform: translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom}); transform-origin: 0 0;`;
     }
 
     /**
@@ -70,6 +72,7 @@ export function useViewport({ editor, rootRef }) {
 
     /**
      * Update visible viewport rectangle (canvas coordinates)
+     * Includes 300px buffer for smooth scrolling/panning
      */
     function updateViewRect() {
         if (!rootRef.el) return;
@@ -77,12 +80,15 @@ export function useViewport({ editor, rootRef }) {
         const viewport = getViewport();
         const rect = rootRef.el.getBoundingClientRect();
 
-        // Convert screen rect to canvas coordinates
+        // Add 300px buffer for smooth scrolling/panning
+        const BUFFER = 300;
+
+        // Convert screen rect to canvas coordinates with buffer
         Object.assign(viewRect, {
-            x: -viewport.panX / viewport.zoom,
-            y: -viewport.panY / viewport.zoom,
-            width: rect.width / viewport.zoom,
-            height: rect.height / viewport.zoom,
+            x: -viewport.panX / viewport.zoom - BUFFER,
+            y: -viewport.panY / viewport.zoom - BUFFER,
+            width: rect.width / viewport.zoom + (BUFFER * 2),
+            height: rect.height / viewport.zoom + (BUFFER * 2),
         });
     }
 
@@ -136,6 +142,7 @@ export function useViewport({ editor, rootRef }) {
         const currentZoom = getViewport().zoom;
         const newZoom = Math.min(Math.round((currentZoom + 0.1) * 10) / 10, 2);
         editor.actions.zoomTo(newZoom);
+        updateViewRect();
     }
 
     /**
@@ -145,6 +152,7 @@ export function useViewport({ editor, rootRef }) {
         const currentZoom = getViewport().zoom;
         const newZoom = Math.max(Math.round((currentZoom - 0.1) * 10) / 10, 0.25);
         editor.actions.zoomTo(newZoom);
+        updateViewRect();
     }
 
     /**
@@ -152,6 +160,7 @@ export function useViewport({ editor, rootRef }) {
      */
     function resetZoom() {
         editor.actions.resetViewport();
+        updateViewRect();
     }
 
     /**
@@ -160,40 +169,22 @@ export function useViewport({ editor, rootRef }) {
      */
     function fitToView(nodes) {
         if (!nodes || nodes.length === 0) return;
-
-        const NODE_WIDTH = 200;
-        const NODE_HEIGHT = 100;
-        const PADDING = 50;
-
-        const xs = nodes.map(n => n.x || 0);
-        const ys = nodes.map(n => n.y || 0);
-
-        const bounds = {
-            minX: Math.min(...xs),
-            maxX: Math.max(...xs) + NODE_WIDTH,
-            minY: Math.min(...ys),
-            maxY: Math.max(...ys) + NODE_HEIGHT,
-        };
-
-        const contentWidth = bounds.maxX - bounds.minX + PADDING * 2;
-        const contentHeight = bounds.maxY - bounds.minY + PADDING * 2;
-
         if (!rootRef.el) return;
+
+        const dims = getDimensions ? getDimensions() : null;
+        if (!dims) return;
+
         const rect = rootRef.el.getBoundingClientRect();
+        const viewState = calculateFitView(nodes, dims, rect);
 
-        const zoom = Math.min(
-            rect.width / contentWidth,
-            rect.height / contentHeight,
-            1
-        );
-
-        const panX = -bounds.minX + PADDING + (rect.width / zoom - contentWidth) / 2;
-        const panY = -bounds.minY + PADDING + (rect.height / zoom - contentHeight) / 2;
+        if (!viewState) return;
 
         editor.actions.setViewport({
-            pan: { x: panX, y: panY },
-            zoom,
+            pan: { x: viewState.panX, y: viewState.panY },
+            zoom: viewState.zoom,
         });
+
+        updateViewRect();
     }
 
     // Initialize view rect on mount

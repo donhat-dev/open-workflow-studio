@@ -11,7 +11,7 @@
 1. **Canonical editor state service**: workflowEditor as single source of truth for graph and UI state.
 2. **Service-driven architecture**: All mutations via service actions; UI is thin and reactive.
 3. **Studio-like patterns**: useSubEnv for editor scoping, behavior hooks for DOM, pure utils for logic.
-4. **Event bus as intent-only**: Bus carries drag/connect/key events; listeners call service actions, never mutate state directly.
+4. **Event bus as intent-only**: Prefer direct service actions for commands; use bus for intents/events when fan-out or extensibility is desired; listeners call service actions, never mutate state directly.
 
 ---
 
@@ -127,7 +127,7 @@
 ## DISCIPLINE RULES (AGENTS.md Update)
 - ✋ **No prop callbacks**: Components emit bus intents or call service actions; never introduce callback props
 - 📍 **Service is source of truth**: All graph/UI state lives in workflowEditor; components read from it
-- 🚌 **Bus is intent-only**: Bus carries user actions (drag, connect, keys); listeners translate to service actions
+- 🚌 **Bus is intent-only**: Default to calling actions directly for commands; use bus for intents/events (fan-out / extension points); listeners translate to service actions
 - 🧮 **Pure utils**: Geometry, selection, drag logic in separate utils/ files; no component coupling
 - 🪝 **Behavior hooks**: useNodeDrag, useConnection etc. handle DOM setup/cleanup; no inline listeners
 

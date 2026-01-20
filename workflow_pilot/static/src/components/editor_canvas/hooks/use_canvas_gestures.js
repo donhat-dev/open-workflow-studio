@@ -2,6 +2,7 @@
 
 import { useState, useExternalListener } from "@odoo/owl";
 import { screenToCanvas, getSelectionBox } from "../utils/geometry";
+import { getNodeBounds } from "../utils/view_utils";
 
 /**
  * useCanvasGestures Hook
@@ -23,7 +24,8 @@ export function useCanvasGestures({
     rootRef,
     getViewport,
     getCanvasPosition,
-    onViewRectUpdate
+    onViewRectUpdate,
+    getDimensions
 }) {
     // Gesture state
     const state = useState({
@@ -153,15 +155,16 @@ export function useCanvasGestures({
         const minY = Math.min(box.startY, box.endY);
         const maxY = Math.max(box.startY, box.endY);
 
-        const NODE_WIDTH = 180;
-        const NODE_HEIGHT = 80;
+        const dims = getDimensions ? getDimensions() : null;
+        if (!dims) return;
 
         // Get nodes from editor service
         const nodes = editor.state.graph.nodes;
-        const selected = nodes.filter(node => {
-            const nodeRight = node.x + NODE_WIDTH;
-            const nodeBottom = node.y + NODE_HEIGHT;
-            return node.x < maxX && nodeRight > minX && node.y < maxY && nodeBottom > minY;
+        const selected = nodes.filter((node) => {
+            const bounds = getNodeBounds(node, dims);
+            const nodeRight = bounds.x + bounds.width;
+            const nodeBottom = bounds.y + bounds.height;
+            return bounds.x < maxX && nodeRight > minX && bounds.y < maxY && nodeBottom > minY;
         });
 
         if (selected.length > 0) {

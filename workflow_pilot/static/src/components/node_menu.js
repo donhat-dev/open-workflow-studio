@@ -80,8 +80,7 @@ export class NodeMenu extends Component {
 
     static props = {
         position: { type: Object },  // { x, y } - screen coordinates
-        onSelect: { type: Function }, // (nodeType) => void
-        onClose: { type: Function },  // () => void
+        // Callbacks removed in favor of bus/service actions
         variant: { type: String, optional: true }, // 'default' or 'large'
         // Optional: for inserting node into a connection (can be null)
         connectionContext: { type: [Object, { value: null }], optional: true },
@@ -94,13 +93,19 @@ export class NodeMenu extends Component {
         this.env = useEnv();
         this.editor = this.env.workflowEditor;
 
+        this._onClickOutside = this._onClickOutside.bind(this);
+
         this.state = useState({
             searchQuery: "",
         });
 
         // Auto-focus search input on mount
         onMounted(() => {
-            this.searchInputRef.el?.focus();
+            const inputEl = this.searchInputRef.el;
+            if (!inputEl) {
+                throw new Error("[NodeMenu] Missing search input ref element");
+            }
+            inputEl.focus();
             document.addEventListener("mousedown", this._onClickOutside);
 
             // Animation DISABLED
@@ -112,8 +117,6 @@ export class NodeMenu extends Component {
         onWillUnmount(() => {
             document.removeEventListener("mousedown", this._onClickOutside);
         });
-
-        this._onClickOutside = this._onClickOutside.bind(this);
     }
 
     /**
@@ -190,10 +193,15 @@ export class NodeMenu extends Component {
     onSelectNode(nodeType) {
         // Track usage for "recent" feature
         this.nodeService.trackUsage(nodeType);
-        // Call parent callback (EditorCanvas.onNodeMenuSelect)
-        this.props.onSelect(nodeType, this.props.connectionContext);
-        // Close the menu
-        this.props.onClose();
+
+        // Trigger bus event for EditorCanvas to handle
+        this.editor.bus.trigger("MENU:NODE_SELECTED", {
+            nodeType,
+            connectionContext: this.props.connectionContext
+        });
+
+        // Close request via bus
+        this.editor.bus.trigger("MENU:CLOSE");
     }
 
     /**
@@ -202,7 +210,7 @@ export class NodeMenu extends Component {
     onKeyDown(ev) {
         if (ev.key === "Escape") {
             ev.preventDefault();
-            this.props.onClose();
+            this.editor.bus.trigger("MENU:CLOSE");
         }
     }
 
@@ -218,7 +226,7 @@ export class NodeMenu extends Component {
      */
     _onClickOutside(ev) {
         if (this.menuRef.el && !this.menuRef.el.contains(ev.target)) {
-            this.props.onClose();
+            this.editor.bus.trigger("MENU:CLOSE");
         }
     }
 }

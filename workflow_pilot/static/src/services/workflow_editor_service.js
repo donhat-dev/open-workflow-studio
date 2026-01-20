@@ -25,6 +25,16 @@ const DEFAULT_UI_STATE = () => ({
     panels: { configOpen: false, configNodeId: null, menuOpen: false },
     hoveredConnection: null,
     history: { canUndo: false, canRedo: false },
+    // NodeMenu state (source of truth)
+    nodeMenu: {
+        visible: false,
+        x: 0,           // Screen X position
+        y: 0,           // Screen Y position
+        canvasX: 0,     // Canvas X position for node creation
+        canvasY: 0,     // Canvas Y position for node creation
+        variant: 'default', // 'default' or 'large'
+        connectionContext: null, // { connectionId, position } for inserting node
+    },
 });
 
 export const workflowEditorService = {
@@ -226,6 +236,43 @@ export const workflowEditorService = {
                 state.ui.hoveredConnection = connId
                     ? { id: connId, midpoint: midpoint || null }
                     : null;
+            },
+
+            /**
+             * Open NodeMenu at specified position
+             * @param {Object} config - Menu configuration
+             * @param {number} config.x - Screen X position
+             * @param {number} config.y - Screen Y position  
+             * @param {number} config.canvasX - Canvas X position for node creation
+             * @param {number} config.canvasY - Canvas Y position for node creation
+             * @param {string} [config.variant='default'] - 'default' or 'large'
+             * @param {Object} [config.connectionContext=null] - { connectionId, position } for inserting node
+             */
+            openNodeMenu({ x, y, canvasX, canvasY, variant = 'default', connectionContext = null }) {
+                state.ui.nodeMenu = {
+                    visible: true,
+                    x,
+                    y,
+                    canvasX,
+                    canvasY,
+                    variant,
+                    connectionContext,
+                };
+            },
+
+            /**
+             * Close NodeMenu
+             */
+            closeNodeMenu() {
+                state.ui.nodeMenu = {
+                    visible: false,
+                    x: 0,
+                    y: 0,
+                    canvasX: 0,
+                    canvasY: 0,
+                    variant: 'default',
+                    connectionContext: null,
+                };
             },
 
             /**

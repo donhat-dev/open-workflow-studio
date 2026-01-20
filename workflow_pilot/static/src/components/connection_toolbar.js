@@ -36,8 +36,6 @@ export class ConnectionToolbar extends Component {
         position: { type: Object },      // { x, y } - midpoint in canvas coordinates
         connectionId: { type: String },
         zoom: { type: Number, optional: true },
-        // Hover callback kept for parent to manage toolbar visibility
-        onHoverChange: { type: Function, optional: true },
     };
 
     setup() {
@@ -76,10 +74,16 @@ export class ConnectionToolbar extends Component {
      * Keep toolbar visible while hovering over it
      */
     onMouseEnter() {
-        this.props.onHoverChange?.(true);
+        this.editor.bus.trigger("CONNECTION:TOOLBAR_HOVER", {
+            connectionId: this.props.connectionId,
+            isHovering: true,
+        });
     }
 
     onMouseLeave() {
-        this.props.onHoverChange?.(false);
+        this.editor.bus.trigger("CONNECTION:TOOLBAR_HOVER", {
+            connectionId: this.props.connectionId,
+            isHovering: false,
+        });
     }
 }

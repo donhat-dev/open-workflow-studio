@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, useEnv } from "@odoo/owl";
+import { Component, useRef } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
 import { CanvasNodeToolbar } from "./canvas_node_toolbar";
 import { LucideIcon } from "./common/lucide_icon";
@@ -27,14 +27,9 @@ export class WorkflowNode extends Component {
 
     setup() {
         this.rootRef = useRef("root");
-        this.state = useState({ isDragging: false });
         this.editor = this.env.workflowEditor;
-
-        useExternalListener(document, "mousemove", this.onMouseMove.bind(this));
-        useExternalListener(document, "mouseup", this.onMouseUp.bind(this));
-
-        this.dragState = { startX: 0, startY: 0, initialX: 0, initialY: 0 };
     }
+
 
     /**
      * Start drag sequence on header mousedown
@@ -43,22 +38,13 @@ export class WorkflowNode extends Component {
         ev.stopPropagation();
         ev.preventDefault();
 
-        this.state.isDragging = true;
-        this.dragState = {
-            startX: ev.clientX,
-            startY: ev.clientY,
-            initialX: this.props.node.x || 0,
-            initialY: this.props.node.y || 0,
-        };
-
-        // Begin history batch for undo grouping
-        this.editor.actions.beginBatch();
-
-        // Select this node (Ctrl for multi-select)
+        // Node Selection Logic
         const currentSelection = this.editor.state.ui.selection.nodeIds || [];
-        if (ev.ctrlKey || ev.metaKey) {
+        const isSelected = currentSelection.includes(this.props.node.id);
+        const isMultiSelect = ev.ctrlKey || ev.metaKey;
+
+        if (isMultiSelect) {
             // Toggle selection
-            const isSelected = currentSelection.includes(this.props.node.id);
             if (isSelected) {
                 this.editor.actions.select(
                     currentSelection.filter(id => id !== this.props.node.id)
@@ -67,9 +53,15 @@ export class WorkflowNode extends Component {
                 this.editor.actions.select([...currentSelection, this.props.node.id]);
             }
         } else {
-            // Single select
-            this.editor.actions.select([this.props.node.id]);
+            // If not holding Ctrl, and node is NOT selected, select it (and clear others).
+            // If it IS selected, keep selection as-is to allow multi-node drag.
+            if (!isSelected) {
+                this.editor.actions.select([this.props.node.id]);
+            }
         }
+
+        // Trigger drag start
+        this.editor.bus.trigger("NODE:DRAG_START", { nodeId: this.props.node.id, event: ev });
     }
 
     /**
@@ -86,42 +78,6 @@ export class WorkflowNode extends Component {
 
         ev.stopPropagation();
         this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
-    }
-
-    /**
-     * Handle mouse movement during drag
-     */
-    onMouseMove(ev) {
-        if (!this.state.isDragging) return;
-        if (this._dragFrame) return;
-
-        this._dragFrame = requestAnimationFrame(() => {
-            this._dragFrame = null;
-            if (!this.state.isDragging) return;
-
-            const zoom = this.props.zoom || 1;
-            const dx = (ev.clientX - this.dragState.startX) / zoom;
-            const dy = (ev.clientY - this.dragState.startY) / zoom;
-
-            const GRID_SIZE = 20;
-            const targetX = this.dragState.initialX + dx;
-            const targetY = this.dragState.initialY + dy;
-            const snappedX = Math.round(targetX / GRID_SIZE) * GRID_SIZE;
-            const snappedY = Math.round(targetY / GRID_SIZE) * GRID_SIZE;
-
-            this.editor.actions.moveNode(this.props.node.id, { x: snappedX, y: snappedY });
-        });
-    }
-
-    /**
-     * End drag sequence
-     */
-    onMouseUp() {
-        if (this.state.isDragging) {
-            this.state.isDragging = false;
-            // Commit history batch
-            this.editor.actions.endBatch("Move node");
-        }
     }
 
     /**
@@ -240,7 +196,7 @@ export class WorkflowNode extends Component {
                 this.editor.bus.trigger("SOCKET:MOUSE_UP", data);
             },
             onQuickAdd: (data) => {
-                this.editor?.bus.trigger("SOCKET:QUICK_ADD", data);
+                this.editor.bus.trigger("SOCKET:QUICK_ADD", data);
             },
         };
     }
@@ -268,9 +224,10 @@ export class WorkflowNode extends Component {
 
         let styles = `left:${x}px;top:${y}px;`;
 
-        if (this.props.dimensionConfig?.getCSSProperties) {
-            const props = this.props.dimensionConfig.getCSSProperties();
-            for (const [key, value] of Object.entries(props)) {
+        const dimensionConfig = this.props.dimensionConfig;
+        if (dimensionConfig && typeof dimensionConfig.getCSSProperties === "function") {
+            const cssProps = dimensionConfig.getCSSProperties();
+            for (const [key, value] of Object.entries(cssProps)) {
                 styles += `${key}:${value};`;
             }
         }

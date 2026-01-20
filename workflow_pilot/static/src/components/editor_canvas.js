@@ -13,7 +13,8 @@ import {
     getVerticalStackPath,
     getConnectionPath as calculateConnectionPath
 } from "./editor_canvas/utils/connection_path";
-import { useCanvasGestures } from "./editor_canvas/hooks";
+import { calculateFitView } from "./editor_canvas/utils/view_utils";
+import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useKeyboardShortcuts, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
 
 /**
@@ -41,60 +42,125 @@ export class EditorCanvas extends Component {
         // Bind component to service state reactivity
         this.editorState = useState(this.editor.state);
 
+        const adapterService = this.env.services.workflowAdapter;
+        const executorService = this.env.services.workflowExecutor;
+        const runService = this.env.services.workflowRun;
+
+        if (!adapterService) {
+            throw new Error("[EditorCanvas] Missing workflowAdapter service");
+        }
+        if (!executorService) {
+            throw new Error("[EditorCanvas] Missing workflowExecutor service");
+        }
+        if (!runService) {
+            throw new Error("[EditorCanvas] Missing workflowRun service");
+        }
+
+        this.nodeConfigActions = {
+            getControls: (nodeId) => adapterService.getNodeControls(nodeId),
+            getNodeMeta: (nodeId) => adapterService.getNodeMeta(nodeId),
+            setNodeMeta: (nodeId, meta) => adapterService.setNodeMeta(nodeId, meta),
+            getExpressionContext: () => adapterService.getExpressionContext(),
+            buildContextForNode: (workflow, nodeId) => executorService.buildContextForNode(workflow, nodeId),
+            runUntilNode: (workflow, nodeId, options) => runService.runUntilNode(workflow, nodeId, options),
+            runNode: (nodeId, options) => runService.runNode(nodeId, options),
+            setNodeConfig: (nodeId, values) => adapterService.setNodeConfig(nodeId, values),
+            isExecuting: () => runService.isExecuting,
+        };
+
         this.state = useState({
-            // Transient connection drawing state
-            isConnecting: false,
-            connectionStart: null,
-            tempLineEndpoint: null,
-            snappedSocket: null,  // { nodeId, socketKey, x, y } - for smart snapping
+            // Connection drawing state managed by useConnectionDrawing hook
             // Dimension configuration (reactive for runtime updates)
             dimensionConfig: this.props.dimensionConfig || {},
-            nodeMenu: {
-                visible: false,
-                x: 0,
-                y: 0,
-                canvasX: 0,
-                canvasY: 0,
-                variant: 'default', // 'default' or 'large'
-                connectionContext: null,  // { connectionId, position } for inserting node
-            },
+            // NodeMenu state - now in workflowEditor.state.ui.nodeMenu
             // Hovered connection for toolbar
             hoveredConnection: {
                 id: null,
                 midpoint: { x: 0, y: 0 },
             },
-            // Viewport tracking for culling
-            viewRect: { x: 0, y: 0, w: 0, h: 0 },
+            // Viewport tracking for culling - now handled by useViewport
             // Config panel state - now read from service via getter isConfigPanelOpen
+        });
+
+        // Initialize Viewport Hook (zoom, pan, coordinate conversion) - MUST be first
+        this.viewportHook = useViewport({
+            editor: this.editor,
+            rootRef: this.rootRef,
+            getDimensions: () => this.dimensions,
         });
 
         // Initialize Canvas Gestures Hook (pan/selection box)
         this.gestures = useCanvasGestures({
             editor: this.editor,
             rootRef: this.rootRef,
-            getViewport: () => this.viewport,
-            getCanvasPosition: (ev) => this.getCanvasPosition(ev),
-            onViewRectUpdate: () => this.updateViewRect(),
+            getViewport: () => this.viewportHook.getViewport(),
+            getCanvasPosition: (ev) => this.viewportHook.getCanvasPosition(ev),
+            onViewRectUpdate: () => this.viewportHook.updateViewRect(),
+            getDimensions: () => this.dimensions,
+        });
+
+        // Initialize Connection Drawing Hook
+        this.connectionDrawing = useConnectionDrawing({
+            editor: this.editor,
+            getCanvasPosition: (ev) => this.viewportHook.getCanvasPosition(ev),
+            getSocketPositionForNode: (node, key, type) => this.getSocketPositionForNode(node, key, type),
+            getNodes: () => this.nodes,
+            openNodeMenu: (config) => { this.editor.actions.openNodeMenu(config); },
+        });
+
+        // Initialize Multi-Node Drag Hook
+        this.multiNodeDrag = useMultiNodeDrag({
+            editor: this.editor,
+            getNodes: () => this.nodes,
+            getZoom: () => this.viewportHook.getViewport().zoom,
+        });
+
+        // Initialize Keyboard Shortcuts Hook (Delete, Arrows, Undo/Redo, Select All)
+        // Copy/Paste remains managed locally until useClipboard is implemented
+        useKeyboardShortcuts({
+            editor: this.editor,
+            getNodes: () => this.nodes,
+        });
+
+        // Initialize Connection Culling Hook (Visibility + Memoization)
+        this.connectionCulling = useConnectionCulling({
+            getNodes: () => this.nodes,
+            getConnections: () => this.connections,
+            getViewRect: () => this.viewportHook.viewRect,
+            getSocketPosition: (node, key, type) => this.getSocketPositionForNode(node, key, type),
+        });
+
+        // Initialize Clipboard Hook (Copy/Paste)
+        useClipboard({
+            editor: this.editor,
+            getNodes: () => this.nodes,
+            getConnections: () => this.connections,
+            getSelection: () => this.editorState.ui.selection,
         });
 
         // Resize observer to update viewport on window resize
-        this._resizeObserver = new ResizeObserver(() => this.updateViewRect());
+        this._resizeObserver = new ResizeObserver(() => this.viewportHook.updateViewRect());
         onMounted(() => {
             if (this.rootRef.el) {
                 this._resizeObserver.observe(this.rootRef.el);
-                this.updateViewRect();
+                // viewRect is already initialized in useViewport onMounted
             }
         });
 
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
-        useExternalListener(document, "keydown", this.onKeyDown.bind(this));
+
 
         // Bus listener: ConnectionToolbar "Add Node" button
         this.editor.bus.addEventListener("CONNECTION:INSERT_NODE", (ev) => {
             const { connectionId, position } = ev.detail;
             this.onConnectionAddNode(connectionId, position);
+        });
+
+        this.editor.bus.addEventListener("CONNECTION:TOOLBAR_HOVER", (ev) => {
+            const { isHovering } = ev.detail;
+            this.onToolbarHoverChange(isHovering);
         });
 
         this.editor.bus.addEventListener("NODE:EXECUTE", async (ev) => {
@@ -116,18 +182,30 @@ export class EditorCanvas extends Component {
             console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
             await runService.runUntilNode(workflow, nodeId);
         });
+        // Socket events - delegate to connectionDrawing hook
         this.editor.bus.addEventListener("SOCKET:MOUSE_DOWN", (ev) => {
-            this.onSocketMouseDown(ev.detail);
+            this.connectionDrawing.onSocketMouseDown(ev.detail);
         });
         this.editor.bus.addEventListener("SOCKET:MOUSE_UP", (ev) => {
-            this.onSocketMouseUp(ev.detail);
+            this.connectionDrawing.onSocketMouseUp(ev.detail);
         });
         this.editor.bus.addEventListener("SOCKET:QUICK_ADD", (ev) => {
             this.onSocketQuickAdd(ev.detail);
         });
-        // Menu node selection spawning
+
+        // Menu events
         this.editor.bus.addEventListener("MENU:NODE_SELECTED", (ev) => {
-            this.onNodeMenuSelect(ev.detail.nodeType, ev.detail.connectionContext);
+            const { nodeType, connectionContext } = ev.detail;
+            this.onNodeMenuSelect(nodeType, connectionContext);
+        });
+
+        this.editor.bus.addEventListener("MENU:CLOSE", () => {
+            this.onNodeMenuClose();
+        });
+
+        // Node events
+        this.editor.bus.addEventListener("NODE:DRAG_START", (ev) => {
+            this.multiNodeDrag.onNodeDragStart(ev.detail);
         });
 
         window.canvas = this;
@@ -201,244 +279,142 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Get viewport from service state (provides compatible panX/panY/zoom format)
-     * Uses editorState (wrapped in useState) for OWL reactivity
+     * Get NodeMenu state from service (source of truth)
+     * @returns {{ visible: boolean, x: number, y: number, canvasX: number, canvasY: number, variant: string, connectionContext: Object|null }}
+     */
+    get nodeMenu() {
+        return this.editorState.ui.nodeMenu;
+    }
+
+    /**
+     * Get viewport from viewportHook (provides compatible panX/panY/zoom format)
+     * Delegated to useViewport hook
      * @returns {{ zoom: number, panX: number, panY: number }}
      */
     get viewport() {
-        const { pan, zoom } = this.editorState.ui.viewport;
-        return {
-            zoom,
-            panX: pan.x,
-            panY: pan.y,
-        };
+        return this.viewportHook.getViewport();
     }
 
     /**
      * Calculate viewport transform style
-     * ESSENTIAL for pan/zoom - this is not an animation, it's the viewport positioning
+     * Delegated to useViewport hook
      */
     get viewportTransformStyle() {
-        const { panX, panY, zoom } = this.viewport;
-        return `transform: translate(${panX}px, ${panY}px) scale(${zoom}); transform-origin: 0 0;`;
+        return this.viewportHook.getViewportTransformStyle();
     }
 
     /**
      * Get style for the parent canvas to sync background pattern with viewport
-     * This ensures the grid stays visible and correctly sized when zooming/panning
+     * Delegated to useViewport hook
      */
     get canvasBackgroundStyle() {
-        const { panX, panY, zoom } = this.viewport;
-
-        const size = 20 * zoom;
-        // Background position should stay in sync with panning
-        return `background-size: ${size}px ${size}px; background-position: ${panX}px ${panY}px;`;
+        return this.viewportHook.getCanvasBackgroundStyle();
     }
 
     /**
      * Convert screen coordinates to canvas coordinates (accounting for zoom/pan)
+     * Delegated to useViewport hook
      * @param {MouseEvent} ev
      * @returns {{ x: number, y: number }}
      */
     getCanvasPosition(ev) {
-        const rect = this.rootRef.el.getBoundingClientRect();
-        const { zoom, panX, panY } = this.viewport;
-        return {
-            x: (ev.clientX - rect.left - panX) / zoom,
-            y: (ev.clientY - rect.top - panY) / zoom
-        };
+        return this.viewportHook.getCanvasPosition(ev);
     }
 
     /**
      * Convert canvas coordinates to screen coordinates (relative to canvas container)
-     * Useful for positioning fixed-size overlays
+     * Delegated to useViewport hook
      * @param {number} canvasX 
      * @param {number} canvasY 
      * @returns {{ x: number, y: number }}
      */
     getScreenPosition(canvasX, canvasY) {
-        const { zoom, panX, panY } = this.viewport;
-        return {
-            x: canvasX * zoom + panX,
-            y: canvasY * zoom + panY
-        };
+        return this.viewportHook.getScreenPosition(canvasX, canvasY);
     }
 
     /**
      * Update visible viewport rectangle (canvas coordinates)
-     * Called on pan, zoom, and resize
+     * Delegated to useViewport hook
      */
     updateViewRect() {
-        if (!this.rootRef.el) return;
-        const rect = this.rootRef.el.getBoundingClientRect();
-        const { zoom, panX, panY } = this.viewport;
-
-        // Add 300px buffer for smooth scrolling/panning
-        const BUFFER = 300;
-
-        // Calculate visible area in canvas space
-        this.state.viewRect = {
-            x: -panX / zoom - BUFFER,
-            y: -panY / zoom - BUFFER,
-            w: rect.width / zoom + (BUFFER * 2),
-            h: rect.height / zoom + (BUFFER * 2),
-        };
+        this.viewportHook.updateViewRect();
     }
 
     /**
      * Get nodes that are currently visible in the viewport
+     * Delegated to connectionCulling hook
      * @returns {Array}
      */
     get visibleNodes() {
-        const { x, y, w, h } = this.state.viewRect;
-        // Conservative node size estimate for intersection check
-        const MAX_NODE_WIDTH = 500;
-        const MAX_NODE_HEIGHT = 500;
-
-        return this.nodes.filter(node => {
-            // Simple AABB intersection test
-            return (
-                node.x < x + w &&
-                node.x + MAX_NODE_WIDTH > x &&
-                node.y < y + h &&
-                node.y + MAX_NODE_HEIGHT > y
-            );
-        });
-    }
-
-    /**
-     * Get connections associated with visible nodes
-     * @returns {Array}
-     */
-    get visibleConnections() {
-        // Only render connection if source OR target is visible
-        const visibleNodeIds = new Set(this.visibleNodes.map(n => n.id));
-        return this.connections.filter(c =>
-            visibleNodeIds.has(c.source) || visibleNodeIds.has(c.target)
-        );
+        return this.connectionCulling.visibleNodes;
     }
 
     /**
      * Handle wheel event for zoom
+     * Delegated to useViewport hook
      * @param {WheelEvent} ev
      */
     onWheel(ev) {
-        // If mouse is over NodeMenu or other fixed overlays, allow normal scrolling and skip zoom
-        if (ev.target.closest('.node-menu') || ev.target.closest('.connection-toolbar')) {
-            return;
-        }
-
-        ev.preventDefault();
-
-        if (this._scrollFrame) return;
-
-        this._scrollFrame = requestAnimationFrame(() => {
-            this._scrollFrame = null;
-            const { zoom, panX, panY } = this.viewport;
-            const delta = ev.deltaY > 0 ? 0.9 : 1.1;
-            const newZoom = Math.min(Math.max(zoom * delta, 0.25), 2);
-
-            // Zoom towards cursor position
-            const rect = this.rootRef.el.getBoundingClientRect();
-            const mouseX = ev.clientX - rect.left;
-            const mouseY = ev.clientY - rect.top;
-
-            // Adjust pan to zoom towards cursor
-            const factor = newZoom / zoom;
-            const newPanX = mouseX - (mouseX - panX) * factor;
-            const newPanY = mouseY - (mouseY - panY) * factor;
-
-            // Update via service action
-            this.editor.actions.setViewport({
-                pan: { x: newPanX, y: newPanY },
-                zoom: newZoom,
-            });
-
-            this.updateViewRect();
-        });
+        this.viewportHook.onWheel(ev);
     }
 
     /**
      * Get zoom percentage for display
+     * Delegated to useViewport hook
      */
     get zoomPercentage() {
-        return Math.round(this.viewport.zoom * 100);
+        return this.viewportHook.getZoomPercentage();
     }
 
     /**
      * Zoom in by 10% (fixed step)
+     * Delegated to useViewport hook
      */
     zoomIn() {
-        const currentZoom = this.viewport.zoom;
-        // Round to nearest 0.1 to avoid floating point drift
-        const newZoom = Math.min(Math.round((currentZoom + 0.1) * 10) / 10, 2);
-        this.editor.actions.zoomTo(newZoom);
+        this.viewportHook.zoomIn();
     }
 
     /**
      * Zoom out by 10% (fixed step)
+     * Delegated to useViewport hook
      */
     zoomOut() {
-        const currentZoom = this.viewport.zoom;
-        // Round to nearest 0.1 to avoid floating point drift  
-        const newZoom = Math.max(Math.round((currentZoom - 0.1) * 10) / 10, 0.25);
-        this.editor.actions.zoomTo(newZoom);
+        this.viewportHook.zoomOut();
     }
 
     /**
      * Reset zoom to 100% and pan to origin
+     * Delegated to useViewport hook
      */
     resetZoom() {
-        this.editor.actions.resetViewport();
+        this.viewportHook.resetZoom();
     }
 
     /**
      * Fit all nodes into viewport with padding
      * Inspired by n8n/VueFlow fitView implementation
      */
+    /**
+     * Fit all nodes into viewport with padding
+     * Logic extracted to utils/view_utils.js
+     */
     fitToView() {
         const nodes = this.nodes;
         if (!nodes || nodes.length === 0) return;
 
-        // Calculate bounding box
-        const NODE_WIDTH = 200;
-        const NODE_HEIGHT = 100;
-        const PADDING = 50;
-
-        const xs = nodes.map(n => n.x || 0);
-        const ys = nodes.map(n => n.y || 0);
-
-        const bounds = {
-            minX: Math.min(...xs),
-            maxX: Math.max(...xs) + NODE_WIDTH,
-            minY: Math.min(...ys),
-            maxY: Math.max(...ys) + NODE_HEIGHT,
-        };
-
-        const contentWidth = bounds.maxX - bounds.minX + PADDING * 2;
-        const contentHeight = bounds.maxY - bounds.minY + PADDING * 2;
-
-        // Get canvas dimensions
         const canvasEl = this.rootRef.el;
         if (!canvasEl) return;
+
         const rect = canvasEl.getBoundingClientRect();
+        const viewState = calculateFitView(nodes, this.dimensions, rect);
 
-        // Calculate zoom to fit (max 1 = don't zoom in beyond 100%)
-        const zoom = Math.min(
-            rect.width / contentWidth,
-            rect.height / contentHeight,
-            1
-        );
-
-        // Calculate pan to center content
-        const panX = -bounds.minX + PADDING + (rect.width / zoom - contentWidth) / 2;
-        const panY = -bounds.minY + PADDING + (rect.height / zoom - contentHeight) / 2;
-
-        // Update via service action
-        this.editor.actions.setViewport({
-            pan: { x: panX, y: panY },
-            zoom,
-        });
+        if (viewState) {
+            this.editor.actions.setViewport({
+                pan: { x: viewState.panX, y: viewState.panY },
+                zoom: viewState.zoom,
+            });
+            this.updateViewRect();
+        }
     }
 
     // =========================================
@@ -447,6 +423,8 @@ export class EditorCanvas extends Component {
 
     /**
      * Auto-arrange nodes using Dagre.js layout algorithm
+     * Note: Direct mutation of node.x/y provides immediate visual feedback.
+     *       Then syncs to Core via actions.moveNode for persistence.
      */
     tidyUp() {
         if (this.nodes.length === 0) return;
@@ -456,7 +434,7 @@ export class EditorCanvas extends Component {
         for (const node of this.nodes) {
             const pos = positions[node.id];
             if (pos) {
-                // Update local UI state
+                // Update local UI state (immediate feedback)
                 node.x = pos.x;
                 node.y = pos.y;
 
@@ -506,45 +484,40 @@ export class EditorCanvas extends Component {
 
     /**
      * Get connections with calculated paths for SVG rendering
-     * This getter is called on every render, so paths update when nodes move
-     * Returns paths as an array to support multi-segment routing
+     * Delegated to connectionCulling hook (includes memoization)
      */
     get renderedConnections() {
-        return this.visibleConnections.map(conn => {
-            const sourceNode = this.nodes.find(n => n.id === conn.source);
-            const targetNode = this.nodes.find(n => n.id === conn.target);
-
-            if (!sourceNode || !targetNode) {
-                return { ...conn, paths: [''], isBackEdge: false, isVerticalStack: false };
-            }
-
-            const sourcePos = this.getSocketPositionForNode(sourceNode, conn.sourceHandle, 'output');
-            const targetPos = this.getSocketPositionForNode(targetNode, conn.targetHandle, 'input');
-
-            const result = this.getConnectionPath(sourcePos, targetPos);
-            return { ...conn, ...result };
-        });
+        return this.connectionCulling.renderedConnections;
     }
+
+    /**
+     * Check if currently drawing a connection (for template reactivity)
+     */
+    get isDrawingConnection() {
+        return this.connectionDrawing.state.isConnecting;
+    }
+
     /**
      * Get temp connection path while drawing
      * Returns empty string if not drawing
      * Uses unified getConnectionPath for consistency with renderedConnections
      */
     get tempConnectionPath() {
-        if (!this.state.isConnecting || !this.state.connectionStart || !this.state.tempLineEndpoint) {
+        const connState = this.connectionDrawing.state;
+        if (!connState.isConnecting || !connState.connectionStart || !connState.tempLineEndpoint) {
             return '';
         }
 
-        const { nodeId, socketKey, socketType } = this.state.connectionStart;
+        const { nodeId, socketKey, socketType } = connState.connectionStart;
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return '';
 
         const startPos = this.getSocketPositionForNode(node, socketKey, socketType);
 
         // Smart snapping: use snapped socket position if available
-        const endPos = this.state.snappedSocket
-            ? { x: this.state.snappedSocket.x, y: this.state.snappedSocket.y }
-            : this.state.tempLineEndpoint;
+        const endPos = connState.snappedSocket
+            ? { x: connState.snappedSocket.x, y: connState.snappedSocket.y }
+            : connState.tempLineEndpoint;
 
         // Determine source/target based on socket type
         const sourcePos = socketType === 'output' ? startPos : endPos;
@@ -554,56 +527,9 @@ export class EditorCanvas extends Component {
         return paths.join(' ');
     }
 
-    /**
-     * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
-     */
-    onSocketMouseDown = (data) => {
-        const { nodeId, socketKey, socketType, event } = data;
-
-        // Only start connection from output sockets
-        if (socketType !== 'output') return;
-
-        event.stopPropagation();
-        event.preventDefault();
-
-        // Use canvas coordinates (accounts for zoom/pan)
-        const canvasPos = this.getCanvasPosition(event);
-
-        this.state.isConnecting = true;
-        this.state.connectionStart = { nodeId, socketKey, socketType };
-        this.state.tempLineEndpoint = canvasPos;
-    };
-
-    /**
-     * Find nearest compatible input socket within snap radius
-     * @param {number} x - Canvas X coordinate
-     * @param {number} y - Canvas Y coordinate
-     * @param {string} sourceNodeId - Node ID to exclude (can't connect to self)
-     * @returns {{ nodeId: string, socketKey: string, x: number, y: number } | null}
-     */
-    findNearestSocket(x, y, sourceNodeId) {
-        const SNAP_RADIUS = 50;
-        let closest = null;
-        let minDist = Infinity;
-
-        // Iterate backwards to prioritize top-most nodes (rendered later = on top)
-        for (let i = this.nodes.length - 1; i >= 0; i--) {
-            const node = this.nodes[i];
-            if (node.id === sourceNodeId) continue; // Skip source node
-
-            // Check each input socket
-            for (const [key, _] of Object.entries(node.inputs || {})) {
-                const pos = this.getSocketPositionForNode(node, key, 'input');
-                const dist = Math.hypot(x - pos.x, y - pos.y);
-
-                if (dist < SNAP_RADIUS && dist < minDist) {
-                    minDist = dist;
-                    closest = { nodeId: node.id, socketKey: key, x: pos.x, y: pos.y };
-                }
-            }
-        }
-        return closest;
-    }
+    // Connection drawing methods now handled by useConnectionDrawing hook
+    // Keeping findNearestSocket for backward compatibility with hook dependency
+    // (hook receives getSocketPositionForNode which uses this internally)
 
     /**
      * @param {MouseEvent} ev
@@ -619,15 +545,13 @@ export class EditorCanvas extends Component {
                 return;
             }
 
-            // Connection drawing
-            if (!this.state.isConnecting) return;
+            // Delegate multi-node drag to hook
+            if (this.multiNodeDrag.handleMouseMove(ev)) {
+                return;
+            }
 
-            const pos = this.getCanvasPosition(ev);
-            this.state.tempLineEndpoint = pos;
-
-            // Smart snapping: find nearest socket
-            const sourceNodeId = this.state.connectionStart?.nodeId;
-            this.state.snappedSocket = this.findNearestSocket(pos.x, pos.y, sourceNodeId);
+            // Delegate connection drawing to hook
+            this.connectionDrawing.handleMouseMove(ev);
         });
     }
 
@@ -646,105 +570,14 @@ export class EditorCanvas extends Component {
             return;
         }
 
-        if (!this.state.isConnecting) return;
-
-        // Smart snapping: if snapped to a socket, create connection
-        if (this.state.snappedSocket) {
-            const start = this.state.connectionStart;
-            if (start && start.socketType === 'output') {
-                this.editor.actions.addConnection(
-                    start.nodeId,
-                    start.socketKey,
-                    this.state.snappedSocket.nodeId,
-                    this.state.snappedSocket.socketKey
-                );
-            }
-            this.cancelConnection();
+        // Delegate multi-node drag end to hook
+        if (this.multiNodeDrag.handleMouseUp(ev)) {
             return;
         }
 
-        // Check if released on an input socket directly
-        const target = ev.target;
-        const isSocket = target.classList?.contains('workflow-node__socket-point');
-        const socketType = target.dataset?.socketType;
-
-        if (isSocket && socketType === 'input') {
-            return; // Will be handled by onSocketMouseUp
-        }
-
-        // FEATURE: Spawn NodeMenu when dropping connection on empty canvas
-        // Only for output socket drags (input sockets don't create connections)
-        const start = this.state.connectionStart;
-        if (start && start.socketType === 'output') {
-            const canvasPos = this.getCanvasPosition(ev);
-            const canvasRect = this.rootRef.el?.getBoundingClientRect() || { left: 0, top: 0 };
-
-            // Screen position relative to canvas container
-            const screenX = ev.clientX - canvasRect.left;
-            const screenY = ev.clientY - canvasRect.top;
-
-            this.state.nodeMenu = {
-                visible: true,
-                x: screenX,
-                y: screenY,
-                canvasX: canvasPos.x,
-                canvasY: canvasPos.y,
-                variant: 'default',
-                connectionContext: {
-                    type: 'dragConnect',
-                    sourceNodeId: start.nodeId,
-                    sourceSocketKey: start.socketKey,
-                },
-            };
-
-            // Clear connection drawing state but keep context in nodeMenu
-            this.state.isConnecting = false;
-            this.state.tempLineEndpoint = null;
-            this.state.snappedSocket = null;
-            // Note: connectionStart cleared when menu closes
-            return;
-        }
-
-        this.cancelConnection();
-    }
-
-    /**
-     * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
-     */
-    onSocketMouseUp = (data) => {
-        if (!this.state.isConnecting) return;
-
-        const { nodeId, socketKey, socketType } = data;
-        const start = this.state.connectionStart;
-
-        // Validate: must be output -> input, different nodes
-        if (!start) {
-            this.cancelConnection();
-            return;
-        }
-
-        // Output to input only
-        if (start.socketType === 'output' && socketType === 'input' && start.nodeId !== nodeId) {
-            // Create connection
-            this.editor.actions.addConnection(
-                start.nodeId,
-                start.socketKey,
-                nodeId,
-                socketKey
-            );
-        }
-
-        this.cancelConnection();
-    };
-
-    /**
-     * Cancel ongoing connection drawing
-     */
-    cancelConnection() {
-        this.state.isConnecting = false;
-        this.state.connectionStart = null;
-        this.state.tempLineEndpoint = null;
-        this.state.snappedSocket = null;
+        // Delegate connection drawing end to hook
+        const canvasRect = this.rootRef.el?.getBoundingClientRect() || { left: 0, top: 0 };
+        this.connectionDrawing.handleCanvasMouseUp(ev, canvasRect);
     }
 
     /**
@@ -771,26 +604,6 @@ export class EditorCanvas extends Component {
         position.y = Math.round(position.y);
         // Add node via service action
         this.editor.actions.addNode(type, position);
-    }
-
-    /**
-     * Handle node position change during drag
-     * @param {{ nodeId: string, x: number, y: number }} param
-     */
-    onNodeMove({ nodeId, x, y }) {
-        // Find node in props and update directly (reactive) for immediate local feedback
-        const node = this.nodes.find(n => n.id === nodeId);
-        if (node) {
-            node.x = x;
-            node.y = y;
-
-            // Throttle propagation to 60fps (16ms) to prevent flooding undo stack
-            if (this._throttleMove) return;
-            this._throttleMove = setTimeout(() => {
-                this.editor.actions.moveNode(nodeId, { x, y });
-                this._throttleMove = null;
-            }, 16);
-        }
     }
 
     /**
@@ -868,7 +681,6 @@ export class EditorCanvas extends Component {
         // Check if clicking on background (including specific elements that are part of background)
         if (ev.target === this.rootRef.el || ev.target.classList?.contains('workflow-editor-canvas__content')) {
             this.clearSelection();
-            this.editor.actions.select([]);
         }
     }
 
@@ -880,203 +692,6 @@ export class EditorCanvas extends Component {
         // Select only this connection (clear node selection)
         this.editor.actions.select([], [connId]);
     }
-
-    /**
-     * Handle keydown events (Delete/Backspace, Arrow keys, Ctrl+C/V)
-     * @param {KeyboardEvent} ev 
-     */
-    onKeyDown(ev) {
-        console.log(`[EditorCanvas] Handling key: ${ev.key}, ctrl: ${ev.ctrlKey || ev.metaKey}`);
-        // Skip if in input field
-        if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable) {
-            return;
-        }
-
-        const ctrl = ev.ctrlKey || ev.metaKey;
-
-        // =========================================
-        // Delete nodes/connections
-        // =========================================
-        if (ev.key === 'Delete' || ev.key === 'Backspace') {
-            // Delete nodes (All selected)
-            const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
-            if (selectedNodeIds.length > 0) {
-                [...selectedNodeIds].forEach(id => {
-                    this.editor.actions.removeNode(id);
-                });
-                this.editor.actions.select([]);
-            }
-
-            // Delete connection
-            const selectedConnIds = this.editorState.ui.selection.connectionIds || [];
-            if (selectedConnIds.length > 0) {
-                [...selectedConnIds].forEach(id => {
-                    this.editor.actions.removeConnection(id);
-                });
-                this.editor.actions.select([], []);
-            }
-            return;
-        }
-
-        // =========================================
-        // Keyboard Navigation (Arrow keys)
-        // =========================================
-        const MOVE_STEP = ev.shiftKey ? 50 : 20;  // Shift = larger step
-        const arrowMoves = {
-            'ArrowUp': { x: 0, y: -MOVE_STEP },
-            'ArrowDown': { x: 0, y: MOVE_STEP },
-            'ArrowLeft': { x: -MOVE_STEP, y: 0 },
-            'ArrowRight': { x: MOVE_STEP, y: 0 },
-        };
-
-        if (arrowMoves[ev.key]) {
-            ev.preventDefault();
-            const { x: dx, y: dy } = arrowMoves[ev.key];
-
-            // Move selected node(s)
-
-            const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
-            selectedNodeIds.forEach(nodeId => {
-                const node = this.nodes.find(n => n.id === nodeId);
-                if (node) {
-                    this.editor.actions.moveNode(nodeId, {
-                        x: (node.x || 0) + dx,
-                        y: (node.y || 0) + dy,
-                    });
-                }
-            });
-            return;
-        }
-
-        // =========================================
-        // Copy/Paste (Ctrl+C, Ctrl+V)
-        // =========================================
-        if (ctrl && ev.key.toLowerCase() === 'c') {
-            ev.preventDefault();
-            this.copySelectedNodes();
-            return;
-        }
-
-        if (ctrl && ev.key.toLowerCase() === 'v') {
-            ev.preventDefault();
-            this.pasteNodes();
-            return;
-        }
-
-        // =========================================
-        // Undo/Redo (Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z)
-        // =========================================
-        if (ctrl && ev.key.toLowerCase() === 'z') {
-            ev.preventDefault();
-            if (ev.shiftKey) {
-                this.editor.actions.redo();
-            } else {
-                this.editor.actions.undo();
-            }
-            return;
-        }
-
-        if (ctrl && ev.key.toLowerCase() === 'y') {
-            ev.preventDefault();
-            this.editor.actions.redo();
-            return;
-        }
-    }
-
-    // =========================================
-    // Copy/Paste Implementation
-    // =========================================
-
-    /**
-     * Copy selected nodes to system clipboard
-     */
-    async copySelectedNodes() {
-        // Prioritize multiple selection list
-        const selectedNodeIds = this.editor.state.ui.selection.nodeIds;
-        if (selectedNodeIds.length === 0) return;
-
-        const nodesToCopy = this.nodes.filter(n => selectedNodeIds.includes(n.id));
-        const connectionsToCopy = this.connections.filter(
-            c => selectedNodeIds.includes(c.source) && selectedNodeIds.includes(c.target)
-        );
-
-        // Use adapterService to get config for each node
-        const adapterService = this.env.services.workflowAdapter;
-
-        const data = {
-            nodes: nodesToCopy.map(n => ({
-                id: n.id,  // Include for connection mapping
-                type: n.type,
-                x: n.x,
-                y: n.y,
-                title: n.title,
-                // Get config via adapter service (no _node access)
-                config: adapterService?.getNodeConfig(n.id) || {},
-            })),
-            connections: connectionsToCopy,
-        };
-
-        try {
-            await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-            console.log(`Copied ${data.nodes.length} nodes to clipboard`);
-        } catch (e) {
-            console.error('Failed to copy to clipboard:', e);
-        }
-    }
-
-    async pasteNodes() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const data = JSON.parse(text);
-
-            if (!data.nodes || !Array.isArray(data.nodes)) {
-                return;
-            }
-
-            // Start history batch via service
-            this.editor.actions.beginBatch();
-
-            const PASTE_OFFSET_X = 50;
-            const PASTE_OFFSET_Y = 50;
-            const idMap = {};
-            const adapterService = this.env.services.workflowAdapter;
-
-            // Create new nodes with offset
-            data.nodes.forEach(nodeData => {
-                const position = {
-                    x: (nodeData.x || 0) + PASTE_OFFSET_X,
-                    y: (nodeData.y || 0) + PASTE_OFFSET_Y,
-                };
-                const newId = this.editor.actions.addNode(nodeData.type, position);
-                if (newId) {
-                    idMap[nodeData.id] = newId;
-                    // Apply config if available
-                    if (nodeData.config && adapterService) {
-                        adapterService.setNodeConfig(newId, nodeData.config);
-                    }
-                }
-            });
-
-            // Recreate connections between pasted nodes
-            (data.connections || []).forEach(conn => {
-                if (idMap[conn.source] && idMap[conn.target]) {
-                    this.editor.actions.addConnection(
-                        idMap[conn.source],
-                        conn.sourceHandle,
-                        idMap[conn.target],
-                        conn.targetHandle
-                    );
-                }
-            });
-
-            // End history batch
-            this.editor.actions.endBatch('Paste nodes');
-        } catch (e) {
-            this.editor.actions.endBatch();
-            console.warn('[EditorCanvas] Failed to paste:', e);
-        }
-    }
-
 
     /**
      * Check if node is selected
@@ -1098,28 +713,28 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle right-click on canvas to open NodeMenu
+     * Uses service action (source of truth)
      */
     onCanvasContextMenu(ev) {
         ev.preventDefault();
         const rect = this.rootRef.el.getBoundingClientRect();
         const canvasPos = this.getCanvasPosition(ev);
 
-        this.state.nodeMenu = {
-            visible: true,
+        this.editor.actions.openNodeMenu({
             x: ev.clientX - rect.left,
             y: ev.clientY - rect.top,
             canvasX: canvasPos.x,
             canvasY: canvasPos.y,
             variant: 'default',
             connectionContext: null,
-        };
+        });
     }
 
     /**
      * Handle NodeMenu selection
      */
     onNodeMenuSelect(nodeType, connectionContext) {
-        let { canvasX, canvasY } = this.state.nodeMenu;
+        let { canvasX, canvasY } = this.nodeMenu;
         const dims = this.dimensions;
 
         // Final position for node placement
@@ -1161,20 +776,14 @@ export class EditorCanvas extends Component {
 
     /**
      * Close NodeMenu
+     * Uses service action (source of truth)
      */
     onNodeMenuClose() {
-        // Clear any pending connection state from drag-connect flow
-        this.state.connectionStart = null;
+        // Cancel any pending connection drawing from drag-connect flow
+        this.connectionDrawing.cancelConnection();
 
-        this.state.nodeMenu = {
-            visible: false,
-            x: 0,
-            y: 0,
-            canvasX: 0,
-            canvasY: 0,
-            variant: 'default',
-            connectionContext: null,
-        };
+        // Close menu via service action
+        this.editor.actions.closeNodeMenu();
     }
 
     /**
@@ -1247,9 +856,16 @@ export class EditorCanvas extends Component {
     onConnectionAddNode(connectionId, position) {
         // position here is the screen-relative midpoint from state.hoveredConnection.midpoint
         // We use the stored canvasMidpoint for the actual node placement
-        const canvasPos = this.state.hoveredConnection.canvasMidpoint;
+        let canvasPos = this.state.hoveredConnection.canvasMidpoint;
+        if (!canvasPos) {
+            const rect = this.rootRef.el.getBoundingClientRect();
+            canvasPos = this.viewportHook.getCanvasPosition({
+                clientX: rect.left + position.x,
+                clientY: rect.top + position.y,
+            });
+        }
 
-        this.state.nodeMenu = {
+        this.editor.actions.openNodeMenu({
             visible: true,
             x: position.x,
             y: position.y,
@@ -1257,7 +873,7 @@ export class EditorCanvas extends Component {
             canvasY: canvasPos.y,
             variant: 'default',
             connectionContext: { connectionId, position: canvasPos },
-        };
+        });
     }
 
     /**
@@ -1362,15 +978,14 @@ export class EditorCanvas extends Component {
             clientY: rect.top + rect.height / 2
         });
 
-        this.state.nodeMenu = {
-            visible: true,
+        this.editor.actions.openNodeMenu({
             x,
             y,
             canvasX: canvasPos.x,
             canvasY: canvasPos.y,
             variant: 'large',
             connectionContext: null,
-        };
+        });
     }
 
     /**
@@ -1386,8 +1001,7 @@ export class EditorCanvas extends Component {
         const screenPos = this.getScreenPosition(socketPos.x, socketPos.y);
         const rect = this.rootRef.el.getBoundingClientRect();
 
-        this.state.nodeMenu = {
-            visible: true,
+        this.editor.actions.openNodeMenu({
             x: screenPos.x + 30,  // Offset from socket
             y: screenPos.y - 100, // Position above socket
             canvasX: socketPos.x + 150,  // Where new node will be placed (right of socket)
@@ -1399,7 +1013,7 @@ export class EditorCanvas extends Component {
                 sourceNodeId: nodeId,
                 sourceSocketKey: socketKey,
             },
-        };
+        });
     };
 
     // ============================================

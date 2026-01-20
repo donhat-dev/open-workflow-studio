@@ -1,7 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted, useEnv } from "@odoo/owl";
-import { useService } from "@web/core/utils/hooks";
+import { Component, useState, useRef, onMounted } from "@odoo/owl";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 
@@ -19,19 +18,17 @@ export class NodeConfigPanel extends Component {
     static props = {
         node: { type: Object },  // Required: node data object (plain, no _node)
         workflow: { type: Object, optional: true },  // { nodes: [], connections: [] }
+        actions: { type: Object },
         onClose: { type: Function },
         onSave: { type: Function },
         onExecute: { type: Function, optional: true },  // Callback after node execution
     };
 
     setup() {
-        // Use adapterService for config operations
-        this.adapterService = useService("workflowAdapter");
-        // Executor service for workflow execution
-        this.executorService = useService("workflowExecutor");
-        // Run service for orchestrated execution
-        this.runService = useService("workflowRun");
-        this.editor = this.env.workflowEditor;
+        this.actions = this.props.actions;
+        if (!this.actions) {
+            throw new Error("[NodeConfigPanel] Missing actions prop");
+        }
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -69,7 +66,10 @@ export class NodeConfigPanel extends Component {
         const nodeId = this.props.node.id;
 
         // Get control metadata from adapter (includes current values)
-        const controls = this.adapterService.getNodeControls(nodeId);
+        if (!this.actions.getControls) {
+            throw new Error("[NodeConfigPanel] Missing actions.getControls");
+        }
+        const controls = this.actions.getControls(nodeId);
         this.state.controls = controls;
 
         // Extract values for local state
@@ -80,7 +80,10 @@ export class NodeConfigPanel extends Component {
         this.state.controlValues = values;
 
         // Restore UI modes from node meta (persisted)
-        const meta = this.adapterService.getNodeMeta(nodeId);
+        if (!this.actions.getNodeMeta) {
+            throw new Error("[NodeConfigPanel] Missing actions.getNodeMeta");
+        }
+        const meta = this.actions.getNodeMeta(nodeId);
         const ui = meta.ui || {};
         const restoredControlModes = ui.controlModes || {};
         const restoredPairModes = ui.pairModes || {};
@@ -199,7 +202,10 @@ export class NodeConfigPanel extends Component {
         if (!workflow) return null;
 
         // Get aggregated context from executor
-        const context = this.executorService.buildContextForNode(
+        if (!this.actions.buildContextForNode) {
+            throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
+        }
+        const context = this.actions.buildContextForNode(
             workflow,
             this.props.node.id
         );
@@ -276,7 +282,10 @@ export class NodeConfigPanel extends Component {
             };
         }
 
-        const base = this.adapterService.getExpressionContext() || {
+        if (!this.actions.getExpressionContext) {
+            throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
+        }
+        const base = this.actions.getExpressionContext() || {
             $vars: {},
             $node: {},
             $json: {},
@@ -296,7 +305,10 @@ export class NodeConfigPanel extends Component {
             };
         }
 
-        const wfContext = this.executorService.buildContextForNode(workflow, this.props.node.id);
+        if (!this.actions.buildContextForNode) {
+            throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
+        }
+        const wfContext = this.actions.buildContextForNode(workflow, this.props.node.id);
         const json = wfContext.$json || {};
 
         return {
@@ -335,7 +347,10 @@ export class NodeConfigPanel extends Component {
 
     _persistUiModes() {
         const nodeId = this.props.node.id;
-        this.adapterService.setNodeMeta(nodeId, {
+        if (!this.actions.setNodeMeta) {
+            throw new Error("[NodeConfigPanel] Missing actions.setNodeMeta");
+        }
+        this.actions.setNodeMeta(nodeId, {
             ui: {
                 controlModes: this.state.controlModes || {},
                 pairModes: this.state.pairModes || {},
@@ -378,7 +393,10 @@ export class NodeConfigPanel extends Component {
      * This allows users to see and drag $vars expressions
      */
     get workflowVariables() {
-        const expressionContext = this.adapterService.getExpressionContext();
+        if (!this.actions.getExpressionContext) {
+            throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
+        }
+        const expressionContext = this.actions.getExpressionContext();
         return expressionContext?.$vars || {};
     }
 
@@ -410,7 +428,10 @@ export class NodeConfigPanel extends Component {
      * 3. Results returned to UI
      */
     async onExecute() {
-        if (this.runService.isExecuting) return;
+        if (!this.actions.runUntilNode || !this.actions.runNode) {
+            throw new Error("[NodeConfigPanel] Missing run actions");
+        }
+        if (this.actions.isExecuting && this.actions.isExecuting()) return;
 
         const nodeId = this.props.node.id;
         const workflow = this._getWorkflowFromContext();
@@ -422,29 +443,25 @@ export class NodeConfigPanel extends Component {
             let result = null;
 
             if (workflow) {
-                // Use runService for proper orchestration
-                result = await this.runService.runUntilNode(
-                    workflow,
-                    nodeId,
-                    {
-                        syncConfig: true,
-                        controlValues: this.state.controlValues,
-                        onProgress: (executedNodeId, nodeResult) => {
-                            console.log(`[NodeConfigPanel] Node ${executedNodeId} executed`);
-                        }
+                result = await this.actions.runUntilNode(workflow, nodeId, {
+                    syncConfig: true,
+                    controlValues: this.state.controlValues,
+                    onProgress: (executedNodeId, nodeResult) => {
+                        console.log(`[NodeConfigPanel] Node ${executedNodeId} executed`);
                     }
-                );
+                });
 
                 this.state.executionResult = result;
                 this.state.lastExecutionContext = result?.expressionContext || null;
             } else {
-                // Fallback to single node execution
-                result = await this.runService.runNode(nodeId, {});
+                result = await this.actions.runNode(nodeId, {});
                 this.state.executionResult = result;
             }
 
             // Notify parent to refresh variable inspector
-            this.props.onExecute?.(nodeId, result);
+            if (this.props.onExecute) {
+                this.props.onExecute(nodeId, result);
+            }
 
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
@@ -495,7 +512,10 @@ export class NodeConfigPanel extends Component {
         const nodeId = this.props.node.id;
 
         // Phase 3: Save via adapterService (updates Core layer)
-        this.adapterService.setNodeConfig(nodeId, this.state.controlValues);
+        if (!this.actions.setNodeConfig) {
+            throw new Error("[NodeConfigPanel] Missing actions.setNodeConfig");
+        }
+        this.actions.setNodeConfig(nodeId, this.state.controlValues);
         console.log('[NodeConfigPanel] Config saved via adapterService');
 
         this.props.onSave(this.state.controlValues);
@@ -503,7 +523,7 @@ export class NodeConfigPanel extends Component {
     }
 
     onClose() {
-        this.editor.actions.closePanel("config");
+        this.props.onClose();
     }
 
     onBackdropClick(ev) {

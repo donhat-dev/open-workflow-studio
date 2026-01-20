@@ -8,7 +8,7 @@ settings.json
 settings.local.json
 .github/
 
-AGENTS.md
+*.md
 opencode.json
 stock_barcode/
 lf_web_studio/

@@ -139,6 +139,18 @@ export const workflowAdapterService = {
             },
 
             /**
+             * Add node with fixed ID (for undo/redo)
+             * @param {string} type
+             * @param {{x: number, y: number}} position
+             * @param {string} forcedId
+             * @param {Object} [config]
+             * @returns {string|null} nodeId
+             */
+            addNodeWithId(type, position, forcedId, config) {
+                return currentAdapter.addNodeWithId(type, position, forcedId, config);
+            },
+
+            /**
              * Add connection
              * @param {string} source
              * @param {string} sourceHandle
