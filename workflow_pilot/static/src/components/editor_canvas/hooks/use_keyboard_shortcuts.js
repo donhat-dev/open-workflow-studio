@@ -28,8 +28,8 @@ export function useKeyboardShortcuts({ editor, getNodes }) {
 
         const keys = {
             delete: ev.key === 'Delete' || ev.key === 'Backspace',
-            undo: (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z',
-            redo: (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y',
+            undo: (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z',
+            redo: (ev.ctrlKey || ev.metaKey) && (ev.key.toLowerCase() === 'y' || (ev.shiftKey && ev.key.toLowerCase() === 'z')),
             selectAll: (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a',
         };
 

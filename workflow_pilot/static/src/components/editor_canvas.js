@@ -5,7 +5,6 @@ import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
 import { NodeConfigPanel } from "./node_config_panel";
-import { WorkflowGraph } from "../utils/graph_utils";
 import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
 import {
     getBezierPath,
@@ -14,6 +13,7 @@ import {
     getConnectionPath as calculateConnectionPath
 } from "./editor_canvas/utils/connection_path";
 import { calculateFitView } from "./editor_canvas/utils/view_utils";
+import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useKeyboardShortcuts, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
 
@@ -454,25 +454,24 @@ export class EditorCanvas extends Component {
 
     /**
      * Auto-arrange nodes using Dagre.js layout algorithm
-     * Note: Direct mutation of node.x/y provides immediate visual feedback.
-     *       Then syncs to Core via actions.moveNode for persistence.
+     * Uses pure util for position calculation, service actions for mutations.
+     * Wrapped in batch for single undo/redo step.
      */
     tidyUp() {
         if (this.nodes.length === 0) return;
-        // Create graph from current nodes and connections
-        const graph = WorkflowGraph.fromNodes(this.nodes, this.connections);
-        const positions = graph.layoutWithSplitting();
+
+        // Calculate new positions using pure utility (no side effects)
+        const positions = calculateTidyPositions(this.nodes, this.connections);
+
+        // Apply positions via service actions (wrapped in batch for single undo)
+        this.editor.actions.beginBatch();
         for (const node of this.nodes) {
             const pos = positions[node.id];
             if (pos) {
-                // Update local UI state (immediate feedback)
-                node.x = pos.x;
-                node.y = pos.y;
-
-                // Sync with Core layer via service action
                 this.editor.actions.moveNode(node.id, { x: pos.x, y: pos.y });
             }
         }
+        this.editor.actions.endBatch("Tidy up layout");
     }
 
     /**
@@ -1088,5 +1087,37 @@ export class EditorCanvas extends Component {
         const nodeId = this.editorState.ui.panels.configNodeId;
         if (!nodeId) return;
         this.onConfigPanelClose();
+    };
+
+    // ============================================
+    // UNDO/REDO
+    // ============================================
+
+    /**
+     * Check if undo is available (reads from service state)
+     */
+    get canUndo() {
+        return this.editorState.ui.history.canUndo;
+    }
+
+    /**
+     * Check if redo is available (reads from service state)
+     */
+    get canRedo() {
+        return this.editorState.ui.history.canRedo;
+    }
+
+    /**
+     * Handle undo button click
+     */
+    onUndo = () => {
+        this.editor.actions.undo();
+    };
+
+    /**
+     * Handle redo button click
+     */
+    onRedo = () => {
+        this.editor.actions.redo();
     };
 }

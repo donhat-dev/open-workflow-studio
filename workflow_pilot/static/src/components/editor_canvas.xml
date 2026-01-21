@@ -4,6 +4,13 @@
 		<div class="workflow-editor-canvas" t-ref="root" t-att-style="canvasBackgroundStyle" t-on-dragover="onDragOver" t-on-drop="onDrop" t-on-click="onCanvasClick" t-on-mousedown="onCanvasMouseDown" t-on-wheel="onWheel" t-on-contextmenu="onCanvasContextMenu">
 			<!-- Controls Bar (Top-Left) -->
 			<div class="workflow-editor-canvas__controls">
+				<button class="canvas-btn" t-on-click="onUndo" t-att-disabled="!canUndo" title="Undo (Ctrl+Z)">
+					<LucideIcon t-props="{ name: 'Undo2', size: 16 }"/>
+				</button>
+				<button class="canvas-btn" t-on-click="onRedo" t-att-disabled="!canRedo" title="Redo (Ctrl+Y)">
+					<LucideIcon t-props="{ name: 'Redo2', size: 16 }"/>
+				</button>
+				<div class="controls-divider"/>
 				<button class="canvas-btn" t-on-click="tidyUp" title="Tidy Up">
 					<LucideIcon t-props="{ name: 'Sparkles', size: 16 }"/>
 				</button>
