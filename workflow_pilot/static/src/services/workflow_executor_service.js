@@ -10,10 +10,16 @@
  *
  * Config Resolution Flow:
  *   executor._executeNode() → adapterService.getNodeConfig(nodeId) → Core layer
+ * 
+ * PHASE 2 NOTE: Client-side execution disabled for RPC integration.
+ * Gated with EXECUTION_ENABLED flag. Will be re-enabled in Phase 3.
  */
 
 import { registry } from "@web/core/registry";
 import { StackExecutor } from "../mocks/stack_executor";
+
+// Feature flag: Disable client-side execution for Phase 2 (RPC integration)
+const EXECUTION_ENABLED = false;
 
 export const workflowExecutorService = {
     dependencies: ["workflowNode", "workflowAdapter", "workflowVariable"],
@@ -149,6 +155,11 @@ export const workflowExecutorService = {
              * @returns {Promise<Map>} nodeOutputs map
              */
             async executeUntil(workflow, targetNodeId, onNodeComplete = null) {
+                if (!EXECUTION_ENABLED) {
+                    console.warn('[WorkflowExecutor] Client-side execution is disabled for Phase 2 (RPC integration)');
+                    return new Map();
+                }
+                
                 if (isExecuting) {
                     throw new Error("Workflow execution already in progress");
                 }
@@ -275,6 +286,11 @@ export const workflowExecutorService = {
              * @returns {Promise<Map>} nodeOutputs map
              */
             async executeAll(workflow, onNodeComplete = null) {
+                if (!EXECUTION_ENABLED) {
+                    console.warn('[WorkflowExecutor] Client-side execution is disabled for Phase 2 (RPC integration)');
+                    return new Map();
+                }
+                
                 if (isExecuting) {
                     throw new Error("Workflow execution already in progress");
                 }

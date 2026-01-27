@@ -24,9 +24,15 @@
  *   
  *   // Execute single node
  *   await runService.runNode(nodeId, inputData);
+ * 
+ * PHASE 2 NOTE: Client-side execution disabled for RPC integration.
+ * Gated with EXECUTION_ENABLED flag. Will be re-enabled in Phase 3.
  */
 
 import { registry } from "@web/core/registry";
+
+// Feature flag: Disable client-side execution for Phase 2 (RPC integration)
+const EXECUTION_ENABLED = false;
 
 export const workflowRunService = {
     dependencies: ["workflowExecutor", "workflowAdapter", "workflowVariable"],
@@ -72,6 +78,11 @@ export const workflowRunService = {
              * @returns {Promise<{output, error, meta}>}
              */
             async runUntilNode(workflow, destinationNodeId, options = {}) {
+                if (!EXECUTION_ENABLED) {
+                    console.warn('[workflowRun] Client-side execution is disabled for Phase 2 (RPC integration)');
+                    return { output: null, error: 'Execution disabled', meta: {} };
+                }
+                
                 if (executionState.status === 'running') {
                     console.warn('[workflowRun] Execution already in progress');
                     return null;
@@ -147,6 +158,11 @@ export const workflowRunService = {
              * @returns {Promise<{json, error, meta}>}
              */
             async runNode(nodeId, inputData = {}) {
+                if (!EXECUTION_ENABLED) {
+                    console.warn('[workflowRun] Client-side execution is disabled for Phase 2 (RPC integration)');
+                    return { json: null, error: 'Execution disabled', meta: {} };
+                }
+                
                 if (executionState.status === 'running') {
                     console.warn('[workflowRun] Execution already in progress');
                     return null;
@@ -203,6 +219,11 @@ export const workflowRunService = {
              * @returns {Promise<{results: Object, errors: Array, executedNodes: Array}>}
              */
             async runEntireWorkflow(workflow, options = {}) {
+                if (!EXECUTION_ENABLED) {
+                    console.warn('[workflowRun] Client-side execution is disabled for Phase 2 (RPC integration)');
+                    return { results: {}, errors: [], executedNodes: [] };
+                }
+                
                 if (executionState.status === 'running') {
                     console.warn('[workflowRun] Execution already in progress');
                     return null;
