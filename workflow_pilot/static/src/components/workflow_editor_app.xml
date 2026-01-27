@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="workflow_pilot.workflow_editor_app">
+        <div class="workflow-editor-app">
+            <!-- Loading state -->
+            <t t-if="state.loading">
+                <div class="loading-spinner">
+                    <p>Loading workflow...</p>
+                </div>
+            </t>
+            
+            <!-- Error state -->
+            <t t-elif="state.error">
+                <div class="error-message">
+                    <h3>Error</h3>
+                    <p><t t-esc="state.error"/></p>
+                </div>
+            </t>
+            
+            <!-- Main editor (loaded successfully) -->
+            <t t-else="">
+                <div class="editor-container">
+                    <!-- Toolbar with Save button -->
+                    <div class="editor-toolbar">
+                        <h2 class="editor-title">Workflow Editor</h2>
+                        <button 
+                            class="btn btn-primary btn-save" 
+                            t-on-click="save" 
+                            t-att-disabled="state.saving ? 'disabled' : undefined">
+                            <t t-if="state.saving">Saving...</t>
+                            <t t-else="">💾 Save</t>
+                        </button>
+                    </div>
+                    
+                    <!-- Canvas -->
+                    <EditorCanvas />
+                </div>
+            </t>
+            
+            <!-- Conflict modal (overlay) -->
+            <t t-if="state.showConflictModal">
+                <div class="modal-backdrop" t-on-click="closeConflictModal">
+                    <div class="modal-dialog" t-on-click.stop="">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>Workflow Conflict</h3>
+                            </div>
+                            <div class="modal-body">
+                                <p>Workflow was modified by another user. Please reload to see changes.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-primary" t-on-click="reload">Reload</button>
+                                <button class="btn btn-secondary" t-on-click="closeConflictModal">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>
