@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- 
+            Built-in Node Types for Workflow Pilot
+            These match frontend definitions in static/src/nodes/
+            
+            Categories:
+            - integration: External API integrations
+            - flow: Control flow (loops, conditions)
+            - transform: Data transformation
+            - data: Variable/data operations
+        -->
+
+        <!-- Integration Nodes -->
+        <record id="workflow_type_http" model="workflow.type">
+            <field name="name">HTTP Request</field>
+            <field name="node_type">http</field>
+            <field name="category">integration</field>
+            <field name="icon">fa-globe</field>
+            <field name="description">Make HTTP API calls to external services</field>
+            <field name="config_schema">{
+    "method": {"type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "GET"},
+    "url": {"type": "string", "required": true},
+    "headers": {"type": "keyvalue"},
+    "body": {"type": "text"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "response": {"type": "DataSocket", "label": "Response"},
+    "error": {"type": "ErrorSocket", "label": "Error"}
+}</field>
+        </record>
+
+        <!-- Flow Control Nodes -->
+        <record id="workflow_type_loop" model="workflow.type">
+            <field name="name">Loop Over Items</field>
+            <field name="node_type">loop</field>
+            <field name="category">flow</field>
+            <field name="icon">fa-repeat</field>
+            <field name="description">Iterate over array items in batches</field>
+            <field name="config_schema">{
+    "inputItems": {"type": "expression", "label": "Input Items"},
+    "batchSize": {"type": "number", "default": 1},
+    "reset": {"type": "boolean", "default": false}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Data"}
+}</field>
+            <field name="output_schema">{
+    "done": {"type": "DataSocket", "label": "Done"},
+    "loop": {"type": "DataSocket", "label": "Loop"}
+}</field>
+        </record>
+
+        <record id="workflow_type_if" model="workflow.type">
+            <field name="name">If</field>
+            <field name="node_type">if</field>
+            <field name="category">flow</field>
+            <field name="icon">split</field>
+            <field name="description">Route data based on condition</field>
+            <field name="config_schema">{
+    "leftOperand": {"type": "expression", "label": "Left Operand"},
+    "operator": {"type": "select", "options": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "startsWith", "endsWith", "empty", "notEmpty", "truthy", "falsy"], "default": "eq"},
+    "rightOperand": {"type": "expression", "label": "Right Operand"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Data"}
+}</field>
+            <field name="output_schema">{
+    "true": {"type": "DataSocket", "label": "True"},
+    "false": {"type": "DataSocket", "label": "False"}
+}</field>
+        </record>
+
+        <record id="workflow_type_noop" model="workflow.type">
+            <field name="name">Replace Me</field>
+            <field name="node_type">noop</field>
+            <field name="category">flow</field>
+            <field name="icon">fa-circle-o</field>
+            <field name="description">Placeholder node</field>
+            <field name="config_schema">{}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Data"}
+}</field>
+            <field name="output_schema">{
+    "result": {"type": "DataSocket", "label": "Result"}
+}</field>
+        </record>
+
+        <!-- Transform Nodes -->
+        <record id="workflow_type_code" model="workflow.type">
+            <field name="name">Code</field>
+            <field name="node_type">code</field>
+            <field name="category">transform</field>
+            <field name="icon">fa-code</field>
+            <field name="description">Execute custom JavaScript code</field>
+            <field name="config_schema">{
+    "code": {"type": "code", "language": "javascript", "label": "JavaScript Code"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Output"}
+}</field>
+        </record>
+
+        <record id="workflow_type_validation" model="workflow.type">
+            <field name="name">Data Validation</field>
+            <field name="node_type">validation</field>
+            <field name="category">transform</field>
+            <field name="icon">fa-check-circle</field>
+            <field name="description">Validate data against rules</field>
+            <field name="config_schema">{
+    "requiredFields": {"type": "string", "label": "Required Fields"},
+    "schema": {"type": "json", "label": "Validation Schema"},
+    "customRules": {"type": "keyvalue", "label": "Custom Rules"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "valid": {"type": "DataSocket", "label": "Valid Data"},
+    "invalid": {"type": "ErrorSocket", "label": "Validation Errors"}
+}</field>
+        </record>
+
+        <record id="workflow_type_set_data" model="workflow.type">
+            <field name="name">Set Data</field>
+            <field name="node_type">set_data</field>
+            <field name="category">transform</field>
+            <field name="icon">fa-pencil</field>
+            <field name="description">Set or transform data fields</field>
+            <field name="config_schema">{
+    "fields": {"type": "keyvalue", "label": "Fields to Set"},
+    "keepOnlySet": {"type": "select", "options": ["merge", "replace"], "default": "merge"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Output Data"}
+}</field>
+        </record>
+
+        <record id="workflow_type_mapping" model="workflow.type">
+            <field name="name">Data Mapping</field>
+            <field name="node_type">mapping</field>
+            <field name="category">transform</field>
+            <field name="icon">fa-exchange</field>
+            <field name="description">Map and transform data fields</field>
+            <field name="config_schema">{
+    "mappings": {"type": "keyvalue", "label": "Field Mappings"},
+    "transform": {"type": "select", "options": ["none", "uppercase", "lowercase", "trim", "number", "string", "boolean", "json_parse", "json_stringify"], "default": "none"},
+    "defaultValue": {"type": "string", "label": "Default Value"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "mapped": {"type": "DataSocket", "label": "Mapped Data"}
+}</field>
+        </record>
+
+        <!-- Data Nodes -->
+        <record id="workflow_type_variable" model="workflow.type">
+            <field name="name">Set Variable</field>
+            <field name="node_type">variable</field>
+            <field name="category">data</field>
+            <field name="icon">fa-cube</field>
+            <field name="description">Set or get workflow variables</field>
+            <field name="config_schema">{
+    "operation": {"type": "select", "options": ["set", "get", "append", "merge", "increment", "delete"], "default": "set"},
+    "variableName": {"type": "string", "required": true, "label": "Variable Name"},
+    "value": {"type": "expression", "label": "Value"}
+}</field>
+            <field name="input_schema">{
+    "trigger": {"type": "DataSocket", "label": "Trigger"}
+}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Output"}
+}</field>
+        </record>
+
+        <!-- Sequence for workflow.run -->
+        <record id="seq_workflow_run" model="ir.sequence">
+            <field name="name">Workflow Run Sequence</field>
+            <field name="code">workflow.run</field>
+            <field name="prefix">WFR/</field>
+            <field name="padding">6</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>
