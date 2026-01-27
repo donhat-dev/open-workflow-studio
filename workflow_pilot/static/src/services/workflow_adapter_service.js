@@ -19,11 +19,13 @@
 import { registry } from "@web/core/registry";
 
 export const workflowAdapterService = {
-    dependencies: ["workflowVariable"],
+    dependencies: ["workflowVariable", "rpc"],
 
-    start(env, { workflowVariable }) {
+    start(env, { workflowVariable, rpc }) {
         // Current adapter instance (set by app component)
         let currentAdapter = null;
+        let _versionHash = null;
+        let _workflowId = null;
 
         return {
             /**
@@ -206,6 +208,61 @@ export const workflowAdapterService = {
                 const result = await currentAdapter.executeNode(nodeId, inputData, context);
 
                 return result;
+            },
+
+            /**
+             * Load workflow from database via RPC
+             * @param {number} workflowId
+             * @returns {Promise<Object>} Workflow data with draft_snapshot
+             */
+            async loadWorkflow(workflowId) {
+                const data = await rpc('/web/dataset/call_kw', {
+                    model: 'workflow',
+                    method: 'load_workflow',
+                    args: [workflowId],
+                    kwargs: {},
+                });
+
+                currentAdapter.fromJSON(data.draft_snapshot);
+                _versionHash = data.version_hash;
+                _workflowId = workflowId;
+
+                return data;
+            },
+
+            /**
+             * Save workflow to database via RPC
+             * @returns {Promise<Object>} Result with new version_hash
+             */
+            async saveWorkflow() {
+                const snapshot = currentAdapter.toJSON();
+                const result = await rpc('/web/dataset/call_kw', {
+                    model: 'workflow',
+                    method: 'save_workflow',
+                    args: [_workflowId, snapshot, _versionHash],
+                    kwargs: {},
+                });
+
+                _versionHash = result.version_hash;
+                return result;
+            },
+
+            /**
+             * Get current workflow ID
+             * @returns {number|null}
+             */
+            getWorkflowId() {
+                return _workflowId;
+            },
+
+            /**
+             * Check if workflow has unsaved changes
+             * @returns {boolean}
+             */
+            hasUnsavedChanges() {
+                // Simple implementation: compare current snapshot with saved state
+                // For now, always return false (no comparison logic needed in Phase 2)
+                return false;
             },
 
             /**
