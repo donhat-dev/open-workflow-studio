@@ -1,7 +1,7 @@
 /** @odoo-module **/
 import { Component, useState, onMounted, useSubEnv } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
-import { EditorCanvas } from "./editor_canvas/editor_canvas";
+import { EditorCanvas } from "../components/editor_canvas";
 
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
@@ -15,13 +15,13 @@ export class WorkflowEditorApp extends Component {
     
     setup() {
         // Services (Fail-First - no optional chaining)
-        this.adapterService = useService("workflowAdapter");
         this.editorService = useService("workflowEditor");
         
         // State
         this.state = useState({
             loading: true,
             saving: false,
+            publishing: false,
             error: null,
             showConflictModal: false
         });
@@ -44,12 +44,15 @@ export class WorkflowEditorApp extends Component {
         useSubEnv({
             bus: this.editorService.bus,
             workflowEditor: this.editorService,
+            services: {
+                workflowEditor: this.editorService,
+            },
         });
         
         // Load on mount
         onMounted(async () => {
             try {
-                await this.adapterService.loadWorkflow(this.workflowId);
+                await this.editorService.loadWorkflow(this.workflowId);
                 this.state.loading = false;
             } catch (error) {
                 this.state.error = error.message || "Failed to load workflow";
@@ -65,7 +68,7 @@ export class WorkflowEditorApp extends Component {
     async save() {
         this.state.saving = true;
         try {
-            await this.adapterService.saveWorkflow();
+            await this.editorService.saveWorkflow();
             console.log('Workflow saved successfully');
         } catch (error) {
             // Check if conflict error (message contains "modified by another user")
@@ -77,6 +80,21 @@ export class WorkflowEditorApp extends Component {
             }
         } finally {
             this.state.saving = false;
+        }
+    }
+
+    /**
+     * Publish current workflow (saves first)
+     */
+    async publish() {
+        this.state.publishing = true;
+        try {
+            await this.editorService.publishWorkflow();
+            console.log('Workflow published successfully');
+        } catch (error) {
+            this.state.error = error.message || "Failed to publish workflow";
+        } finally {
+            this.state.publishing = false;
         }
     }
     

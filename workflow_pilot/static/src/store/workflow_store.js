@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 /**
- * workflowEditor Service (authoritative graph/UI state)
+ * workflowEditor Store (authoritative graph/UI state)
  *
  * - Wraps WorkflowAdapter for graph mutations
  * - Exposes reactive state.graph and state.ui (viewport/selection/panels/hovered)
@@ -10,6 +10,7 @@
 
 import { reactive, EventBus } from "@odoo/owl";
 import { registry } from "@web/core/registry";
+import { rpc } from "@web/core/network/rpc";
 import {
     HistoryManager,
     createAddNodeAction,
@@ -18,6 +19,7 @@ import {
     createAddConnectionAction,
     createRemoveConnectionAction,
 } from "../core/history";
+import { WorkflowAdapter } from "../core/adapter";
 
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
@@ -38,16 +40,19 @@ const DEFAULT_UI_STATE = () => ({
 });
 
 export const workflowEditorService = {
-    dependencies: ["workflowAdapter"],
+    dependencies: [],
 
-    start(env, { workflowAdapter }) {
+    start() {
         const history = new HistoryManager();
         const editorBus = new EventBus();
+        let adapter = new WorkflowAdapter();
+        let versionHash = null;
+        let workflowId = null;
 
         const state = reactive({
             // Dynamic getter ensures we always point to the current adapter's state
             get graph() {
-                return workflowAdapter.state;
+                return adapter.state;
             },
             ui: DEFAULT_UI_STATE(),
         });
@@ -68,38 +73,38 @@ export const workflowEditorService = {
         // ===============
         const actions = {
             addNode(type, position) {
-                const nodeId = workflowAdapter.addNode(type, position);
+                const nodeId = adapter.addNode(type, position);
                 if (!nodeId) return null;
 
-                const config = workflowAdapter.getNodeConfig(nodeId);
+                const config = adapter.getNodeConfig(nodeId);
                 history.push(
-                    createAddNodeAction(workflowAdapter, { id: nodeId, type, position, config })
+                    createAddNodeAction(adapter, { id: nodeId, type, position, config })
                 );
 
                 // n8n-style Loop Auto-Creation Pattern
                 // When spawning a Loop node, also create a NoOp placeholder + cycle connections
                 if (type === 'loop') {
                     const LOOP_OFFSET_Y = 160;
-                    const noopId = workflowAdapter.addNode('noop', {
+                    const noopId = adapter.addNode('noop', {
                         x: position.x + 80,
                         y: position.y + LOOP_OFFSET_Y,
                     });
 
                     if (noopId) {
-                        const noopConfig = workflowAdapter.getNodeConfig(noopId);
-                        history.push(createAddNodeAction(workflowAdapter, {
+                        const noopConfig = adapter.getNodeConfig(noopId);
+                        history.push(createAddNodeAction(adapter, {
                             id: noopId, type: 'noop',
                             position: { x: position.x + 80, y: position.y + LOOP_OFFSET_Y },
                             config: noopConfig
                         }));
 
                         // Loop.loop → NoOp.data
-                        const conn1 = workflowAdapter.addConnection(nodeId, 'loop', noopId, 'data');
-                        if (conn1) history.push(createAddConnectionAction(workflowAdapter, conn1));
+                        const conn1 = adapter.addConnection(nodeId, 'loop', noopId, 'data');
+                        if (conn1) history.push(createAddConnectionAction(adapter, conn1));
 
                         // NoOp.result → Loop.data (back-edge)
-                        const conn2 = workflowAdapter.addConnection(noopId, 'result', nodeId, 'data');
-                        if (conn2) history.push(createAddConnectionAction(workflowAdapter, conn2));
+                        const conn2 = adapter.addConnection(noopId, 'result', nodeId, 'data');
+                        if (conn2) history.push(createAddConnectionAction(adapter, conn2));
                     }
                 }
 
@@ -109,10 +114,10 @@ export const workflowEditorService = {
             moveNode(nodeId, position) {
                 const node = getNode(nodeId);
                 const oldPosition = node ? { x: node.x, y: node.y } : null;
-                workflowAdapter.updatePosition(nodeId, position);
+                adapter.updatePosition(nodeId, position);
                 if (oldPosition) {
                     history.push(
-                        createMoveNodeAction(workflowAdapter, nodeId, oldPosition, position)
+                        createMoveNodeAction(adapter, nodeId, oldPosition, position)
                     );
                 }
             },
@@ -124,7 +129,7 @@ export const workflowEditorService = {
                 const relatedConnections = state.graph.connections.filter(
                     (c) => c.source === nodeId || c.target === nodeId
                 );
-                const config = workflowAdapter.getNodeConfig(nodeId);
+                const config = adapter.getNodeConfig(nodeId);
                 const nodeData = {
                     id: node.id,
                     type: node.type,
@@ -132,22 +137,22 @@ export const workflowEditorService = {
                     config,
                 };
 
-                workflowAdapter.removeNode(nodeId);
+                adapter.removeNode(nodeId);
                 history.push(
-                    createRemoveNodeAction(workflowAdapter, nodeData, relatedConnections)
+                    createRemoveNodeAction(adapter, nodeData, relatedConnections)
                 );
                 return true;
             },
 
             addConnection(source, sourceHandle, target, targetHandle) {
-                const conn = workflowAdapter.addConnection(
+                const conn = adapter.addConnection(
                     source,
                     sourceHandle,
                     target,
                     targetHandle
                 );
                 if (conn) {
-                    history.push(createAddConnectionAction(workflowAdapter, conn));
+                    history.push(createAddConnectionAction(adapter, conn));
                     return conn.id;
                 }
                 return null;
@@ -157,8 +162,8 @@ export const workflowEditorService = {
                 const conn = getConnection(connectionId);
                 if (!conn) return false;
 
-                workflowAdapter.removeConnection(connectionId);
-                history.push(createRemoveConnectionAction(workflowAdapter, conn));
+                adapter.removeConnection(connectionId);
+                history.push(createRemoveConnectionAction(adapter, conn));
                 return true;
             },
 
@@ -281,9 +286,9 @@ export const workflowEditorService = {
              * @param {string} nodeId
              */
             toggleDisable(nodeId) {
-                const currentMeta = workflowAdapter.getNodeMeta(nodeId) || {};
+                const currentMeta = adapter.getNodeMeta(nodeId) || {};
                 const isDisabled = !currentMeta.disabled;
-                workflowAdapter.setNodeMeta(nodeId, { disabled: isDisabled });
+                adapter.setNodeMeta(nodeId, { disabled: isDisabled });
                 editorBus.trigger("NODE:DISABLED_CHANGED", { nodeId, disabled: isDisabled });
             },
 
@@ -293,7 +298,7 @@ export const workflowEditorService = {
              * @returns {boolean}
              */
             isNodeDisabled(nodeId) {
-                const meta = workflowAdapter.getNodeMeta(nodeId);
+                const meta = adapter.getNodeMeta(nodeId);
                 return meta.disabled === true;
             },
 
@@ -318,6 +323,92 @@ export const workflowEditorService = {
             state,
             bus: editorBus,
             actions,
+            setAdapter(nextAdapter) {
+                adapter = nextAdapter;
+            },
+            getAdapter() {
+                return adapter;
+            },
+            getNodeConfig(nodeId) {
+                return adapter.getNodeConfig(nodeId);
+            },
+            setNodeConfig(nodeId, config) {
+                return adapter.setNodeConfig(nodeId, config);
+            },
+            getNodeControls(nodeId) {
+                return adapter.getNodeControls(nodeId);
+            },
+            getNodeMeta(nodeId) {
+                return adapter.getNodeMeta(nodeId);
+            },
+            setNodeMeta(nodeId, metaPatch) {
+                return adapter.setNodeMeta(nodeId, metaPatch);
+            },
+            setControlValue(nodeId, controlKey, value) {
+                return adapter.setControlValue(nodeId, controlKey, value);
+            },
+            updatePosition(nodeId, position) {
+                return adapter.updatePosition(nodeId, position);
+            },
+            removeNode(nodeId) {
+                return adapter.removeNode(nodeId);
+            },
+            addNode(type, position) {
+                return adapter.addNode(type, position);
+            },
+            addNodeWithId(type, position, forcedId, config) {
+                return adapter.addNodeWithId(type, position, forcedId, config);
+            },
+            addConnection(source, sourceHandle, target, targetHandle) {
+                return adapter.addConnection(source, sourceHandle, target, targetHandle);
+            },
+            removeConnection(connectionId) {
+                return adapter.removeConnection(connectionId);
+            },
+            getNodeClass(type) {
+                return adapter.getNodeClass(type);
+            },
+            async loadWorkflow(id) {
+                const data = await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'load_workflow',
+                    args: [id],
+                    kwargs: {},
+                });
+                adapter.fromJSON(data.draft_snapshot);
+                versionHash = data.version_hash;
+                workflowId = id;
+                return data;
+            },
+            async saveWorkflow() {
+                const snapshot = adapter.toJSON();
+                const result = await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'save_workflow',
+                    args: [[workflowId], snapshot, versionHash],
+                    kwargs: {},
+                });
+                versionHash = result.version_hash;
+                history.clear();
+                return result;
+            },
+            async publishWorkflow() {
+                // Ensure latest snapshot is persisted first
+                await this.saveWorkflow();
+                const result = await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'action_publish',
+                    args: [[workflowId]],
+                    kwargs: {},
+                });
+                return result;
+            },
+            getWorkflowId() {
+                return workflowId;
+            },
+            hasUnsavedChanges() {
+                return history.canUndo();
+            },
             history: {
                 undo: () => history.undo(),
                 redo: () => history.redo(),

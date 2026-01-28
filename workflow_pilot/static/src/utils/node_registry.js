@@ -1,0 +1,127 @@
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { fuzzyLookup } from "@web/core/utils/search";
+
+const nodeTypeRegistry = registry.category("workflow_node_types");
+const nodeCategoryRegistry = registry.category("workflow_node_categories");
+const MAX_RECENT = 10;
+let recentNodeKeys = [];
+
+export function getAllNodeTypes() {
+    return nodeTypeRegistry.getEntries().map(([key, value]) => {
+        const NodeClass = value.class || value;
+        const isClass = typeof NodeClass === 'function';
+
+        if (!isClass) {
+            console.warn(`[workflowNode] Invalid node type "${key}":`, value);
+            return null;
+        }
+
+        return {
+            key,
+            class: NodeClass,
+            name: NodeClass.label || value.name || key,
+            icon: NodeClass.icon || value.icon || "fa-cube",
+            category: NodeClass.category || value.category || "action",
+            description: NodeClass.description || value.description || "",
+        };
+    }).filter(Boolean);
+}
+
+export function getNodeType(key) {
+    if (!nodeTypeRegistry.contains(key)) {
+        return null;
+    }
+    const value = nodeTypeRegistry.get(key);
+    const NodeClass = value.class || value;
+
+    return {
+        key,
+        class: NodeClass,
+        name: NodeClass.label || value.name || key,
+        icon: NodeClass.icon || value.icon || "fa-cube",
+        category: NodeClass.category || value.category || "action",
+        description: NodeClass.description || value.description || "",
+    };
+}
+
+export function getNodeClass(key) {
+    if (!nodeTypeRegistry.contains(key)) {
+        return null;
+    }
+    const value = nodeTypeRegistry.get(key);
+    return value.class || value;
+}
+
+export function getCategories() {
+    const entries = nodeCategoryRegistry.getEntries();
+    return entries
+        .map(([key, value]) => ({ key, ...value }))
+        .sort((a, b) => {
+            const seqA = nodeCategoryRegistry.get(a.key, { sequence: 100 }).sequence || 100;
+            const seqB = nodeCategoryRegistry.get(b.key, { sequence: 100 }).sequence || 100;
+            return seqA - seqB;
+        });
+}
+
+export function searchNodes(searchValue = "", options = {}) {
+    let nodes = getAllNodeTypes();
+
+    if (options.category) {
+        nodes = nodes.filter(n => n.category === options.category);
+    }
+
+    if (searchValue && searchValue.trim()) {
+        nodes = fuzzyLookup(searchValue, nodes, (n) => n.name);
+    }
+
+    return groupByCategory(nodes);
+}
+
+export function trackNodeUsage(nodeKey) {
+    recentNodeKeys = recentNodeKeys.filter(k => k !== nodeKey);
+    recentNodeKeys.unshift(nodeKey);
+    recentNodeKeys = recentNodeKeys.slice(0, MAX_RECENT);
+}
+
+export function getRecentNodes(limit = 5) {
+    return recentNodeKeys
+        .slice(0, limit)
+        .map(key => getNodeType(key))
+        .filter(Boolean);
+}
+
+export function clearRecentNodes() {
+    recentNodeKeys = [];
+}
+
+function groupByCategory(nodes) {
+    const categories = getCategories();
+    const grouped = [];
+
+    for (const cat of categories) {
+        const catNodes = nodes.filter(n => n.category === cat.key);
+        if (catNodes.length) {
+            grouped.push({
+                key: cat.key,
+                name: cat.name,
+                icon: cat.icon,
+                nodes: catNodes,
+            });
+        }
+    }
+
+    const categorized = new Set(categories.map(c => c.key));
+    const uncategorized = nodes.filter(n => !categorized.has(n.category));
+    if (uncategorized.length) {
+        grouped.push({
+            key: "default",
+            name: "Other",
+            icon: "fa-cube",
+            nodes: uncategorized,
+        });
+    }
+
+    return grouped;
+}

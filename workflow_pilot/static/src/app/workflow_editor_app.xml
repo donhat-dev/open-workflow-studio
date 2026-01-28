@@ -23,13 +23,22 @@
                     <!-- Toolbar with Save button -->
                     <div class="editor-toolbar">
                         <h2 class="editor-title">Workflow Editor</h2>
-                        <button 
-                            class="btn btn-primary btn-save" 
-                            t-on-click="save" 
-                            t-att-disabled="state.saving ? 'disabled' : undefined">
-                            <t t-if="state.saving">Saving...</t>
-                            <t t-else="">💾 Save</t>
-                        </button>
+                        <div class="editor-actions">
+                            <button 
+                                class="btn btn-primary btn-save" 
+                                t-on-click="save" 
+                                t-att-disabled="state.saving ? 'disabled' : undefined">
+                                <t t-if="state.saving">Saving...</t>
+                                <t t-else="">💾 Save</t>
+                            </button>
+                            <button 
+                                class="btn btn-secondary btn-save" 
+                                t-on-click="publish" 
+                                t-att-disabled="state.publishing ? 'disabled' : undefined">
+                                <t t-if="state.publishing">Publishing...</t>
+                                <t t-else="">🚀 Publish</t>
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- Canvas -->

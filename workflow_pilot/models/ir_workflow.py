@@ -68,7 +68,7 @@ class Workflow(models.Model):
     # === Snapshot Architecture ===
     draft_snapshot = fields.Json(
         string='Draft Snapshot',
-        default=lambda self: {'nodes': {}, 'connections': [], 'metadata': {}},
+        default=lambda self: {'nodes': [], 'connections': [], 'metadata': {}},
         help='Working copy updated on every save. Contains full graph state.'
     )
     published_snapshot = fields.Json(
@@ -159,7 +159,7 @@ class Workflow(models.Model):
     @api.depends('draft_snapshot')
     def _compute_node_count(self):
         for record in self:
-            nodes = record.draft_snapshot.get('nodes', {}) if record.draft_snapshot else {}
+            nodes = record.draft_snapshot.get('nodes', []) if record.draft_snapshot else []
             record.node_count = len(nodes)
 
     # === Constraints ===
@@ -183,7 +183,7 @@ class Workflow(models.Model):
         """Initialize version and ensure snapshot structure."""
         for vals in vals_list:
             if 'draft_snapshot' not in vals:
-                vals['draft_snapshot'] = {'nodes': {}, 'connections': [], 'metadata': {}}
+                vals['draft_snapshot'] = {'nodes': [], 'connections': [], 'metadata': {}}
             vals['version'] = 1
         return super().create(vals_list)
 
@@ -286,12 +286,12 @@ class Workflow(models.Model):
         if not isinstance(snapshot, dict):
             raise UserError(_("Invalid snapshot format."))
         
-        # Ensure required keys exist
-        if 'nodes' not in snapshot:
-            snapshot['nodes'] = {}
-        if 'connections' not in snapshot:
+        # Ensure required keys exist and have correct types
+        if 'nodes' not in snapshot or not isinstance(snapshot.get('nodes'), list):
+            snapshot['nodes'] = []
+        if 'connections' not in snapshot or not isinstance(snapshot.get('connections'), list):
             snapshot['connections'] = []
-        if 'metadata' not in snapshot:
+        if 'metadata' not in snapshot or not isinstance(snapshot.get('metadata'), dict):
             snapshot['metadata'] = {}
         
         self.write({'draft_snapshot': snapshot})

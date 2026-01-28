@@ -32,7 +32,7 @@ class WorkflowRun(models.Model):
         'ir.workflow',
         string='Workflow',
         required=True,
-        ondelete='set null',  # Per user spec: set null on workflow delete
+        ondelete='restrict',
         index=True,
         help='Executed workflow'
     )
