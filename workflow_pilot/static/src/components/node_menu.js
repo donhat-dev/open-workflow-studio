@@ -4,7 +4,7 @@
  * NodeMenu Component
  * 
  * A floating context menu for adding nodes to the workflow canvas.
- * Uses workflowNode service for dynamic node categories.
+ * Uses workflowEditor.nodes for dynamic node categories.
  * 
  * Features:
  * - Search bar with auto-focus
@@ -13,14 +13,13 @@
  * - Click outside to close
  * - Absolute positioning at spawn location
  * 
- * @odoo-dependency - Uses useService for workflowNode service
+ * @odoo-dependency - Uses useEditor hook for workflowEditor service
  */
 
 import { Component, xml, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
-// @odoo-dependency - useService hook
-import { useService } from "@web/core/utils/hooks";
-import { MotionHelpers } from "../utils/motion_helpers";
-import { LucideIcon } from "./common/lucide_icon";
+import { useEditor } from "@workflow_pilot/store/use_editor";
+import { MotionHelpers } from "@workflow_pilot/utils/motion_helpers";
+import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
 
 export class NodeMenu extends Component {
     static template = xml`
@@ -89,7 +88,7 @@ export class NodeMenu extends Component {
     setup() {
         this.menuRef = useRef("menuRoot");
         this.searchInputRef = useRef("searchInput");
-        this.nodeService = useService("workflowNode");
+        this.editor = useEditor();
 
         this._onClickOutside = this._onClickOutside.bind(this);
 
@@ -118,7 +117,7 @@ export class NodeMenu extends Component {
      */
     get categories() {
         // Get grouped nodes from service
-        const grouped = this.nodeService.searchNodes("");
+        const grouped = this.editor.nodes.searchNodes("");
 
         // Transform to menu format
         return grouped.map(group => ({
@@ -145,7 +144,7 @@ export class NodeMenu extends Component {
         }
 
         // Use service search for fuzzy matching
-        const searchResults = this.nodeService.searchNodes(query);
+        const searchResults = this.editor.nodes.searchNodes(query);
 
         return searchResults.map(group => ({
             key: group.key,
@@ -185,7 +184,7 @@ export class NodeMenu extends Component {
      */
     onSelectNode(nodeType) {
         // Track usage for "recent" feature
-        this.nodeService.trackUsage(nodeType);
+        this.editor.nodes.trackUsage(nodeType);
         this.props.onNodeSelected(nodeType, this.props.connectionContext);
         this.props.onClose();
     }

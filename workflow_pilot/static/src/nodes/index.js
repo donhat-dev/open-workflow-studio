@@ -13,16 +13,18 @@
 
 // Re-export node classes (they self-register when imported)
 export { HttpRequestNode } from './http_request';
+export { ManualTriggerNode } from './manual_trigger';
 export { LoopNode, IfNode, CodeNode, NoOpNode } from './flow_nodes';
 export { DataValidationNode, DataMappingNode } from './data_nodes';
 
 // Import for building legacy object
 import { HttpRequestNode } from './http_request';
+import { ManualTriggerNode } from './manual_trigger';
 import { LoopNode, IfNode, CodeNode, NoOpNode } from './flow_nodes';
 import { DataValidationNode, DataMappingNode } from './data_nodes';
 
 /**
- * @deprecated Use workflowNode service or import directly from node files
+ * @deprecated Use workflowEditor.nodes or import directly from node files
  * Legacy NodeRegistry for backward compatibility during migration
  */
 // export const NodeRegistry = {

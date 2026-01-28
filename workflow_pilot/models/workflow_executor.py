@@ -40,17 +40,27 @@ class ExpressionEvaluator:
         $json.items[0].name → json['items'][0]['name']
         $node.Http.data → node['Http']['data']
         $vars.count → vars['count']
+        json.field → json['field'] (bare namespace, no $)
+        json.items[0].name → json['items'][0]['name'] (bare namespace)
     """
     
-    # Pattern to match $namespace.path expressions
+    # Pattern to match $namespace.path expressions (with $ prefix)
     NAMESPACE_PATTERN = re.compile(r'\$(\w+)((?:\.\w+|\[\d+\])*)')
+    
+    # Pattern to match bare namespace.path expressions (without $ prefix)
+    # Matches: json.field, node.Http, vars.count, etc.
+    BARE_NAMESPACE_PATTERN = re.compile(r'\b(json|node|vars)((?:\.\w+|\[\d+\])+)')
     
     @classmethod
     def translate_expression(cls, expr):
         """Translate n8n expression to Python expression.
         
+        Supports both:
+        - $json.items[0].name → json['items'][0]['name']
+        - json.items[0].name → json['items'][0]['name']
+        
         Args:
-            expr: Expression string, e.g., "$json.items[0].name"
+            expr: Expression string, e.g., "$json.items[0].name" or "json.items[0].name"
             
         Returns:
             Python expression string, e.g., "json['items'][0]['name']"
@@ -59,6 +69,7 @@ class ExpressionEvaluator:
             return expr
             
         def replace_namespace(match):
+            """Helper to convert namespace.path to namespace['path']."""
             namespace = match.group(1)  # json, node, vars, etc.
             path = match.group(2)       # .field.subfield[0]
             
@@ -79,11 +90,22 @@ class ExpressionEvaluator:
             
             return result
         
-        return cls.NAMESPACE_PATTERN.sub(replace_namespace, expr)
+        # First translate $namespace.path (with $ prefix)
+        result = cls.NAMESPACE_PATTERN.sub(replace_namespace, expr)
+        
+        # Then translate bare namespace.path (without $ prefix)
+        # This handles json.field, node.Http, vars.count, etc.
+        result = cls.BARE_NAMESPACE_PATTERN.sub(replace_namespace, result)
+        
+        return result
     
     @classmethod
     def evaluate(cls, expr, context):
         """Evaluate expression with given context.
+        
+        Supports both syntaxes:
+        - $json.field (n8n-style with $ prefix)
+        - json.field (bare namespace without $ prefix)
         
         Args:
             expr: Expression string (n8n or Python style)
@@ -114,11 +136,12 @@ class ExpressionEvaluator:
             
             return template_pattern.sub(replace_template, expr)
         
-        # Check if entire string is an expression (starts with = or $)
+        # Check if entire string is an expression (starts with = or $ or bare namespace)
         if expr.startswith('='):
             expr = expr[1:].strip()
         
-        if expr.startswith('$') or '.' in expr:
+        # Check for $namespace, bare namespace (json/node/vars), or contains dots
+        if expr.startswith('$') or expr.startswith(('json', 'node', 'vars')) or '.' in expr:
             translated = cls.translate_expression(expr)
             try:
                 return safe_eval(translated, context, mode='eval')

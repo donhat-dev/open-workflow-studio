@@ -1,12 +1,11 @@
 /** @odoo-module **/
 
 import { Component, useState, xml, onMounted, useSubEnv, useEffect } from "@odoo/owl";
-import { useService } from "@web/core/utils/hooks";
+import { useEditor } from "@workflow_pilot/store/use_editor";
 
 import { NodePalette } from "./components/node_palette";
 import { EditorCanvas } from "./components/editor_canvas";
 import { WorkflowAdapter } from "./core/adapter";
-import { NodeRegistry, LoopNode, NoOpNode } from "./nodes/index";
 import { HistoryManager, createAddNodeAction, createRemoveNodeAction, createAddConnectionAction, createRemoveConnectionAction } from "./core/history";
 import { runStressTest } from "./utils/benchmark";
 
@@ -62,7 +61,7 @@ export class WorkflowPilotDevApp extends Component {
         this.adapter = new WorkflowAdapter();
 
         // Get workflowEditor service (centralized state + actions)
-        this.editorService = useService("workflowEditor");
+        this.editorService = useEditor();
         this.editorService.setAdapter(this.adapter);
 
         useSubEnv({

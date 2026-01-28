@@ -90,6 +90,20 @@
 }</field>
         </record>
 
+        <!-- Trigger Nodes -->
+        <record id="workflow_type_manual_trigger" model="workflow.type">
+            <field name="name">Manual Trigger</field>
+            <field name="node_type">manual_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-play</field>
+            <field name="description">Manually start a workflow execution</field>
+            <field name="config_schema">{}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Output"}
+}</field>
+        </record>
+
         <!-- Transform Nodes -->
         <record id="workflow_type_code" model="workflow.type">
             <field name="name">Code</field>

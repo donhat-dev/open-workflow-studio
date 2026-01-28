@@ -778,3 +778,88 @@
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
 }
+
+/* ========================================= */
+/* 9. Workflow Editor App (Production Layout) */
+/* ========================================= */
+
+.workflow-editor-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0f1115; /* Match canvas bg */
+  color: #e0e0e0;
+  overflow: hidden; /* Prevent double scrollbars */
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-toolbar {
+  height: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid #2a2d33;
+  background: #16181d;
+  z-index: 20;
+}
+
+.editor-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  /* Override Odoo btn styles only if needed, or rely on btn-primary */
+}
+
+.editor-toolbar .btn__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Ensure canvas takes remaining height */
+.editor-container .workflow-editor-canvas {
+  flex: 1;
+  height: auto !important; /* Allow flex to control height */
+  min-height: 0 !important; /* Allow shrinking */
+}
+
+/* Loading and Error states should also fill screen */
+.workflow-editor-app .loading-spinner,
+.workflow-editor-app .error-message {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}

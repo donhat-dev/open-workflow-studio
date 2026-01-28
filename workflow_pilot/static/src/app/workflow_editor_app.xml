@@ -28,15 +28,21 @@
                                 class="btn btn-primary btn-save" 
                                 t-on-click="save" 
                                 t-att-disabled="state.saving ? 'disabled' : undefined">
+                                <span class="btn__icon">
+                                    <LucideIcon t-props="{ name: 'Save', size: 16 }"/>
+                                </span>
                                 <t t-if="state.saving">Saving...</t>
-                                <t t-else="">💾 Save</t>
+                                <t t-else="">Save</t>
                             </button>
                             <button 
                                 class="btn btn-secondary btn-save" 
                                 t-on-click="publish" 
                                 t-att-disabled="state.publishing ? 'disabled' : undefined">
+                                <span class="btn__icon">
+                                    <LucideIcon t-props="{ name: 'Rocket', size: 16 }"/>
+                                </span>
                                 <t t-if="state.publishing">Publishing...</t>
-                                <t t-else="">🚀 Publish</t>
+                                <t t-else="">Publish</t>
                             </button>
                         </div>
                     </div>

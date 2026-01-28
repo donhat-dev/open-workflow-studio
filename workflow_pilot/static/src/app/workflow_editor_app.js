@@ -1,7 +1,8 @@
 /** @odoo-module **/
 import { Component, useState, onMounted, useSubEnv } from "@odoo/owl";
-import { useService } from "@web/core/utils/hooks";
-import { EditorCanvas } from "../components/editor_canvas";
+import { useEditor } from "@workflow_pilot/store/use_editor";
+import { EditorCanvas } from "@workflow_pilot/components/editor_canvas";
+import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
 
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
@@ -11,11 +12,11 @@ import { EditorCanvas } from "../components/editor_canvas";
  */
 export class WorkflowEditorApp extends Component {
     static template = "workflow_pilot.workflow_editor_app";
-    static components = { EditorCanvas };
+    static components = { EditorCanvas, LucideIcon };
     
     setup() {
         // Services (Fail-First - no optional chaining)
-        this.editorService = useService("workflowEditor");
+        this.editorService = useEditor();
         
         // State
         this.state = useState({

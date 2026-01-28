@@ -15,7 +15,7 @@ class WorkflowType(models.Model):
         - integration: External service nodes (http)
         - transform: Data transformation nodes (code, set_data, mapping, validation)
         - data: Variable/data nodes (variable)
-        - trigger: Trigger nodes (manual_trigger, webhook) - Phase 4
+        - trigger: Trigger nodes (manual_trigger, webhook)
     """
     _name = 'workflow.type'
     _description = 'Workflow Node Type'

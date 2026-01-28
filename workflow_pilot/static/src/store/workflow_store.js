@@ -20,6 +20,16 @@ import {
     createRemoveConnectionAction,
 } from "../core/history";
 import { WorkflowAdapter } from "../core/adapter";
+import {
+    clearRecentNodes,
+    getAllNodeTypes,
+    getCategories,
+    getNodeClass as getRegistryNodeClass,
+    getNodeType,
+    getRecentNodes,
+    searchNodes,
+    trackNodeUsage,
+} from "../utils/node_registry";
 
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
@@ -423,6 +433,16 @@ export const workflowEditorService = {
                 getConnection,
                 getNodes: () => state.graph.nodes,
                 getConnections: () => state.graph.connections,
+            },
+            nodes: {
+                getAllNodeTypes: () => getAllNodeTypes(),
+                getCategories: () => getCategories(),
+                getNodeType: (key) => getNodeType(key),
+                getNodeClass: (key) => getRegistryNodeClass(key),
+                getRecentNodes: (limit) => getRecentNodes(limit),
+                searchNodes: (query, options) => searchNodes(query, options),
+                trackUsage: (key) => trackNodeUsage(key),
+                clearRecentNodes: () => clearRecentNodes(),
             },
         };
 
