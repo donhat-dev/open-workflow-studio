@@ -29,7 +29,7 @@ class WorkflowRun(models.Model):
 
     # === Relationships ===
     workflow_id = fields.Many2one(
-        'workflow',
+        'ir.workflow',
         string='Workflow',
         required=True,
         ondelete='set null',  # Per user spec: set null on workflow delete

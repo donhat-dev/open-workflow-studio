@@ -217,7 +217,7 @@ export const workflowAdapterService = {
              */
             async loadWorkflow(workflowId) {
                 const data = await rpc('/web/dataset/call_kw', {
-                    model: 'workflow',
+                    model: 'ir.workflow',
                     method: 'load_workflow',
                     args: [workflowId],
                     kwargs: {},
@@ -237,7 +237,7 @@ export const workflowAdapterService = {
             async saveWorkflow() {
                 const snapshot = currentAdapter.toJSON();
                 const result = await rpc('/web/dataset/call_kw', {
-                    model: 'workflow',
+                    model: 'ir.workflow',
                     method: 'save_workflow',
                     args: [_workflowId, snapshot, _versionHash],
                     kwargs: {},

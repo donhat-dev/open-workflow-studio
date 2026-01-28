@@ -65,10 +65,10 @@
             <field name="perm_unlink" eval="1"/>
         </record>
 
-        <!-- workflow: User sees own workflows in company -->
+        <!-- ir.workflow: User sees own workflows in company -->
         <record id="rule_workflow_user" model="ir.rule">
             <field name="name">Workflow: User Own Company</field>
-            <field name="model_id" ref="model_workflow"/>
+            <field name="model_id" ref="model_ir_workflow"/>
             <field name="domain_force">[
                 ('user_id', '=', user.id),
                 '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
@@ -76,10 +76,10 @@
             <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
         </record>
 
-        <!-- workflow: Manager sees all workflows in company -->
+        <!-- ir.workflow: Manager sees all workflows in company -->
         <record id="rule_workflow_manager" model="ir.rule">
             <field name="name">Workflow: Manager Company</field>
-            <field name="model_id" ref="model_workflow"/>
+            <field name="model_id" ref="model_ir_workflow"/>
             <field name="domain_force">[
                 '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
             ]</field>

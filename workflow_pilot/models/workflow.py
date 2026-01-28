@@ -21,7 +21,7 @@ class Workflow(models.Model):
         - version increments on each save
         - version_hash computed from draft_snapshot for conflict detection
     """
-    _name = 'workflow'
+    _name = 'ir.workflow'
     _description = 'Workflow'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'name'

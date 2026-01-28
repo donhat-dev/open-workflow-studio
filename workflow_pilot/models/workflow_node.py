@@ -35,7 +35,7 @@ class WorkflowNode(models.Model):
 
     # === Relationships ===
     workflow_id = fields.Many2one(
-        'workflow',
+        'ir.workflow',
         string='Workflow',
         required=True,
         ondelete='cascade',
