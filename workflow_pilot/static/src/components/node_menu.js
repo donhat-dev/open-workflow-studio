@@ -44,7 +44,10 @@ export class NodeMenu extends Component {
                 <t t-foreach="filteredCategories" t-as="category" t-key="category.key">
                     <div class="node-menu__category">
                         <div class="node-menu__category-title">
-                            <LucideIcon t-if="category.icon" name="category.icon" size="14" class="'node-menu__category-icon'"/>
+                            <t t-if="category.icon">
+                                <i t-if="isFontAwesome(category.icon)" t-att-class="getFaClass(category.icon, 'node-menu__category-icon')"/>
+                                <LucideIcon t-else="" name="category.icon" size="14" class="'node-menu__category-icon'"/>
+                            </t>
                             <t t-esc="category.name"/>
                         </div>
                         <t t-foreach="category.items" t-as="item" t-key="item.key">
@@ -52,7 +55,8 @@ export class NodeMenu extends Component {
                                  t-att-data-node-type="item.key"
                                  t-on-click="onItemClick">
                                 <div class="node-menu__item-icon">
-                                    <LucideIcon name="item.icon" size="18"/>
+                                    <i t-if="isFontAwesome(item.icon)" t-att-class="getFaClass(item.icon, 'node-menu__item-fa')"/>
+                                    <LucideIcon t-else="" name="item.icon" size="18"/>
                                 </div>
                                 <div class="node-menu__item-info">
                                     <div class="node-menu__item-title">
@@ -109,6 +113,18 @@ export class NodeMenu extends Component {
         onWillUnmount(() => {
             document.removeEventListener("mousedown", this._onClickOutside);
         });
+    }
+
+    isFontAwesome(icon) {
+        return typeof icon === 'string' && icon.startsWith('fa-');
+    }
+
+    getFaClass(icon, extraClass) {
+        const base = `fa ${icon}`;
+        if (extraClass) {
+            return `${base} ${extraClass}`;
+        }
+        return base;
     }
 
     /**

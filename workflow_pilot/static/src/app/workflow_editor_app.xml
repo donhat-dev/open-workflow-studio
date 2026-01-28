@@ -44,6 +44,16 @@
                                 <t t-if="state.publishing">Publishing...</t>
                                 <t t-else="">Publish</t>
                             </button>
+                            <button 
+                                class="btn btn-secondary btn-execute" 
+                                t-on-click="execute" 
+                                t-att-disabled="state.executing ? 'disabled' : undefined">
+                                <span class="btn__icon">
+                                    <LucideIcon t-props="{ name: 'Play', size: 16 }"/>
+                                </span>
+                                <t t-if="state.executing">Executing...</t>
+                                <t t-else="">Execute</t>
+                            </button>
                         </div>
                     </div>
                     

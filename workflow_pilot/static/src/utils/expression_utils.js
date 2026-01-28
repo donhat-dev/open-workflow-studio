@@ -4,12 +4,14 @@
  * Expression Utilities
  * 
  * n8n-style expression handling: {{ $json.field }}, {{ $vars.name }}, {{ $loop.item }}
+ * Bare namespace handling: {{ json.field }}, {{ vars.name }}, {{ input.item }}
  * 
  * Supports all ExecutionContext namespaces:
  * - $json: Previous node output (shortcut)
  * - $node: Node outputs keyed by node ID
  * - $vars: Mutable workflow variables
  * - $loop: Current loop iteration context
+ * - $input: Input data for current node
  * 
  * @core - Pure JavaScript utilities, no Odoo dependencies.
  */
@@ -24,8 +26,10 @@ export const EXPRESSION_PATTERNS = {
     SINGLE_TEMPLATE: /\{\{(.+?)\}\}/,
     // Check if entire value is expression (n8n style: starts with =)
     EXPRESSION_PREFIX: /^=/,
-    // Match namespace prefix: $json, $vars, $loop, $node
+    // Match namespace prefix: $json, $vars, $loop, $node, $input
     NAMESPACE: /^\$(\w+)/,
+    // Match bare namespace: json, vars, loop, node, input
+    BARE_NAMESPACE: /^(json|vars|loop|node|input)(?=\.|\[|$)/,
     // n8n-style node selector: $('nodeId') or $("nodeId")
     NODE_SELECTOR: /\$\(\s*['"]([^'"]+)['"]\s*\)/g,
     // Single node selector match
@@ -35,7 +39,7 @@ export const EXPRESSION_PATTERNS = {
 /**
  * Supported expression namespaces
  */
-export const NAMESPACES = ['$json', '$vars', '$loop', '$node'];
+export const NAMESPACES = ['$json', '$vars', '$loop', '$node', '$input'];
 
 /**
  * Check if a value contains expression templates
@@ -204,12 +208,16 @@ export function parseExpressionPath(path) {
 
     // Extract namespace
     const nsMatch = path.match(EXPRESSION_PATTERNS.NAMESPACE);
-    const namespace = nsMatch ? `$${nsMatch[1]}` : null;
+    const bareMatch = nsMatch ? null : path.match(EXPRESSION_PATTERNS.BARE_NAMESPACE);
+    const namespace = nsMatch
+        ? `$${nsMatch[1]}`
+        : (bareMatch ? `$${bareMatch[1]}` : null);
 
     // Remove namespace prefix for path parsing
     let cleanPath = path;
     if (namespace) {
-        cleanPath = path.slice(namespace.length);
+        const prefixLength = nsMatch ? namespace.length : bareMatch[1].length;
+        cleanPath = path.slice(prefixLength);
         // Remove leading dot if present
         if (cleanPath.startsWith('.')) {
             cleanPath = cleanPath.slice(1);
@@ -265,10 +273,10 @@ export function getValueByPath(data, path) {
 
 /**
  * Resolve value from full expression context
- * Supports all namespaces: $json, $vars, $loop, $node
+ * Supports all namespaces: $json, $vars, $loop, $node, $input
  * 
  * @param {string} expression - Expression like $json.email, $vars.result, $loop.item
- * @param {Object} context - Full context { $json, $vars, $loop, $node }
+ * @param {Object} context - Full context { $json, $vars, $loop, $node, $input }
  * @returns {*} - Resolved value or undefined
  */
 export function resolveExpression(expression, context = {}) {
@@ -279,6 +287,9 @@ export function resolveExpression(expression, context = {}) {
     switch (namespace) {
         case '$json':
             source = context.$json || {};
+            break;
+        case '$input':
+            source = context.$input || {};
             break;
         case '$vars':
             source = context.$vars || {};

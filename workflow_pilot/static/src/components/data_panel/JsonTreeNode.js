@@ -122,7 +122,7 @@ export class JsonTreeNode extends Component {
         }
 
         // Fallback for legacy/preview contexts (typically readonly).
-        return generateExpressionPath(this.props.path);
+        return generateExpressionPath(this.props.path, 'json');
     }
 
     get expressionTemplate() {

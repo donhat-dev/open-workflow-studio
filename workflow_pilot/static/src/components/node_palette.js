@@ -68,6 +68,7 @@ class NodePalette extends Component {
 
     get items() {
         return [
+            { name: "manual_trigger", title: ("Manual Trigger"), icon: "Play", className: "node-palette__item--trigger" },
             { name: "http", title: ("HTTP Request"), icon: "Globe", className: "node-palette__item--http" },
             { name: "variable", title: ("Set Variable"), icon: "Box", className: "node-palette__item--variable" },
             { name: "validation", title: ("Data Validation"), icon: "CheckCircle", className: "node-palette__item--validation" },

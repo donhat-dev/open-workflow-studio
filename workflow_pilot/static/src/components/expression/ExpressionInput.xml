@@ -25,7 +25,7 @@
 			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
 				<!-- Expression mode prefix -->
 				<span t-if="isExpression" class="expression-input__fx">ƒx</span>
-				<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ $json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" spellcheck="false"/>
+			<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" spellcheck="false"/>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
 					<i class="fa fa-plus-circle"/>

@@ -413,6 +413,16 @@ export const workflowEditorService = {
                 });
                 return result;
             },
+            async executeWorkflow(inputData = {}) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                const result = await rpc('/workflow_pilot/execute', {
+                    workflow_id: workflowId,
+                    input_data: inputData,
+                });
+                return result;
+            },
             getWorkflowId() {
                 return workflowId;
             },

@@ -18,7 +18,7 @@ class WorkflowPilotController(http.Controller):
     """Controller for workflow execution endpoints."""
     
     @http.route('/workflow_pilot/execute', type='json', auth='user', methods=['POST'])
-    def execute_workflow(self, workflow_id, input_data=None):
+    def execute_workflow(self, workflow_id=None, input_data=None, **kwargs):
         """Execute a published workflow.
         
         Args:
@@ -31,6 +31,16 @@ class WorkflowPilotController(http.Controller):
         Raises:
             UserError if workflow not found or not published
         """
+        payload = request.jsonrequest or {}
+        if workflow_id is None:
+            workflow_id = payload.get('workflow_id')
+        if input_data is None:
+            input_data = payload.get('input_data', {})
+
+        if workflow_id is None:
+            return {'error': 'Workflow ID is required'}
+
+        workflow_id = int(workflow_id)
         workflow = request.env['ir.workflow'].browse(workflow_id)
         if not workflow.exists():
             return {'error': 'Workflow not found'}

@@ -23,6 +23,7 @@ export class WorkflowEditorApp extends Component {
             loading: true,
             saving: false,
             publishing: false,
+            executing: false,
             error: null,
             showConflictModal: false
         });
@@ -96,6 +97,21 @@ export class WorkflowEditorApp extends Component {
             this.state.error = error.message || "Failed to publish workflow";
         } finally {
             this.state.publishing = false;
+        }
+    }
+    
+    /**
+     * Execute current workflow
+     */
+    async execute() {
+        this.state.executing = true;
+        try {
+            await this.editorService.executeWorkflow();
+            console.log('Workflow executed successfully');
+        } catch (error) {
+            this.state.error = error.message || "Failed to execute workflow";
+        } finally {
+            this.state.executing = false;
         }
     }
     
