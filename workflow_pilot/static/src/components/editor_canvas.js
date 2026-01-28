@@ -42,30 +42,36 @@ export class EditorCanvas extends Component {
         // Bind component to service state reactivity
         this.editorState = useState(this.editor.state);
 
-        const adapterService = this.env.services.workflowAdapter;
-        const executorService = this.env.services.workflowExecutor;
-        const runService = this.env.services.workflowRun;
-
-        if (!adapterService) {
-            throw new Error("[EditorCanvas] Missing workflowAdapter service");
-        }
-        if (!executorService) {
-            throw new Error("[EditorCanvas] Missing workflowExecutor service");
-        }
-        if (!runService) {
-            throw new Error("[EditorCanvas] Missing workflowRun service");
-        }
+        const emptyExpressionContext = () => ({
+            $vars: {},
+            $node: {},
+            $json: {},
+            $loop: null,
+            $input: { item: null, json: null },
+        });
 
         this.nodeConfigActions = {
-            getControls: (nodeId) => adapterService.getNodeControls(nodeId),
-            getNodeMeta: (nodeId) => adapterService.getNodeMeta(nodeId),
-            setNodeMeta: (nodeId, meta) => adapterService.setNodeMeta(nodeId, meta),
-            getExpressionContext: () => adapterService.getExpressionContext(),
-            buildContextForNode: (workflow, nodeId) => executorService.buildContextForNode(workflow, nodeId),
-            runUntilNode: (workflow, nodeId, options) => runService.runUntilNode(workflow, nodeId, options),
-            runNode: (nodeId, options) => runService.runNode(nodeId, options),
-            setNodeConfig: (nodeId, values) => adapterService.setNodeConfig(nodeId, values),
-            isExecuting: () => runService.isExecuting,
+            getControls: (nodeId) => this.editor.getNodeControls(nodeId),
+            getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
+            setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
+            getExpressionContext: () => emptyExpressionContext(),
+            buildContextForNode: () => ({
+                $node: {},
+                $json: {},
+                $input: { item: null, json: null },
+            }),
+            runUntilNode: async () => ({
+                output: null,
+                error: "Execution is disabled in editor mode",
+                expressionContext: emptyExpressionContext(),
+            }),
+            runNode: async () => ({
+                output: null,
+                error: "Execution is disabled in editor mode",
+                expressionContext: emptyExpressionContext(),
+            }),
+            setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
+            isExecuting: () => false,
         };
 
         this.state = useState({
@@ -214,21 +220,7 @@ export class EditorCanvas extends Component {
                 this.multiNodeDrag.onNodeDragStart({ nodeId, event });
             },
             onExecute: async (nodeId) => {
-                const runService = this.env.services.workflowRun;
-                const adapter = this.env.services.workflowAdapter;
-
-                if (!runService || !adapter) {
-                    console.error('[EditorCanvas] Missing workflowRun or workflowAdapter service');
-                    return;
-                }
-
-                const workflow = {
-                    nodes: adapter.state.nodes,
-                    connections: adapter.state.connections,
-                };
-
-                console.log(`[EditorCanvas] Executing until node: ${nodeId}`);
-                await runService.runUntilNode(workflow, nodeId);
+                this.editor.actions.openPanel("config", { nodeId });
             },
             onSocketMouseDown: (data) => {
                 this.connectionDrawing.onSocketMouseDown(data);

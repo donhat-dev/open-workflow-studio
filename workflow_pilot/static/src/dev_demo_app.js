@@ -61,13 +61,9 @@ export class WorkflowPilotDevApp extends Component {
         // Initialize adapter (Core layer)
         this.adapter = new WorkflowAdapter();
 
-        // Register adapter with service for child components
-        // This allows NodeConfigPanel to access adapter methods via useService
-        this.adapterService = useService("workflowAdapter");
-        this.adapterService.setAdapter(this.adapter);
-
         // Get workflowEditor service (centralized state + actions)
         this.editorService = useService("workflowEditor");
+        this.editorService.setAdapter(this.adapter);
 
         useSubEnv({
             bus: this.editorService.bus,

@@ -6,9 +6,11 @@
     'author': '',
     'website': '',
     'category': '',
-    'depends': ['base', 'web'],
+    'depends': ['base', 'web', 'mail'],
     'data': [
-        'data/workflow_pilot_menu.xml',
+        'security/groups.xml',
+        'security/ir.model.access.csv',
+        'views/ir_workflow_views.xml',
     ],
     'assets': {
         # Core libs bundle - can be lazy-loaded or included separately
@@ -24,6 +26,8 @@
             'workflow_pilot/static/src/registries/**/*',
             # Mocks / Frontend execution engine
             'workflow_pilot/static/src/mocks/**/*',
+            # App entry points
+            'workflow_pilot/static/src/app/**/*',
             # Store (workflowEditor service)
             'workflow_pilot/static/src/store/**/*',
             # Core classes (pure JS, minimal deps)

@@ -87,22 +87,7 @@
 								</div>
 							</t>
 						</div>
-						<div class="left-panel-footer">
-							<button class="node-execute-btn small" t-on-click="onExecute" t-att-disabled="state.isExecuting or !canExecute" t-att-class="{ executing: state.isExecuting }">
-								<t t-if="state.isExecuting">
-									<i class="fa fa-spinner fa-spin"/> Running...
-								</t>
-								<t t-else="">
-									<i class="fa fa-play"/> Execute
-								</t>
-							</button>
-							<t t-if="state.executionResult">
-								<span t-att-class="'execution-status status-' + executionStatus">
-									<i t-att-class="executionStatus === 'success' ? 'fa fa-check' : 'fa fa-exclamation'"/>
-									<t t-esc="executionStatusLabel"/>
-								</span>
-							</t>
-						</div>
+                        <div class="left-panel-footer"/>
 					</div>
 					<!-- RIGHT PANEL: Node Configuration -->
 					<div class="node-config-right-panel">
