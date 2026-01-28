@@ -302,3 +302,53 @@ class Workflow(models.Model):
             'version_hash': self.version_hash,
             'node_count': self.node_count,
         }
+
+    # === Execution Methods ===
+    def execute_workflow(self, input_data=None):
+        """Execute published workflow synchronously.
+        
+        Creates a workflow.run record and executes all nodes from start
+        to completion. Partial results are persisted for debugging.
+        
+        Args:
+            input_data: Initial input data for workflow (optional)
+            
+        Returns:
+            dict with run_id and output_data
+            
+        Raises:
+            UserError if workflow not published or execution fails
+        """
+        self.ensure_one()
+        
+        # Validate workflow is published
+        if not self.is_published or not self.published_snapshot:
+            raise UserError(_("Workflow must be published before execution."))
+        
+        if not self.published_snapshot.get('nodes'):
+            raise UserError(_("Published workflow has no nodes."))
+        
+        # Create run record with snapshot copy
+        run = self.env['workflow.run'].create({
+            'workflow_id': self.id,
+            'status': 'pending',
+            'input_data': input_data or {},
+            'executed_version': self.published_version,
+            'executed_snapshot': self.published_snapshot.copy(),
+        })
+        
+        # Execute using WorkflowExecutor
+        from .workflow_executor import WorkflowExecutor
+        
+        executor = WorkflowExecutor(self.env, run)
+        output_data = executor.execute(input_data)
+        
+        return {
+            'run_id': run.id,
+            'run_name': run.name,
+            'status': run.status,
+            'output_data': output_data,
+            'node_count_executed': run.node_count_executed,
+            'execution_count': run.execution_count,
+            'duration_seconds': run.duration_seconds,
+        }
