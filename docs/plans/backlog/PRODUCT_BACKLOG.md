@@ -272,6 +272,7 @@
 | E6.2.3   | User permissions    |      2 | P1       |       0% | ❌             | Access control      |
 | E6.2.4   | Folder organization |      2 | P1       |       0% | ❌             | Workflow categories |
 | E6.2.5   | Search & filter     |      3 | P1       |       0% | ❌             | Find workflows      |
+| E6.2.6   | Workflow run sequence|      1 | P1       |     100% | ✅ Done        | Added `workflow.run` sequence data + manifest entry |
 |          |                     |        |          |          |               |                     |
 | **E6.3** | **Versioning**      |  **8** | P2       |   **0%** | ❌ Planned     |                     |
 | E6.3.1   | Version snapshots   |      3 | P2       |       0% | ❌             | Save history        |

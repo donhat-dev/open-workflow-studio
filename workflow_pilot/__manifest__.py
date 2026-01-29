@@ -10,6 +10,7 @@
     'data': [
         'security/groups.xml',
         'security/ir.model.access.csv',
+        'data/data.xml',
         'views/ir_workflow_views.xml',
     ],
     'assets': {

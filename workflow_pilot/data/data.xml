@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="workflow_run_ir_sequence" model="ir.sequence">
+        <field name="name">Workflow Run</field>
+        <field name="code">workflow.run</field>
+        <field name="prefix">WFR/</field>
+        <field name="padding">6</field>
+        <field name="company_id" eval="False"/>
+    </record>
+</odoo>
