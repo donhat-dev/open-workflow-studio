@@ -136,19 +136,7 @@ class ExpressionEvaluator:
             
             return template_pattern.sub(replace_template, expr)
         
-        # Check if entire string is an expression (starts with = or $ or bare namespace)
-        if expr.startswith('='):
-            expr = expr[1:].strip()
-        
-        # Check for $namespace, bare namespace (json/node/vars), or contains dots
-        if expr.startswith('$') or expr.startswith(('json', 'node', 'vars')) or '.' in expr:
-            translated = cls.translate_expression(expr)
-            try:
-                return safe_eval(translated, context, mode='eval')
-            except Exception as e:
-                raise ValueError(f"Expression evaluation failed: {expr} -> {e}")
-        
-        # Return as-is if not an expression
+        # Return as-is if not an explicit template expression
         return expr
 
 
@@ -212,9 +200,16 @@ class HttpNodeRunner(BaseNodeRunner):
         method = node_config.get('method', 'GET').upper()
         
         # Evaluate headers
-        headers = node_config.get('headers', {})
+        headers = node_config.get('headers', [])
+        headers_dict = {}
+        for h in headers:
+            key = h.get('key')
+            value = h.get('value', '')
+            headers_dict[key] = value
         evaluated_headers = {}
-        for key, value in headers.items():
+        for key, value in headers_dict.items():
+            if not key:
+                continue
             evaluated_headers[key] = ExpressionEvaluator.evaluate(value, eval_context)
         
         # Evaluate body for methods that support it
@@ -453,22 +448,32 @@ class WorkflowExecutor:
         'loop': LoopNodeRunner,
     }
     
-    def __init__(self, env, workflow_run):
+    def __init__(self, env, workflow_run=None, snapshot=None, persist=True):
         """Initialize executor.
-        
+
         Args:
             env: Odoo environment
             workflow_run: workflow.run record being executed
+            snapshot: Workflow snapshot dict (used when persist=False)
+            persist: Whether to persist run/node records
         """
         self.env = env
         self.run = workflow_run
-        self.snapshot = workflow_run.executed_snapshot
+        self.persist = bool(persist)
+
+        if self.persist:
+            if not self.run:
+                raise UserError("WorkflowExecutor requires a workflow.run record when persist=True")
+            self.snapshot = self.run.executed_snapshot
+        else:
+            self.snapshot = snapshot or {}
         
         # Execution state
         self.stack = []  # [{nodeId, inputData}]
         self.node_outputs = {}  # nodeId -> NodeOutput
         self.node_context = {}  # nodeId -> persistent state (loops)
         self.vars = {}  # Workflow variables
+        self.executed_order = []
         
         # Build lookup structures
         self._build_graph()
@@ -508,11 +513,12 @@ class WorkflowExecutor:
         """
         try:
             # Update run status
-            self.run.write({
-                'status': 'running',
-                'started_at': fields.Datetime.now(),
-            })
-            self.env.cr.commit()
+            if self.persist:
+                self.run.write({
+                    'status': 'running',
+                    'started_at': fields.Datetime.now(),
+                })
+                self.env.cr.commit()
             
             # Find start nodes (nodes with no incoming connections)
             start_nodes = self._find_start_nodes()
@@ -538,6 +544,10 @@ class WorkflowExecutor:
                 
                 # Execute node
                 result = self._execute_node(node_id, input_data)
+
+                # Store output
+                self.node_outputs[node_id] = result
+                self.executed_order.append(node_id)
                 
                 # Route outputs to connected nodes
                 self._route_outputs(node_id, result)
@@ -547,25 +557,85 @@ class WorkflowExecutor:
             
             # Complete run
             output_data = self._collect_final_output()
-            self.run.write({
-                'status': 'completed',
-                'completed_at': fields.Datetime.now(),
-                'output_data': output_data,
-                'node_count_executed': len(self.node_outputs),
-                'execution_count': iteration,
-            })
+            if self.persist:
+                self.run.write({
+                    'status': 'completed',
+                    'completed_at': fields.Datetime.now(),
+                    'output_data': output_data,
+                    'node_count_executed': len(self.node_outputs),
+                    'execution_count': iteration,
+                })
             
             return output_data
             
         except Exception as e:
             # Mark run as failed
-            self.run.write({
-                'status': 'failed',
-                'completed_at': fields.Datetime.now(),
-                'error_message': str(e),
-            })
-            self.env.cr.commit()
+            if self.persist:
+                self.run.write({
+                    'status': 'failed',
+                    'completed_at': fields.Datetime.now(),
+                    'error_message': str(e),
+                })
+                self.env.cr.commit()
             raise
+
+    def execute_until(self, target_node_id, input_data=None, max_iterations=1000):
+        """Execute workflow until target node is reached.
+
+        Args:
+            target_node_id: Node ID to stop after execution
+            input_data: Initial input data
+            max_iterations: Safety limit for stack iterations
+
+        Returns:
+            dict with node_outputs, executed_order, execution_count, target_node_id
+        """
+        if not target_node_id:
+            raise UserError(_("Target node is required for preview execution"))
+
+        # Find start nodes (nodes with no incoming connections)
+        start_nodes = self._find_start_nodes_for_target(target_node_id)
+        if not start_nodes:
+            raise UserError(_("Workflow has no start nodes"))
+
+        # Push start nodes to stack
+        for node_id in start_nodes:
+            self.stack.append({
+                'nodeId': node_id,
+                'inputData': input_data or {},
+            })
+
+        # Execute until target node or stack empty
+        iteration = 0
+        while self.stack and iteration < max_iterations:
+            iteration += 1
+            entry = self.stack.pop()
+            node_id = entry['nodeId']
+            node_input = entry['inputData']
+
+            # Execute node
+            result = self._execute_node(node_id, node_input, persist=False)
+
+            # Store output
+            self.node_outputs[node_id] = result
+            self.executed_order.append(node_id)
+
+            # Stop after target node executes
+            if node_id == target_node_id:
+                break
+
+            # Route outputs to connected nodes
+            self._route_outputs(node_id, result)
+
+        if iteration >= max_iterations:
+            raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
+
+        return {
+            'node_outputs': self.node_outputs,
+            'executed_order': self.executed_order,
+            'execution_count': iteration,
+            'target_node_id': target_node_id,
+        }
     
     def _find_start_nodes(self):
         """Find nodes with no incoming connections."""
@@ -581,8 +651,107 @@ class WorkflowExecutor:
                 start_nodes.append(node_id)
         
         return start_nodes
+
+    def _find_start_nodes_for_target(self, target_node_id):
+        """Find start nodes that lead to target node (preview flow)."""
+        start_nodes = self._find_start_nodes()
+        if not target_node_id:
+            return start_nodes
+
+        ancestors = self._get_node_ancestors(target_node_id)
+        ancestors.add(target_node_id)
+
+        filtered = [
+            node_id for node_id in start_nodes
+            if node_id in ancestors or self._has_path_to_node(node_id, target_node_id)
+        ]
+
+        if not filtered:
+            if target_node_id in start_nodes:
+                return [target_node_id]
+            return start_nodes
+
+        return filtered
+
+    def _get_node_ancestors(self, target_node_id):
+        """Get all ancestor node IDs of a target node (BFS backwards)."""
+        ancestors = set()
+        visited = set()
+        queue = [target_node_id]
+
+        reverse_adj = {}
+        for conn in self.connections:
+            target = conn.get('target')
+            source = conn.get('source')
+            if not target or not source:
+                continue
+            reverse_adj.setdefault(target, []).append(source)
+
+        while queue:
+            current = queue.pop(0)
+            parents = reverse_adj.get(current, [])
+            for parent in parents:
+                if parent in visited:
+                    continue
+                visited.add(parent)
+                ancestors.add(parent)
+                queue.append(parent)
+
+        return ancestors
+
+    def _has_path_to_node(self, source_node_id, target_node_id):
+        """Check if there's a path from source node to target node."""
+        visited = set()
+        queue = [source_node_id]
+
+        forward_adj = {}
+        for conn in self.connections:
+            source = conn.get('source')
+            target = conn.get('target')
+            if not source or not target:
+                continue
+            forward_adj.setdefault(source, []).append(target)
+
+        while queue:
+            current = queue.pop(0)
+            if current == target_node_id:
+                return True
+            if current in visited:
+                continue
+            visited.add(current)
+            for child in forward_adj.get(current, []):
+                if child not in visited:
+                    queue.append(child)
+
+        return False
     
-    def _execute_node(self, node_id, input_data):
+    def _execute_node_core(self, node_id, input_data):
+        """Execute a single node (no persistence)."""
+        node = self.nodes.get(node_id)
+        if not node:
+            raise UserError(_("Node not found: %s") % node_id)
+
+        node_type = node.get('type')
+        config = node.get('config', {})
+
+        # Build execution context
+        context = {
+            'current_node_id': node_id,
+            'node': self.node_outputs,
+            'vars': self.vars,
+            'node_context': self.node_context,
+        }
+
+        # Get runner for node type
+        runner = self.runners.get(node_type)
+        if not runner:
+            return {
+                'outputs': [[input_data]],
+                'json': input_data,
+            }
+        return runner.execute(config, input_data, context)
+
+    def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
         
         Args:
@@ -592,13 +761,18 @@ class WorkflowExecutor:
         Returns:
             NodeOutput dict with outputs, json, etc.
         """
+        if persist is None:
+            persist = self.persist
+
         node = self.nodes.get(node_id)
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
-        
+
+        if not persist:
+            return self._execute_node_core(node_id, input_data)
+
         node_type = node.get('type')
-        config = node.get('config', {})
-        
+
         # Create node run record
         started_at = datetime.now()
         node_run = self.env['workflow.run.node'].create({
@@ -611,34 +785,14 @@ class WorkflowExecutor:
             'input_data': input_data,
             'sequence': len(self.node_outputs),
         })
-        
+
         try:
-            # Build execution context
-            context = {
-                'current_node_id': node_id,
-                'node': self.node_outputs,
-                'vars': self.vars,
-                'node_context': self.node_context,
-            }
-            
-            # Get runner for node type
-            runner = self.runners.get(node_type)
-            if not runner:
-                # Passthrough for unknown node types
-                result = {
-                    'outputs': [[input_data]],
-                    'json': input_data,
-                }
-            else:
-                result = runner.execute(config, input_data, context)
-            
-            # Store output
-            self.node_outputs[node_id] = result
-            
+            result = self._execute_node_core(node_id, input_data)
+
             # Update node run record
             completed_at = datetime.now()
             duration_ms = (completed_at - started_at).total_seconds() * 1000
-            
+
             # Determine output socket used
             output_socket = None
             if result.get('outputs'):
@@ -646,7 +800,7 @@ class WorkflowExecutor:
                     if output:
                         output_socket = str(i)
                         break
-            
+
             node_run.write({
                 'status': 'completed',
                 'completed_at': completed_at,
@@ -654,9 +808,9 @@ class WorkflowExecutor:
                 'output_data': result.get('json'),
                 'output_socket': output_socket,
             })
-            
+
             return result
-            
+
         except Exception as e:
             # Mark node as failed
             node_run.write({
@@ -664,12 +818,13 @@ class WorkflowExecutor:
                 'completed_at': datetime.now(),
                 'error_message': str(e),
             })
-            
+
             # Update run with error node
-            self.run.write({
-                'error_node_id': node_id,
-            })
-            
+            if self.persist:
+                self.run.write({
+                    'error_node_id': node_id,
+                })
+
             raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
     
     def _route_outputs(self, node_id, result):

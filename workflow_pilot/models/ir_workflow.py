@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import copy
+from .workflow_executor import WorkflowExecutor
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
@@ -351,4 +353,76 @@ class Workflow(models.Model):
             'node_count_executed': run.node_count_executed,
             'execution_count': run.execution_count,
             'duration_seconds': run.duration_seconds,
+        }
+
+    def execute_preview(self, target_node_id=None, input_data=None, config_overrides=None, snapshot=None, max_iterations=None):
+        """Execute draft workflow until target node is reached (preview mode).
+
+        Args:
+            target_node_id: Node ID to stop after execution
+            input_data: Initial input data for workflow
+            config_overrides: Dict of nodeId -> config overrides
+            snapshot: Optional snapshot to execute (defaults to draft_snapshot)
+            max_iterations: Optional iteration limit
+
+        Returns:
+            dict with node_outputs, executed_order, execution_count, target_node_id
+        """
+        self.ensure_one()
+        self.check_access('read')
+
+        if not target_node_id:
+            raise UserError(_("Target node is required for preview execution."))
+
+        base_snapshot = snapshot or self.draft_snapshot or {}
+        if not base_snapshot.get('nodes'):
+            raise UserError(_("Draft workflow has no nodes."))
+
+        # Deep copy to avoid mutating stored snapshots
+        working_snapshot = copy.deepcopy(base_snapshot)
+
+        # Apply config overrides
+        if config_overrides:
+            if not isinstance(config_overrides, dict):
+                raise UserError(_("Invalid config overrides format."))
+            overrides = config_overrides
+            for node in working_snapshot.get('nodes', []):
+                node_id = node.get('id')
+                if node_id in overrides:
+                    existing = node.get('config') or {}
+                    override = overrides.get(node_id) or {}
+                    if not isinstance(override, dict):
+                        raise UserError(_("Invalid config override for node %s") % node_id)
+                    node['config'] = {**existing, **override}
+
+
+        executor = WorkflowExecutor(self.env, workflow_run=None, snapshot=working_snapshot, persist=False)
+        result = executor.execute_until(
+            target_node_id=target_node_id,
+            input_data=input_data or {},
+            max_iterations=max_iterations or 1000,
+        )
+
+        # Enrich node outputs with labels for UI mapping
+        labels_by_id = {}
+        for node in working_snapshot.get('nodes', []):
+            node_id = node.get('id')
+            labels_by_id[node_id] = node.get('label') or node.get('title') or node.get('type') or node_id
+
+        node_outputs = {}
+        for node_id, output in (result.get('node_outputs') or {}).items():
+            node_outputs[node_id] = {
+                'outputs': output.get('outputs'),
+                'json': output.get('json'),
+                'error': output.get('error'),
+                'meta': output.get('meta'),
+                'title': labels_by_id.get(node_id),
+            }
+
+        return {
+            'status': 'completed',
+            'target_node_id': result.get('target_node_id'),
+            'execution_count': result.get('execution_count'),
+            'executed_order': result.get('executed_order') or [],
+            'node_outputs': node_outputs,
         }

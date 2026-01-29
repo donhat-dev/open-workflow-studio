@@ -31,7 +31,7 @@ class WorkflowPilotController(http.Controller):
         Raises:
             UserError if workflow not found or not published
         """
-        payload = request.jsonrequest or {}
+        payload = request.httprequest.json or {}
         if workflow_id is None:
             workflow_id = payload.get('workflow_id')
         if input_data is None:
@@ -54,8 +54,8 @@ class WorkflowPilotController(http.Controller):
                 'error': str(e),
                 'status': 'failed',
             }
-    
-    @http.route('/workflow_pilot/run/<int:run_id>', type='json', auth='user', methods=['GET'])
+
+    @http.route('/workflow_pilot/run/<int:run_id>', type='json', auth='user', methods=['GET', 'POST'])
     def get_run(self, run_id):
         """Get workflow run details.
         
@@ -96,3 +96,62 @@ class WorkflowPilotController(http.Controller):
             'node_count_executed': run.node_count_executed,
             'node_results': node_results,
         }
+
+    @http.route('/workflow_pilot/execute_until', type='json', auth='user', methods=['POST'])
+    def execute_until(self, workflow_id=None, target_node_id=None, input_data=None, snapshot=None, config_overrides=None, **kwargs):
+        """Execute workflow until target node is reached (preview mode).
+
+        Args:
+            workflow_id: Database ID of workflow to execute
+            target_node_id: Node ID to stop after execution
+            input_data: Optional input data for workflow
+            snapshot: Optional snapshot to execute (defaults to draft)
+            config_overrides: Optional node config overrides
+
+        Returns:
+            dict with run_id, status, node_results
+        """
+        payload = request.httprequest.json or {}
+        if workflow_id is None:
+            workflow_id = payload.get('workflow_id')
+        if target_node_id is None:
+            target_node_id = payload.get('target_node_id')
+        if input_data is None:
+            input_data = payload.get('input_data', {})
+        if snapshot is None:
+            snapshot = payload.get('snapshot')
+        if config_overrides is None:
+            config_overrides = payload.get('config_overrides')
+
+        if workflow_id is None:
+            return {'error': 'Workflow ID is required'}
+        if not target_node_id:
+            return {'error': 'Target node ID is required'}
+
+        workflow_id = int(workflow_id)
+        workflow = request.env['ir.workflow'].browse(workflow_id)
+        if not workflow.exists():
+            return {'error': 'Workflow not found'}
+
+        try:
+            result = workflow.execute_preview(
+                target_node_id=target_node_id,
+                input_data=input_data or {},
+                config_overrides=config_overrides,
+                snapshot=snapshot,
+            )
+
+            return {
+                'status': 'completed',
+                'target_node_id': result.get('target_node_id'),
+                'execution_count': result.get('execution_count', 0),
+                'executed_order': result.get('executed_order', []),
+                'node_outputs': result.get('node_outputs') or {},
+                'input_data': input_data or {},
+            }
+        except Exception as e:
+            _logger.exception("Workflow preview execution failed")
+            return {
+                'status': 'failed',
+                'error': str(e),
+            }
