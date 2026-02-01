@@ -137,25 +137,25 @@
 									</div>
 								</t>
 							</t>
-							<!-- Output Tab -->
-							<t t-if="state.activeTab === 'output'">
-								<div class="node-config-section">
-									<div class="node-config-section-title">Execution Output</div>
-									<t t-if="state.executionResult">
-										<t t-if="state.executionResult.error">
-											<JsonTreeNode data="state.executionResult.error" path="[]" draggable="false"/>
-										</t>
-										<t t-else="">
-											<JsonTreeNode data="state.executionResult.output" path="[]" draggable="false"/>
-										</t>
+						<!-- Output Tab -->
+						<t t-if="state.activeTab === 'output'">
+							<div class="node-config-section">
+								<div class="node-config-section-title">Execution Output</div>
+								<t t-if="executionDisplayResult">
+									<t t-if="executionDisplayResult.error">
+										<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
 									</t>
 									<t t-else="">
-										<div class="input-data-empty">
-											<i class="fa fa-terminal"/>
-											<p>No output yet</p>
-											<span>Click Execute to run this node</span>
-										</div>
+										<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
 									</t>
+								</t>
+								<t t-else="">
+									<div class="input-data-empty">
+										<i class="fa fa-terminal"/>
+										<p>No output yet</p>
+										<span>Click Execute to run this node</span>
+									</div>
+								</t>
 								</div>
 							</t>
 							<!-- Settings Tab -->

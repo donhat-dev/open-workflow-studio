@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, reactive, onMounted, useEnv } from "@odoo/owl";
+import { Component, useRef, useState, useExternalListener, reactive, onMounted, onWillUnmount, useEnv } from "@odoo/owl";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
@@ -60,11 +60,23 @@ export class EditorCanvas extends Component {
                 $json: {},
                 $input: { item: null, json: null },
             }),
-            runUntilNode: async () => ({
-                output: null,
-                error: "Execution is disabled in editor mode",
-                expressionContext: emptyExpressionContext(),
-            }),
+            runUntilNode: async (workflow, nodeId, options = {}) => {
+                const configOverrides = options.controlValues
+                    ? { [nodeId]: options.controlValues }
+                    : null;
+                const result = await this.editor.actions.executeUntilNode(
+                    nodeId,
+                    {},
+                    configOverrides
+                );
+                return {
+                    output: null,
+                    error: result.error || null,
+                    expressionContext: this.editorState.execution?.contextSnapshot || null,
+                    nodeOutputs: result.node_outputs || {},
+                    executedOrder: result.executed_order || [],
+                };
+            },
             runNode: async () => ({
                 output: null,
                 error: "Execution is disabled in editor mode",
@@ -79,11 +91,6 @@ export class EditorCanvas extends Component {
             // Dimension configuration (reactive for runtime updates)
             dimensionConfig: this.props.dimensionConfig || {},
             // NodeMenu state - now in workflowEditor.state.ui.nodeMenu
-            // Hovered connection for toolbar
-            hoveredConnection: {
-                id: null,
-                midpoint: { x: 0, y: 0 },
-            },
             // Viewport tracking for culling - now handled by useViewport
             // Config panel state - now read from service via getter isConfigPanelOpen
         });
@@ -152,6 +159,9 @@ export class EditorCanvas extends Component {
                 // viewRect is already initialized in useViewport onMounted
             }
         });
+        onWillUnmount(() => {
+            this._resizeObserver.disconnect();
+        });
 
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
@@ -162,7 +172,8 @@ export class EditorCanvas extends Component {
         // - NodeMenu: onNodeSelected, onClose
         // - WorkflowNode: nodeActions (onDragStart, onExecute, onSocket*)
 
-        window.canvas = this;
+        this.isDebug = typeof odoo !== "undefined" && odoo.debug;
+        window.canvas = this.isDebug ? this : null;
     }
 
     // ========================================
@@ -182,6 +193,10 @@ export class EditorCanvas extends Component {
                 this.onToolbarHoverChange(isHovering);
             },
         };
+    }
+
+    get hoveredConnection() {
+        return this.editorState.ui.hoveredConnection;
     }
 
     /**
@@ -299,6 +314,10 @@ export class EditorCanvas extends Component {
             nodes: this.nodes,
             connections: this.connections,
         };
+    }
+
+    get executionState() {
+        return this.editorState.execution;
     }
 
     /**
@@ -822,26 +841,26 @@ export class EditorCanvas extends Component {
         }
 
         // Only update if connection changed (debounce rapid hovers)
-        if (this.state.hoveredConnection.id === conn.id) return;
+        if (this.editorState.ui.hoveredConnection.id === conn.id) return;
 
         const midpoint = this.getConnectionMidpoint(conn);
         const screenPos = this.getScreenPosition(midpoint.x, midpoint.y);
 
-        this.state.hoveredConnection = {
+        this.editor.actions.setHoveredConnection({
             id: conn.id,
-            midpoint: screenPos,      // Screen coords for fixed toolbar placement
-            canvasMidpoint: midpoint, // Original coords for node placement
-        };
+            midpoint: screenPos,
+            canvasMidpoint: midpoint,
+        });
     }
 
     /**
      * Handle connection hover - show toolbar (legacy, kept for compatibility)
      */
     onConnectionMouseEnter(connectionId, midpoint) {
-        this.state.hoveredConnection = {
+        this.editor.actions.setHoveredConnection({
             id: connectionId,
             midpoint,
-        };
+        });
     }
 
     /**
@@ -851,10 +870,7 @@ export class EditorCanvas extends Component {
         // Small delay to allow clicking on toolbar
         this._connectionHoverTimeout = setTimeout(() => {
             if (!this._isHoveringToolbar) {
-                this.state.hoveredConnection = {
-                    id: null,
-                    midpoint: { x: 0, y: 0 },
-                };
+                this.editor.actions.setHoveredConnection();
             }
         }, 100);
     }
@@ -865,10 +881,7 @@ export class EditorCanvas extends Component {
     onToolbarHoverChange(isHovering) {
         this._isHoveringToolbar = isHovering;
         if (!isHovering) {
-            this.state.hoveredConnection = {
-                id: null,
-                midpoint: { x: 0, y: 0 },
-            };
+            this.editor.actions.setHoveredConnection();
         }
     }
 
@@ -876,9 +889,9 @@ export class EditorCanvas extends Component {
      * Handle "Add Node" from connection toolbar
      */
     onConnectionAddNode(connectionId, position) {
-        // position here is the screen-relative midpoint from state.hoveredConnection.midpoint
+        // position here is the screen-relative midpoint from state.ui.hoveredConnection.midpoint
         // We use the stored canvasMidpoint for the actual node placement
-        let canvasPos = this.state.hoveredConnection.canvasMidpoint;
+        let canvasPos = this.editorState.ui.hoveredConnection.canvasMidpoint;
         if (!canvasPos) {
             const rect = this.rootRef.el.getBoundingClientRect();
             canvasPos = this.viewportHook.getCanvasPosition({
@@ -977,10 +990,7 @@ export class EditorCanvas extends Component {
      */
     removeConnectionById(connectionId) {
         this.editor.actions.removeConnection(connectionId);
-        this.state.hoveredConnection = {
-            id: null,
-            midpoint: { x: 0, y: 0 },
-        };
+        this.editor.actions.setHoveredConnection();
     }
 
     /**

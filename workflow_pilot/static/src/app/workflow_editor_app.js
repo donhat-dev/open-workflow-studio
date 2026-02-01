@@ -1,5 +1,7 @@
 /** @odoo-module **/
 import { Component, useState, onMounted, useSubEnv } from "@odoo/owl";
+import { useBus, useService } from "@web/core/utils/hooks";
+import { AlertDialog, ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useEditor } from "@workflow_pilot/store/use_editor";
 import { EditorCanvas } from "@workflow_pilot/components/editor_canvas";
 import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
@@ -17,6 +19,8 @@ export class WorkflowEditorApp extends Component {
     setup() {
         // Services (Fail-First - no optional chaining)
         this.editorService = useEditor();
+        this.notification = useService("notification");
+        this.dialog = useService("dialog");
         
         // State
         this.state = useState({
@@ -25,7 +29,6 @@ export class WorkflowEditorApp extends Component {
             publishing: false,
             executing: false,
             error: null,
-            showConflictModal: false
         });
         
         // Get workflow_id from props (try context.active_id first, then params)
@@ -50,6 +53,8 @@ export class WorkflowEditorApp extends Component {
                 workflowEditor: this.editorService,
             },
         });
+
+        useBus(this.editorService.bus, "save", () => this.save());
         
         // Load on mount
         onMounted(async () => {
@@ -71,14 +76,22 @@ export class WorkflowEditorApp extends Component {
         this.state.saving = true;
         try {
             await this.editorService.saveWorkflow();
-            console.log('Workflow saved successfully');
+            this.notification.add("Workflow saved.", { type: "success" });
         } catch (error) {
             // Check if conflict error (message contains "modified by another user")
             if (error.message && error.message.includes('modified by another user')) {
-                this.state.showConflictModal = true;
+                this.dialog.add(ConfirmationDialog, {
+                    title: "Workflow Conflict",
+                    body: "Workflow was modified by another user. Reload to see changes.",
+                    confirmLabel: "Reload",
+                    cancelLabel: "Cancel",
+                    confirm: () => this.reload(),
+                });
             } else {
-                // Other errors - show in error state
-                this.state.error = error.message || "Failed to save workflow";
+                this.dialog.add(AlertDialog, {
+                    title: "Save Failed",
+                    body: error.message || "Failed to save workflow",
+                });
             }
         } finally {
             this.state.saving = false;
@@ -92,9 +105,12 @@ export class WorkflowEditorApp extends Component {
         this.state.publishing = true;
         try {
             await this.editorService.publishWorkflow();
-            console.log('Workflow published successfully');
+            this.notification.add("Workflow published.", { type: "success" });
         } catch (error) {
-            this.state.error = error.message || "Failed to publish workflow";
+            this.dialog.add(AlertDialog, {
+                title: "Publish Failed",
+                body: error.message || "Failed to publish workflow",
+            });
         } finally {
             this.state.publishing = false;
         }
@@ -106,10 +122,22 @@ export class WorkflowEditorApp extends Component {
     async execute() {
         this.state.executing = true;
         try {
-            await this.editorService.executeWorkflow();
-            console.log('Workflow executed successfully');
+            const result = await this.editorService.executeWorkflow();
+            if (result.error){
+                return this.notification.add("Execution erorr: " + result.error, {
+                    type: "danger",
+                    sticky: false,
+                })
+            }
+            this.notification.add("Execution started.", {
+                type: "success",
+                sticky: false,
+            });
         } catch (error) {
-            this.state.error = error.message || "Failed to execute workflow";
+            this.dialog.add(AlertDialog, {
+                title: "Execution Failed",
+                body: error.message || "Failed to execute workflow",
+            });
         } finally {
             this.state.executing = false;
         }
@@ -122,10 +150,4 @@ export class WorkflowEditorApp extends Component {
         window.location.reload();
     }
     
-    /**
-     * Close conflict modal (user cancelled reload)
-     */
-    closeConflictModal() {
-        this.state.showConflictModal = false;
-    }
 }

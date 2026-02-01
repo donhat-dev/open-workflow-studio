@@ -1,0 +1,129 @@
+# -*- coding: utf-8 -*-
+
+"""
+Loop Node Runner
+
+Iterates over arrays following n8n SplitInBatches pattern (ADR-003).
+Maintains state across iterations via nodeContext.
+"""
+
+import logging
+
+from .base import BaseNodeRunner, ExpressionEvaluator
+
+_logger = logging.getLogger(__name__)
+
+
+class LoopNodeRunner(BaseNodeRunner):
+    """Loop node - iterates over arrays.
+    
+    Follows n8n SplitInBatches pattern):
+    - Maintains state in nodeContext (currentIndex, items, processedItems)
+    - Each iteration outputs to "loop" socket (index 1)
+    - On completion outputs to "done" socket (index 0)
+    
+    Config:
+        items: Expression that evaluates to array to iterate
+        batchSize: Number of items per iteration (default 1)
+        
+    Outputs:
+        [0]: Done - receives accumulated results when loop completes
+        [1]: Loop - receives current batch item(s) for processing
+    """
+    
+    node_type = 'loop'
+    
+    def execute(self, node_config, input_data, context):
+        node_id = context.get('current_node_id')
+        node_context = context.get('node_context', {})
+        loop_state = node_context.get(node_id, {})
+        
+        # Check if this is continuation of existing loop
+        if loop_state.get('initialized'):
+            # Continue loop - called from back-edge
+            return self._continue_loop(loop_state, input_data, context)
+        else:
+            # Initialize new loop
+            return self._init_loop(node_config, input_data, context, node_id)
+    
+    def _init_loop(self, node_config, input_data, context, node_id):
+        """Initialize a new loop iteration."""
+        # Build context for expression evaluation
+        eval_context = {
+            'json': input_data or {},
+            'node': context.get('node', {}),
+            'vars': context.get('vars', {}),
+        }
+        
+        # Get items to iterate
+        items_expr = node_config.get('inputItems', '{{json}}')
+        try:
+            items = ExpressionEvaluator.evaluate(items_expr, eval_context)
+        except Exception as e:
+            raise ValueError(f"Loop items expression failed: {e}")
+        
+        if not isinstance(items, (list, tuple)):
+            if items is None:
+                items = []
+            else:
+                items = [items]
+        
+        items = list(items)
+        batch_size = node_config.get('batchSize', 1) or 1
+        
+        # Initialize loop state
+        loop_state = {
+            'initialized': True,
+            'items': items,
+            'currentIndex': 0,
+            'batchSize': batch_size,
+            'processedItems': [],
+        }
+        
+        # Store in context
+        context.setdefault('node_context', {})[node_id] = loop_state
+        
+        # Check if empty loop
+        if not items:
+            return {
+                'outputs': [[], []],  # Both empty - no iteration needed
+                'json': [],
+            }
+        
+        # First iteration
+        return self._emit_batch(loop_state)
+    
+    def _continue_loop(self, loop_state, input_data, context):
+        """Continue loop with result from previous iteration."""
+        # Store processed result
+        if input_data is not None:
+            loop_state['processedItems'].append(input_data)
+        
+        # Advance index
+        loop_state['currentIndex'] += loop_state['batchSize']
+        
+        # Check if done
+        if loop_state['currentIndex'] >= len(loop_state['items']):
+            # Loop complete - output accumulated results
+            results = loop_state['processedItems']
+            return {
+                'outputs': [[results], []],  # Done socket gets results
+                'json': results,
+            }
+        
+        # Continue iteration
+        return self._emit_batch(loop_state)
+    
+    def _emit_batch(self, loop_state):
+        """Emit next batch to loop output."""
+        start = loop_state['currentIndex']
+        end = start + (loop_state['batchSize'] or 1)
+        batch = loop_state['items'][start:end]
+        
+        # Single item if batch size is 1
+        output_data = batch[0] if len(batch) == 1 else batch
+        
+        return {
+            'outputs': [[], [output_data]],  # Loop socket gets current batch
+            'json': output_data,
+        }

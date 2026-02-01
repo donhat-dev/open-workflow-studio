@@ -11,7 +11,10 @@
         'security/groups.xml',
         'security/ir.model.access.csv',
         'data/data.xml',
+        'data/workflow_type_data.xml',
         'views/ir_workflow_views.xml',
+        'views/workflow_type_views.xml',
+        'views/workflow_run_views.xml',
     ],
     'assets': {
         # Core libs bundle - can be lazy-loaded or included separately

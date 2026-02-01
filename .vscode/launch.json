@@ -2,19 +2,24 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Odoo: run (addons + workspace)",
+      "name": "hrm",
       "type": "debugpy",
       "request": "launch",
-      "program": "/Users/longnhatdophuong/Documents/18EE-NS/odoo-bin",
-      "cwd": "/Users/longnhatdophuong/Documents/18EE-NS",
+      "program": "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS\\odoo-bin",
+      "python": "C:\\Users\\ODOO\\Documents\\.venv18\\Scripts\\python.exe",
       "console": "integratedTerminal",
-      "justMyCode": false,
       "args": [
         "-c",
-        "/Users/longnhatdophuong/Documents/18EE-NS/odoo.conf",
-        "--addons-path=/Users/longnhatdophuong/Documents/18EE-NS/odoo/addons,${workspaceFolder}",
-        "--dev=xml",
+        "C:\\Users\\ODOO\\Documents\\GitHub\\hrm-odoo\\.github\\odoo.conf",
+        "--dev",
+        "xml",
+        "-d",
+        "hrm_pro_18"
       ],
+      "env": {
+        "JWT_EXPIRE_TIME": "999999"
+      },
+      "justMyCode": true
     }
   ]
 }

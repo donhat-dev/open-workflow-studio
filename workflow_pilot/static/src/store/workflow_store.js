@@ -35,7 +35,11 @@ const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
     viewport: { pan: { x: 0, y: 0 }, zoom: 1 },
     panels: { configOpen: false, configNodeId: null, menuOpen: false },
-    hoveredConnection: null,
+    hoveredConnection: {
+        id: null,
+        midpoint: { x: 0, y: 0 },
+        canvasMidpoint: null,
+    },
     history: { canUndo: false, canRedo: false },
     // NodeMenu state (source of truth)
     nodeMenu: {
@@ -65,6 +69,7 @@ export const workflowEditorService = {
                 return adapter.state;
             },
             ui: DEFAULT_UI_STATE(),
+            execution: null,
         });
 
         // Keep reactive history flags in sync for future toolbar bindings.
@@ -75,13 +80,20 @@ export const workflowEditorService = {
         // ===============
         // Helper selectors (with null checks for safety)
         // ===============
-        const getNode = (nodeId) => state.graph?.nodes?.find((n) => n.id === nodeId) || null;
-        const getConnection = (connId) => state.graph?.connections?.find((c) => c.id === connId) || null;
+        const getNode = (nodeId) => state.graph.nodes.find((n) => n.id === nodeId) || null;
+        const getConnection = (connId) =>
+            state.graph.connections.find((c) => c.id === connId) || null;
 
         // ===============
         // Actions (graph via adapter, UI local)
         // ===============
         const actions = {
+            setExecutionResult(result) {
+                state.execution = result;
+            },
+            clearExecution() {
+                state.execution = null;
+            },
             addNode(type, position) {
                 const nodeId = adapter.addNode(type, position);
                 if (!nodeId) return null;
@@ -247,10 +259,20 @@ export const workflowEditorService = {
                 }
             },
 
-            setHoveredConnection(connId, midpoint) {
-                state.ui.hoveredConnection = connId
-                    ? { id: connId, midpoint: midpoint || null }
-                    : null;
+            setHoveredConnection({ id = null, midpoint = null, canvasMidpoint = null } = {}) {
+                if (!id) {
+                    state.ui.hoveredConnection = {
+                        id: null,
+                        midpoint: { x: 0, y: 0 },
+                        canvasMidpoint: null,
+                    };
+                    return;
+                }
+                state.ui.hoveredConnection = {
+                    id,
+                    midpoint: midpoint || { x: 0, y: 0 },
+                    canvasMidpoint: canvasMidpoint || null,
+                };
             },
 
             /**
@@ -421,6 +443,115 @@ export const workflowEditorService = {
                     workflow_id: workflowId,
                     input_data: inputData,
                 });
+                if (result && result.run_id) {
+                    const run = await rpc(`/workflow_pilot/run/${result.run_id}`, {});
+                    if (run && run.error) {
+                        actions.setExecutionResult({
+                            runId: result.run_id,
+                            status: result.status || 'failed',
+                            error: run.error || result.error || 'Failed to load run details',
+                            errorNodeId: null,
+                            outputData: null,
+                            executedOrder: [],
+                            executionCount: null,
+                            inputData: inputData || {},
+                            nodeResults: [],
+                            updatedAt: new Date().toISOString(),
+                        });
+                        return result;
+                    }
+                    actions.setExecutionResult({
+                        runId: run.id,
+                        status: run.status || result.status || 'completed',
+                        error: run.error_message || result.error || null,
+                        errorNodeId: run.error_node_id || null,
+                        outputData: run.output_data || null,
+                        executedOrder: run.executed_order || [],
+                        executionCount: run.execution_count || null,
+                        inputData: run.input_data || inputData || {},
+                        nodeResults: run.node_results || [],
+                        updatedAt: new Date().toISOString(),
+                    });
+                } else if (result && result.error) {
+                    actions.setExecutionResult({
+                        runId: null,
+                        status: result.status || 'failed',
+                        error: result.error,
+                        errorNodeId: null,
+                        outputData: null,
+                        executedOrder: [],
+                        executionCount: null,
+                        inputData: inputData || {},
+                        nodeResults: [],
+                        updatedAt: new Date().toISOString(),
+                    });
+                }
+                return result;
+            },
+            async executeUntilNode(targetNodeId, inputData = {}, configOverrides = null) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                if (!targetNodeId) {
+                    throw new Error('Target node ID is required');
+                }
+                const result = await rpc('/workflow_pilot/execute_until', {
+                    workflow_id: workflowId,
+                    target_node_id: targetNodeId,
+                    input_data: inputData,
+                    snapshot: adapter.toJSON(),
+                    config_overrides: configOverrides,
+                });
+                if (result && result.status === 'completed') {
+                    const nodeOutputs = result.node_outputs || {};
+                    const executedOrder = result.executed_order || [];
+                    const nodeResults = executedOrder.length
+                        ? executedOrder.map((nodeId) => {
+                            const output = nodeOutputs[nodeId] || {};
+                            return {
+                                node_id: nodeId,
+                                output_data: output.json,
+                                error_message: output.error || null,
+                                title: output.title,
+                                meta: output.meta || null,
+                            };
+                        })
+                        : Object.entries(nodeOutputs).map(([nodeId, output]) => ({
+                            node_id: nodeId,
+                            output_data: output.json,
+                            error_message: output.error || null,
+                            title: output.title,
+                            meta: output.meta || null,
+                        }));
+
+                    actions.setExecutionResult({
+                        runId: null,
+                        status: 'completed',
+                        error: null,
+                        errorNodeId: null,
+                        outputData: null,
+                        executedOrder,
+                        executionCount: result.execution_count || null,
+                        inputData: inputData || {},
+                        nodeResults,
+                        nodeOutputs,
+                        contextSnapshot: result.context_snapshot || null,
+                        updatedAt: new Date().toISOString(),
+                    });
+                } else if (result && result.status === 'failed') {
+                    actions.setExecutionResult({
+                        runId: null,
+                        status: 'failed',
+                        error: result.error || 'Execution failed',
+                        errorNodeId: null,
+                        outputData: null,
+                        executedOrder: [],
+                        executionCount: result.execution_count || null,
+                        inputData: inputData || {},
+                        nodeResults: [],
+                        updatedAt: new Date().toISOString(),
+                    });
+                }
                 return result;
             },
             getWorkflowId() {

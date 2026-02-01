@@ -61,26 +61,6 @@
                     <EditorCanvas />
                 </div>
             </t>
-            
-            <!-- Conflict modal (overlay) -->
-            <t t-if="state.showConflictModal">
-                <div class="modal-backdrop" t-on-click="closeConflictModal">
-                    <div class="modal-dialog" t-on-click.stop="">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h3>Workflow Conflict</h3>
-                            </div>
-                            <div class="modal-body">
-                                <p>Workflow was modified by another user. Please reload to see changes.</p>
-                            </div>
-                            <div class="modal-footer">
-                                <button class="btn btn-primary" t-on-click="reload">Reload</button>
-                                <button class="btn btn-secondary" t-on-click="closeConflictModal">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </t>
         </div>
     </t>
 </templates>

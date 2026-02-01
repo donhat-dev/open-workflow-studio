@@ -343,17 +343,27 @@ class Workflow(models.Model):
         from .workflow_executor import WorkflowExecutor
         
         executor = WorkflowExecutor(self.env, run)
-        output_data = executor.execute(input_data)
-        
-        return {
-            'run_id': run.id,
-            'run_name': run.name,
-            'status': run.status,
-            'output_data': output_data,
-            'node_count_executed': run.node_count_executed,
-            'execution_count': run.execution_count,
-            'duration_seconds': run.duration_seconds,
-        }
+        try:
+            output_data = executor.execute(input_data)
+            return {
+                'run_id': run.id,
+                'run_name': run.name,
+                'status': run.status,
+                'output_data': output_data,
+                'node_count_executed': run.node_count_executed,
+                'execution_count': run.execution_count,
+                'duration_seconds': run.duration_seconds,
+            }
+        except Exception as e:
+            return {
+                'run_id': run.id,
+                'run_name': run.name,
+                'status': 'failed',
+                'error': str(e),
+                'node_count_executed': run.node_count_executed,
+                'execution_count': run.execution_count,
+                'duration_seconds': run.duration_seconds,
+            }
 
     def execute_preview(self, target_node_id=None, input_data=None, config_overrides=None, snapshot=None, max_iterations=None):
         """Execute draft workflow until target node is reached (preview mode).

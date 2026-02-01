@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted } from "@odoo/owl";
+import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 
@@ -22,6 +22,7 @@ export class NodeConfigPanel extends Component {
         onClose: { type: Function },
         onSave: { type: Function },
         onExecute: { type: Function, optional: true },  // Callback after node execution
+        execution: { type: Object, optional: true },
     };
 
     setup() {
@@ -57,13 +58,32 @@ export class NodeConfigPanel extends Component {
         onMounted(() => {
             this.initControlValues();
         });
+
+        onWillUpdateProps((nextProps) => {
+            if (nextProps.node.id !== this.props.node.id) {
+                this.state.activeTab = "parameters";
+                this.state.isDirty = false;
+                this.state.controlValues = {};
+                this.state.controls = [];
+                this.state.controlModes = {};
+                this.state.pairModes = {};
+                this.state.lastExecutionContext = null;
+                this.state.isExecuting = false;
+                this.state.executionResult = null;
+                this.initControlValues(nextProps.node);
+            }
+        });
     }
 
     /**
      * Initialize control values from Core layer via adapterService
      */
-    initControlValues() {
-        const nodeId = this.props.node.id;
+    initControlValues(node) {
+        const targetNode = node || this.props.node;
+        if (!targetNode) {
+            throw new Error("[NodeConfigPanel] Missing node for initialization");
+        }
+        const nodeId = targetNode.id;
 
         // Get control metadata from adapter (includes current values)
         if (!this.actions.getControls) {
@@ -169,14 +189,31 @@ export class NodeConfigPanel extends Component {
 
     get executionStatus() {
         if (this.state.isExecuting) return 'running';
-        if (!this.state.executionResult) return 'idle';
-        if (this.state.executionResult.error) return 'error';
+        if (this.state.executionResult) {
+            if (this.state.executionResult.error) return 'error';
+            return 'success';
+        }
+        const execution = this.props.execution;
+        if (execution && execution.status === 'failed') return 'error';
+        const runResult = this.executionNodeResult;
+        if (!runResult) return 'idle';
+        if (runResult.error_message) return 'error';
         return 'success';
     }
 
     get executionStatusLabel() {
         const result = this.state.executionResult;
-        if (!result) return '';
+        if (!result) {
+            const execution = this.props.execution;
+            if (execution && execution.status === 'failed') {
+                return `Error: ${execution.error || 'Execution failed'}`;
+            }
+            const runResult = this.executionNodeResult;
+            if (runResult?.error_message) {
+                return `Error: ${runResult.error_message}`;
+            }
+            return '';
+        }
 
         if (result.error) return `Error: ${result.error}`;
 
@@ -188,8 +225,20 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionOutputJson() {
-        if (!this.state.executionResult?.output) return '';
-        return JSON.stringify(this.state.executionResult.output, null, 2);
+        if (this.state.executionResult?.output) {
+            return JSON.stringify(this.state.executionResult.output, null, 2);
+        }
+        const runResult = this.executionNodeResult;
+        if (!runResult || runResult.output_data === undefined) return '';
+        return JSON.stringify(runResult.output_data, null, 2);
+    }
+
+    get executionNodeResult() {
+        const execution = this.props.execution;
+        if (!execution || !Array.isArray(execution.nodeResults)) {
+            return null;
+        }
+        return execution.nodeResults.find((result) => result.node_id === this.props.node.id) || null;
     }
 
     /**
@@ -198,6 +247,18 @@ export class NodeConfigPanel extends Component {
      * Returns array with isInputNode marker for expression prefix handling
      */
     get leftPanelData() {
+        const execution = this.props.execution;
+        if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
+            return execution.nodeResults.map((result, index) => ({
+                nodeId: result.node_id,
+                data: {
+                    json: result.output_data,
+                    title: result.title || result.node_label || result.node_type || result.node_id,
+                },
+                isInputNode: index === 0,
+            }));
+        }
+
         const workflow = this._getWorkflowFromContext();
         if (!workflow) return null;
 
@@ -217,9 +278,33 @@ export class NodeConfigPanel extends Component {
         // Return array with isInputNode marker (first node = $input)
         return entries.map(([nodeId, data], index) => ({
             nodeId,
-            data,
+            data: {
+                json: data,
+                title: nodeId,
+            },
             isInputNode: index === 0,
         }));
+    }
+
+    get executionDisplayResult() {
+        if (this.state.executionResult) {
+            return {
+                error: this.state.executionResult.error,
+                output: this.state.executionResult.output,
+            };
+        }
+        const runResult = this.executionNodeResult;
+        if (!runResult) return null;
+        if (runResult.error_message) {
+            return {
+                error: runResult.error_message,
+                output: null,
+            };
+        }
+        return {
+            error: null,
+            output: runResult.output_data,
+        };
     }
 
     /**
@@ -241,6 +326,13 @@ export class NodeConfigPanel extends Component {
      * Get input data for expression preview (immediate previous node)
      */
     get inputData() {
+        const execution = this.props.execution;
+        if (execution) {
+            const runResult = this.executionNodeResult;
+            if (runResult && runResult.output_data !== undefined) {
+                return runResult.output_data;
+            }
+        }
         const workflow = this._getWorkflowFromContext();
         if (!workflow) {
             // Fallback to execution result for single-node preview
@@ -251,10 +343,10 @@ export class NodeConfigPanel extends Component {
             return result.output;
         }
 
-        const context = this.executorService.buildContextForNode(
-            workflow,
-            this.props.node.id
-        );
+        if (!this.actions.buildContextForNode) {
+            throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
+        }
+        const context = this.actions.buildContextForNode(workflow, this.props.node.id);
         return context.$json;
     }
 
@@ -279,6 +371,23 @@ export class NodeConfigPanel extends Component {
                 // For UX, treat $json as the current input item
                 $json: inputJson,
                 $input: snap.$input || { item: inputJson, json: inputJson },
+            };
+        }
+
+        const execution = this.props.execution;
+        if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
+            const nodeMap = {};
+            for (const result of execution.nodeResults) {
+                nodeMap[result.node_id] = result.output_data;
+            }
+            const runResult = this.executionNodeResult;
+            const json = runResult?.output_data || {};
+            return {
+                $vars: {},
+                $loop: null,
+                $node: nodeMap,
+                $json: json,
+                $input: { item: json, json },
             };
         }
 
@@ -450,9 +559,8 @@ export class NodeConfigPanel extends Component {
                         console.log(`[NodeConfigPanel] Node ${executedNodeId} executed`);
                     }
                 });
-
-                this.state.executionResult = result;
-                this.state.lastExecutionContext = result?.expressionContext || null;
+                this.state.executionResult = null;
+                this.state.lastExecutionContext = null;
             } else {
                 result = await this.actions.runNode(nodeId, {});
                 this.state.executionResult = result;

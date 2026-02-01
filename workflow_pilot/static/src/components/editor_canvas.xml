@@ -70,11 +70,11 @@
 				<!-- Fixed-size overlays (independent of zoom/pan) -->
 				<div class="workflow-editor-canvas__overlays">
 					<!-- Connection Toolbar (on hover) -->
-					<ConnectionToolbar t-if="state.hoveredConnection.id" position="state.hoveredConnection.midpoint" connectionId="state.hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
+					<ConnectionToolbar t-if="hoveredConnection.id" position="hoveredConnection.midpoint" connectionId="hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
 					<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
 					<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 					<!-- Node Config Panel -->
-					<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
+					<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionState" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 				</div>
 			</div>
 		</div>

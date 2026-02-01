@@ -6,7 +6,7 @@ Workflow Executor - Backend Execution Engine
 Stack-based execution following ADR-001 pattern.
 Implements synchronous execution with partial result persistence.
 
-Node Runners:
+Node Runners are imported from the runners package:
     - HttpNodeRunner: HTTP requests via requests library
     - IfNodeRunner: Conditional branching
     - LoopNodeRunner: Array iteration with back-edge pattern
@@ -15,417 +15,22 @@ Expression Evaluation:
     Translates n8n-style $json.field to Python json['field'] for safe_eval.
 """
 
-import re
-import json
 import logging
-import requests
+from copy import deepcopy
 from datetime import datetime
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
-from odoo.tools.safe_eval import safe_eval, test_python_expr
+
+from .runners import (
+    BaseNodeRunner,
+    ExpressionEvaluator,
+    HttpNodeRunner,
+    IfNodeRunner,
+    LoopNodeRunner,
+)
 
 _logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# EXPRESSION EVALUATOR
-# =============================================================================
-
-class ExpressionEvaluator:
-    """Evaluates n8n-style expressions using safe_eval.
-    
-    Translates:
-        $json.field → json['field']
-        $json.items[0].name → json['items'][0]['name']
-        $node.Http.data → node['Http']['data']
-        $vars.count → vars['count']
-        json.field → json['field'] (bare namespace, no $)
-        json.items[0].name → json['items'][0]['name'] (bare namespace)
-    """
-    
-    # Pattern to match $namespace.path expressions (with $ prefix)
-    NAMESPACE_PATTERN = re.compile(r'\$(\w+)((?:\.\w+|\[\d+\])*)')
-    
-    # Pattern to match bare namespace.path expressions (without $ prefix)
-    # Matches: json.field, node.Http, vars.count, etc.
-    BARE_NAMESPACE_PATTERN = re.compile(r'\b(json|node|vars)((?:\.\w+|\[\d+\])+)')
-    
-    @classmethod
-    def translate_expression(cls, expr):
-        """Translate n8n expression to Python expression.
-        
-        Supports both:
-        - $json.items[0].name → json['items'][0]['name']
-        - json.items[0].name → json['items'][0]['name']
-        
-        Args:
-            expr: Expression string, e.g., "$json.items[0].name" or "json.items[0].name"
-            
-        Returns:
-            Python expression string, e.g., "json['items'][0]['name']"
-        """
-        if not isinstance(expr, str):
-            return expr
-            
-        def replace_namespace(match):
-            """Helper to convert namespace.path to namespace['path']."""
-            namespace = match.group(1)  # json, node, vars, etc.
-            path = match.group(2)       # .field.subfield[0]
-            
-            # Build Python path
-            result = namespace
-            if path:
-                # Split by dots and brackets
-                parts = re.split(r'\.(?![^\[]*\])', path.lstrip('.'))
-                for part in parts:
-                    if not part:
-                        continue
-                    # Handle array access like items[0]
-                    bracket_match = re.match(r'(\w+)(\[\d+\])?', part)
-                    if bracket_match:
-                        field = bracket_match.group(1)
-                        index = bracket_match.group(2) or ''
-                        result += f"['{field}']{index}"
-            
-            return result
-        
-        # First translate $namespace.path (with $ prefix)
-        result = cls.NAMESPACE_PATTERN.sub(replace_namespace, expr)
-        
-        # Then translate bare namespace.path (without $ prefix)
-        # This handles json.field, node.Http, vars.count, etc.
-        result = cls.BARE_NAMESPACE_PATTERN.sub(replace_namespace, result)
-        
-        return result
-    
-    @classmethod
-    def evaluate(cls, expr, context):
-        """Evaluate expression with given context.
-        
-        Supports both syntaxes:
-        - $json.field (n8n-style with $ prefix)
-        - json.field (bare namespace without $ prefix)
-        
-        Args:
-            expr: Expression string (n8n or Python style)
-            context: Dict with json, node, vars, etc.
-            
-        Returns:
-            Evaluated result
-            
-        Raises:
-            ValueError: If expression evaluation fails
-        """
-        if not isinstance(expr, str):
-            return expr
-            
-        # Check for template syntax {{ ... }}
-        template_pattern = re.compile(r'\{\{(.+?)\}\}')
-        if template_pattern.search(expr):
-            # String interpolation mode
-            def replace_template(match):
-                inner_expr = match.group(1).strip()
-                translated = cls.translate_expression(inner_expr)
-                try:
-                    result = safe_eval(translated, context, mode='eval')
-                    return str(result) if result is not None else ''
-                except Exception as e:
-                    _logger.warning(f"Expression evaluation failed: {inner_expr} -> {e}")
-                    return ''
-            
-            return template_pattern.sub(replace_template, expr)
-        
-        # Return as-is if not an explicit template expression
-        return expr
-
-
-# =============================================================================
-# NODE RUNNERS
-# =============================================================================
-
-class BaseNodeRunner:
-    """Base class for node execution."""
-    
-    node_type = None
-    
-    def __init__(self, executor):
-        self.executor = executor
-        
-    def execute(self, node_config, input_data, context):
-        """Execute node and return outputs.
-        
-        Args:
-            node_config: Node configuration dict
-            input_data: Input data from previous node
-            context: Execution context with json, node, vars
-            
-        Returns:
-            dict with 'outputs' (2D array) and 'json' (first output item)
-        """
-        raise NotImplementedError
-
-
-class HttpNodeRunner(BaseNodeRunner):
-    """HTTP Request node runner.
-    
-    Config:
-        url: Request URL (supports expressions)
-        method: HTTP method (GET, POST, PUT, DELETE, PATCH)
-        headers: Dict of headers
-        body: Request body (for POST/PUT/PATCH)
-        timeout: Request timeout in seconds (default 30)
-    """
-    
-    node_type = 'http'
-    DEFAULT_TIMEOUT = 30
-    MAX_RESPONSE_SIZE = 1024 * 1024  # 1MB
-    
-    def execute(self, node_config, input_data, context):
-        # Build context for expression evaluation
-        eval_context = {
-            'json': input_data or {},
-            'node': context.get('node', {}),
-            'vars': context.get('vars', {}),
-        }
-        
-        # Evaluate URL
-        url = node_config.get('url', '')
-        url = ExpressionEvaluator.evaluate(url, eval_context)
-        
-        if not url:
-            raise ValueError("HTTP node requires a URL")
-        
-        # Get method
-        method = node_config.get('method', 'GET').upper()
-        
-        # Evaluate headers
-        headers = node_config.get('headers', [])
-        headers_dict = {}
-        for h in headers:
-            key = h.get('key')
-            value = h.get('value', '')
-            headers_dict[key] = value
-        evaluated_headers = {}
-        for key, value in headers_dict.items():
-            if not key:
-                continue
-            evaluated_headers[key] = ExpressionEvaluator.evaluate(value, eval_context)
-        
-        # Evaluate body for methods that support it
-        body = None
-        if method in ('POST', 'PUT', 'PATCH'):
-            body_config = node_config.get('body', {})
-            if isinstance(body_config, str):
-                body = ExpressionEvaluator.evaluate(body_config, eval_context)
-            elif isinstance(body_config, dict):
-                # Evaluate each field
-                body = {}
-                for key, value in body_config.items():
-                    body[key] = ExpressionEvaluator.evaluate(value, eval_context)
-        
-        # Get timeout
-        timeout = node_config.get('timeout', self.DEFAULT_TIMEOUT)
-        
-        # Make request
-        try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=evaluated_headers,
-                json=body if isinstance(body, dict) else None,
-                data=body if isinstance(body, str) else None,
-                timeout=timeout,
-            )
-            
-            # Parse response
-            try:
-                response_data = response.json()
-            except ValueError:
-                # Non-JSON response
-                content = response.text
-                if len(content) > self.MAX_RESPONSE_SIZE:
-                    content = content[:self.MAX_RESPONSE_SIZE]
-                    _logger.warning(f"HTTP response truncated to {self.MAX_RESPONSE_SIZE} bytes")
-                response_data = {'body': content, 'text': True}
-            
-            result = {
-                'data': response_data,
-                'status': response.status_code,
-                'headers': dict(response.headers),
-            }
-            
-            # Check for error status codes
-            if not response.ok:
-                raise ValueError(f"HTTP {response.status_code}: {response.reason}")
-            
-            return {
-                'outputs': [[result]],
-                'json': result,
-            }
-            
-        except requests.RequestException as e:
-            raise ValueError(f"HTTP request failed: {str(e)}")
-
-
-class IfNodeRunner(BaseNodeRunner):
-    """IF conditional branching node.
-    
-    Config:
-        condition: Expression that evaluates to truthy/falsy
-        
-    Outputs:
-        [0]: True branch - receives input if condition is truthy
-        [1]: False branch - receives input if condition is falsy
-    """
-    
-    node_type = 'if'
-    
-    def execute(self, node_config, input_data, context):
-        # Build context for expression evaluation
-        eval_context = {
-            'json': input_data or {},
-            'node': context.get('node', {}),
-            'vars': context.get('vars', {}),
-        }
-        
-        # Evaluate condition
-        condition_expr = node_config.get('condition', 'false')
-        
-        try:
-            condition_result = ExpressionEvaluator.evaluate(condition_expr, eval_context)
-        except Exception as e:
-            _logger.warning(f"IF condition evaluation failed: {e}, treating as false")
-            condition_result = False
-        
-        # Route to appropriate branch
-        if condition_result:
-            return {
-                'outputs': [[input_data], []],  # True branch gets data, false empty
-                'json': input_data,
-                'branch': 'true',
-            }
-        else:
-            return {
-                'outputs': [[], [input_data]],  # False branch gets data, true empty
-                'json': input_data,
-                'branch': 'false',
-            }
-
-
-class LoopNodeRunner(BaseNodeRunner):
-    """Loop node - iterates over arrays.
-    
-    Follows n8n SplitInBatches pattern (ADR-003):
-    - Maintains state in nodeContext (currentIndex, items, processedItems)
-    - Each iteration outputs to "loop" socket (index 1)
-    - On completion outputs to "done" socket (index 0)
-    
-    Config:
-        items: Expression that evaluates to array to iterate
-        batchSize: Number of items per iteration (default 1)
-        
-    Outputs:
-        [0]: Done - receives accumulated results when loop completes
-        [1]: Loop - receives current batch item(s) for processing
-    """
-    
-    node_type = 'loop'
-    
-    def execute(self, node_config, input_data, context):
-        node_id = context.get('current_node_id')
-        node_context = context.get('node_context', {})
-        loop_state = node_context.get(node_id, {})
-        
-        # Check if this is continuation of existing loop
-        if loop_state.get('initialized'):
-            # Continue loop - called from back-edge
-            return self._continue_loop(loop_state, input_data, context)
-        else:
-            # Initialize new loop
-            return self._init_loop(node_config, input_data, context, node_id)
-    
-    def _init_loop(self, node_config, input_data, context, node_id):
-        """Initialize a new loop iteration."""
-        # Build context for expression evaluation
-        eval_context = {
-            'json': input_data or {},
-            'node': context.get('node', {}),
-            'vars': context.get('vars', {}),
-        }
-        
-        # Get items to iterate
-        items_expr = node_config.get('items', '$json')
-        try:
-            items = ExpressionEvaluator.evaluate(items_expr, eval_context)
-        except Exception as e:
-            raise ValueError(f"Loop items expression failed: {e}")
-        
-        if not isinstance(items, (list, tuple)):
-            if items is None:
-                items = []
-            else:
-                items = [items]
-        
-        items = list(items)
-        batch_size = node_config.get('batchSize', 1)
-        
-        # Initialize loop state
-        loop_state = {
-            'initialized': True,
-            'items': items,
-            'currentIndex': 0,
-            'batchSize': batch_size,
-            'processedItems': [],
-        }
-        
-        # Store in context
-        context.setdefault('node_context', {})[node_id] = loop_state
-        
-        # Check if empty loop
-        if not items:
-            return {
-                'outputs': [[], []],  # Both empty - no iteration needed
-                'json': [],
-            }
-        
-        # First iteration
-        return self._emit_batch(loop_state)
-    
-    def _continue_loop(self, loop_state, input_data, context):
-        """Continue loop with result from previous iteration."""
-        # Store processed result
-        if input_data is not None:
-            loop_state['processedItems'].append(input_data)
-        
-        # Advance index
-        loop_state['currentIndex'] += loop_state['batchSize']
-        
-        # Check if done
-        if loop_state['currentIndex'] >= len(loop_state['items']):
-            # Loop complete - output accumulated results
-            results = loop_state['processedItems']
-            return {
-                'outputs': [[results], []],  # Done socket gets results
-                'json': results,
-            }
-        
-        # Continue iteration
-        return self._emit_batch(loop_state)
-    
-    def _emit_batch(self, loop_state):
-        """Emit next batch to loop output."""
-        start = loop_state['currentIndex']
-        end = start + loop_state['batchSize']
-        batch = loop_state['items'][start:end]
-        
-        # Single item if batch size is 1
-        output_data = batch[0] if len(batch) == 1 else batch
-        
-        return {
-            'outputs': [[], [output_data]],  # Loop socket gets current batch
-            'json': output_data,
-        }
 
 
 # =============================================================================
@@ -607,6 +212,8 @@ class WorkflowExecutor:
 
         # Execute until target node or stack empty
         iteration = 0
+        target_reached = False
+        target_result = None
         while self.stack and iteration < max_iterations:
             iteration += 1
             entry = self.stack.pop()
@@ -622,6 +229,8 @@ class WorkflowExecutor:
 
             # Stop after target node executes
             if node_id == target_node_id:
+                target_reached = True
+                target_result = result
                 break
 
             # Route outputs to connected nodes
@@ -630,11 +239,15 @@ class WorkflowExecutor:
         if iteration >= max_iterations:
             raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
 
+        if not target_reached:
+            raise UserError(_("Target node %s was not reached") % target_node_id)
+
         return {
             'node_outputs': self.node_outputs,
             'executed_order': self.executed_order,
             'execution_count': iteration,
             'target_node_id': target_node_id,
+            'context_snapshot': self._build_context_snapshot(target_node_id, target_result),
         }
     
     def _find_start_nodes(self):
@@ -900,3 +513,21 @@ class WorkflowExecutor:
         if len(final_outputs) == 1:
             return list(final_outputs.values())[0]
         return final_outputs
+
+    def _build_context_snapshot(self, target_node_id, target_result):
+        """Build context snapshot at target node execution."""
+        target_json = None
+        if target_result:
+            target_json = target_result.get('json')
+
+        node_json_snapshot = {
+            node_id: output.get('json')
+            for node_id, output in self.node_outputs.items()
+        }
+
+        return {
+            'json': target_json,
+            'node': node_json_snapshot,
+            'vars': deepcopy(self.vars),
+            'node_context': deepcopy(self.node_context),
+        }

@@ -16,7 +16,7 @@
  * @odoo-dependency - Uses useEditor hook for workflowEditor service
  */
 
-import { Component, xml, useState, useRef, onMounted, onWillUnmount } from "@odoo/owl";
+import { Component, xml, useState, useRef, onMounted, useExternalListener } from "@odoo/owl";
 import { useEditor } from "@workflow_pilot/store/use_editor";
 import { MotionHelpers } from "@workflow_pilot/utils/motion_helpers";
 import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
@@ -107,12 +107,8 @@ export class NodeMenu extends Component {
                 throw new Error("[NodeMenu] Missing search input ref element");
             }
             inputEl.focus();
-            document.addEventListener("mousedown", this._onClickOutside);
         });
-
-        onWillUnmount(() => {
-            document.removeEventListener("mousedown", this._onClickOutside);
-        });
+        useExternalListener(document, "mousedown", this._onClickOutside);
     }
 
     isFontAwesome(icon) {
