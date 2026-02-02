@@ -18,8 +18,8 @@ Expression Evaluation:
 import logging
 import re
 from copy import deepcopy
-from datetime import datetime
-
+from datetime import datetime, date
+import json
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -35,6 +35,9 @@ from .runners import (
     CodeNodeRunner,
     SwitchNodeRunner,
 )
+from .context_objects import to_plain, wrap_mutable, wrap_readonly
+from .security.safe_env_proxy import SafeEnvProxy
+from .security.secret_broker import SecretBrokerFactory
 
 _logger = logging.getLogger(__name__)
 
@@ -172,17 +175,18 @@ class WorkflowExecutor:
                 raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
             
             # Complete run
-            output_data = self._collect_final_output()
+            output_data_raw = self._collect_final_output()
+            output_data_display = self._mask_sensitive_data(output_data_raw)
             if self.persist:
                 self.run.write({
                     'status': 'completed',
                     'completed_at': fields.Datetime.now(),
-                    'output_data': output_data,
+                    'output_data': output_data_display,
                     'node_count_executed': len(self.node_outputs),
                     'execution_count': iteration,
                 })
-            
-            return output_data
+
+            return output_data_display
             
         except Exception as e:
             # Mark run as failed
@@ -368,6 +372,9 @@ class WorkflowExecutor:
             'workflow': self._get_workflow_context(),
         }
 
+        if node_type == 'code':
+            context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
+
         # Get runner for node type
         runner = self.runners.get(node_type)
         if not runner:
@@ -409,6 +416,195 @@ class WorkflowExecutor:
             return workflow
         return None
 
+    def _get_env_with_user(self, user):
+        with_user = getattr(self.env, 'with_user', None)
+        if callable(with_user):
+            return with_user(user)
+        try:
+            return self.env(user=user)
+        except TypeError as exc:
+            raise UserError(
+                _("Environment does not support with_user or env(user=...) for run_as_user")
+            ) from exc
+
+    def _get_node_record(self, node_id):
+        if not self.run or not self.run.workflow_id:
+            return None
+        return self.env['workflow.node'].search([
+            ('workflow_id', '=', self.run.workflow_id.id),
+            ('node_id', '=', node_id),
+        ], limit=1)
+
+    def _get_secure_eval_context(self, node_id, input_data):
+        """
+        Build secure evaluation context for code/expression nodes.
+        
+        Includes:
+        - SafeEnvProxy (blocks sudo, enforces allowlist/denylist)
+        - SecretBroker (secret.get(key))
+        - Standard namespaces (_json, _vars, _node, etc.)
+        
+        Hooks are auto-registered via @SafeEnvProxy.pre_hook decorator.
+        The audit_model_access hook is defined in safe_env_proxy.py.
+        
+        Args:
+            node_id: Current node ID
+            input_data: Input data for node
+            
+        Returns:
+            dict: Secure evaluation context
+        """
+        # Get workflow for security config
+        workflow = None
+        if self.run and self.run.workflow_id:
+            workflow = self.run.workflow_id
+        elif self.snapshot.get('metadata', {}).get('workflow', {}).get('id'):
+            workflow_id = self.snapshot['metadata']['workflow']['id']
+            workflow = self.env['ir.workflow'].browse(workflow_id)
+        
+        # Determine effective user for execution
+        effective_user = self.env.user
+        if workflow and workflow.run_as_user_id:
+            effective_user = workflow.run_as_user_id
+        
+        # Create environment with effective user
+        effective_env = self._get_env_with_user(effective_user)
+        
+        # Get node record for audit
+        node_record_id = None
+        node_record = self._get_node_record(node_id)
+        if node_record:
+            node_record_id = node_record.id
+        
+        # Build execution context for hooks
+        hook_context = {
+            'env': self.env,
+            'run_id': self.run.id if self.run else None,
+            'node_id': node_record_id,
+            'workflow_id': workflow.id if workflow else None,
+            'persist': self.persist,
+        }
+        
+        # Create safe environment proxy with context
+        # Hooks are auto-bound from @SafeEnvProxy.pre_hook decorators
+        if workflow:
+            safe_env = SafeEnvProxy.from_workflow(effective_env, workflow, context=hook_context)
+        else:
+            safe_env = SafeEnvProxy(effective_env, context=hook_context)
+        
+        # Create secret broker (runtime mode = unmasked)
+        run_id = self.run.id if self.run else None
+        workflow_id = workflow.id if workflow else None
+        secret = SecretBrokerFactory.for_execution(
+            self.env, 
+            run_id=run_id, 
+            node_id=node_record_id,
+            workflow_id=workflow_id
+        )
+        
+        return {
+            # Standard namespaces
+            '_json': wrap_readonly(input_data or {}),
+            '_input': wrap_readonly(input_data or {}),
+            '_vars': wrap_mutable(deepcopy(self.vars)),
+            '_node': wrap_readonly({nid: out.get('json') for nid, out in self.node_outputs.items()}),
+            '_loop': wrap_readonly(self.node_context.get(node_id, {}).get('loop', {})),
+            
+            # Time
+            '_now': datetime.now(),
+            '_today': date.today(),
+            
+            # Execution metadata
+            '_execution': wrap_readonly(self._get_execution_context() or {}),
+            '_workflow': wrap_readonly(self._get_workflow_context() or {}),
+            
+            # Secure proxies
+            'env': safe_env,
+            'secret': secret,
+            
+            # Output variable
+            'result': None,
+        }
+
+    def _redact_output(self, output, node_id=None):
+        """
+        Redact output for display.
+
+        Args:
+            output: Raw output data
+            node_id: Node ID for security checks
+
+        Returns:
+            dict with raw/display objects and serialized strings
+        """
+        output_raw = to_plain(output)
+        output_display = output_raw
+
+        if not self._can_unmask_output(node_id):
+            output_display = self._mask_sensitive_data(output_raw)
+
+        return {
+            'raw': output_raw,
+            'display': output_display,
+            'raw_text': self._serialize_output(output_raw),
+            'display_text': self._serialize_output(output_display),
+        }
+
+    def _can_unmask_output(self, node_id):
+        if not node_id or not self.run:
+            return False
+        node_record = self._get_node_record(node_id)
+        if not node_record:
+            return False
+        return node_record._should_unmask_for_user(self.env.user, run=self.run)
+
+    def _serialize_output(self, output):
+        if isinstance(output, str):
+            return output
+        try:
+            return json.dumps(output, ensure_ascii=True)
+        except Exception:
+            return str(output)
+
+    def _mask_sensitive_data(self, value):
+        """
+        Mask sensitive patterns in text.
+
+        Patterns masked:
+        - API keys (sk-..., key-..., etc.)
+        - Passwords
+        - Tokens
+        - Email addresses
+        """
+        import re
+
+        patterns = [
+            (r'(sk-[a-zA-Z0-9]{20,})', '********'),  # OpenAI-style keys
+            (r'(key-[a-zA-Z0-9]{20,})', '********'),  # Generic API keys
+            (r'(password["\s:=]+)[^\s,"]+', r'\1********'),  # Passwords
+            (r'(token["\s:=]+)[^\s,"]+', r'\1********'),  # Tokens
+            (r'(secret["\s:=]+)[^\s,"]+', r'\1********'),  # Secrets
+            (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '***@***.***'),  # Emails
+        ]
+
+        value = to_plain(value)
+
+        if isinstance(value, dict):
+            return {
+                key: self._mask_sensitive_data(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [self._mask_sensitive_data(item) for item in value]
+        if not isinstance(value, str):
+            return value
+
+        result = value
+        for pattern, replacement in patterns:
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        return result
+
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
         
@@ -447,6 +643,8 @@ class WorkflowExecutor:
         try:
             result = self._execute_node_core(node_id, input_data)
 
+            redacted = self._redact_output(result.get('json'), node_id)
+
             # Update node run record
             completed_at = datetime.now()
             duration_ms = (completed_at - started_at).total_seconds() * 1000
@@ -463,9 +661,19 @@ class WorkflowExecutor:
                 'status': 'completed',
                 'completed_at': completed_at,
                 'duration_ms': duration_ms,
-                'output_data': result.get('json'),
+                'output_data': redacted['display'],
                 'output_socket': output_socket,
             })
+
+            node_record = self._get_node_record(node_id)
+            if node_record:
+                self.env['workflow.node.output'].create({
+                    'run_id': self.run.id,
+                    'node_id': node_record.id,
+                    'output_raw': redacted['raw_text'],
+                    'output_display': redacted['display_text'],
+                    'output_json': redacted['display_text'],
+                })
 
             return result
 

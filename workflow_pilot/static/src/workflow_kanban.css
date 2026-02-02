@@ -1,0 +1,12 @@
+.o_workflow_pilot_list_kanban_view .o_kanban_renderer.o_kanban_ungrouped {
+    padding: 0;
+}
+
+.o_workflow_pilot_list_kanban_view .o_kanban_renderer.o_kanban_ungrouped .o_kanban_record {
+    width: 100%;
+    margin: 0;
+}
+
+.o_workflow_pilot_list_kanban_view .o_kanban_renderer.o_kanban_ungrouped .o_workflow_kanban_card {
+    border-top: 0;
+}

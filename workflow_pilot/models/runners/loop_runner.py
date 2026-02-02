@@ -9,6 +9,7 @@ Maintains state across iterations via nodeContext.
 
 import logging
 
+from ..context_objects import build_eval_context
 from .base import BaseNodeRunner, ExpressionEvaluator
 
 _logger = logging.getLogger(__name__)
@@ -50,12 +51,7 @@ class LoopNodeRunner(BaseNodeRunner):
         """Initialize a new loop iteration."""
         # Build context for expression evaluation
         payload = input_data or {}
-        eval_context = {
-            '_json': payload,
-            '_node': context.get('node', {}),
-            '_vars': context.get('vars', {}),
-            '_input': {'item': payload, 'json': payload},
-        }
+        eval_context = build_eval_context(payload, context, include_input_item=True)
         
         # Get items to iterate
         items_expr = node_config.get('inputItems', '{{ _json }}')

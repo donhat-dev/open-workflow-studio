@@ -67,6 +67,24 @@ class Workflow(models.Model):
         help='User who created/owns this workflow'
     )
 
+    # === Security: Run-as User ===
+    run_as_user_id = fields.Many2one(
+        'res.users',
+        string='Run as User',
+        help='User context for workflow execution. Leave empty to use current user.',
+    )
+
+    # === Security: Model Access Control ===
+    model_allowlist = fields.Text(
+        string='Model Allowlist (JSON)',
+        help='JSON array of model names allowed. Empty = all allowed (except denylist)'
+    )
+    model_denylist = fields.Text(
+        string='Model Denylist (JSON)',
+        default='["ir.%"]',
+        help='JSON array of model patterns to block. Supports % wildcard. ir.* always blocked.'
+    )
+
     # === Snapshot Architecture ===
     draft_snapshot = fields.Json(
         string='Draft Snapshot',
@@ -428,9 +446,10 @@ class Workflow(models.Model):
 
         node_outputs = {}
         for node_id, output in (result.get('node_outputs') or {}).items():
+            redacted = executor._redact_output(output.get('json'), node_id)
             node_outputs[node_id] = {
-                'outputs': output.get('outputs'),
-                'json': output.get('json'),
+                'outputs': executor._mask_sensitive_data(output.get('outputs')),
+                'json': redacted['display'],
                 'error': output.get('error'),
                 'meta': output.get('meta'),
                 'title': labels_by_id.get(node_id),

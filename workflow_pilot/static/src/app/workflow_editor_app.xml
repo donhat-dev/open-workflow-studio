@@ -2,65 +2,78 @@
 <templates>
     <t t-name="workflow_pilot.workflow_editor_app">
         <div class="workflow-editor-app">
-            <!-- Loading state -->
-            <t t-if="state.loading">
-                <div class="loading-spinner">
-                    <p>Loading workflow...</p>
-                </div>
-            </t>
-            
-            <!-- Error state -->
-            <t t-elif="state.error">
-                <div class="error-message">
-                    <h3>Error</h3>
-                    <p><t t-esc="state.error"/></p>
-                </div>
-            </t>
-            
-            <!-- Main editor (loaded successfully) -->
-            <t t-else="">
-                <div class="editor-container">
-                    <!-- Toolbar with Save button -->
-                    <div class="editor-toolbar">
-                        <h2 class="editor-title">Workflow Editor</h2>
-                        <div class="editor-actions">
-                            <button 
-                                class="btn btn-primary btn-save" 
-                                t-on-click="save" 
-                                t-att-disabled="state.saving ? 'disabled' : undefined">
-                                <span class="btn__icon">
-                                    <LucideIcon t-props="{ name: 'Save', size: 16 }"/>
-                                </span>
-                                <t t-if="state.saving">Saving...</t>
-                                <t t-else="">Save</t>
-                            </button>
-                            <button 
-                                class="btn btn-secondary btn-save" 
-                                t-on-click="publish" 
-                                t-att-disabled="state.publishing ? 'disabled' : undefined">
-                                <span class="btn__icon">
-                                    <LucideIcon t-props="{ name: 'Rocket', size: 16 }"/>
-                                </span>
-                                <t t-if="state.publishing">Publishing...</t>
-                                <t t-else="">Publish</t>
-                            </button>
-                            <button 
-                                class="btn btn-secondary btn-execute" 
-                                t-on-click="execute" 
-                                t-att-disabled="state.executing ? 'disabled' : undefined">
-                                <span class="btn__icon">
-                                    <LucideIcon t-props="{ name: 'Play', size: 16 }"/>
-                                </span>
-                                <t t-if="state.executing">Executing...</t>
-                                <t t-else="">Execute</t>
-                            </button>
+            <div class="editor-toolbar">
+                <div class="editor-toolbar__left">
+                    <button t-on-click="exit" class="editor-toolbar__exit btn btn-secondary" title="Back" style="min-width:42px; min-height:42px;">
+                        <i class="oi oi-chevron-left"/>
+                    </button>
+                    <button class="editor-title-button" t-on-click="toggleWorkflowView">
+                        <div class="editor-title" t-esc="workflowTitle"/>
+                        <div class="editor-subtitle">
+                            <t t-if="state.view === 'editor'">Workflow Editor</t>
+                            <t t-else="">Workflow Details</t>
                         </div>
-                    </div>
-                    
-                    <!-- Canvas -->
-                    <EditorCanvas />
+                    </button>
                 </div>
-            </t>
+                <div class="editor-actions" t-if="state.view === 'editor'">
+                    <button 
+                        class="btn btn-primary btn-save" 
+                        t-on-click="save" 
+                        t-att-disabled="state.saving ? 'disabled' : undefined">
+                        <span class="btn__icon">
+                            <LucideIcon t-props="{ name: 'Save', size: 16 }"/>
+                        </span>
+                        <t t-if="state.saving">Saving...</t>
+                        <t t-else="">Save</t>
+                    </button>
+                    <button 
+                        class="btn btn-secondary btn-save" 
+                        t-on-click="publish" 
+                        t-att-disabled="state.publishing ? 'disabled' : undefined">
+                        <span class="btn__icon">
+                            <LucideIcon t-props="{ name: 'Rocket', size: 16 }"/>
+                        </span>
+                        <t t-if="state.publishing">Publishing...</t>
+                        <t t-else="">Publish</t>
+                    </button>
+                    <button 
+                        class="btn btn-secondary btn-execute" 
+                        t-on-click="execute" 
+                        t-att-disabled="state.executing ? 'disabled' : undefined">
+                        <span class="btn__icon">
+                            <LucideIcon t-props="{ name: 'Play', size: 16 }"/>
+                        </span>
+                        <t t-if="state.executing">Executing...</t>
+                        <t t-else="">Execute</t>
+                    </button>
+                </div>
+            </div>
+            <div class="editor-body">
+                <t t-if="state.loading">
+                    <div class="loading-spinner">
+                        <p>Loading workflow...</p>
+                    </div>
+                </t>
+                <t t-elif="state.error">
+                    <div class="error-message">
+                        <h3>Error</h3>
+                        <p><t t-esc="state.error"/></p>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="editor-container">
+                        <t t-if="state.view === 'editor'">
+                            <EditorCanvas />
+                        </t>
+                        <t t-else="">
+                            <div class="workflow-form-container">
+                                <View t-props="workflowFormViewProps"/>
+                                <Chatter threadModel="resModel" threadId="resId"/>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
         </div>
     </t>
 </templates>

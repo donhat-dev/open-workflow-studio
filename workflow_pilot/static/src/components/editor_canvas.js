@@ -320,7 +320,7 @@ export class EditorCanvas extends Component {
     }
 
     get executionState() {
-        return this.editorState.execution;
+        return this.editorState.execution || undefined;
     }
 
     /**

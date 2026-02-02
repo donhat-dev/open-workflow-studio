@@ -46,6 +46,7 @@
 						<group string="Display">
 							<field name="icon" placeholder="e.g., globe, split"/>
 							<field name="color" widget="color"/>
+							<field name="group_id"/>
 						</group>
 					</group>
 					<group>

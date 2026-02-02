@@ -85,6 +85,13 @@ class WorkflowType(models.Model):
         help='Hex color for node display (e.g., #3498db)'
     )
 
+    # === Security ===
+    group_id = fields.Many2one(
+        'res.groups',
+        string='Required Group',
+        help='Group required to add/configure this node type'
+    )
+
     _sql_constraints = [
         ('node_type_uniq', 'UNIQUE(node_type)', 
          'Node type key must be unique!'),

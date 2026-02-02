@@ -17,3 +17,9 @@ access_workflow_run_admin,workflow.run.admin,model_workflow_run,workflow_pilot.g
 access_workflow_run_node_user,workflow.run.node.user,model_workflow_run_node,workflow_pilot.group_workflow_user,1,0,0,0
 access_workflow_run_node_manager,workflow.run.node.manager,model_workflow_run_node,workflow_pilot.group_workflow_manager,1,0,0,0
 access_workflow_run_node_admin,workflow.run.node.admin,model_workflow_run_node,workflow_pilot.group_workflow_admin,1,1,1,1
+access_workflow_node_output_user,workflow.node.output.user,model_workflow_node_output,workflow_pilot.group_workflow_user,1,0,0,0
+access_workflow_node_output_manager,workflow.node.output.manager,model_workflow_node_output,workflow_pilot.group_workflow_manager,1,0,0,0
+access_workflow_node_output_admin,workflow.node.output.admin,model_workflow_node_output,base.group_system,1,1,1,1
+access_ir_workflow_logging_user,ir.workflow.logging.user,model_ir_workflow_logging,workflow_pilot.group_workflow_user,1,0,0,0
+access_ir_workflow_logging_manager,ir.workflow.logging.manager,model_ir_workflow_logging,workflow_pilot.group_workflow_manager,1,0,0,0
+access_ir_workflow_logging_admin,ir.workflow.logging.admin,model_ir_workflow_logging,workflow_pilot.group_workflow_admin,1,1,1,1

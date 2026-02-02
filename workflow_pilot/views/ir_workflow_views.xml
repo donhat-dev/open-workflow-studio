@@ -25,13 +25,65 @@
 				</list>
 			</field>
 		</record>
+		<record id="view_ir_workflow_kanban" model="ir.ui.view">
+			<field name="name">ir.workflow.kanban</field>
+			<field name="model">ir.workflow</field>
+			<field name="arch" type="xml">
+				<kanban class="o_workflow_kanban" js_class="workflow_pilot_list_kanban">
+					<field name="name"/>
+					<field name="description"/>
+					<field name="version"/>
+					<field name="node_count"/>
+					<field name="is_published"/>
+					<field name="active"/>
+					<templates>
+						<t t-name="card">
+							<widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+							<widget name="web_ribbon" title="Published" bg_color="text-bg-success" invisible="not is_published or not active"/>
+							<div t-attf-class="o_workflow_kanban_card #{record.is_published.raw_value ? 'o_workflow_kanban_card_published' : 'o_workflow_kanban_card_draft'}" class="d-flex flex-column h-100 px-3 py-2">
+								<div class="d-flex align-items-start justify-content-between gap-2">
+									<div class="flex-grow-1">
+										<field name="name" class="fw-bold fs-4"/>
+										<t t-if="record.description.raw_value">
+											<div class="text-muted o_text_overflow">
+												<field name="description"/>
+											</div>
+										</t>
+									</div>
+								</div>
+								<div class="row g-0 border-top mt-2 pt-2 text-center">
+									<div class="col-4 border-end">
+										<div class="fw-bold">
+											<field name="node_count"/>
+										</div>
+										<div class="text-muted small">Nodes</div>
+									</div>
+									<div class="col-4 border-end">
+										<div class="fw-bold">
+											<field name="version"/>
+										</div>
+										<div class="text-muted small">Version</div>
+									</div>
+									<div class="col-4">
+										<div class="fw-bold">
+											<t t-if="record.active.raw_value">Active</t>
+											<t t-else="">Archived</t>
+										</div>
+										<div class="text-muted small">State</div>
+									</div>
+								</div>
+							</div>
+						</t>
+					</templates>
+				</kanban>
+			</field>
+		</record>
 		<record id="view_ir_workflow_form" model="ir.ui.view">
 			<field name="name">ir.workflow.form</field>
 			<field name="model">ir.workflow</field>
 			<field name="arch" type="xml">
 				<form string="Workflow">
 					<header>
-						<button name="%(action_workflow_editor_app)d" type="action" string="Open Editor" class="oe_highlight"/>
 					</header>
 					<sheet>
 						<group>
@@ -44,6 +96,19 @@
 							<field name="version" readonly="1"/>
 							<field name="node_count" readonly="1"/>
 						</group>
+						<notebook>
+							<page string="Security" name="security">
+								<group>
+									<group string="Execution Context">
+										<field name="run_as_user_id"/>
+									</group>
+									<group string="Model Access Control">
+										<field name="model_allowlist" widget="text" placeholder='["sale.order", "stock.picking"]'/>
+										<field name="model_denylist" widget="text" placeholder='["ir.%", "res.users"]'/>
+									</group>
+								</group>
+							</page>
+						</notebook>
 					</sheet>
 				</form>
 			</field>
@@ -51,7 +116,8 @@
 		<record id="action_ir_workflow" model="ir.actions.act_window">
 			<field name="name">Workflows</field>
 			<field name="res_model">ir.workflow</field>
-			<field name="view_mode">list,form</field>
+			<field name="view_mode">kanban,list,form</field>
+			<field name="view_id" ref="view_ir_workflow_kanban"/>
 		</record>
 		<menuitem id="menu_workflow_pilot_root" name="Workflow Pilot" action="action_ir_workflow" sequence="100"/>
 		<menuitem id="menu_workflow_pilot_dev" name="Workflow Pilot Dev Playground" action="action_workflow_pilot_dev" sequence="100" parent="menu_workflow_pilot_root" />

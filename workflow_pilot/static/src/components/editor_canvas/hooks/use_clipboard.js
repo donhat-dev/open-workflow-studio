@@ -29,10 +29,8 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
             c => selectedNodeIds.includes(c.source) && selectedNodeIds.includes(c.target)
         );
 
-        // Use adapterService to get config for each node (fail-fast if missing)
-        const adapterService = env.services.workflowAdapter;
-        if (!adapterService) {
-            throw new Error('[EditorClipboard] workflowAdapter service is required but not available');
+        if (!editor || !editor.getNodeConfig) {
+            throw new Error('[EditorClipboard] workflowEditor adapter is required but not available');
         }
 
         const data = {
@@ -43,7 +41,7 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
                 y: n.y,
                 title: n.title,
                 // Get config via adapter service
-                config: adapterService.getNodeConfig(n.id) || {},
+                config: editor.getNodeConfig(n.id) || {},
             })),
             connections: connectionsToCopy,
         };
@@ -71,9 +69,8 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
             const PASTE_OFFSET_X = 50;
             const PASTE_OFFSET_Y = 50;
             const idMap = {};
-            const adapterService = env.services.workflowAdapter;
-            if (!adapterService) {
-                throw new Error('[EditorClipboard] workflowAdapter service is required but not available');
+            if (!editor || !editor.setNodeConfig) {
+                throw new Error('[EditorClipboard] workflowEditor adapter is required but not available');
             }
 
             // Create new nodes with offset
@@ -87,7 +84,7 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
                     idMap[nodeData.id] = newId;
                     // Apply config if available
                     if (nodeData.config) {
-                        adapterService.setNodeConfig(newId, nodeData.config);
+                        editor.setNodeConfig(newId, nodeData.config);
                     }
                 }
             });
@@ -119,6 +116,10 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
     function onKeyDown(ev) {
         // Skip if in input field
         if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable) {
+            return;
+        }
+        // If input is not likely in canvas, we should skip them
+        if (!ev.target.classList.contains('o_web_client')){
             return;
         }
 

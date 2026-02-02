@@ -86,6 +86,18 @@ class WorkflowNode(models.Model):
         help='Node-specific configuration (controls values)'
     )
 
+    # === Security ===
+    group_id = fields.Many2one(
+        'res.groups',
+        string='Required Group (Override)',
+        help='Overrides the node type group_id'
+    )
+    unmask_expression = fields.Char(
+        string='Unmask Expression',
+        help="Python expression returning True to unmask output. "
+             "Context: env, user, uid, company, workflow, node, run"
+    )
+
     # === Ordering ===
     sequence = fields.Integer(
         string='Sequence',
@@ -166,3 +178,61 @@ class WorkflowNode(models.Model):
         self.ensure_one()
         config = self.config or {}
         return config.get(key, default)
+
+    def _should_unmask_for_user(self, user, run=None):
+        """
+        Check if output should be unmasked for given user.
+        
+        Logic:
+        1. Check node.group_id (override) or type_id.group_id
+        2. If group_id set, user must be member
+        3. If unmask_expression set, evaluate it
+        4. Default deny unless expression explicitly allows
+        
+        Args:
+            user: res.users record
+            run: workflow.run record (optional, for expression context)
+            
+        Returns:
+            bool: True if user can see unmasked output
+        """
+        self.ensure_one()
+        
+        # Check group requirement (node override > type)
+        required_group = self.group_id or (self.type_id.group_id if self.type_id else False)
+        if required_group:
+            if not user.has_group(required_group.get_external_id().get(required_group.id, '')):
+                # Try direct membership check
+                if required_group.id not in user.groups_id.ids:
+                    return False
+
+        # Unmask expression is required for unmasking
+        if not self.unmask_expression:
+            return False
+
+        try:
+            from odoo.tools.safe_eval import safe_eval
+            context = {
+                'env': self.env,
+                'user': user,
+                'uid': user.id,
+                'company': user.company_id,
+                'company_id': user.company_id.id,
+                'company_ids': user.company_ids.ids,
+                'workflow': self.workflow_id,
+                'node': self,
+                'run': run,
+            }
+            result = safe_eval(self.unmask_expression, context, mode='eval')
+            return bool(result)
+        except Exception:
+            return False
+
+    def _get_effective_group(self):
+        """
+        Get effective required group for this node.
+        
+        Returns node.group_id if set, otherwise type_id.group_id.
+        """
+        self.ensure_one()
+        return self.group_id or (self.type_id.group_id if self.type_id else False)

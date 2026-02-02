@@ -11,6 +11,7 @@ import re
 
 from odoo.tools.safe_eval import safe_eval
 
+from ..context_objects import build_eval_context
 from .base import BaseNodeRunner, ExpressionEvaluator
 
 _logger = logging.getLogger(__name__)
@@ -31,12 +32,7 @@ class IfNodeRunner(BaseNodeRunner):
     
     def execute(self, node_config, input_data, context):
         payload = input_data or {}
-        eval_context = {
-            '_json': payload,
-            '_node': context.get('node', {}),
-            '_vars': context.get('vars', {}),
-            '_input': {'item': payload, 'json': payload},
-        }
+        eval_context = build_eval_context(payload, context, include_input_item=True)
 
         if any(key in node_config for key in ('leftOperand', 'operator', 'rightOperand')):
             left_raw = node_config.get('leftOperand', '')
@@ -81,9 +77,8 @@ class IfNodeRunner(BaseNodeRunner):
         template_match = re.fullmatch(r'\{\{(.+)\}\}', stripped)
         if template_match:
             inner_expr = template_match.group(1).strip()
-            translated = ExpressionEvaluator.translate_expression(inner_expr)
             try:
-                return safe_eval(translated, eval_context, mode='eval')
+                return safe_eval(inner_expr, eval_context, mode='eval')
             except Exception as e:
                 _logger.warning("IF template evaluation failed: %s", e)
                 return raw_value

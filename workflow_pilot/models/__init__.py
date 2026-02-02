@@ -6,3 +6,5 @@ from . import workflow_node
 from . import workflow_connection
 from . import workflow_run
 from . import workflow_executor
+from . import ir_logging_workflow
+from . import workflow_node_output

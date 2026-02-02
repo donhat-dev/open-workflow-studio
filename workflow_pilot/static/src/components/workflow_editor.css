@@ -797,6 +797,13 @@
   bottom: 0;
 }
 
+.editor-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .editor-container {
   flex: 1;
   display: flex;
@@ -818,12 +825,43 @@
   z-index: 20;
 }
 
+.editor-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.editor-toolbar__exit {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.editor-title-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
 .editor-title {
   font-weight: 700;
   font-size: 1rem;
   color: #f8fafc;
   letter-spacing: -0.01em;
   margin: 0;
+}
+
+.editor-subtitle {
+  font-size: 0.75rem;
+  color: #94a3b8;
 }
 
 .editor-actions {
@@ -852,6 +890,12 @@
   flex: 1;
   height: auto !important; /* Allow flex to control height */
   min-height: 0 !important; /* Allow shrinking */
+}
+
+.workflow-form-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Loading and Error states should also fill screen */
