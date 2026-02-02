@@ -75,6 +75,29 @@
 }</field>
         </record>
 
+        <record id="workflow_type_switch" model="workflow.type">
+            <field name="name">Switch</field>
+            <field name="node_type">switch</field>
+            <field name="category">flow</field>
+            <field name="icon">fa-random</field>
+            <field name="description">Route data based on matching cases</field>
+            <field name="config_schema">{
+    "switchValue": {"type": "expression", "label": "Switch Value"},
+    "case1": {"type": "expression", "label": "Case 1"},
+    "case2": {"type": "expression", "label": "Case 2"},
+    "case3": {"type": "expression", "label": "Case 3"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Data"}
+}</field>
+            <field name="output_schema">{
+    "case_1": {"type": "DataSocket", "label": "Case 1"},
+    "case_2": {"type": "DataSocket", "label": "Case 2"},
+    "case_3": {"type": "DataSocket", "label": "Case 3"},
+    "default": {"type": "DataSocket", "label": "Default"}
+}</field>
+        </record>
+
         <record id="workflow_type_noop" model="workflow.type">
             <field name="name">Replace Me</field>
             <field name="node_type">noop</field>
@@ -110,9 +133,9 @@
             <field name="node_type">code</field>
             <field name="category">transform</field>
             <field name="icon">fa-code</field>
-            <field name="description">Execute custom JavaScript code</field>
+            <field name="description">Execute Python code (set result for output)</field>
             <field name="config_schema">{
-    "code": {"type": "code", "language": "javascript", "label": "JavaScript Code"}
+    "code": {"type": "code", "language": "python", "label": "Python Code"}
 }</field>
             <field name="input_schema">{
     "data": {"type": "DataSocket", "label": "Input Data"}
@@ -157,25 +180,6 @@
 }</field>
             <field name="output_schema">{
     "output": {"type": "DataSocket", "label": "Output Data"}
-}</field>
-        </record>
-
-        <record id="workflow_type_mapping" model="workflow.type">
-            <field name="name">Data Mapping</field>
-            <field name="node_type">mapping</field>
-            <field name="category">transform</field>
-            <field name="icon">fa-exchange</field>
-            <field name="description">Map and transform data fields</field>
-            <field name="config_schema">{
-    "mappings": {"type": "keyvalue", "label": "Field Mappings"},
-    "transform": {"type": "select", "options": ["none", "uppercase", "lowercase", "trim", "number", "string", "boolean", "json_parse", "json_stringify"], "default": "none"},
-    "defaultValue": {"type": "string", "label": "Default Value"}
-}</field>
-            <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
-}</field>
-            <field name="output_schema">{
-    "mapped": {"type": "DataSocket", "label": "Mapped Data"}
 }</field>
         </record>
 

@@ -390,6 +390,13 @@ class Workflow(models.Model):
 
         # Deep copy to avoid mutating stored snapshots
         working_snapshot = copy.deepcopy(base_snapshot)
+        metadata = working_snapshot.get('metadata') or {}
+        metadata['workflow'] = {
+            'id': self.id,
+            'name': self.name,
+            'active': self.active,
+        }
+        working_snapshot['metadata'] = metadata
 
         # Apply config overrides
         if config_overrides:
@@ -435,4 +442,5 @@ class Workflow(models.Model):
             'execution_count': result.get('execution_count'),
             'executed_order': result.get('executed_order') or [],
             'node_outputs': node_outputs,
+            'context_snapshot': result.get('context_snapshot'),
         }

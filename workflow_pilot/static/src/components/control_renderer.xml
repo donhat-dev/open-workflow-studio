@@ -42,8 +42,9 @@
 				<CodeEditor
 					value="value"
 					height="props.control.height || 200"
-					language="props.control.language || 'javascript'"
+					language="props.control.language || 'python'"
 					placeholder="props.control.placeholder || ''"
+					completionContext="props.inputContext"
 					onChange="(v) => this.onCodeChange(v)"
 				/>
 			</t>

@@ -34,7 +34,7 @@ export class ControlRenderer extends Component {
     static props = {
         control: Object,  // Plain object, not Control instance
         onChange: { type: Function },
-        inputContext: { type: Object, optional: true },  // { $json: {...} } for expression preview
+        inputContext: { type: Object, optional: true },  // { _json: {...} } for expression preview
         // Controlled expression mode
         mode: { type: String, optional: true }, // 'fixed' | 'expression'
         onModeChange: { type: Function, optional: true },

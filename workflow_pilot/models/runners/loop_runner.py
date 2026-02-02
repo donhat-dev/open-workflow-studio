@@ -49,14 +49,16 @@ class LoopNodeRunner(BaseNodeRunner):
     def _init_loop(self, node_config, input_data, context, node_id):
         """Initialize a new loop iteration."""
         # Build context for expression evaluation
+        payload = input_data or {}
         eval_context = {
-            'json': input_data or {},
-            'node': context.get('node', {}),
-            'vars': context.get('vars', {}),
+            '_json': payload,
+            '_node': context.get('node', {}),
+            '_vars': context.get('vars', {}),
+            '_input': {'item': payload, 'json': payload},
         }
         
         # Get items to iterate
-        items_expr = node_config.get('inputItems', '{{json}}')
+        items_expr = node_config.get('inputItems', '{{ _json }}')
         try:
             items = ExpressionEvaluator.evaluate(items_expr, eval_context)
         except Exception as e:

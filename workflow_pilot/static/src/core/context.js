@@ -4,10 +4,10 @@
  * ExecutionContext - Manages workflow execution state
  *
  * Provides namespaced access to:
- * - $vars: Mutable workflow variables (user-defined)
- * - $node: Immutable node outputs (keyed by node ID)
- * - $json: Shortcut to previous node output
- * - $loop: Current loop iteration context
+ * - _vars: Mutable workflow variables (user-defined)
+ * - _node: Immutable node outputs (keyed by node ID)
+ * - _json: Shortcut to previous node output
+ * - _loop: Current loop iteration context
  *
  * USAGE:
  * ──────
@@ -24,15 +24,15 @@
  *
  * // Loop context
  * ctx.pushLoop([item1, item2, item3]);
- * while (ctx.$loop) {
- *     console.log(ctx.$loop.item, ctx.$loop.index);
+ * while (ctx._loop) {
+ *     console.log(ctx._loop.item, ctx._loop.index);
  *     if (!ctx.advanceLoop()) break;
  * }
  * ctx.popLoop();
  *
  * // Expression context
  * const exprCtx = ctx.toExpressionContext();
- * // { $vars: {...}, $node: {...}, $json: {...}, $loop: {...} }
+ * // { _vars: {...}, _node: {...}, _json: {...}, _loop: {...} }
  */
 export class ExecutionContext {
     constructor() {
@@ -56,7 +56,7 @@ export class ExecutionContext {
     }
 
     // ============================================
-    // VARIABLES ($vars)
+    // VARIABLES (_vars)
     // ============================================
 
     /**
@@ -181,7 +181,7 @@ export class ExecutionContext {
     }
 
     // ============================================
-    // NODE OUTPUTS ($node, $json)
+    // NODE OUTPUTS (_node, _json)
     // ============================================
 
     /**
@@ -206,7 +206,7 @@ export class ExecutionContext {
     }
 
     /**
-     * Get previous node output ($json shortcut)
+     * Get previous node output (_json shortcut)
      *
      * @returns {*} Previous node output or empty object
      */
@@ -215,6 +215,10 @@ export class ExecutionContext {
         return this._nodeOutputs[this._currentNodeId]?.json ||
                this._nodeOutputs[this._currentNodeId] ||
                {};
+    }
+
+    get _json() {
+        return this.$json;
     }
 
     /**
@@ -226,6 +230,10 @@ export class ExecutionContext {
         return this._nodeOutputs;
     }
 
+    get _node() {
+        return this.$node;
+    }
+
     /**
      * Get all variables
      *
@@ -235,8 +243,12 @@ export class ExecutionContext {
         return this._vars;
     }
 
+    get _vars() {
+        return this.$vars;
+    }
+
     // ============================================
-    // INPUT DATA ($input)
+    // INPUT DATA (_input)
     // ============================================
 
     /**
@@ -250,7 +262,7 @@ export class ExecutionContext {
     }
 
     /**
-     * Get current input data ($input shortcut)
+     * Get current input data (_input shortcut)
      * For nodes inside a loop, this is the current loop item
      *
      * @returns {Object} Current input data
@@ -272,8 +284,12 @@ export class ExecutionContext {
         };
     }
 
+    get _input() {
+        return this.$input;
+    }
+
     // ============================================
-    // LOOP CONTEXT ($loop)
+    // LOOP CONTEXT (_loop)
     // ============================================
 
     /**
@@ -318,6 +334,10 @@ export class ExecutionContext {
             isFirst: current.index === 0,
             isLast: current.index === current.total - 1,
         };
+    }
+
+    get _loop() {
+        return this.$loop;
     }
 
     /**
@@ -408,11 +428,11 @@ export class ExecutionContext {
      */
     toExpressionContext() {
         return {
-            $vars: this._vars,
-            $node: this._nodeOutputs,
-            $json: this.$json,
-            $loop: this.$loop,
-            $input: this.$input,
+            _vars: this._vars,
+            _node: this._nodeOutputs,
+            _json: this.$json,
+            _loop: this.$loop,
+            _input: this.$input,
         };
     }
 

@@ -4,7 +4,7 @@
 Base Node Runner and Expression Evaluator
 
 Provides foundation for node execution:
-    - ExpressionEvaluator: Translates n8n-style $json.field to Python json['field'] for safe_eval
+    - ExpressionEvaluator: Translates _json.field to Python _json['field'] for safe_eval
     - BaseNodeRunner: Abstract base class for node execution
 """
 
@@ -24,31 +24,40 @@ class ExpressionEvaluator:
     """Evaluates n8n-style expressions using safe_eval.
     
     Translates:
-        $json.field → json['field']
-        $json.items[0].name → json['items'][0]['name']
-        $node.Http.data → node['Http']['data']
-        $vars.count → vars['count']
-        json.field → json['field'] (bare namespace, no $)
-        json.items[0].name → json['items'][0]['name'] (bare namespace)
+        _json.field → _json['field']
+        _json.items[0].name → _json['items'][0]['name']
+        _node.Http.data → _node['Http']['data']
+        _vars.count → _vars['count']
+        $json.field → _json['field'] (legacy $ prefix)
+        json.field → _json['field'] (legacy bare namespace)
+        vars.count → _vars['count'] (legacy bare namespace)
     """
     
-    # Pattern to match $namespace.path expressions (with $ prefix)
-    NAMESPACE_PATTERN = re.compile(r'\$(\w+)((?:\.\w+|\[\d+\])*)')
+    # Pattern to match $namespace.path or _namespace.path expressions
+    NAMESPACE_PATTERN = re.compile(r'(\$|_)(\w+)((?:\.\w+|\[\d+\])*)')
     
-    # Pattern to match bare namespace.path expressions (without $ prefix)
-    # Matches: json.field, node.Http, vars.count, etc.
-    BARE_NAMESPACE_PATTERN = re.compile(r'\b(json|node|vars)((?:\.\w+|\[\d+\])+)')
+    # Pattern to match bare namespace.path expressions (without prefix)
+    # Matches: json.field, node.Http, vars.count, input.item, loop.item
+    BARE_NAMESPACE_PATTERN = re.compile(r'\b(json|node|vars|input|loop)((?:\.\w+|\[\d+\])+)')
+
+    NAMESPACE_MAP = {
+        'json': '_json',
+        'node': '_node',
+        'vars': '_vars',
+        'input': '_input',
+        'loop': '_loop',
+    }
     
     @classmethod
     def translate_expression(cls, expr):
         """Translate n8n expression to Python expression.
         
         Supports both:
-        - $json.items[0].name → json['items'][0]['name']
-        - json.items[0].name → json['items'][0]['name']
+        - _json.items[0].name → _json['items'][0]['name']
+        - json.items[0].name → _json['items'][0]['name']
         
         Args:
-            expr: Expression string, e.g., "$json.items[0].name" or "json.items[0].name"
+            expr: Expression string, e.g., "_json.items[0].name" or "json.items[0].name"
             
         Returns:
             Python expression string, e.g., "json['items'][0]['name']"
@@ -58,11 +67,16 @@ class ExpressionEvaluator:
             
         def replace_namespace(match):
             """Helper to convert namespace.path to namespace['path']."""
-            namespace = match.group(1)  # json, node, vars, etc.
-            path = match.group(2)       # .field.subfield[0]
+            if match.group(1) in ('$', '_'):
+                namespace = match.group(2)
+                path = match.group(3) or ''
+            else:
+                namespace = match.group(1)
+                path = match.group(2) or ''
+            target = cls.NAMESPACE_MAP.get(namespace, namespace)
             
             # Build Python path
-            result = namespace
+            result = target
             if path:
                 # Split by dots and brackets
                 parts = re.split(r'\.(?![^\[]*\])', path.lstrip('.'))
@@ -72,17 +86,18 @@ class ExpressionEvaluator:
                     # Handle array access like items[0]
                     bracket_match = re.match(r'(\w+)(\[\d+\])?', part)
                     if bracket_match:
-                        field = bracket_match.group(1)
+                        field = bracket_match.group(1) or ''
+                        if not field:
+                            continue
                         index = bracket_match.group(2) or ''
                         result += f"['{field}']{index}"
             
             return result
         
-        # First translate $namespace.path (with $ prefix)
+        # First translate $namespace.path or _namespace.path
         result = cls.NAMESPACE_PATTERN.sub(replace_namespace, expr)
         
-        # Then translate bare namespace.path (without $ prefix)
-        # This handles json.field, node.Http, vars.count, etc.
+        # Then translate bare namespace.path (legacy without prefix)
         result = cls.BARE_NAMESPACE_PATTERN.sub(replace_namespace, result)
         
         return result
@@ -92,8 +107,9 @@ class ExpressionEvaluator:
         """Evaluate expression with given context.
         
         Supports both syntaxes:
-        - $json.field (n8n-style with $ prefix)
-        - json.field (bare namespace without $ prefix)
+        - _json.field (preferred)
+        - $json.field (legacy with $ prefix)
+        - json.field (legacy bare namespace)
         
         Args:
             expr: Expression string (n8n or Python style)

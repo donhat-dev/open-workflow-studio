@@ -28,8 +28,6 @@
             ('include', 'workflow_pilot.assets_libs'),
             # Registries (define categories and lib refs)
             'workflow_pilot/static/src/registries/**/*',
-            # Mocks / Frontend execution engine
-            'workflow_pilot/static/src/mocks/**/*',
             # App entry points
             'workflow_pilot/static/src/app/**/*',
             # Store (workflowEditor service)

@@ -11,9 +11,9 @@ class WorkflowType(models.Model):
     Built-in types are loaded via XML data (noupdate=1).
     
     Categories:
-        - flow: Control flow nodes (if, loop, noop)
+        - flow: Control flow nodes (if, loop, switch, noop)
         - integration: External service nodes (http)
-        - transform: Data transformation nodes (code, set_data, mapping, validation)
+        - transform: Data transformation nodes (code, set_data, validation)
         - data: Variable/data nodes (variable)
         - trigger: Trigger nodes (manual_trigger, webhook)
     """

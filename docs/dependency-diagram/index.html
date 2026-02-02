@@ -465,7 +465,7 @@
       <div class="card toolbar">
         <div class="search" title="Gõ để tìm module, Enter để tập trung, Esc để xoá">
           <span class="dot" style="background:rgba(16,24,40,.55)"></span>
-          <input id="q" placeholder="Tìm nhanh… (vd: EditorCanvas, workflowExecutor, StackExecutor)" autocomplete="off" />
+          <input id="q" placeholder="Tìm nhanh… (vd: EditorCanvas, workflowExecutor)" autocomplete="off" />
           <kbd>Esc</kbd>
         </div>
         <div class="row" aria-label="Legend roles">
@@ -475,7 +475,6 @@
           <span class="pill"><span class="dot core"></span>Core</span>
           <span class="pill"><span class="dot node"></span>Node Type</span>
           <span class="pill"><span class="dot utils"></span>Utils</span>
-          <span class="pill"><span class="dot mocks"></span>Mocks</span>
           <span class="pill"><span class="dot platform"></span>Platform</span>
         </div>
       </div>
@@ -529,7 +528,7 @@
           <p>
             Luồng kiến trúc chủ đạo (Phase 3):
             <br/>UI (OWL components) → Services (useService) → Adapter (WorkflowAdapter) → Core (WorkflowEditor/BaseNode) → Node Types.
-            <br/>Execution demo dùng StackExecutor (mocks) để chạy workflow có cycle/branch (loop/if).
+            <br/>Execution dùng WorkflowExecutor (backend) để chạy workflow có cycle/branch (loop/if).
           </p>
         </div>
       </aside>
@@ -550,7 +549,6 @@
       core:    { label: 'Core',         symbol: '⬣' },
       node:    { label: 'Node Type',    symbol: '◇' },
       utils:   { label: 'Utils',        symbol: '✦' },
-      mocks:   { label: 'Mocks',        symbol: '⟲' },
       platform:{ label: 'Platform',     symbol: '⬡' },
     };
 
@@ -628,7 +626,7 @@
       {
         id: 'svc_executor', role: 'svc',
         title: 'workflowExecutor service',
-        desc: 'Chạy workflow bằng StackExecutor (cycle/branch); lấy config qua workflowAdapter + tạo NodeClass qua workflowNode.',
+        desc: 'Chạy workflow bằng WorkflowExecutor (backend); lấy config qua workflowAdapter + tạo NodeClass qua workflowNode.',
         path: 'workflow_pilot/static/src/services/workflow_executor_service.js',
         x: 410, y: 640,
       },
@@ -695,14 +693,6 @@
         x: 760, y: 720,
       },
 
-      // Mocks / Execution engine
-      {
-        id: 'mock_executor', role: 'mocks',
-        title: 'StackExecutor',
-        desc: 'Stack-based execution engine (n8n-like): supports cycles, if/loop branching, outputs[][] routing.',
-        path: 'workflow_pilot/static/src/mocks/stack_executor.js',
-        x: 760, y: 850,
-      },
 
       // Nodes (types)
       {
@@ -721,8 +711,8 @@
       },
       {
         id: 'node_data', role: 'node',
-        title: 'Data nodes (Mapping/Validation)',
-        desc: 'Data transform/validation nodes (đăng ký vào registry tương tự).',
+        title: 'Data nodes (Validation/SetData/Variable)',
+        desc: 'Data transform/variable nodes (đăng ký vào registry tương tự).',
         path: 'workflow_pilot/static/src/nodes/data_nodes.js',
         x: 1460, y: 520,
       },
@@ -809,13 +799,7 @@
       // variable service → context
       { from: 'svc_variable', to: 'core_context', kind: 'import', label: 'wraps ExecutionContext' },
 
-      // expression utils used in nodes and executor
-      { from: 'mock_executor', to: 'core_context', kind: 'import', label: 'ExecutionContext' },
-      { from: 'mock_executor', to: 'utils_expr', kind: 'import', label: 'evaluateExpression' },
-      { from: 'node_flow', to: 'utils_expr', kind: 'import', label: 'evaluateExpression' },
-
       // executor service
-      { from: 'svc_executor', to: 'mock_executor', kind: 'exec', label: 'stack exec' },
       { from: 'svc_executor', to: 'svc_node', kind: 'service', label: 'getNodeClass' },
       { from: 'svc_executor', to: 'svc_adapter', kind: 'service', label: 'getNodeConfig' },
       { from: 'svc_executor', to: 'svc_variable', kind: 'service', label: 'createContext' },

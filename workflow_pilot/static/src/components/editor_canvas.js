@@ -43,47 +43,50 @@ export class EditorCanvas extends Component {
         this.editorState = useState(this.editor.state);
 
         const emptyExpressionContext = () => ({
-            $vars: {},
-            $node: {},
-            $json: {},
-            $loop: null,
-            $input: { item: null, json: null },
+            _vars: {},
+            _node: {},
+            _json: {},
+            _loop: null,
+            _input: { item: null, json: null },
+            _execution: null,
+            _workflow: null,
         });
 
         this.nodeConfigActions = {
             getControls: (nodeId) => this.editor.getNodeControls(nodeId),
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
-            getExpressionContext: () => emptyExpressionContext(),
-            buildContextForNode: () => ({
-                $node: {},
-                $json: {},
-                $input: { item: null, json: null },
-            }),
-            runUntilNode: async (workflow, nodeId, options = {}) => {
-                const configOverrides = options.controlValues
-                    ? { [nodeId]: options.controlValues }
-                    : null;
-                const result = await this.editor.actions.executeUntilNode(
-                    nodeId,
-                    {},
-                    configOverrides
-                );
+            getExpressionContext: () => {
+                const snapshot = this.editorState.execution?.contextSnapshot || null;
+                if (!snapshot) {
+                    return emptyExpressionContext();
+                }
+                const json = snapshot.json || {};
+                const wrappedNode = {};
+                const nodeEntries = snapshot.node || {};
+                for (const [nodeId, output] of Object.entries(nodeEntries)) {
+                    wrappedNode[nodeId] = { json: output };
+                }
                 return {
-                    output: null,
-                    error: result.error || null,
-                    expressionContext: this.editorState.execution?.contextSnapshot || null,
-                    nodeOutputs: result.node_outputs || {},
-                    executedOrder: result.executed_order || [],
+                    _vars: snapshot.vars || {},
+                    _node: wrappedNode,
+                    _json: json,
+                    _loop: null,
+                    _input: { item: json, json },
+                    _execution: snapshot.execution || null,
+                    _workflow: snapshot.workflow || null,
                 };
             },
-            runNode: async () => ({
-                output: null,
-                error: "Execution is disabled in editor mode",
-                expressionContext: emptyExpressionContext(),
+            buildContextForNode: () => ({
+                _node: {},
+                _json: {},
+                _input: { item: null, json: null },
+                _execution: null,
+                _workflow: null,
             }),
+            executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
+                this.editor.actions.executeUntilNode(nodeId, inputData, configOverrides),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
-            isExecuting: () => false,
         };
 
         this.state = useState({

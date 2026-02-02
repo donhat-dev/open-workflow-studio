@@ -22,7 +22,7 @@ export class WorkflowPilotDevApp extends Component {
                 
                 <!-- Variable Inspector -->
                 <div class="variable-inspector">
-                    <h3 class="sidebar__title">Variables ($vars)</h3>
+                    <h3 class="sidebar__title">Variables (_vars)</h3>
                     <div class="variable-inspector__content">
                         <t t-if="Object.keys(variableState.vars).length === 0">
                             <div class="variable-inspector__empty">No variables set</div>
@@ -30,7 +30,7 @@ export class WorkflowPilotDevApp extends Component {
                         <t t-else="">
                             <t t-foreach="Object.entries(variableState.vars)" t-as="entry" t-key="entry[0]">
                                 <div class="variable-inspector__item">
-                                    <span class="variable-inspector__key">$vars.<t t-esc="entry[0]"/></span>
+                                    <span class="variable-inspector__key">_vars.<t t-esc="entry[0]"/></span>
                                     <span class="variable-inspector__value"><t t-esc="formatVarValue(entry[1])"/></span>
                                 </div>
                             </t>
@@ -76,7 +76,7 @@ export class WorkflowPilotDevApp extends Component {
         // The adapter is now the single source of truth using a reactive Store
         this.state = useState(this.adapter.state);
 
-        // Variable Inspector state - reactive view of $vars
+        // Variable Inspector state - reactive view of _vars
         this.variableState = useState({
             vars: {},
         });
@@ -381,8 +381,8 @@ export class WorkflowPilotDevApp extends Component {
      * Update variable inspector from execution context
      */
     updateVariableInspector(context) {
-        if (context && context.$vars) {
-            this.variableState.vars = { ...context.$vars };
+        if (context && context._vars) {
+            this.variableState.vars = { ...context._vars };
         } else {
             this.variableState.vars = {};
         }
@@ -407,6 +407,6 @@ export class WorkflowPilotDevApp extends Component {
 
         // Refresh variable inspector from current context
         const context = this.adapterService.getExpressionContext?.() || {};
-        this.variableState.vars = { ...(context.$vars || {}) };
+        this.variableState.vars = { ...(context._vars || {}) };
     };
 }

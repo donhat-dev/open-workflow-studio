@@ -1,0 +1,102 @@
+# -*- coding: utf-8 -*-
+
+"""
+Switch Node Runner
+
+Routes data to one of multiple branches based on equality checks.
+"""
+
+import re
+
+from odoo.tools.safe_eval import safe_eval
+
+from .base import BaseNodeRunner, ExpressionEvaluator
+
+
+class SwitchNodeRunner(BaseNodeRunner):
+    """Runner for switch node."""
+
+    node_type = 'switch'
+
+    def execute(self, node_config, input_data, context):
+        payload = input_data or {}
+        eval_context = {
+            '_json': payload,
+            '_node': context.get('node', {}),
+            '_vars': context.get('vars', {}),
+            '_input': {'item': payload, 'json': payload},
+        }
+
+        switch_value = self._resolve_value(node_config.get('switchValue', ''), eval_context)
+        case1 = self._resolve_value(node_config.get('case1', ''), eval_context)
+        case2 = self._resolve_value(node_config.get('case2', ''), eval_context)
+        case3 = self._resolve_value(node_config.get('case3', ''), eval_context)
+
+        switch_value, case1 = self._coerce_numbers(switch_value, case1)
+        switch_value, case2 = self._coerce_numbers(switch_value, case2)
+        switch_value, case3 = self._coerce_numbers(switch_value, case3)
+
+        output_index = 3
+        if case1 != '':
+            if switch_value == case1:
+                output_index = 0
+        if output_index == 3 and case2 != '':
+            if switch_value == case2:
+                output_index = 1
+        if output_index == 3 and case3 != '':
+            if switch_value == case3:
+                output_index = 2
+
+        outputs = [[], [], [], []]
+        outputs[output_index] = [input_data]
+
+        return {
+            'outputs': outputs,
+            'json': input_data,
+            'branch': output_index,
+        }
+
+    def _resolve_value(self, raw_value, eval_context):
+        if not isinstance(raw_value, str):
+            return raw_value
+
+        stripped = raw_value.strip()
+        if not stripped:
+            return ''
+
+        template_match = re.fullmatch(r'\{\{(.+)\}\}', stripped)
+        if template_match:
+            inner_expr = template_match.group(1).strip()
+            translated = ExpressionEvaluator.translate_expression(inner_expr)
+            try:
+                return safe_eval(translated, eval_context, mode='eval')
+            except Exception:
+                return raw_value
+
+        if '{{' in raw_value and '}}' in raw_value:
+            try:
+                return ExpressionEvaluator.evaluate(raw_value, eval_context)
+            except Exception:
+                return raw_value
+
+        return raw_value
+
+    def _coerce_numbers(self, left, right):
+        left_num = self._maybe_number(left)
+        right_num = self._maybe_number(right)
+        if isinstance(left_num, (int, float)) and isinstance(right_num, (int, float)):
+            return left_num, right_num
+        return left, right
+
+    def _maybe_number(self, value):
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return value
+            try:
+                return float(stripped)
+            except ValueError:
+                return value
+        return value

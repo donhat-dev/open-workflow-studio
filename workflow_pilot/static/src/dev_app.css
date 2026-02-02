@@ -172,14 +172,14 @@
 .node-palette__item--validation .node-palette__icon {
   color: #f43f5e;
 }
-.node-palette__item--mapping .node-palette__icon {
-  color: #3b82f6;
-}
 .node-palette__item--loop .node-palette__icon {
   color: #8b5cf6;
 }
 .node-palette__item--if .node-palette__icon {
   color: #f59e0b;
+}
+.node-palette__item--switch .node-palette__icon {
+  color: #f97316;
 }
 .node-palette__item--code .node-palette__icon {
   color: #10b981;

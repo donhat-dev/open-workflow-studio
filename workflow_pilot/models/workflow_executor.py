@@ -12,10 +12,11 @@ Node Runners are imported from the runners package:
     - LoopNodeRunner: Array iteration with back-edge pattern
 
 Expression Evaluation:
-    Translates n8n-style $json.field to Python json['field'] for safe_eval.
+    Translates _json.field to Python _json['field'] for safe_eval.
 """
 
 import logging
+import re
 from copy import deepcopy
 from datetime import datetime
 
@@ -28,6 +29,11 @@ from .runners import (
     HttpNodeRunner,
     IfNodeRunner,
     LoopNodeRunner,
+    NoOpNodeRunner,
+    VariableNodeRunner,
+    ValidationNodeRunner,
+    CodeNodeRunner,
+    SwitchNodeRunner,
 )
 
 _logger = logging.getLogger(__name__)
@@ -51,6 +57,11 @@ class WorkflowExecutor:
         'http': HttpNodeRunner,
         'if': IfNodeRunner,
         'loop': LoopNodeRunner,
+        'noop': NoOpNodeRunner,
+        'variable': VariableNodeRunner,
+        'validation': ValidationNodeRunner,
+        'code': CodeNodeRunner,
+        'switch': SwitchNodeRunner,
     }
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True):
@@ -353,6 +364,8 @@ class WorkflowExecutor:
             'node': self.node_outputs,
             'vars': self.vars,
             'node_context': self.node_context,
+            'execution': self._get_execution_context(),
+            'workflow': self._get_workflow_context(),
         }
 
         # Get runner for node type
@@ -362,7 +375,39 @@ class WorkflowExecutor:
                 'outputs': [[input_data]],
                 'json': input_data,
             }
-        return runner.execute(config, input_data, context)
+        result = runner.execute(config, input_data, context)
+        vars_payload = result.get('vars') if isinstance(result, dict) else None
+        if isinstance(vars_payload, dict) and vars_payload is not self.vars:
+            self.vars = vars_payload
+        return result
+
+    def _get_execution_context(self):
+        if not self.run:
+            return None
+        return {
+            'id': self.run.id,
+            'name': self.run.name,
+            'status': self.run.status,
+            'started_at': self.run.started_at,
+            'completed_at': self.run.completed_at,
+            'duration_seconds': self.run.duration_seconds,
+            'execution_count': self.run.execution_count,
+        }
+
+    def _get_workflow_context(self):
+        if self.run and self.run.workflow_id:
+            workflow = self.run.workflow_id
+            return {
+                'id': workflow.id,
+                'name': workflow.name,
+                'active': workflow.active,
+            }
+
+        metadata = self.snapshot.get('metadata') or {}
+        workflow = metadata.get('workflow')
+        if isinstance(workflow, dict):
+            return workflow
+        return None
 
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
@@ -484,6 +529,14 @@ class WorkflowExecutor:
             - 'true', 'done' -> 0
             - 'false', 'loop' -> 1
         """
+        if socket_name:
+            match = re.match(r'case_?(\d+)$', socket_name)
+            if match:
+                index = int(match.group(1)) - 1
+                return max(index, 0)
+            if socket_name == 'default':
+                return 3
+
         socket_map = {
             'output': 0,
             'result': 0,
@@ -530,4 +583,6 @@ class WorkflowExecutor:
             'node': node_json_snapshot,
             'vars': deepcopy(self.vars),
             'node_context': deepcopy(self.node_context),
+            'execution': self._get_execution_context(),
+            'workflow': self._get_workflow_context(),
         }

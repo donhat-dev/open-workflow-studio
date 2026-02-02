@@ -4,16 +4,17 @@
  * CodeEditor Component
  * 
  * OWL wrapper for Monaco Editor with workflow context autocomplete.
- * Loads Monaco from CDN and provides suggestions for $json, $vars, etc.
+ * Loads Monaco from CDN and provides suggestions for Python workflow context.
  */
 
-import { Component, useRef, onMounted, onWillUnmount, useState } from "@odoo/owl";
+import { Component, useRef, onMounted, onWillUnmount, onWillUpdateProps, useState } from "@odoo/owl";
 
 // Monaco CDN base URL
 const MONACO_CDN = "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs";
 
 // Global Monaco loader promise (singleton)
 let monacoLoaderPromise = null;
+let completionContext = {};
 
 /**
  * Load Monaco Editor from CDN
@@ -59,8 +60,8 @@ function registerWorkflowCompletions() {
     const monaco = window.monaco;
     if (!monaco) return;
 
-    monaco.languages.registerCompletionItemProvider("javascript", {
-        triggerCharacters: ["$", "."],
+    monaco.languages.registerCompletionItemProvider("python", {
+        triggerCharacters: ["_", ".", "[", "\"", "'"],
 
         provideCompletionItems: (model, position) => {
             const word = model.getWordUntilPosition(position);
@@ -71,47 +72,87 @@ function registerWorkflowCompletions() {
                 endColumn: word.endColumn,
             };
 
+            const linePrefix = model
+                .getLineContent(position.lineNumber)
+                .slice(0, position.column - 1);
+
+            const dynamicSuggestions = buildDynamicSuggestions(monaco, linePrefix, range);
+            if (dynamicSuggestions.length) {
+                return { suggestions: dynamicSuggestions };
+            }
+
             // Context variable suggestions
             const suggestions = [
                 {
-                    label: "$",
-                    kind: monaco.languages.CompletionItemKind.Function,
-                    insertText: "$('${1:node_name}')",
-                    insertTextRules: 2, // monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-                    detail: "Access other node data",
-                    documentation: "Helper function to access data from other nodes by name or ID. Example: $('HTTP Request').json",
-                    range,
-                },
-                {
-                    label: "$json",
+                    label: "_json",
                     kind: monaco.languages.CompletionItemKind.Variable,
-                    insertText: "$json",
+                    insertText: "_json",
                     detail: "Input data from previous node",
-                    documentation: "Object containing the output data from the previous node in the workflow.",
+                    documentation: "Object containing output data from the previous node.",
                     range,
                 },
                 {
-                    label: "$input",
+                    label: "_input",
                     kind: monaco.languages.CompletionItemKind.Variable,
-                    insertText: "$input",
-                    detail: "Alias for $json",
-                    documentation: "Same as $json - input data from previous node.",
+                    insertText: "_input",
+                    detail: "Alias for _json",
+                    documentation: "Same as _json - input data from previous node.",
                     range,
                 },
                 {
-                    label: "$vars",
+                    label: "_vars",
                     kind: monaco.languages.CompletionItemKind.Variable,
-                    insertText: "$vars",
+                    insertText: "_vars",
                     detail: "Workflow variables",
-                    documentation: "Access workflow-level variables set by Variable nodes. Example: $vars.myVar",
+                    documentation: "Mutable workflow variables. Example: _vars['myVar']",
                     range,
                 },
                 {
-                    label: "$node",
+                    label: "_node",
                     kind: monaco.languages.CompletionItemKind.Variable,
-                    insertText: "$node",
-                    detail: "Access other node outputs",
-                    documentation: "Access output from specific nodes. Example: $node['HTTP Request'].json",
+                    insertText: "_node",
+                    detail: "Other node outputs",
+                    documentation: "Access output from specific nodes. Example: _node['HTTP Request']",
+                    range,
+                },
+                {
+                    label: "_now",
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    insertText: "_now",
+                    detail: "Current datetime",
+                    documentation: "Datetime at execution time.",
+                    range,
+                },
+                {
+                    label: "_today",
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    insertText: "_today",
+                    detail: "Current date",
+                    documentation: "Date at execution time.",
+                    range,
+                },
+                {
+                    label: "_execution",
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    insertText: "_execution",
+                    detail: "Execution metadata",
+                    documentation: "Run metadata when available.",
+                    range,
+                },
+                {
+                    label: "_workflow",
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    insertText: "_workflow",
+                    detail: "Workflow metadata",
+                    documentation: "Workflow id/name/active when available.",
+                    range,
+                },
+                {
+                    label: "result",
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    insertText: "result",
+                    detail: "Output variable",
+                    documentation: "Set result to control node output.",
                     range,
                 },
             ];
@@ -119,6 +160,30 @@ function registerWorkflowCompletions() {
             return { suggestions };
         },
     });
+}
+
+function buildDynamicSuggestions(monaco, linePrefix, range) {
+    const bracketMatch = linePrefix.match(/_(json|vars|node|execution|workflow)\s*\[\s*['"]?([a-zA-Z0-9_]*)$/);
+    const dotMatch = linePrefix.match(/_(json|vars|node|execution|workflow)\.([a-zA-Z0-9_]*)$/);
+    if (!bracketMatch && !dotMatch) {
+        return [];
+    }
+    const match = bracketMatch || dotMatch;
+    const scope = `_${match[1]}`;
+    const prefix = match[2] || "";
+    const data = completionContext && completionContext[scope];
+    if (!data || typeof data !== "object") {
+        return [];
+    }
+    return Object.keys(data)
+        .filter((key) => key.startsWith(prefix))
+        .map((key) => ({
+            label: key,
+            kind: monaco.languages.CompletionItemKind.Field,
+            insertText: key,
+            detail: `${scope} key`,
+            range,
+        }));
 }
 
 export class CodeEditor extends Component {
@@ -131,6 +196,7 @@ export class CodeEditor extends Component {
         language: { type: String, optional: true },
         placeholder: { type: String, optional: true },
         readonly: { type: Boolean, optional: true },
+        completionContext: { type: Object, optional: true },
     };
 
     static defaultProps = {
@@ -148,11 +214,16 @@ export class CodeEditor extends Component {
 
         onMounted(async () => {
             try {
+                completionContext = this.props.completionContext || {};
                 await this.initEditor();
             } catch (error) {
                 console.error("[CodeEditor] Init error:", error);
                 this.state.error = error.message;
             }
+        });
+
+        onWillUpdateProps((nextProps) => {
+            completionContext = nextProps.completionContext || {};
         });
 
         onWillUnmount(() => {

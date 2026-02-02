@@ -284,52 +284,6 @@ export class WorkflowAdapter {
         return true;
     }
 
-    // ============================================
-    // EXECUTION
-    // ============================================
-
-    /**
-     * Execute a single node with input data and context
-     *
-     * @param {string} nodeId - Node ID
-     * @param {Object} inputData - Input data for execution
-     * @param {Object} context - Expression context { $vars, $json, $node, $loop }
-     * @returns {Promise<{json: *, error: string|null, meta: Object}>}
-     */
-    async executeNode(nodeId, inputData = {}, context = null) {
-        const coreNode = this._getCoreNode(nodeId);
-        if (!coreNode) {
-            return {
-                json: null,
-                error: `Node not found: ${nodeId}`,
-                meta: {}
-            };
-        }
-
-        const startTime = Date.now();
-        try {
-            // Pass context to node execute for expression resolution
-            const output = await coreNode.execute(inputData, context);
-            return {
-                json: output,
-                error: null,
-                meta: {
-                    duration: Date.now() - startTime,
-                    executedAt: new Date().toISOString(),
-                }
-            };
-        } catch (error) {
-            return {
-                json: null,
-                error: error.message || String(error),
-                meta: {
-                    duration: Date.now() - startTime,
-                    executedAt: new Date().toISOString(),
-                }
-            };
-        }
-    }
-
     /**
      * Get node class by type (from Odoo registry)
      *

@@ -59,6 +59,11 @@ export class WorkflowEditorApp extends Component {
         // Load on mount
         onMounted(async () => {
             try {
+                await this.editorService.loadNodeTypes();
+            } catch (error) {
+                this.notification.add("Failed to load node types.", { type: "warning" });
+            }
+            try {
                 await this.editorService.loadWorkflow(this.workflowId);
                 this.state.loading = false;
             } catch (error) {

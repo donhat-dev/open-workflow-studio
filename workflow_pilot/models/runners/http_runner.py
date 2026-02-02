@@ -32,10 +32,12 @@ class HttpNodeRunner(BaseNodeRunner):
     
     def execute(self, node_config, input_data, context):
         # Build context for expression evaluation
+        payload = input_data or {}
         eval_context = {
-            'json': input_data or {},
-            'node': context.get('node', {}),
-            'vars': context.get('vars', {}),
+            '_json': payload,
+            '_node': context.get('node', {}),
+            '_vars': context.get('vars', {}),
+            '_input': {'item': payload, 'json': payload},
         }
         
         # Evaluate URL

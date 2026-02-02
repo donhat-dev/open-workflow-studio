@@ -8,7 +8,35 @@ const nodeCategoryRegistry = registry.category("workflow_node_categories");
 const MAX_RECENT = 10;
 let recentNodeKeys = [];
 
-export function getAllNodeTypes() {
+export function getAllNodeTypes(backendTypes = null) {
+    const hasBackendTypes = Array.isArray(backendTypes) && backendTypes.length > 0;
+    if (hasBackendTypes) {
+        return backendTypes.map((entry) => {
+            const key = entry.node_type || entry.nodeType || entry.key;
+            if (!key) {
+                return null;
+            }
+            if (!nodeTypeRegistry.contains(key)) {
+                console.warn(`[workflowNode] Missing frontend node class for "${key}"`);
+                return null;
+            }
+            const value = nodeTypeRegistry.get(key);
+            const NodeClass = value.class || value;
+            if (typeof NodeClass !== 'function') {
+                console.warn(`[workflowNode] Invalid node type "${key}":`, value);
+                return null;
+            }
+            return {
+                key,
+                class: NodeClass,
+                name: entry.name || NodeClass.label || value.name || key,
+                icon: entry.icon || NodeClass.icon || value.icon || "fa-cube",
+                category: entry.category || NodeClass.category || value.category || "action",
+                description: entry.description || NodeClass.description || value.description || "",
+            };
+        }).filter(Boolean);
+    }
+
     return nodeTypeRegistry.getEntries().map(([key, value]) => {
         const NodeClass = value.class || value;
         const isClass = typeof NodeClass === 'function';
@@ -29,20 +57,21 @@ export function getAllNodeTypes() {
     }).filter(Boolean);
 }
 
-export function getNodeType(key) {
+export function getNodeType(key, backendTypes = null) {
     if (!nodeTypeRegistry.contains(key)) {
         return null;
     }
     const value = nodeTypeRegistry.get(key);
     const NodeClass = value.class || value;
+    const backend = findBackendType(backendTypes, key);
 
     return {
         key,
         class: NodeClass,
-        name: NodeClass.label || value.name || key,
-        icon: NodeClass.icon || value.icon || "fa-cube",
-        category: NodeClass.category || value.category || "action",
-        description: NodeClass.description || value.description || "",
+        name: (backend && backend.name) || NodeClass.label || value.name || key,
+        icon: (backend && backend.icon) || NodeClass.icon || value.icon || "fa-cube",
+        category: (backend && backend.category) || NodeClass.category || value.category || "action",
+        description: (backend && backend.description) || NodeClass.description || value.description || "",
     };
 }
 
@@ -65,8 +94,8 @@ export function getCategories() {
         });
 }
 
-export function searchNodes(searchValue = "", options = {}) {
-    let nodes = getAllNodeTypes();
+export function searchNodes(searchValue = "", options = {}, backendTypes = null) {
+    let nodes = getAllNodeTypes(backendTypes);
 
     if (options.category) {
         nodes = nodes.filter(n => n.category === options.category);
@@ -124,4 +153,17 @@ function groupByCategory(nodes) {
     }
 
     return grouped;
+}
+
+function findBackendType(backendTypes, key) {
+    if (!Array.isArray(backendTypes)) {
+        return null;
+    }
+    for (const entry of backendTypes) {
+        const entryKey = entry.node_type || entry.nodeType || entry.key;
+        if (entryKey === key) {
+            return entry;
+        }
+    }
+    return null;
 }

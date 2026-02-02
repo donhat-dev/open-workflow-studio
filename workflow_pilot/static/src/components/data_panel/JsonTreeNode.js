@@ -18,10 +18,10 @@ export class JsonTreeNode extends Component {
         path: { type: Array },  // Array of path segments
         keyName: { type: String, optional: true },  // Key name for display
         onItemClick: { type: Function, optional: true },
-        // Force require: if provided, expression paths will be node-scoped: $("nodeId").json...
-        // Can be null for $input nodes
+        // Force require: if provided, expression paths will be node-scoped: _node["nodeId"].json...
+        // Can be null for _input nodes
         sourceNodeId: { type: [String, { value: null }], optional: true },
-        // When true, expression paths use $input.json... prefix instead of node selector
+        // When true, expression paths use _input.json... prefix instead of node selector
         isInputNode: { type: Boolean, optional: true },
         // When false, disables drag entirely (readonly tree)
         draggable: { type: Boolean, optional: true },
@@ -111,9 +111,13 @@ export class JsonTreeNode extends Component {
     }
 
     get expressionPath() {
-        // If isInputNode, use $input prefix (matches CodeNode runtime)
+        // If isInputNode, use _input prefix (matches CodeNode runtime)
         if (this.props.isInputNode) {
-            return generateExpressionPath(this.props.path, '$input');
+            return generateExpressionPath(this.props.path, '_input');
+        }
+
+        if (this.props.path && this.props.path[0] === '_vars') {
+            return generateExpressionPath(this.props.path.slice(1), '_vars');
         }
 
         // If sourceNodeId is provided, use node-scoped selector
@@ -122,7 +126,7 @@ export class JsonTreeNode extends Component {
         }
 
         // Fallback for legacy/preview contexts (typically readonly).
-        return generateExpressionPath(this.props.path, 'json');
+        return generateExpressionPath(this.props.path, '_json');
     }
 
     get expressionTemplate() {
@@ -147,8 +151,11 @@ export class JsonTreeNode extends Component {
     get isDraggable() {
         // Explicitly disabled by parent
         if (this.props.draggable === false) return false;
-        // Allow drag for $input nodes or node-scoped data
-        return this.props.isInputNode || Boolean(this.props.sourceNodeId);
+        // Allow drag for _input nodes or node-scoped data
+        if (this.props.isInputNode || Boolean(this.props.sourceNodeId)) {
+            return true;
+        }
+        return this.props.path && this.props.path[0] === '_vars';
     }
 
     onDragStart(ev) {

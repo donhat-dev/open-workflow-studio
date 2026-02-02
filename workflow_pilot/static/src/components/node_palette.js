@@ -2,6 +2,7 @@
 import { _t } from "@web/core/l10n/translation";
 
 import { Component, xml } from "@odoo/owl";
+import { useEditor } from "@workflow_pilot/store/use_editor";
 import { LucideIcon } from "./common/lucide_icon";
 
 export class NodePaletteItem extends Component {
@@ -12,7 +13,8 @@ export class NodePaletteItem extends Component {
             t-on-dragstart="onDragStart"
             draggable="true">
             <div class="node-palette__icon">
-                <LucideIcon name="props.icon" size="18"/>
+                <i t-if="isFontAwesome(props.icon)" t-att-class="getFaClass(props.icon)"/>
+                <LucideIcon t-else="" name="props.icon" size="18"/>
             </div>
             <div class="node-palette__label"><t t-esc="props.title || ('Node')"/></div>
         </div>
@@ -30,6 +32,14 @@ export class NodePaletteItem extends Component {
 
     setup() {
         this._t = _t;
+    }
+
+    isFontAwesome(icon) {
+        return typeof icon === "string" && icon.startsWith("fa-");
+    }
+
+    getFaClass(icon) {
+        return `fa ${icon}`;
     }
 
     onClick() {
@@ -64,19 +74,25 @@ class NodePalette extends Component {
 
     setup() {
         this._t = _t;
+        this.editor = useEditor();
     }
 
     get items() {
-        return [
-            { name: "manual_trigger", title: ("Manual Trigger"), icon: "Play", className: "node-palette__item--trigger" },
-            { name: "http", title: ("HTTP Request"), icon: "Globe", className: "node-palette__item--http" },
-            { name: "variable", title: ("Set Variable"), icon: "Box", className: "node-palette__item--variable" },
-            { name: "validation", title: ("Data Validation"), icon: "CheckCircle", className: "node-palette__item--validation" },
-            { name: "mapping", title: ("Data Mapping"), icon: "ArrowRightLeft", className: "node-palette__item--mapping" },
-            { name: "loop", title: ("Loop Over Items"), icon: "Repeat", className: "node-palette__item--loop" },
-            { name: "if", title: ("If"), icon: "GitBranch", className: "node-palette__item--if" },
-            { name: "code", title: ("Code"), icon: "Code", className: "node-palette__item--code" },
-        ];
+        const nodes = this.editor.nodes.getAllNodeTypes();
+        const items = nodes.map((node) => ({
+            name: node.key,
+            title: node.name || node.key,
+            icon: node.icon,
+            className: `node-palette__item--${node.key}`,
+            category: node.category || "",
+        }));
+        items.sort((a, b) => {
+            if (a.category === b.category) {
+                return a.title.localeCompare(b.title);
+            }
+            return a.category.localeCompare(b.category);
+        });
+        return items;
     }
 }
 

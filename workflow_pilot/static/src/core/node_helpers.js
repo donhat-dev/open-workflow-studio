@@ -130,7 +130,7 @@ export class NodeHelpers {
 
     /**
      * Get expression evaluation context
-     * Contains $json, $node, $vars, $loop, etc.
+     * Contains _json, _node, _vars, _loop, etc.
      * @returns {Object}
      */
     getExpressionContext() {
@@ -139,7 +139,7 @@ export class NodeHelpers {
 
     /**
      * Get specific expression variable
-     * @param {string} name - Variable name (e.g., '$json', '$vars')
+     * @param {string} name - Variable name (e.g., '_json', '_vars')
      * @returns {any}
      */
     getExpressionVariable(name) {
@@ -158,7 +158,7 @@ export class NodeHelpers {
         if (this._variableService) {
             return this._variableService.getAllVariables?.() || {};
         }
-        return this._expressionContext.$vars || {};
+        return this._expressionContext._vars || {};
     }
 
     /**

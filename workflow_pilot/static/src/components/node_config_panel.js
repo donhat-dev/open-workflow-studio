@@ -39,11 +39,6 @@ export class NodeConfigPanel extends Component {
             // Expression UI modes (persisted in node.meta.ui)
             controlModes: {},  // { [controlKey]: 'fixed' | 'expression' }
             pairModes: {},  // { [controlKey]: { [pairId]: 'fixed' | 'expression' } }
-            // Execution snapshot for expression preview
-            lastExecutionContext: null, // { $vars, $node, $json, $loop, $input }
-            // Execution state
-            isExecuting: false,
-            executionResult: null,  // { output, error, meta }
             // Collapsed ancestor sections
             collapsedSections: {},  // { nodeId: true/false }
             // Panel resize state
@@ -67,9 +62,6 @@ export class NodeConfigPanel extends Component {
                 this.state.controls = [];
                 this.state.controlModes = {};
                 this.state.pairModes = {};
-                this.state.lastExecutionContext = null;
-                this.state.isExecuting = false;
-                this.state.executionResult = null;
                 this.initControlValues(nextProps.node);
             }
         });
@@ -188,11 +180,6 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionStatus() {
-        if (this.state.isExecuting) return 'running';
-        if (this.state.executionResult) {
-            if (this.state.executionResult.error) return 'error';
-            return 'success';
-        }
         const execution = this.props.execution;
         if (execution && execution.status === 'failed') return 'error';
         const runResult = this.executionNodeResult;
@@ -202,32 +189,18 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionStatusLabel() {
-        const result = this.state.executionResult;
-        if (!result) {
-            const execution = this.props.execution;
-            if (execution && execution.status === 'failed') {
-                return `Error: ${execution.error || 'Execution failed'}`;
-            }
-            const runResult = this.executionNodeResult;
-            if (runResult?.error_message) {
-                return `Error: ${runResult.error_message}`;
-            }
-            return '';
+        const execution = this.props.execution;
+        if (execution && execution.status === 'failed') {
+            return `Error: ${execution.error || 'Execution failed'}`;
         }
-
-        if (result.error) return `Error: ${result.error}`;
-
-        // Try to get HTTP status from output
-        const status = result.output?.status;
-        if (status) return `${status} ${result.output?.statusText || ''}`;
-
-        return 'Success';
+        const runResult = this.executionNodeResult;
+        if (runResult && runResult.error_message) {
+            return `Error: ${runResult.error_message}`;
+        }
+        return '';
     }
 
     get executionOutputJson() {
-        if (this.state.executionResult?.output) {
-            return JSON.stringify(this.state.executionResult.output, null, 2);
-        }
         const runResult = this.executionNodeResult;
         if (!runResult || runResult.output_data === undefined) return '';
         return JSON.stringify(runResult.output_data, null, 2);
@@ -271,11 +244,11 @@ export class NodeConfigPanel extends Component {
             this.props.node.id
         );
 
-        const $node = context.$node || {};
-        const entries = Object.entries($node);
+        const nodeContext = context._node || {};
+        const entries = Object.entries(nodeContext);
         if (entries.length === 0) return null;
 
-        // Return array with isInputNode marker (first node = $input)
+        // Return array with isInputNode marker (first node = _input)
         return entries.map(([nodeId, data], index) => ({
             nodeId,
             data: {
@@ -287,12 +260,6 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionDisplayResult() {
-        if (this.state.executionResult) {
-            return {
-                error: this.state.executionResult.error,
-                output: this.state.executionResult.output,
-            };
-        }
         const runResult = this.executionNodeResult;
         if (!runResult) return null;
         if (runResult.error_message) {
@@ -309,12 +276,12 @@ export class NodeConfigPanel extends Component {
 
     /**
      * Initialize collapse state for ancestor sections
-     * First node ($input) expanded, others collapsed
+     * First node (_input) expanded, others collapsed
      * @private
      */
     _initAncestorCollapseState() {
         const leftData = this.leftPanelData || [];
-        const defaults = { '$vars': true }; // $vars always collapsed
+        const defaults = { '_vars': true }; // _vars always collapsed
         for (const item of leftData) {
             // First node (isInputNode) expanded, others collapsed
             defaults[item.nodeId] = !item.isInputNode;
@@ -335,45 +302,26 @@ export class NodeConfigPanel extends Component {
         }
         const workflow = this._getWorkflowFromContext();
         if (!workflow) {
-            // Fallback to execution result for single-node preview
-            const result = this.state.executionResult;
-            if (!result?.output) return null;
-            if (result.output.body?.data) return result.output.body.data;
-            if (result.output.body) return result.output.body;
-            return result.output;
+            return null;
         }
 
         if (!this.actions.buildContextForNode) {
             throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
         }
         const context = this.actions.buildContextForNode(workflow, this.props.node.id);
-        return context.$json;
+        return context._json;
     }
 
     /**
      * Full expression context for ExpressionInput preview.
      *
-     * Goal: allow preview/evaluation of $vars expressions without requiring UI mapping.
+     * Goal: allow preview/evaluation of _vars expressions without requiring UI mapping.
      *
-     * - $json: immediate previous node output (existing behavior)
-     * - $node: ancestor node outputs (for cross-node lookup)
-     * - $vars/$loop: from workflowVariable service via adapterService.getExpressionContext()
+     * - _json: immediate previous node output (existing behavior)
+     * - _node: ancestor node outputs (for cross-node lookup)
+     * - _vars/_loop: from workflowVariable service via adapterService.getExpressionContext()
      */
     get expressionPreviewContext() {
-        // Prefer the last execution snapshot for preview (stable, matches executed data flow).
-        if (this.state.lastExecutionContext) {
-            const snap = this.state.lastExecutionContext;
-            const inputJson = snap.$input?.json ?? snap.$input?.item ?? snap.$json ?? {};
-            return {
-                $vars: snap.$vars || {},
-                $loop: snap.$loop || null,
-                $node: snap.$node || {},
-                // For UX, treat $json as the current input item
-                $json: inputJson,
-                $input: snap.$input || { item: inputJson, json: inputJson },
-            };
-        }
-
         const execution = this.props.execution;
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
             const nodeMap = {};
@@ -381,13 +329,23 @@ export class NodeConfigPanel extends Component {
                 nodeMap[result.node_id] = result.output_data;
             }
             const runResult = this.executionNodeResult;
-            const json = runResult?.output_data || {};
+            let json = {};
+            if (runResult && runResult.output_data !== undefined) {
+                json = runResult.output_data;
+            }
+            const snapshot = execution.contextSnapshot || {};
+            const wrappedNodeMap = {};
+            for (const [nodeId, output] of Object.entries(nodeMap)) {
+                wrappedNodeMap[nodeId] = { json: output };
+            }
             return {
-                $vars: {},
-                $loop: null,
-                $node: nodeMap,
-                $json: json,
-                $input: { item: json, json },
+                _vars: snapshot.vars || {},
+                _loop: null,
+                _node: wrappedNodeMap,
+                _json: json,
+                _input: { item: json, json },
+                _execution: snapshot.execution || null,
+                _workflow: snapshot.workflow || null,
             };
         }
 
@@ -395,22 +353,26 @@ export class NodeConfigPanel extends Component {
             throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
         }
         const base = this.actions.getExpressionContext() || {
-            $vars: {},
-            $node: {},
-            $json: {},
-            $loop: null,
-            $input: { item: null, json: null },
+            _vars: {},
+            _node: {},
+            _json: {},
+            _loop: null,
+            _input: { item: null, json: null },
+            _execution: null,
+            _workflow: null,
         };
 
         const workflow = this._getWorkflowFromContext();
         if (!workflow) {
             const json = this.inputData || {};
             return {
-                $vars: base.$vars || {},
-                $loop: base.$loop || null,
-                $node: base.$node || {},
-                $json: json,
-                $input: { item: json, json },
+                _vars: base._vars || {},
+                _loop: base._loop || null,
+                _node: base._node || {},
+                _json: json,
+                _input: { item: json, json },
+                _execution: base._execution || null,
+                _workflow: base._workflow || null,
             };
         }
 
@@ -418,15 +380,17 @@ export class NodeConfigPanel extends Component {
             throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
         }
         const wfContext = this.actions.buildContextForNode(workflow, this.props.node.id);
-        const json = wfContext.$json || {};
+        const json = wfContext._json || {};
 
         return {
-            $vars: base.$vars || {},
-            $loop: base.$loop || null,
+            _vars: base._vars || {},
+            _loop: base._loop || null,
             // Prefer workflow-scoped node outputs for this node (ancestors)
-            $node: wfContext.$node || base.$node || {},
-            $json: json,
-            $input: { item: json, json },
+            _node: wfContext._node || base._node || {},
+            _json: json,
+            _input: { item: json, json },
+            _execution: base._execution || null,
+            _workflow: base._workflow || null,
         };
     }
 
@@ -498,15 +462,18 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
-     * S2.3: Get workflow variables ($vars) for display in left panel
-     * This allows users to see and drag $vars expressions
+     * S2.3: Get workflow variables (_vars) for display in left panel
+     * This allows users to see and drag _vars expressions
      */
     get workflowVariables() {
         if (!this.actions.getExpressionContext) {
             throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
         }
         const expressionContext = this.actions.getExpressionContext();
-        return expressionContext?.$vars || {};
+        if (expressionContext && expressionContext._vars) {
+            return expressionContext._vars;
+        }
+        return {};
     }
 
     /**
@@ -537,49 +504,22 @@ export class NodeConfigPanel extends Component {
      * 3. Results returned to UI
      */
     async onExecute() {
-        if (!this.actions.runUntilNode || !this.actions.runNode) {
-            throw new Error("[NodeConfigPanel] Missing run actions");
+        if (!this.actions.executeUntilNode) {
+            throw new Error("[NodeConfigPanel] Missing executeUntilNode action");
         }
-        if (this.actions.isExecuting && this.actions.isExecuting()) return;
 
         const nodeId = this.props.node.id;
-        const workflow = this._getWorkflowFromContext();
-
-        this.state.isExecuting = true;
-        this.state.executionResult = null;
+        const configOverrides = this.state.controlValues
+            ? { [nodeId]: this.state.controlValues }
+            : null;
 
         try {
-            let result = null;
-
-            if (workflow) {
-                result = await this.actions.runUntilNode(workflow, nodeId, {
-                    syncConfig: true,
-                    controlValues: this.state.controlValues,
-                    onProgress: (executedNodeId, nodeResult) => {
-                        console.log(`[NodeConfigPanel] Node ${executedNodeId} executed`);
-                    }
-                });
-                this.state.executionResult = null;
-                this.state.lastExecutionContext = null;
-            } else {
-                result = await this.actions.runNode(nodeId, {});
-                this.state.executionResult = result;
-            }
-
-            // Notify parent to refresh variable inspector
+            await this.actions.executeUntilNode(nodeId, {}, configOverrides);
             if (this.props.onExecute) {
-                this.props.onExecute(nodeId, result);
+                this.props.onExecute(nodeId);
             }
-
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
-            this.state.executionResult = {
-                output: null,
-                error: err.message,
-                meta: { executedAt: new Date().toISOString() },
-            };
-        } finally {
-            this.state.isExecuting = false;
         }
     }
 

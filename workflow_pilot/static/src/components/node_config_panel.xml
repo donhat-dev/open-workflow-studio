@@ -41,7 +41,7 @@
 											<i t-att-class="'fa ' + (isSectionCollapsed(item.nodeId) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
 											<i t-att-class="item.isInputNode ? 'fa fa-sign-in' : 'fa fa-cube'"/>
 											<t t-if="item.isInputNode">
-												<span>$input (
+											<span>_input (
 													
 													
 													
@@ -66,19 +66,19 @@
 									</div>
 								</t>
 							</t>
-							<!-- S2.3: Workflow Variables ($vars) section -->
-							<t t-if="hasWorkflowVariables">
-								<div class="ancestor-node-section vars-section" t-att-class="{ collapsed: isSectionCollapsed('$vars') }">
-									<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('$vars')">
-										<i t-att-class="'fa ' + (isSectionCollapsed('$vars') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
-										<i class="fa fa-code"/>
-										<span>Workflow Variables ($vars)</span>
-									</div>
-									<div class="ancestor-node-data" t-if="!isSectionCollapsed('$vars')">
-										<JsonTreeNode data="workflowVariables" path="['$vars']" draggable="true"/>
-									</div>
+						<!-- S2.3: Workflow Variables (_vars) section -->
+						<t t-if="hasWorkflowVariables">
+							<div class="ancestor-node-section vars-section" t-att-class="{ collapsed: isSectionCollapsed('_vars') }">
+								<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('_vars')">
+									<i t-att-class="'fa ' + (isSectionCollapsed('_vars') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
+									<i class="fa fa-code"/>
+									<span>Workflow Variables (_vars)</span>
 								</div>
-							</t>
+								<div class="ancestor-node-data" t-if="!isSectionCollapsed('_vars')">
+									<JsonTreeNode data="workflowVariables" path="['_vars']" draggable="true"/>
+								</div>
+							</div>
+						</t>
 							<t t-else="">
 								<div class="input-data-empty">
 									<i class="fa fa-database"/>

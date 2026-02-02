@@ -27,7 +27,11 @@ export class CanvasNodeToolbar extends Component {
      */
     onExecuteClick(ev) {
         ev.stopPropagation();
-        this.props.onExecute?.(this.props.nodeId);
+        const onExecute = this.props.onExecute;
+        if (!onExecute) {
+            throw new Error("[CanvasNodeToolbar] Missing onExecute prop");
+        }
+        onExecute(this.props.nodeId);
     }
 
     /**
@@ -35,7 +39,11 @@ export class CanvasNodeToolbar extends Component {
      */
     onDeleteClick(ev) {
         ev.stopPropagation();
-        this.props.onDelete?.(this.props.nodeId);
+        const onDelete = this.props.onDelete;
+        if (!onDelete) {
+            throw new Error("[CanvasNodeToolbar] Missing onDelete prop");
+        }
+        onDelete(this.props.nodeId);
     }
 
     /**
@@ -43,7 +51,11 @@ export class CanvasNodeToolbar extends Component {
      */
     onToggleClick(ev) {
         ev.stopPropagation();
-        this.props.onToggleDisable?.(this.props.nodeId);
+        const onToggleDisable = this.props.onToggleDisable;
+        if (!onToggleDisable) {
+            throw new Error("[CanvasNodeToolbar] Missing onToggleDisable prop");
+        }
+        onToggleDisable(this.props.nodeId);
     }
 
     /**
@@ -51,7 +63,11 @@ export class CanvasNodeToolbar extends Component {
      */
     onConfigClick(ev) {
         ev.stopPropagation();
-        this.props.onOpenConfig?.(this.props.nodeId);
+        const onOpenConfig = this.props.onOpenConfig;
+        if (!onOpenConfig) {
+            throw new Error("[CanvasNodeToolbar] Missing onOpenConfig prop");
+        }
+        onOpenConfig(this.props.nodeId);
     }
 
     /**
@@ -59,7 +75,11 @@ export class CanvasNodeToolbar extends Component {
      */
     onMenuClick(ev) {
         ev.stopPropagation();
-        this.props.onOpenMenu?.(this.props.nodeId, ev);
+        const onOpenMenu = this.props.onOpenMenu;
+        if (!onOpenMenu) {
+            throw new Error("[CanvasNodeToolbar] Missing onOpenMenu prop");
+        }
+        onOpenMenu(this.props.nodeId, ev);
     }
 
     /**

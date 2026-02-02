@@ -70,6 +70,7 @@ export const workflowEditorService = {
             },
             ui: DEFAULT_UI_STATE(),
             execution: null,
+            nodeTypes: [],
         });
 
         // Keep reactive history flags in sync for future toolbar bindings.
@@ -93,6 +94,9 @@ export const workflowEditorService = {
             },
             clearExecution() {
                 state.execution = null;
+            },
+            setNodeTypes(types) {
+                state.nodeTypes = Array.isArray(types) ? types : [];
             },
             addNode(type, position) {
                 const nodeId = adapter.addNode(type, position);
@@ -412,6 +416,16 @@ export const workflowEditorService = {
                 workflowId = id;
                 return data;
             },
+            async loadNodeTypes() {
+                const result = await rpc('/web/dataset/call_kw', {
+                    model: 'workflow.type',
+                    method: 'get_available_types',
+                    args: [],
+                    kwargs: {},
+                });
+                actions.setNodeTypes(result || []);
+                return result;
+            },
             async saveWorkflow() {
                 const snapshot = adapter.toJSON();
                 const result = await rpc('/web/dataset/call_kw', {
@@ -495,64 +509,81 @@ export const workflowEditorService = {
                 if (!targetNodeId) {
                     throw new Error('Target node ID is required');
                 }
-                const result = await rpc('/workflow_pilot/execute_until', {
-                    workflow_id: workflowId,
-                    target_node_id: targetNodeId,
-                    input_data: inputData,
-                    snapshot: adapter.toJSON(),
-                    config_overrides: configOverrides,
-                });
-                if (result && result.status === 'completed') {
-                    const nodeOutputs = result.node_outputs || {};
-                    const executedOrder = result.executed_order || [];
-                    const nodeResults = executedOrder.length
-                        ? executedOrder.map((nodeId) => {
-                            const output = nodeOutputs[nodeId] || {};
-                            return {
+                try {
+                    const result = await rpc('/workflow_pilot/execute_until', {
+                        workflow_id: workflowId,
+                        target_node_id: targetNodeId,
+                        input_data: inputData,
+                        snapshot: adapter.toJSON(),
+                        config_overrides: configOverrides,
+                    });
+                    if (result && result.status === 'completed') {
+                        const nodeOutputs = result.node_outputs || {};
+                        const executedOrder = result.executed_order || [];
+                        const nodeResults = executedOrder.length
+                            ? executedOrder.map((nodeId) => {
+                                const output = nodeOutputs[nodeId] || {};
+                                return {
+                                    node_id: nodeId,
+                                    output_data: output.json,
+                                    error_message: output.error || null,
+                                    title: output.title,
+                                    meta: output.meta || null,
+                                };
+                            })
+                            : Object.entries(nodeOutputs).map(([nodeId, output]) => ({
                                 node_id: nodeId,
                                 output_data: output.json,
                                 error_message: output.error || null,
                                 title: output.title,
                                 meta: output.meta || null,
-                            };
-                        })
-                        : Object.entries(nodeOutputs).map(([nodeId, output]) => ({
-                            node_id: nodeId,
-                            output_data: output.json,
-                            error_message: output.error || null,
-                            title: output.title,
-                            meta: output.meta || null,
-                        }));
+                            }));
 
-                    actions.setExecutionResult({
-                        runId: null,
-                        status: 'completed',
-                        error: null,
-                        errorNodeId: null,
-                        outputData: null,
-                        executedOrder,
-                        executionCount: result.execution_count || null,
-                        inputData: inputData || {},
-                        nodeResults,
-                        nodeOutputs,
-                        contextSnapshot: result.context_snapshot || null,
-                        updatedAt: new Date().toISOString(),
-                    });
-                } else if (result && result.status === 'failed') {
+                        actions.setExecutionResult({
+                            runId: null,
+                            status: 'completed',
+                            error: null,
+                            errorNodeId: null,
+                            outputData: null,
+                            executedOrder,
+                            executionCount: result.execution_count || null,
+                            inputData: inputData || {},
+                            nodeResults,
+                            nodeOutputs,
+                            contextSnapshot: result.context_snapshot || null,
+                            updatedAt: new Date().toISOString(),
+                        });
+                    } else if (result && result.status === 'failed') {
+                        actions.setExecutionResult({
+                            runId: null,
+                            status: 'failed',
+                            error: result.error || 'Execution failed',
+                            errorNodeId: null,
+                            outputData: null,
+                            executedOrder: [],
+                            executionCount: result.execution_count || null,
+                            inputData: inputData || {},
+                            nodeResults: [],
+                            updatedAt: new Date().toISOString(),
+                        });
+                    }
+                    return result;
+                } catch (error) {
+                    const errorMessage = error && error.message ? error.message : 'Execution failed';
                     actions.setExecutionResult({
                         runId: null,
                         status: 'failed',
-                        error: result.error || 'Execution failed',
+                        error: errorMessage,
                         errorNodeId: null,
                         outputData: null,
                         executedOrder: [],
-                        executionCount: result.execution_count || null,
+                        executionCount: null,
                         inputData: inputData || {},
                         nodeResults: [],
                         updatedAt: new Date().toISOString(),
                     });
+                    throw error;
                 }
-                return result;
             },
             getWorkflowId() {
                 return workflowId;
@@ -576,12 +607,12 @@ export const workflowEditorService = {
                 getConnections: () => state.graph.connections,
             },
             nodes: {
-                getAllNodeTypes: () => getAllNodeTypes(),
+                getAllNodeTypes: () => getAllNodeTypes(state.nodeTypes),
                 getCategories: () => getCategories(),
-                getNodeType: (key) => getNodeType(key),
+                getNodeType: (key) => getNodeType(key, state.nodeTypes),
                 getNodeClass: (key) => getRegistryNodeClass(key),
                 getRecentNodes: (limit) => getRecentNodes(limit),
-                searchNodes: (query, options) => searchNodes(query, options),
+                searchNodes: (query, options) => searchNodes(query, options, state.nodeTypes),
                 trackUsage: (key) => trackNodeUsage(key),
                 clearRecentNodes: () => clearRecentNodes(),
             },

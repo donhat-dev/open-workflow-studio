@@ -182,15 +182,15 @@ export class CheckboxControl extends Control {
 
 /**
  * CodeControl - Code editor (Monaco-based)
- * For writing JavaScript code with syntax highlighting and autocomplete
+ * For writing code with syntax highlighting and autocomplete
  */
 export class CodeControl extends Control {
     constructor(key, options = {}) {
         super(key, options);
         this.type = 'code';
-        this.language = options.language || 'javascript';
+        this.language = options.language || 'python';
         this.height = options.height || 200;
-        this.placeholder = options.placeholder || '// Write your code here\nreturn $json;';
+        this.placeholder = options.placeholder || 'result = _json';
         if (this.value === null) {
             this.value = options.default || '';
         }
