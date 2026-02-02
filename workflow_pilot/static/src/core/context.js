@@ -210,15 +210,11 @@ export class ExecutionContext {
      *
      * @returns {*} Previous node output or empty object
      */
-    get $json() {
+     get _json() {
         if (!this._currentNodeId) return {};
         return this._nodeOutputs[this._currentNodeId]?.json ||
                this._nodeOutputs[this._currentNodeId] ||
                {};
-    }
-
-    get _json() {
-        return this.$json;
     }
 
     /**
@@ -226,25 +222,8 @@ export class ExecutionContext {
      *
      * @returns {Object}
      */
-    get $node() {
-        return this._nodeOutputs;
-    }
-
     get _node() {
-        return this.$node;
-    }
-
-    /**
-     * Get all variables
-     *
-     * @returns {Object}
-     */
-    get $vars() {
-        return this._vars;
-    }
-
-    get _vars() {
-        return this.$vars;
+        return this._nodeOutputs;
     }
 
     // ============================================
@@ -267,10 +246,10 @@ export class ExecutionContext {
      *
      * @returns {Object} Current input data
      */
-    get $input() {
+    get _input() {
         // If inside a loop, return the current loop item wrapped
         if (this._loopStack.length > 0) {
-            const loopCtx = this.$loop;
+            const loopCtx = this._loop;
             return {
                 item: loopCtx?.item,
                 json: loopCtx?.item,
@@ -282,10 +261,6 @@ export class ExecutionContext {
             item: this._currentInput,
             json: this._currentInput,
         };
-    }
-
-    get _input() {
-        return this.$input;
     }
 
     // ============================================
@@ -323,7 +298,7 @@ export class ExecutionContext {
      *
      * @returns {Object|null} Loop context or null if not in loop
      */
-    get $loop() {
+    get _loop() {
         const current = this._loopStack[this._loopStack.length - 1];
         if (!current || current.total === 0) return null;
 
@@ -334,10 +309,6 @@ export class ExecutionContext {
             isFirst: current.index === 0,
             isLast: current.index === current.total - 1,
         };
-    }
-
-    get _loop() {
-        return this.$loop;
     }
 
     /**
@@ -430,9 +401,9 @@ export class ExecutionContext {
         return {
             _vars: this._vars,
             _node: this._nodeOutputs,
-            _json: this.$json,
-            _loop: this.$loop,
-            _input: this.$input,
+            _json: this._json,
+            _loop: this._loop,
+            _input: this._input,
         };
     }
 

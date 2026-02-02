@@ -4,7 +4,6 @@
  * Expression Utilities
  * 
  * Expression handling: {{ _json.field }}, {{ _vars.name }}, {{ _loop.item }}
- * Legacy namespace handling: {{ $json.field }}, {{ json.field }}
  * 
  * Supports all ExecutionContext namespaces:
  * - _json: Previous node output (shortcut)
@@ -26,14 +25,8 @@ export const EXPRESSION_PATTERNS = {
     SINGLE_TEMPLATE: /\{\{(.+?)\}\}/,
     // Check if entire value is expression (n8n style: starts with =)
     EXPRESSION_PREFIX: /^=/,
-    // Match namespace prefix: _json, $json, etc.
-    NAMESPACE: /^(\$|_)(\w+)/,
-    // Match bare namespace: json, vars, loop, node, input (legacy)
-    BARE_NAMESPACE: /^(json|vars|loop|node|input)(?=\.|\[|$)/,
-    // n8n-style node selector: $('nodeId') or $("nodeId")
-    NODE_SELECTOR: /\$\(\s*['"]([^'"]+)['"]\s*\)/g,
-    // Single node selector match
-    SINGLE_NODE_SELECTOR: /^\$\(\s*['"]([^'"]+)['"]\s*\)/,
+    // Match namespace prefix: _json, _vars, _loop, _node, _input
+    NAMESPACE: /^_(\w+)/,
 };
 
 /**
@@ -117,11 +110,11 @@ export function generateExpressionPath(pathParts, root = '_json') {
 }
 
 /**
- * Generate node-scoped expression path using n8n-style node selector.
+ * Generate node-scoped expression path using _node namespace.
  *
  * Example:
  * - nodeId: "n_1", pathParts: ["body", "data"]
- * - result: $("n_1").json.body.data
+ * - result: _node["n_1"].json.body.data
  *
  * Note: nodeId must not contain unescaped quotes; IDs are expected to be safe (e.g., n_1).
  *
@@ -149,36 +142,6 @@ export function wrapExpression(expression) {
 }
 
 /**
- * Rewrite n8n-style node selector to standard _node path.
- * 
- * Converts: $('n_1').json.body.data  →  _node['n_1'].json.body.data
- * Converts: $("n_1").json.key       →  _node['n_1'].json.key
- * 
- * @param {string} expression - Expression that may contain $('nodeId') selectors
- * @returns {{ rewritten: string, error: string|null }}
- */
-export function rewriteNodeSelector(expression) {
-    if (!expression || typeof expression !== 'string') {
-        return { rewritten: expression, error: null };
-    }
-
-    // Check if expression contains node selector pattern
-    if (!expression.includes('$(')) {
-        return { rewritten: expression, error: null };
-    }
-
-    let result = expression;
-    let hasError = null;
-
-    // Replace all $('nodeId') or $("nodeId") with _node['nodeId'].json
-    result = result.replace(EXPRESSION_PATTERNS.NODE_SELECTOR, (match, nodeId) => {
-        return `_node['${nodeId}'].json`;
-    });
-
-    return { rewritten: result, error: hasError };
-}
-
-/**
  * Parse an expression path into namespace and parts
  * @param {string} path - e.g., _json.items[0].name, _vars.result, _loop.item
  * @returns {{ namespace: string, parts: string[] }}
@@ -190,15 +153,12 @@ export function parseExpressionPath(path) {
 
     // Extract namespace
     const nsMatch = path.match(EXPRESSION_PATTERNS.NAMESPACE);
-    const bareMatch = nsMatch ? null : path.match(EXPRESSION_PATTERNS.BARE_NAMESPACE);
-    const namespace = nsMatch
-        ? normalizeNamespace(`${nsMatch[1]}${nsMatch[2]}`)
-        : (bareMatch ? normalizeNamespace(bareMatch[1]) : null);
+    const namespace = nsMatch ? `_${nsMatch[1]}` : null;
 
     // Remove namespace prefix for path parsing
     let cleanPath = path;
     if (namespace) {
-        const prefixLength = nsMatch ? nsMatch[0].length : bareMatch[1].length;
+        const prefixLength = nsMatch[0].length;
         cleanPath = path.slice(prefixLength);
         // Remove leading dot if present
         if (cleanPath.startsWith('.')) {
@@ -226,8 +186,7 @@ export function parseExpressionPath(path) {
 }
 
 /**
- * Legacy: Parse path and return just parts (for backward compatibility)
- * @deprecated Use parseExpressionPath() instead
+ * Parse path and return just parts
  * @param {string} path 
  * @returns {string[]}
  */
@@ -264,27 +223,34 @@ export function getValueByPath(data, path) {
 export function resolveExpression(expression, context = {}) {
     const { namespace, parts } = parseExpressionPath(expression);
 
+    if (!namespace) {
+        throw new Error(`Invalid expression namespace. Use one of: ${NAMESPACES.join(', ')}`);
+    }
+
+    if (!NAMESPACES.includes(namespace)) {
+        throw new Error(`Unsupported namespace ${namespace}. Use one of: ${NAMESPACES.join(', ')}`);
+    }
+
     // Determine source data based on namespace
     let source;
     switch (namespace) {
         case '_json':
-            source = context._json || context.$json || {};
+            source = context._json || {};
             break;
         case '_input':
-            source = context._input || context.$input || {};
+            source = context._input || {};
             break;
         case '_vars':
-            source = context._vars || context.$vars || {};
+            source = context._vars || {};
             break;
         case '_loop':
-            source = context._loop || context.$loop || {};
+            source = context._loop || {};
             break;
         case '_node':
-            source = context._node || context.$node || {};
+            source = context._node || {};
             break;
         default:
-            // No namespace - try to resolve as-is (backward compat)
-            source = context._json || context.$json || {};
+            return undefined;
     }
 
     // Navigate to value
@@ -320,24 +286,14 @@ export function evaluateExpression(expression, context = {}) {
 
         // For single template, evaluate and return value
         if (templates.length === 1 && templates[0].full === expression) {
-            // Rewrite n8n-style node selectors before resolving
-            const { rewritten, error: rewriteError } = rewriteNodeSelector(templates[0].expression);
-            if (rewriteError) {
-                return { value: null, error: rewriteError };
-            }
-            const value = resolveExpression(rewritten, context);
+            const value = resolveExpression(templates[0].expression, context);
             return { value, error: null };
         }
 
         // Multiple templates or mixed content: replace each
         let result = expression;
         for (const tmpl of templates) {
-            // Rewrite n8n-style node selectors
-            const { rewritten, error: rewriteError } = rewriteNodeSelector(tmpl.expression);
-            if (rewriteError) {
-                return { value: null, error: rewriteError };
-            }
-            const value = resolveExpression(rewritten, context);
+            const value = resolveExpression(tmpl.expression, context);
             const stringValue = value === undefined ? '' : String(value);
             result = result.replace(tmpl.full, stringValue);
         }
@@ -346,17 +302,4 @@ export function evaluateExpression(expression, context = {}) {
     } catch (err) {
         return { value: null, error: err.message };
     }
-}
-
-function normalizeNamespace(namespace) {
-    if (!namespace) return null;
-    const trimmed = namespace.replace(/^\$/, '').replace(/^_/, '');
-    const map = {
-        json: '_json',
-        input: '_input',
-        vars: '_vars',
-        loop: '_loop',
-        node: '_node',
-    };
-    return map[trimmed] || `_${trimmed}`;
 }

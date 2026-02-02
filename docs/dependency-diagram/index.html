@@ -619,7 +619,7 @@
       {
         id: 'svc_variable', role: 'svc',
         title: 'workflowVariable service',
-        desc: 'Quản lý ExecutionContext ($vars/$node/$json/$loop/$input) và CRUD variables.',
+        desc: 'Quản lý ExecutionContext (_vars/_node/_json/_loop/_input) và CRUD variables.',
         path: 'workflow_pilot/static/src/services/variable_service.js',
         x: 410, y: 470,
       },
@@ -672,7 +672,7 @@
       {
         id: 'core_context', role: 'core',
         title: 'ExecutionContext',
-        desc: 'Runtime context: $vars/$node/$json/$loop/$input; path helpers; serialize.',
+        desc: 'Runtime context: _vars/_node/_json/_loop/_input; path helpers; serialize.',
         path: 'workflow_pilot/static/src/core/context.js',
         x: 1110, y: 840,
       },
@@ -763,7 +763,7 @@
       { from: 'dev_app', to: 'editor_canvas', kind: 'import', label: 'UI' },
       { from: 'dev_app', to: 'adapter', kind: 'import', label: 'core bridge' },
       { from: 'dev_app', to: 'svc_adapter', kind: 'service', label: 'useService("workflowAdapter")' },
-      { from: 'dev_app', to: 'svc_variable', kind: 'service', label: '$vars inspector' },
+      { from: 'dev_app', to: 'svc_variable', kind: 'service', label: '_vars inspector' },
 
       // editor canvas
       { from: 'editor_canvas', to: 'workflow_node', kind: 'import', label: 'render nodes' },
