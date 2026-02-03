@@ -50,6 +50,8 @@ export class EditorCanvas extends Component {
             _input: { item: null, json: null },
             _execution: null,
             _workflow: null,
+            _now: null,
+            _today: null,
         });
 
         this.nodeConfigActions = {
@@ -75,6 +77,8 @@ export class EditorCanvas extends Component {
                     _input: { item: json, json },
                     _execution: snapshot.execution || null,
                     _workflow: snapshot.workflow || null,
+                    _now: snapshot.now || null,
+                    _today: snapshot.today || null,
                 };
             },
             buildContextForNode: () => ({

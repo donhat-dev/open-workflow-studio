@@ -15,9 +15,8 @@
 
 /* Panel */
 .node-config-panel {
-  width: 50vw;
+  width: 90vw;
   min-width: 700px;
-  max-width: 1200px;
   height: 100%;
   background: #1e2025;
   border-left: 1px solid #32353b;

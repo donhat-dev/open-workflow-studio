@@ -29,7 +29,7 @@
 		<field name="name">workflow.run.form</field>
 		<field name="model">workflow.run</field>
 		<field name="arch" type="xml">
-			<form string="Workflow Run" create="false" edit="false">
+			<form string="Workflow Run" create="false">
 				<header>
 					<field name="status" widget="statusbar" statusbar_visible="pending,running,completed,failed"/>
 				</header>
@@ -77,13 +77,13 @@
 							</field>
 						</page>
 						<page string="Input Data" name="input_data">
-							<field name="input_data" widget="jsoneditor" readonly="1"/>
+							<field name="input_data" widget="flight_json"/>
 						</page>
 						<page string="Output Data" name="output_data">
-							<field name="output_data" widget="jsoneditor" readonly="1"/>
+							<field name="output_data" widget="flight_json"/>
 						</page>
 						<page string="Executed Snapshot" name="snapshot">
-							<field name="executed_snapshot" widget="jsoneditor" readonly="1"/>
+							<field name="executed_snapshot" widget="flight_json"/>
 						</page>
 					</notebook>
 				</sheet>
@@ -157,7 +157,7 @@
 		<field name="name">workflow.run.node.form</field>
 		<field name="model">workflow.run.node</field>
 		<field name="arch" type="xml">
-			<form string="Node Execution Result" create="false" edit="false">
+			<form string="Node Execution Result" create="false">
 				<header>
 					<field name="status" widget="statusbar"/>
 				</header>
@@ -189,10 +189,10 @@
 					</group>
 					<notebook>
 						<page string="Input Data" name="input_data">
-							<field name="input_data" widget="jsoneditor" readonly="1"/>
+							<field name="input_data" widget="flight_json"/>
 						</page>
 						<page string="Output Data" name="output_data">
-							<field name="output_data" widget="jsoneditor" readonly="1"/>
+							<field name="output_data" widget="flight_json"/>
 						</page>
 					</notebook>
 				</sheet>

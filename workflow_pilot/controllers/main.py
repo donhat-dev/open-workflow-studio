@@ -4,12 +4,21 @@
 Workflow Pilot Controllers
 
 Provides HTTP endpoints for workflow execution.
+Uses Pydantic schemas for consistent response structure.
 """
 
 import logging
+from datetime import datetime
 
 from odoo import http
 from odoo.http import request
+
+from ..schemas import (
+    ExecutionResultSchema,
+    ExecutionErrorSchema,
+    NodeResultSchema,
+    ContextSnapshotSchema,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -26,10 +35,7 @@ class WorkflowPilotController(http.Controller):
             input_data: Optional input data for workflow
             
         Returns:
-            dict with run_id, status, output_data
-            
-        Raises:
-            UserError if workflow not found or not published
+            ExecutionResultSchema dict
         """
         payload = request.httprequest.json or {}
         if workflow_id is None:
@@ -38,22 +44,72 @@ class WorkflowPilotController(http.Controller):
             input_data = payload.get('input_data', {})
 
         if workflow_id is None:
-            return {'error': 'Workflow ID is required'}
+            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
 
         workflow_id = int(workflow_id)
         workflow = request.env['ir.workflow'].browse(workflow_id)
         if not workflow.exists():
-            return {'error': 'Workflow not found'}
+            return ExecutionErrorSchema(error='Workflow not found').model_dump()
         
         try:
             result = workflow.execute_workflow(input_data or {})
-            return result
+            run_id = result.get('run_id')
+            
+            # Fetch node results from run record (single iteration for performance)
+            node_results = []
+            node_outputs_map = {}
+            context_snapshot = None
+            if run_id:
+                run = request.env['workflow.run'].browse(run_id)
+                if run.exists():
+                    # Single pass: build both node_results and node_outputs_map
+                    for node_run in run.node_run_ids:
+                        node_results.append(NodeResultSchema(
+                            node_id=node_run.node_id,
+                            node_type=node_run.node_type,
+                            node_label=node_run.node_label,
+                            status=node_run.status,
+                            duration_ms=node_run.duration_ms,
+                            output_data=node_run.output_data,
+                            error_message=node_run.error_message,
+                        ))
+                        node_outputs_map[node_run.node_id] = node_run.output_data
+                    
+                    # Build context snapshot using pre-built map
+                    context_snapshot = ContextSnapshotSchema(
+                        json=run.output_data,
+                        node=node_outputs_map,
+                        execution={
+                            'id': run.id,
+                            'name': run.name,
+                            'status': run.status,
+                        },
+                        workflow={
+                            'id': workflow.id,
+                            'name': workflow.name,
+                            'active': workflow.active,
+                        },
+                        now=datetime.now().isoformat(),
+                        today=datetime.now().date().isoformat(),
+                    )
+            
+            return ExecutionResultSchema(
+                run_id=run_id,
+                run_name=result.get('run_name'),
+                status=result.get('status', 'completed'),
+                error=result.get('error'),
+                execution_count=result.get('execution_count'),
+                node_count_executed=result.get('node_count_executed'),
+                duration_seconds=result.get('duration_seconds'),
+                input_data=input_data or {},
+                output_data=result.get('output_data'),
+                node_results=node_results,
+                context_snapshot=context_snapshot,
+            ).model_dump()
+            
         except Exception as e:
             _logger.exception(f"Workflow execution failed: {workflow_id}")
-            return {
-                'error': str(e),
-                'status': 'failed',
-            }
+            return ExecutionErrorSchema(error=str(e)).model_dump()
 
     @http.route('/workflow_pilot/run/<int:run_id>', type='json', auth='user', methods=['GET', 'POST'])
     def get_run(self, run_id):
@@ -63,39 +119,56 @@ class WorkflowPilotController(http.Controller):
             run_id: Database ID of workflow run
             
         Returns:
-            dict with run details including node results
+            ExecutionResultSchema dict
         """
         run = request.env['workflow.run'].browse(run_id)
         if not run.exists():
-            return {'error': 'Run not found'}
+            return ExecutionErrorSchema(error='Run not found').model_dump()
         
         node_results = []
         for node_run in run.node_run_ids:
-            node_results.append({
-                'node_id': node_run.node_id,
-                'node_type': node_run.node_type,
-                'node_label': node_run.node_label,
-                'status': node_run.status,
-                'duration_ms': node_run.duration_ms,
-                'output_data': node_run.output_data,
-                'error_message': node_run.error_message,
-            })
+            node_results.append(NodeResultSchema(
+                node_id=node_run.node_id,
+                node_type=node_run.node_type,
+                node_label=node_run.node_label,
+                status=node_run.status,
+                duration_ms=node_run.duration_ms,
+                output_data=node_run.output_data,
+                error_message=node_run.error_message,
+            ))
         
-        return {
-            'id': run.id,
-            'name': run.name,
-            'workflow_id': run.workflow_id.id,
-            'status': run.status,
-            'started_at': run.started_at.isoformat() if run.started_at else None,
-            'completed_at': run.completed_at.isoformat() if run.completed_at else None,
-            'duration_seconds': run.duration_seconds,
-            'input_data': run.input_data,
-            'output_data': run.output_data,
-            'error_message': run.error_message,
-            'error_node_id': run.error_node_id,
-            'node_count_executed': run.node_count_executed,
-            'node_results': node_results,
-        }
+        workflow = run.workflow_id
+        context_snapshot = ContextSnapshotSchema(
+            json=run.output_data,
+            node={nr.node_id: nr.output_data for nr in run.node_run_ids},
+            execution={
+                'id': run.id,
+                'name': run.name,
+                'status': run.status,
+                'started_at': run.started_at.isoformat() if run.started_at else None,
+                'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+            },
+            workflow={
+                'id': workflow.id if workflow else None,
+                'name': workflow.name if workflow else None,
+                'active': workflow.active if workflow else False,
+            },
+        )
+        
+        return ExecutionResultSchema(
+            run_id=run.id,
+            run_name=run.name,
+            status=run.status,
+            error=run.error_message,
+            error_node_id=run.error_node_id,
+            execution_count=run.execution_count,
+            node_count_executed=run.node_count_executed,
+            duration_seconds=run.duration_seconds,
+            input_data=run.input_data or {},
+            output_data=run.output_data,
+            node_results=node_results,
+            context_snapshot=context_snapshot,
+        ).model_dump()
 
     @http.route('/workflow_pilot/execute_until', type='json', auth='user', methods=['POST'])
     def execute_until(self, workflow_id=None, target_node_id=None, input_data=None, snapshot=None, config_overrides=None, **kwargs):
@@ -109,7 +182,7 @@ class WorkflowPilotController(http.Controller):
             config_overrides: Optional node config overrides
 
         Returns:
-            dict with run_id, status, node_results
+            ExecutionResultSchema dict
         """
         payload = request.httprequest.json or {}
         if workflow_id is None:
@@ -124,14 +197,14 @@ class WorkflowPilotController(http.Controller):
             config_overrides = payload.get('config_overrides')
 
         if workflow_id is None:
-            return {'error': 'Workflow ID is required'}
+            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
         if not target_node_id:
-            return {'error': 'Target node ID is required'}
+            return ExecutionErrorSchema(error='Target node ID is required').model_dump()
 
         workflow_id = int(workflow_id)
         workflow = request.env['ir.workflow'].browse(workflow_id)
         if not workflow.exists():
-            return {'error': 'Workflow not found'}
+            return ExecutionErrorSchema(error='Workflow not found').model_dump()
 
         try:
             result = workflow.execute_preview(
@@ -141,17 +214,49 @@ class WorkflowPilotController(http.Controller):
                 snapshot=snapshot,
             )
 
-            return {
-                'status': 'completed',
-                'target_node_id': result.get('target_node_id'),
-                'execution_count': result.get('execution_count', 0),
-                'executed_order': result.get('executed_order', []),
-                'node_outputs': result.get('node_outputs') or {},
-                'input_data': input_data or {},
-            }
+            # Convert node_outputs to node_results
+            node_outputs = result.get('node_outputs') or {}
+            executed_order = result.get('executed_order') or []
+            
+            node_results = []
+            for node_id in executed_order:
+                output = node_outputs.get(node_id, {})
+                node_results.append(NodeResultSchema(
+                    node_id=node_id,
+                    node_type=output.get('node_type'),
+                    node_label=output.get('title'),
+                    status='completed' if not output.get('error') else 'failed',
+                    output_data=output.get('json'),
+                    error_message=output.get('error'),
+                    title=output.get('title'),
+                    meta=output.get('meta'),
+                ))
+            
+            # Build context snapshot
+            raw_snapshot = result.get('context_snapshot') or {}
+            context_snapshot = ContextSnapshotSchema(
+                json=raw_snapshot.get('json'),
+                node=raw_snapshot.get('node', {}),
+                vars=raw_snapshot.get('vars', {}),
+                node_context=raw_snapshot.get('node_context', {}),
+                execution=raw_snapshot.get('execution'),
+                workflow=raw_snapshot.get('workflow'),
+                now=raw_snapshot.get('now'),
+                today=raw_snapshot.get('today'),
+            )
+
+            return ExecutionResultSchema(
+                status='completed',
+                target_node_id=result.get('target_node_id'),
+                execution_count=result.get('execution_count', 0),
+                node_count_executed=len(executed_order),
+                executed_order=executed_order,
+                input_data=input_data or {},
+                node_results=node_results,
+                node_outputs=node_outputs,  # Keep for backward compatibility
+                context_snapshot=context_snapshot,
+            ).model_dump()
+            
         except Exception as e:
             _logger.exception("Workflow preview execution failed")
-            return {
-                'status': 'failed',
-                'error': str(e),
-            }
+            return ExecutionErrorSchema(error=str(e)).model_dump()

@@ -25,6 +25,10 @@ export class NodeConfigPanel extends Component {
         execution: { type: Object, optional: true },
     };
 
+    // Static cache for predecessor computation (cleared on workflow change)
+    static _predecessorCache = new Map();  // "workflowId:nodeId" -> Set<predecessorId>
+    static _reverseAdjCache = new Map();   // workflowId -> reverseAdj map
+
     setup() {
         this.actions = this.props.actions;
         if (!this.actions) {
@@ -215,20 +219,31 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
-     * Get aggregated context from all ancestor nodes
-     * Shows data from all previously executed nodes
-     * Returns array with isInputNode marker for expression prefix handling
+     * Get aggregated context from predecessor nodes only.
+     * Shows data from nodes that executed BEFORE the current node (not the current node or successors).
+     * Matches backend behavior: when opening n_2, show n_1's output; when opening n_1, show n_2's output (not n_3).
+     * Returns array with isInputNode marker for expression prefix handling.
      */
     get leftPanelData() {
+        const currentNodeId = this.props.node.id;
         const execution = this.props.execution;
+        
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
-            return execution.nodeResults.map((result, index) => ({
+            // Filter to show only predecessors (nodes executed before current node)
+            const predecessorResults = this._filterPredecessorResults(
+                execution.nodeResults,
+                currentNodeId
+            );
+            
+            if (predecessorResults.length === 0) return null;
+            
+            return predecessorResults.map((result, index) => ({
                 nodeId: result.node_id,
                 data: {
                     json: result.output_data,
                     title: result.title || result.node_label || result.node_type || result.node_id,
                 },
-                isInputNode: index === 0,
+                isInputNode: index === predecessorResults.length - 1,
             }));
         }
 
@@ -248,15 +263,103 @@ export class NodeConfigPanel extends Component {
         const entries = Object.entries(nodeContext);
         if (entries.length === 0) return null;
 
-        // Return array with isInputNode marker (first node = _input)
+        // Return array with isInputNode marker (last entry = immediate predecessor)
         return entries.map(([nodeId, data], index) => ({
             nodeId,
             data: {
                 json: data,
                 title: nodeId,
             },
-            isInputNode: index === 0,
+            isInputNode: index === entries.length - 1,
         }));
+    }
+    
+    /**
+     * Filter execution results to show only predecessors of the current node.
+     * Uses workflow connections to determine which nodes are predecessors.
+     * @private
+     */
+    _filterPredecessorResults(nodeResults, currentNodeId) {
+        const workflow = this.props.workflow;
+        if (!workflow || !workflow.connections) {
+            // Fallback: show all results except current node
+            return nodeResults.filter(r => r.node_id !== currentNodeId);
+        }
+        
+        // Build set of predecessor node IDs (cached BFS backwards from current node)
+        const workflowId = workflow.id || 'draft';
+        const predecessorIds = this._getPredecessorIds(currentNodeId, workflowId, workflow.connections);
+        
+        // Filter results to only include predecessors, maintaining execution order
+        return nodeResults.filter(r => predecessorIds.has(r.node_id));
+    }
+    
+    /**
+     * Get all predecessor node IDs using cached BFS backwards traversal.
+     * Uses static cache keyed by workflowId:nodeId for O(1) repeated lookups.
+     * @private
+     */
+    _getPredecessorIds(targetNodeId, workflowId, connections) {
+        const cacheKey = `${workflowId}:${targetNodeId}`;
+        
+        // Check cache first
+        if (NodeConfigPanel._predecessorCache.has(cacheKey)) {
+            return NodeConfigPanel._predecessorCache.get(cacheKey);
+        }
+        
+        // Get or build reverse adjacency map (cached per workflow)
+        let reverseAdj = NodeConfigPanel._reverseAdjCache.get(workflowId);
+        if (!reverseAdj) {
+            reverseAdj = {};
+            for (const conn of connections) {
+                const target = conn.target;
+                const source = conn.source;
+                if (!target || !source) continue;
+                if (!reverseAdj[target]) reverseAdj[target] = [];
+                reverseAdj[target].push(source);
+            }
+            NodeConfigPanel._reverseAdjCache.set(workflowId, reverseAdj);
+        }
+        
+        // BFS backwards traversal
+        const predecessors = new Set();
+        const visited = new Set();
+        const queue = [targetNodeId];
+        
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const parents = reverseAdj[current] || [];
+            for (const parent of parents) {
+                if (visited.has(parent)) continue;
+                visited.add(parent);
+                predecessors.add(parent);
+                queue.push(parent);
+            }
+        }
+        
+        // Cache result
+        NodeConfigPanel._predecessorCache.set(cacheKey, predecessors);
+        return predecessors;
+    }
+    
+    /**
+     * Clear predecessor cache (call when workflow connections change).
+     * @param {string} [workflowId] - Clear specific workflow or all if omitted
+     */
+    static clearPredecessorCache(workflowId) {
+        if (workflowId) {
+            // Clear specific workflow entries
+            NodeConfigPanel._reverseAdjCache.delete(workflowId);
+            for (const key of NodeConfigPanel._predecessorCache.keys()) {
+                if (key.startsWith(`${workflowId}:`)) {
+                    NodeConfigPanel._predecessorCache.delete(key);
+                }
+            }
+        } else {
+            // Clear all
+            NodeConfigPanel._predecessorCache.clear();
+            NodeConfigPanel._reverseAdjCache.clear();
+        }
     }
 
     get executionDisplayResult() {
@@ -268,22 +371,26 @@ export class NodeConfigPanel extends Component {
                 output: null,
             };
         }
+        const output = runResult.output_data === undefined ? null : runResult.output_data;
         return {
             error: null,
-            output: runResult.output_data,
+            output,
         };
     }
 
     /**
-     * Initialize collapse state for ancestor sections
-     * First node (_input) expanded, others collapsed
+     * Initialize collapse state for ancestor sections.
+     * Immediate input node expanded, others collapsed.
+     * Context variables section collapsed by default.
      * @private
      */
     _initAncestorCollapseState() {
         const leftData = this.leftPanelData || [];
-        const defaults = { '_vars': true }; // _vars always collapsed
+        const defaults = { 
+            '_context': true,  // Context variables collapsed by default
+        };
         for (const item of leftData) {
-            // First node (isInputNode) expanded, others collapsed
+            // Immediate input node (isInputNode=true) expanded, others collapsed
             defaults[item.nodeId] = !item.isInputNode;
         }
         this.state.collapsedSections = { ...defaults, ...this.state.collapsedSections };
@@ -482,6 +589,34 @@ export class NodeConfigPanel extends Component {
     get hasWorkflowVariables() {
         const vars = this.workflowVariables;
         return vars && Object.keys(vars).length > 0;
+    }
+
+    /**
+     * Get context variables for display in left panel.
+     * Uses underscore-prefixed keys matching backend eval_context:
+     * _now, _today, _vars, _execution, _workflow
+     * @see workflow_executor.py _get_secure_eval_context
+     */
+    get contextVariables() {
+        if (!this.actions.getExpressionContext) {
+            throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
+        }
+        const ctx = this.actions.getExpressionContext() || {};
+        
+        return {
+            _now: ctx._now || new Date().toISOString(),
+            _today: ctx._today || new Date().toISOString().split('T')[0],
+            _vars: ctx._vars || {},
+            _execution: ctx._execution || {
+                id: '[filled at execution time]',
+                mode: 'test',
+            },
+            _workflow: ctx._workflow || {
+                id: this.props.workflow ? this.props.workflow.id : null,
+                name: this.props.workflow ? this.props.workflow.name : 'My workflow',
+                active: false,
+            },
+        };
     }
 
     /**

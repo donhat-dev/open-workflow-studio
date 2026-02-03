@@ -33,7 +33,7 @@
 							<span>INPUT</span>
 						</div>
 						<div class="left-panel-content">
-							<!-- Show ancestor nodes with their outputs -->
+							<!-- Show predecessor nodes with their outputs -->
 							<t t-if="leftPanelData and leftPanelData.length > 0">
 								<t t-foreach="leftPanelData" t-as="item" t-key="item.nodeId">
 									<div class="ancestor-node-section" t-att-class="{ collapsed: isSectionCollapsed(item.nodeId) }">
@@ -41,14 +41,8 @@
 											<i t-att-class="'fa ' + (isSectionCollapsed(item.nodeId) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
 											<i t-att-class="item.isInputNode ? 'fa fa-sign-in' : 'fa fa-cube'"/>
 											<t t-if="item.isInputNode">
-											<span>_input (
-													
-													
-													
-													<t t-esc="item.data.title"/>)
-												
-												
-												
+												<span>
+													<t t-esc="item.data.title"/>
 												</span>
 											</t>
 											<t t-else="">
@@ -65,30 +59,26 @@
 										</div>
 									</div>
 								</t>
+								<div class="ancestor-node-section context-section" t-att-class="{ collapsed: isSectionCollapsed('_context') }">
+									<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('_context')">
+										<i t-att-class="'fa ' + (isSectionCollapsed('_context') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
+										<i class="fa fa-code"/>
+										<span>Variables and context</span>
+									</div>
+									<div class="ancestor-node-data" t-if="!isSectionCollapsed('_context') and contextVariables">
+										<JsonTreeNode data="contextVariables or null" path="[]" draggable="true"/>
+									</div>
+								</div>
 							</t>
-						<!-- S2.3: Workflow Variables (_vars) section -->
-						<t t-if="hasWorkflowVariables">
-							<div class="ancestor-node-section vars-section" t-att-class="{ collapsed: isSectionCollapsed('_vars') }">
-								<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('_vars')">
-									<i t-att-class="'fa ' + (isSectionCollapsed('_vars') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
-									<i class="fa fa-code"/>
-									<span>Workflow Variables (_vars)</span>
-								</div>
-								<div class="ancestor-node-data" t-if="!isSectionCollapsed('_vars')">
-									<JsonTreeNode data="workflowVariables" path="['_vars']" draggable="true"/>
-								</div>
-							</div>
-						</t>
 							<t t-else="">
-								<div class="input-data-empty">
+								<div class="input-data-empty input-data-hint">
 									<i class="fa fa-database"/>
 									<p>No input data</p>
 									<span>Execute previous nodes to see data</span>
 								</div>
 							</t>
 						</div>
-                        <div class="left-panel-footer"/>
-					</div>
+						<div class="left-panel-footer"/></div>
 					<!-- RIGHT PANEL: Node Configuration -->
 					<div class="node-config-right-panel">
 						<!-- Tabs -->
@@ -96,26 +86,13 @@
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')">
 								<i class="fa fa-sliders"/> Parameters
 							
-							
-							
-							
-							
-							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
 								<i class="fa fa-code"/> Output
 							
-							
-							
-							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
 								<i class="fa fa-cog"/> Settings
-							
-							
-							
-							
-							
 							
 							</button>
 						</div>
@@ -137,25 +114,25 @@
 									</div>
 								</t>
 							</t>
-						<!-- Output Tab -->
-						<t t-if="state.activeTab === 'output'">
-							<div class="node-config-section">
-								<div class="node-config-section-title">Execution Output</div>
-								<t t-if="executionDisplayResult">
-									<t t-if="executionDisplayResult.error">
-										<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
+							<!-- Output Tab -->
+							<t t-if="state.activeTab === 'output'">
+								<div class="node-config-section">
+									<div class="node-config-section-title">Execution Output</div>
+									<t t-if="executionDisplayResult">
+										<t t-if="executionDisplayResult.error">
+											<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
+										</t>
+										<t t-else="">
+											<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
+										</t>
 									</t>
 									<t t-else="">
-										<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
+										<div class="input-data-empty">
+											<i class="fa fa-terminal"/>
+											<p>No output yet</p>
+											<span>Click Execute to run this node</span>
+										</div>
 									</t>
-								</t>
-								<t t-else="">
-									<div class="input-data-empty">
-										<i class="fa fa-terminal"/>
-										<p>No output yet</p>
-										<span>Click Execute to run this node</span>
-									</div>
-								</t>
 								</div>
 							</t>
 							<!-- Settings Tab -->

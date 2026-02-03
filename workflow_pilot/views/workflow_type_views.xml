@@ -54,13 +54,13 @@
 					</group>
 					<notebook>
 						<page string="Configuration Schema" name="config_schema">
-							<field name="config_schema" widget="code" options="{'mode': 'xml'}"/>
+							<field name="config_schema" widget="flight_json"/>
 						</page>
 						<page string="Input Schema" name="input_schema">
-							<field name="input_schema" widget="code" options="{'mode': 'xml'}"/>
+							<field name="input_schema" widget="flight_json"/>
 						</page>
 						<page string="Output Schema" name="output_schema">
-							<field name="output_schema" widget="code" options="{'mode': 'xml'}"/>
+							<field name="output_schema" widget="flight_json"/>
 						</page>
 					</notebook>
 				</sheet>

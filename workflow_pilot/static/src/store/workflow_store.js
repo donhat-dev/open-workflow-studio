@@ -79,6 +79,92 @@ export const workflowEditorService = {
         });
 
         // ===============
+        // Execution result helpers
+        // ===============
+        function normalizeInputData(inputData) {
+            if (inputData && typeof inputData === "object") {
+                return inputData;
+            }
+            return {};
+        }
+
+        function createExecutionResult(fields) {
+            const base = {
+                runId: null,
+                status: "failed",
+                error: null,
+                errorNodeId: null,
+                outputData: null,
+                executedOrder: [],
+                executionCount: null,
+                inputData: {},
+                nodeResults: [],
+                nodeOutputs: null,
+                contextSnapshot: null,
+                updatedAt: new Date().toISOString(),
+            };
+            return Object.assign(base, fields);
+        }
+
+        function buildExecutionError(message, inputData, overrides) {
+            const fields = Object.assign({
+                status: "failed",
+                error: message,
+                inputData: normalizeInputData(inputData),
+            }, overrides || {});
+            return createExecutionResult(fields);
+        }
+
+        function buildExecutionFromRun(run, result, inputData) {
+            return createExecutionResult({
+                runId: run.id || (result ? result.run_id : null),
+                status: run.status || (result && result.status) || "completed",
+                error: run.error_message || (result && result.error) || null,
+                errorNodeId: run.error_node_id || null,
+                outputData: run.output_data || null,
+                executedOrder: run.executed_order || [],
+                executionCount: run.execution_count || null,
+                inputData: run.input_data || normalizeInputData(inputData),
+                contextSnapshot: (result && result.context_snapshot) || null,
+                nodeResults: run.node_results || [],
+            });
+        }
+
+        function buildNodeResultsFromOutputs(result) {
+            const nodeOutputs = (result && result.node_outputs) || {};
+            const executedOrder = Array.isArray(result && result.executed_order)
+                ? result.executed_order
+                : [];
+            let nodeResults = [];
+
+            if (executedOrder.length) {
+                nodeResults = executedOrder.map((nodeId) => {
+                    const output = nodeOutputs[nodeId] || {};
+                    return {
+                        node_id: nodeId,
+                        output_data: output.json,
+                        error_message: output.error || null,
+                        title: output.title,
+                        meta: output.meta || null,
+                    };
+                });
+            } else {
+                nodeResults = Object.entries(nodeOutputs).map(([nodeId, output]) => {
+                    const safeOutput = output || {};
+                    return {
+                        node_id: nodeId,
+                        output_data: safeOutput.json,
+                        error_message: safeOutput.error || null,
+                        title: safeOutput.title,
+                        meta: safeOutput.meta || null,
+                    };
+                });
+            }
+
+            return { nodeResults, nodeOutputs, executedOrder };
+        }
+
+        // ===============
         // Helper selectors (with null checks for safety)
         // ===============
         const getNode = (nodeId) => state.graph.nodes.find((n) => n.id === nodeId) || null;
@@ -453,52 +539,26 @@ export const workflowEditorService = {
                 if (!workflowId) {
                     throw new Error('No workflow ID loaded');
                 }
+                const safeInput = normalizeInputData(inputData);
                 const result = await rpc('/workflow_pilot/execute', {
                     workflow_id: workflowId,
-                    input_data: inputData,
+                    input_data: safeInput,
                 });
                 if (result && result.run_id) {
                     const run = await rpc(`/workflow_pilot/run/${result.run_id}`, {});
                     if (run && run.error) {
-                        actions.setExecutionResult({
+                        const message = run.error || result.error || 'Failed to load run details';
+                        actions.setExecutionResult(buildExecutionError(message, safeInput, {
                             runId: result.run_id,
                             status: result.status || 'failed',
-                            error: run.error || result.error || 'Failed to load run details',
-                            errorNodeId: null,
-                            outputData: null,
-                            executedOrder: [],
-                            executionCount: null,
-                            inputData: inputData || {},
-                            nodeResults: [],
-                            updatedAt: new Date().toISOString(),
-                        });
+                        }));
                         return result;
                     }
-                    actions.setExecutionResult({
-                        runId: run.id,
-                        status: run.status || result.status || 'completed',
-                        error: run.error_message || result.error || null,
-                        errorNodeId: run.error_node_id || null,
-                        outputData: run.output_data || null,
-                        executedOrder: run.executed_order || [],
-                        executionCount: run.execution_count || null,
-                        inputData: run.input_data || inputData || {},
-                        nodeResults: run.node_results || [],
-                        updatedAt: new Date().toISOString(),
-                    });
+                    actions.setExecutionResult(buildExecutionFromRun(run, result, safeInput));
                 } else if (result && result.error) {
-                    actions.setExecutionResult({
-                        runId: null,
+                    actions.setExecutionResult(buildExecutionError(result.error, safeInput, {
                         status: result.status || 'failed',
-                        error: result.error,
-                        errorNodeId: null,
-                        outputData: null,
-                        executedOrder: [],
-                        executionCount: null,
-                        inputData: inputData || {},
-                        nodeResults: [],
-                        updatedAt: new Date().toISOString(),
-                    });
+                    }));
                 }
                 return result;
             },
@@ -510,78 +570,39 @@ export const workflowEditorService = {
                     throw new Error('Target node ID is required');
                 }
                 try {
+                    const safeInput = normalizeInputData(inputData);
                     const result = await rpc('/workflow_pilot/execute_until', {
                         workflow_id: workflowId,
                         target_node_id: targetNodeId,
-                        input_data: inputData,
+                        input_data: safeInput,
                         snapshot: adapter.toJSON(),
                         config_overrides: configOverrides,
                     });
                     if (result && result.status === 'completed') {
-                        const nodeOutputs = result.node_outputs || {};
-                        const executedOrder = result.executed_order || [];
-                        const nodeResults = executedOrder.length
-                            ? executedOrder.map((nodeId) => {
-                                const output = nodeOutputs[nodeId] || {};
-                                return {
-                                    node_id: nodeId,
-                                    output_data: output.json,
-                                    error_message: output.error || null,
-                                    title: output.title,
-                                    meta: output.meta || null,
-                                };
-                            })
-                            : Object.entries(nodeOutputs).map(([nodeId, output]) => ({
-                                node_id: nodeId,
-                                output_data: output.json,
-                                error_message: output.error || null,
-                                title: output.title,
-                                meta: output.meta || null,
-                            }));
-
-                        actions.setExecutionResult({
+                        const outputResult = buildNodeResultsFromOutputs(result);
+                        actions.setExecutionResult(createExecutionResult({
                             runId: null,
                             status: 'completed',
                             error: null,
                             errorNodeId: null,
                             outputData: null,
-                            executedOrder,
+                            executedOrder: outputResult.executedOrder,
                             executionCount: result.execution_count || null,
-                            inputData: inputData || {},
-                            nodeResults,
-                            nodeOutputs,
+                            inputData: safeInput,
+                            nodeResults: outputResult.nodeResults,
+                            nodeOutputs: outputResult.nodeOutputs,
                             contextSnapshot: result.context_snapshot || null,
-                            updatedAt: new Date().toISOString(),
-                        });
+                        }));
                     } else if (result && result.status === 'failed') {
-                        actions.setExecutionResult({
-                            runId: null,
-                            status: 'failed',
-                            error: result.error || 'Execution failed',
-                            errorNodeId: null,
-                            outputData: null,
-                            executedOrder: [],
+                        const message = result.error || 'Execution failed';
+                        actions.setExecutionResult(buildExecutionError(message, safeInput, {
                             executionCount: result.execution_count || null,
-                            inputData: inputData || {},
-                            nodeResults: [],
-                            updatedAt: new Date().toISOString(),
-                        });
+                        }));
                     }
                     return result;
                 } catch (error) {
                     const errorMessage = error && error.message ? error.message : 'Execution failed';
-                    actions.setExecutionResult({
-                        runId: null,
-                        status: 'failed',
-                        error: errorMessage,
-                        errorNodeId: null,
-                        outputData: null,
-                        executedOrder: [],
-                        executionCount: null,
-                        inputData: inputData || {},
-                        nodeResults: [],
-                        updatedAt: new Date().toISOString(),
-                    });
+                    actions.setExecutionResult(buildExecutionError(errorMessage, inputData));
                     throw error;
                 }
             },

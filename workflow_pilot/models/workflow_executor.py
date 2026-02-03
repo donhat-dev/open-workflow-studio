@@ -42,6 +42,48 @@ from .security.secret_broker import SecretBrokerFactory
 _logger = logging.getLogger(__name__)
 
 
+class NodeOutputsProxy:
+    """Lazy proxy for _node access to avoid O(n²) dict rebuild.
+    
+    Instead of rebuilding {nid: out.get('json') for ...} each node,
+    this proxy provides O(1) access to node outputs on demand.
+    """
+    __slots__ = ('_outputs',)
+    
+    def __init__(self, node_outputs):
+        self._outputs = node_outputs
+    
+    def __getitem__(self, key):
+        output = self._outputs.get(key)
+        if output is None:
+            raise KeyError(key)
+        return output.get('json')
+    
+    def __contains__(self, key):
+        return key in self._outputs
+    
+    def get(self, key, default=None):
+        output = self._outputs.get(key)
+        if output is None:
+            return default
+        return output.get('json', default)
+    
+    def keys(self):
+        return self._outputs.keys()
+    
+    def values(self):
+        return (out.get('json') for out in self._outputs.values())
+    
+    def items(self):
+        return ((nid, out.get('json')) for nid, out in self._outputs.items())
+    
+    def __iter__(self):
+        return iter(self._outputs)
+    
+    def __len__(self):
+        return len(self._outputs)
+
+
 # =============================================================================
 # WORKFLOW EXECUTOR
 # =============================================================================
@@ -518,7 +560,7 @@ class WorkflowExecutor:
             '_json': wrap_readonly(input_data or {}),
             '_input': wrap_readonly(input_data or {}),
             '_vars': self.vars,
-            '_node': wrap_readonly({nid: out.get('json') for nid, out in self.node_outputs.items()}),
+            '_node': NodeOutputsProxy(self.node_outputs),  # Lazy proxy - O(1) instead of O(n)
             '_loop': wrap_readonly(self.node_context.get(node_id, {}).get('loop', {})),
             
             # Time
@@ -896,21 +938,38 @@ class WorkflowExecutor:
         current[parts[-1]] = value
 
     def _build_context_snapshot(self, target_node_id, target_result):
-        """Build context snapshot at target node execution."""
+        """Build context snapshot at target node execution.
+        
+        Includes all context variables matching _get_secure_eval_context:
+        _now, _today, _vars, _execution, _workflow, _node, etc.
+        
+        Performance notes:
+        - node: shallow dict copy (json values are immutable after execution)
+        - vars: deepcopy required (mutable, user can modify)
+        - node_context: shallow copy (loop state is read-only after node completes)
+        """
         target_json = None
         if target_result:
             target_json = target_result.get('json')
 
+        # Shallow copy - json values are already serialized/immutable
         node_json_snapshot = {
             node_id: output.get('json')
             for node_id, output in self.node_outputs.items()
         }
 
+        # Shallow copy node_context - only deepcopy if loops have mutable state
+        node_context_snapshot = {
+            nid: dict(ctx) for nid, ctx in self.node_context.items()
+        }
+
         return {
             'json': target_json,
             'node': node_json_snapshot,
-            'vars': deepcopy(self.vars),
-            'node_context': deepcopy(self.node_context),
+            'vars': deepcopy(to_plain(self.vars)),  # Convert proxy to plain dict first
+            'node_context': node_context_snapshot,
             'execution': self._get_execution_context(),
             'workflow': self._get_workflow_context(),
+            'now': datetime.now().isoformat(),
+            'today': date.today().isoformat(),
         }
