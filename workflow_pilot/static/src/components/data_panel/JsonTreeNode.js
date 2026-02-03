@@ -25,6 +25,8 @@ export class JsonTreeNode extends Component {
         isInputNode: { type: Boolean, optional: true },
         // When false, disables drag entirely (readonly tree)
         draggable: { type: Boolean, optional: true },
+        // When true, allows dragging context variables (e.g., _execution, _workflow)
+        isContextRoot: { type: Boolean, optional: true },
     };
 
     setup() {
@@ -120,6 +122,13 @@ export class JsonTreeNode extends Component {
             return generateExpressionPath(this.props.path.slice(1), '_vars');
         }
 
+        if (this.props.isContextRoot && this.props.path && this.props.path[0]) {
+            const rootKey = this.props.path[0];
+            if (rootKey.startsWith('_')) {
+                return generateExpressionPath(this.props.path.slice(1), rootKey);
+            }
+        }
+
         // If sourceNodeId is provided, use node-scoped selector
         if (this.props.sourceNodeId) {
             return generateNodeSelectorExpressionPath(this.props.sourceNodeId, this.props.path);
@@ -154,6 +163,9 @@ export class JsonTreeNode extends Component {
         // Allow drag for _input nodes or node-scoped data
         if (this.props.isInputNode || Boolean(this.props.sourceNodeId)) {
             return true;
+        }
+        if (this.props.isContextRoot && this.props.path && this.props.path[0]) {
+            return this.props.path[0].startsWith('_');
         }
         return this.props.path && this.props.path[0] === '_vars';
     }

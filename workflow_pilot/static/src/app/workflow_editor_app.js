@@ -244,17 +244,7 @@ export class WorkflowEditorApp extends Component {
     }
 
     _exit() {
-        const { breadcrumbs } = this.env.config;
-        if (!breadcrumbs || breadcrumbs.length <= 1) {
-            this.action.doAction("workflow_pilot.action_ir_workflow");
-            return;
-        }
-        const previousPath = breadcrumbs[breadcrumbs.length - 2].url.split("/");
-        if (isNaN(previousPath[previousPath.length - 1])) {
-            this.env.config.historyBack();
-        } else {
-            history.back();
-        }
+        this.action.doAction("workflow_pilot.action_ir_workflow");
     }
     
 }

@@ -48,34 +48,86 @@ class NodeOutputsProxy:
     Instead of rebuilding {nid: out.get('json') for ...} each node,
     this proxy provides O(1) access to node outputs on demand.
     """
-    __slots__ = ('_outputs',)
+    __slots__ = ('_outputs', '_cache')
     
     def __init__(self, node_outputs):
         self._outputs = node_outputs
-    
-    def __getitem__(self, key):
+        self._cache = {}
+
+    def _build_view(self, output):
+        if not isinstance(output, dict):
+            json_value = output
+            meta_value = None
+            error_value = None
+        else:
+            json_value = output.get('json')
+            meta_value = output.get('meta')
+            error_value = output.get('error')
+
+        items_value = None
+        if isinstance(output, dict):
+            items_value = output.get('items')
+
+        if items_value is None:
+            if isinstance(json_value, list):
+                items_value = json_value
+            elif json_value is None:
+                items_value = []
+            else:
+                items_value = [json_value]
+
+        item_value = None
+        if isinstance(output, dict):
+            item_value = output.get('item')
+        if item_value is None:
+            if isinstance(items_value, list) and items_value:
+                item_value = items_value[0]
+            else:
+                item_value = json_value
+
+        view = {
+            'json': json_value,
+            'item': item_value,
+            'items': items_value,
+            'meta': meta_value,
+            'error': error_value,
+        }
+        return wrap_readonly(view)
+
+    def _get_view(self, key):
         output = self._outputs.get(key)
         if output is None:
+            return None
+        cached = self._cache.get(key)
+        if cached and cached[0] is output:
+            return cached[1]
+        view = self._build_view(output)
+        self._cache[key] = (output, view)
+        return view
+    
+    def __getitem__(self, key):
+        view = self._get_view(key)
+        if view is None:
             raise KeyError(key)
-        return output.get('json')
+        return view
     
     def __contains__(self, key):
         return key in self._outputs
     
     def get(self, key, default=None):
-        output = self._outputs.get(key)
-        if output is None:
+        view = self._get_view(key)
+        if view is None:
             return default
-        return output.get('json', default)
+        return view
     
     def keys(self):
         return self._outputs.keys()
     
     def values(self):
-        return (out.get('json') for out in self._outputs.values())
+        return (self._build_view(out) for out in self._outputs.values())
     
     def items(self):
-        return ((nid, out.get('json')) for nid, out in self._outputs.items())
+        return ((nid, self._build_view(out)) for nid, out in self._outputs.items())
     
     def __iter__(self):
         return iter(self._outputs)
@@ -272,6 +324,8 @@ class WorkflowExecutor:
         iteration = 0
         target_reached = False
         target_result = None
+        error_message = None
+        error_node_id = None
         while self.stack and iteration < max_iterations:
             iteration += 1
             entry = self.stack.pop()
@@ -279,7 +333,20 @@ class WorkflowExecutor:
             node_input = entry['inputData']
 
             # Execute node
-            result = self._execute_node(node_id, node_input, persist=False)
+            try:
+                result = self._execute_node(node_id, node_input, persist=False)
+            except Exception as exc:
+                error_message = str(exc)
+                error_node_id = node_id
+                result = {
+                    'outputs': [],
+                    'json': None,
+                    'error': error_message,
+                }
+                self.node_outputs[node_id] = result
+                self.executed_order.append(node_id)
+                target_result = result
+                break
 
             # Store output
             self.node_outputs[node_id] = result
@@ -297,10 +364,23 @@ class WorkflowExecutor:
         if iteration >= max_iterations:
             raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
 
+        if error_message:
+            return {
+                'status': 'failed',
+                'error': error_message,
+                'error_node_id': error_node_id,
+                'node_outputs': self.node_outputs,
+                'executed_order': self.executed_order,
+                'execution_count': iteration,
+                'target_node_id': target_node_id,
+                'context_snapshot': self._build_context_snapshot(error_node_id, target_result),
+            }
+
         if not target_reached:
             raise UserError(_("Target node %s was not reached") % target_node_id)
 
         return {
+            'status': 'completed',
             'node_outputs': self.node_outputs,
             'executed_order': self.executed_order,
             'execution_count': iteration,
@@ -555,10 +635,23 @@ class WorkflowExecutor:
             value = self._get_var_path(path, _missing)
             return default if value is _missing else value
 
+        input_payload = input_data or {}
+        if isinstance(input_payload, list):
+            input_items = input_payload
+            input_item = input_payload[0] if input_payload else None
+        else:
+            input_items = [] if input_payload is None else [input_payload]
+            input_item = input_payload
+        input_context = {
+            'json': input_payload,
+            'item': input_item,
+            'items': input_items,
+        }
+
         eval_context = {
             # Standard namespaces
-            '_json': wrap_readonly(input_data or {}),
-            '_input': wrap_readonly(input_data or {}),
+            '_json': wrap_readonly(input_payload),
+            '_input': wrap_readonly(input_context),
             '_vars': self.vars,
             '_node': NodeOutputsProxy(self.node_outputs),  # Lazy proxy - O(1) instead of O(n)
             '_loop': wrap_readonly(self.node_context.get(node_id, {}).get('loop', {})),

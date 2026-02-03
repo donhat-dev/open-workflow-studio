@@ -42,12 +42,33 @@ export class EditorCanvas extends Component {
         // Bind component to service state reactivity
         this.editorState = useState(this.editor.state);
 
+        function normalizeItems(value) {
+            if (Array.isArray(value)) {
+                return value;
+            }
+            if (value === null || value === undefined) {
+                return [];
+            }
+            return [value];
+        }
+
+        function buildNodeOutputView(output) {
+            const jsonValue = output;
+            const itemsValue = normalizeItems(jsonValue);
+            const itemValue = itemsValue.length ? itemsValue[0] : jsonValue;
+            return {
+                json: jsonValue,
+                item: itemValue,
+                items: itemsValue,
+            };
+        }
+
         const emptyExpressionContext = () => ({
             _vars: {},
             _node: {},
             _json: {},
             _loop: null,
-            _input: { item: null, json: null },
+            _input: { item: null, json: null, items: [] },
             _execution: null,
             _workflow: null,
             _now: null,
@@ -67,14 +88,15 @@ export class EditorCanvas extends Component {
                 const wrappedNode = {};
                 const nodeEntries = snapshot.node || {};
                 for (const [nodeId, output] of Object.entries(nodeEntries)) {
-                    wrappedNode[nodeId] = { json: output };
+                    wrappedNode[nodeId] = buildNodeOutputView(output);
                 }
+                const inputItems = normalizeItems(json);
                 return {
                     _vars: snapshot.vars || {},
                     _node: wrappedNode,
                     _json: json,
                     _loop: null,
-                    _input: { item: json, json },
+                    _input: { item: inputItems[0] || json, json, items: inputItems },
                     _execution: snapshot.execution || null,
                     _workflow: snapshot.workflow || null,
                     _now: snapshot.now || null,

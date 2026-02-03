@@ -59,14 +59,15 @@
 										</div>
 									</div>
 								</t>
+								<!-- Variables and context section (always visible) -->
 								<div class="ancestor-node-section context-section" t-att-class="{ collapsed: isSectionCollapsed('_context') }">
 									<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection('_context')">
 										<i t-att-class="'fa ' + (isSectionCollapsed('_context') ? 'fa-chevron-right' : 'fa-chevron-down')"/>
 										<i class="fa fa-code"/>
 										<span>Variables and context</span>
 									</div>
-									<div class="ancestor-node-data" t-if="!isSectionCollapsed('_context') and contextVariables">
-										<JsonTreeNode data="contextVariables or null" path="[]" draggable="true"/>
+									<div class="ancestor-node-data" t-if="!isSectionCollapsed('_context')">
+										<JsonTreeNode data="contextVariables" path="[]" draggable="true" isContextRoot="true"/>
 									</div>
 								</div>
 							</t>
@@ -86,13 +87,16 @@
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')">
 								<i class="fa fa-sliders"/> Parameters
 							
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')">
 								<i class="fa fa-code"/> Output
 							
+							
 							</button>
 							<button class="node-config-tab" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')">
 								<i class="fa fa-cog"/> Settings
+							
 							
 							</button>
 						</div>

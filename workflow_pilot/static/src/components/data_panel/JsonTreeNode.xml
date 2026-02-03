@@ -24,7 +24,7 @@
 			<!-- Children (recursive) -->
 			<div t-if="hasChildren and state.isExpanded" class="json-tree-node__children">
 				<t t-foreach="children" t-as="child" t-key="child.key">
-					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="props.draggable"/>
+					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="props.draggable" isContextRoot="props.isContextRoot"/>
 				</t>
 			</div>
 		</div>

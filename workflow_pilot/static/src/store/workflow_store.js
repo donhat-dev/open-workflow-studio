@@ -578,13 +578,13 @@ export const workflowEditorService = {
                         snapshot: adapter.toJSON(),
                         config_overrides: configOverrides,
                     });
-                    if (result && result.status === 'completed') {
+                    if (result && (result.status === 'completed' || result.status === 'failed')) {
                         const outputResult = buildNodeResultsFromOutputs(result);
                         actions.setExecutionResult(createExecutionResult({
                             runId: null,
-                            status: 'completed',
-                            error: null,
-                            errorNodeId: null,
+                            status: result.status,
+                            error: result.error || null,
+                            errorNodeId: result.error_node_id || null,
                             outputData: null,
                             executedOrder: outputResult.executedOrder,
                             executionCount: result.execution_count || null,
@@ -592,11 +592,6 @@ export const workflowEditorService = {
                             nodeResults: outputResult.nodeResults,
                             nodeOutputs: outputResult.nodeOutputs,
                             contextSnapshot: result.context_snapshot || null,
-                        }));
-                    } else if (result && result.status === 'failed') {
-                        const message = result.error || 'Execution failed';
-                        actions.setExecutionResult(buildExecutionError(message, safeInput, {
-                            executionCount: result.execution_count || null,
                         }));
                     }
                     return result;

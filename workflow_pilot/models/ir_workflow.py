@@ -362,11 +362,15 @@ class Workflow(models.Model):
         executor = WorkflowExecutor(self.env, run)
         try:
             output_data = executor.execute(input_data)
+            last_node_id = executor.executed_order[-1] if executor.executed_order else None
+            last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
+            context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
             return {
                 'run_id': run.id,
                 'run_name': run.name,
                 'status': run.status,
                 'output_data': output_data,
+                'context_snapshot': context_snapshot,
                 'node_count_executed': run.node_count_executed,
                 'execution_count': run.execution_count,
                 'duration_seconds': run.duration_seconds,
@@ -455,7 +459,9 @@ class Workflow(models.Model):
             }
 
         data = {
-            'status': 'completed',
+            'status': result.get('status', 'completed'),
+            'error': result.get('error'),
+            'error_node_id': result.get('error_node_id'),
             'target_node_id': result.get('target_node_id'),
             'execution_count': result.get('execution_count'),
             'executed_order': result.get('executed_order') or [],

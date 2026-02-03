@@ -58,7 +58,7 @@ class WorkflowPilotController(http.Controller):
             # Fetch node results from run record (single iteration for performance)
             node_results = []
             node_outputs_map = {}
-            context_snapshot = None
+            context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
             if run_id:
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
@@ -75,23 +75,24 @@ class WorkflowPilotController(http.Controller):
                         ))
                         node_outputs_map[node_run.node_id] = node_run.output_data
                     
-                    # Build context snapshot using pre-built map
-                    context_snapshot = ContextSnapshotSchema(
-                        json=run.output_data,
-                        node=node_outputs_map,
-                        execution={
-                            'id': run.id,
-                            'name': run.name,
-                            'status': run.status,
-                        },
-                        workflow={
-                            'id': workflow.id,
-                            'name': workflow.name,
-                            'active': workflow.active,
-                        },
-                        now=datetime.now().isoformat(),
-                        today=datetime.now().date().isoformat(),
-                    )
+                    if not context_snapshot:
+                        # Build context snapshot using pre-built map (fallback)
+                        context_snapshot = ContextSnapshotSchema(
+                            json=run.output_data,
+                            node=node_outputs_map,
+                            execution={
+                                'id': run.id,
+                                'name': run.name,
+                                'status': run.status,
+                            },
+                            workflow={
+                                'id': workflow.id,
+                                'name': workflow.name,
+                                'active': workflow.active,
+                            },
+                            now=datetime.now().isoformat(),
+                            today=datetime.now().date().isoformat(),
+                        )
             
             return ExecutionResultSchema(
                 run_id=run_id,
@@ -217,6 +218,9 @@ class WorkflowPilotController(http.Controller):
             # Convert node_outputs to node_results
             node_outputs = result.get('node_outputs') or {}
             executed_order = result.get('executed_order') or []
+            status = result.get('status', 'completed')
+            error_message = result.get('error')
+            error_node_id = result.get('error_node_id')
             
             node_results = []
             for node_id in executed_order:
@@ -246,7 +250,9 @@ class WorkflowPilotController(http.Controller):
             )
 
             return ExecutionResultSchema(
-                status='completed',
+                status=status,
+                error=error_message,
+                error_node_id=error_node_id,
                 target_node_id=result.get('target_node_id'),
                 execution_count=result.get('execution_count', 0),
                 node_count_executed=len(executed_order),

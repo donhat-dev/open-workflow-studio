@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Workflow Pilot',
+    'name': 'Workflow Studio',
     'version': '1.0.0',
-    'summary': """ Workflow_pilot Summary """,
+    'summary': """Visual workflow builder with node-based automation.
+        Design complex workflows, execute with backpressure handling, and monitor execution results.""",
     'author': '',
     'website': '',
     'category': '',

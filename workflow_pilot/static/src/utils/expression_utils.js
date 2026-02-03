@@ -11,6 +11,10 @@
  * - _vars: Mutable workflow variables
  * - _loop: Current loop iteration context
  * - _input: Input data for current node
+ * - _execution: Execution metadata
+ * - _workflow: Workflow metadata
+ * - _now: Current datetime (ISO in preview)
+ * - _today: Current date (ISO in preview)
  * 
  * @core - Pure JavaScript utilities, no Odoo dependencies.
  */
@@ -25,14 +29,14 @@ export const EXPRESSION_PATTERNS = {
     SINGLE_TEMPLATE: /\{\{(.+?)\}\}/,
     // Check if entire value is expression (n8n style: starts with =)
     EXPRESSION_PREFIX: /^=/,
-    // Match namespace prefix: _json, _vars, _loop, _node, _input
+    // Match namespace prefix: _json, _vars, _loop, _node, _input, _execution, _workflow, _now, _today
     NAMESPACE: /^_(\w+)/,
 };
 
 /**
  * Supported expression namespaces
  */
-export const NAMESPACES = ['_json', '_vars', '_loop', '_node', '_input'];
+export const NAMESPACES = ['_json', '_vars', '_loop', '_node', '_input', '_execution', '_workflow', '_now', '_today'];
 
 /**
  * Check if a value contains expression templates
@@ -214,7 +218,7 @@ export function getValueByPath(data, path) {
 
 /**
  * Resolve value from full expression context
- * Supports all namespaces: _json, _vars, _loop, _node, _input
+ * Supports all namespaces: _json, _vars, _loop, _node, _input, _execution, _workflow, _now, _today
  * 
  * @param {string} expression - Expression like _json.email, _vars.result, _loop.item
  * @param {Object} context - Full context { _json, _vars, _loop, _node, _input }
@@ -248,6 +252,18 @@ export function resolveExpression(expression, context = {}) {
             break;
         case '_node':
             source = context._node || {};
+            break;
+        case '_execution':
+            source = context._execution || {};
+            break;
+        case '_workflow':
+            source = context._workflow || {};
+            break;
+        case '_now':
+            source = context._now || null;
+            break;
+        case '_today':
+            source = context._today || null;
             break;
         default:
             return undefined;
