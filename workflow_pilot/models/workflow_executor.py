@@ -91,7 +91,8 @@ class WorkflowExecutor:
         self.stack = []  # [{nodeId, inputData}]
         self.node_outputs = {}  # nodeId -> NodeOutput
         self.node_context = {}  # nodeId -> persistent state (loops)
-        self.vars = {}  # Workflow variables
+        self._vars_dirty_paths = set()
+        self.vars = wrap_mutable({}, tracker=self._track_var_path, path="")  # Workflow variables (mutable, dot-access)
         self.executed_order = []
         
         # Build lookup structures
@@ -383,9 +384,8 @@ class WorkflowExecutor:
                 'json': input_data,
             }
         result = runner.execute(config, input_data, context)
-        vars_payload = result.get('vars') if isinstance(result, dict) else None
-        if isinstance(vars_payload, dict) and vars_payload is not self.vars:
-            self.vars = vars_payload
+        if node_type == 'code':
+            self._sanitize_dirty_vars()
         return result
 
     def _get_execution_context(self):
@@ -502,11 +502,22 @@ class WorkflowExecutor:
             workflow_id=workflow_id
         )
         
-        return {
+        def setvar(path, value):
+            cleaned = self._sanitize_value(value, path="_vars.%s" % path)
+            self._set_var_path(path, wrap_mutable(cleaned))
+            return self._get_var_path(path)
+
+        _missing = object()
+
+        def getvar(path, default=None):
+            value = self._get_var_path(path, _missing)
+            return default if value is _missing else value
+
+        eval_context = {
             # Standard namespaces
             '_json': wrap_readonly(input_data or {}),
             '_input': wrap_readonly(input_data or {}),
-            '_vars': wrap_mutable(deepcopy(self.vars)),
+            '_vars': self.vars,
             '_node': wrap_readonly({nid: out.get('json') for nid, out in self.node_outputs.items()}),
             '_loop': wrap_readonly(self.node_context.get(node_id, {}).get('loop', {})),
             
@@ -521,10 +532,14 @@ class WorkflowExecutor:
             # Secure proxies
             'env': safe_env,
             'secret': secret,
+            'setvar': setvar,
+            'getvar': getvar,
             
             # Output variable
             'result': None,
         }
+
+        return eval_context
 
     def _redact_output(self, output, node_id=None):
         """
@@ -774,6 +789,111 @@ class WorkflowExecutor:
         if len(final_outputs) == 1:
             return list(final_outputs.values())[0]
         return final_outputs
+
+    def _track_var_path(self, path):
+        if not isinstance(path, str):
+            return
+        if '[' in path:
+            path = path.split('[', 1)[0]
+        self._vars_dirty_paths.add(path)
+
+    def _sanitize_dirty_vars(self):
+        if not self._vars_dirty_paths:
+            return
+        dirty_paths = self._collapse_dirty_paths(self._vars_dirty_paths)
+        self._vars_dirty_paths = set()
+        if "" in dirty_paths:
+            self.vars = self._sanitize_vars(self.vars)
+            self._vars_dirty_paths.clear()
+            return
+        _missing = object()
+        for path in dirty_paths:
+            raw_value = self._get_var_path(path, default=_missing)
+            if raw_value is _missing:
+                continue
+            cleaned = self._sanitize_value(to_plain(raw_value), path="_vars.%s" % path)
+            self._set_var_path(path, cleaned)
+        self._vars_dirty_paths.clear()
+
+    def _collapse_dirty_paths(self, paths):
+        if "" in paths:
+            return {""}
+        ordered = sorted(paths, key=lambda value: value.count("."))
+        collapsed = set()
+        for path in ordered:
+            skip = False
+            for existing in collapsed:
+                if path == existing:
+                    skip = True
+                    break
+                if path.startswith(existing) and len(path) > len(existing):
+                    next_char = path[len(existing)]
+                    if next_char in ".[":
+                        skip = True
+                        break
+            if not skip:
+                collapsed.add(path)
+        return collapsed
+
+    def _sanitize_vars(self, value):
+        cleaned = self._sanitize_value(to_plain(value), path="_vars")
+        return wrap_mutable(cleaned, tracker=self._track_var_path, path="")
+
+    def _sanitize_value(self, value, path="value"):
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        if isinstance(value, dict):
+            cleaned = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise UserError(
+                        _("Invalid vars key at %s (expected string): %s") % (path, key)
+                    )
+                cleaned[key] = self._sanitize_value(item, path="%s.%s" % (path, key))
+            return cleaned
+        if isinstance(value, (list, tuple)):
+            return [
+                self._sanitize_value(item, path="%s[%s]" % (path, idx))
+                for idx, item in enumerate(value)
+            ]
+        raise UserError(
+            _("Invalid vars value at %s (type %s)") % (path, type(value).__name__)
+        )
+
+    def _split_var_path(self, path):
+        if not isinstance(path, str):
+            raise UserError(_("Variable path must be a string"))
+        return [segment for segment in path.split('.') if segment]
+
+    def _get_var_path(self, path, default=None):
+        parts = self._split_var_path(path)
+        if not parts:
+            return default
+        current = self.vars
+        for part in parts:
+            if not isinstance(current, dict) or part not in current:
+                return default
+            current = current.get(part)
+        return current
+
+    def _set_var_path(self, path, value):
+        parts = self._split_var_path(path)
+        if not parts:
+            raise UserError(_("Variable path is required"))
+        if not isinstance(self.vars, dict):
+            self.vars = wrap_mutable({})
+        current = self.vars
+        prefix = ""
+        for part in parts[:-1]:
+            prefix = "%s.%s" % (prefix, part) if prefix else part
+            next_val = current.get(part)
+            if not isinstance(next_val, dict):
+                next_val = wrap_mutable({}, tracker=self._track_var_path, path=prefix)
+                current[part] = next_val
+            current = next_val
+        current[parts[-1]] = value
 
     def _build_context_snapshot(self, target_node_id, target_result):
         """Build context snapshot at target node execution."""
