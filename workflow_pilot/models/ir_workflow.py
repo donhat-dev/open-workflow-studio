@@ -358,7 +358,6 @@ class Workflow(models.Model):
         })
         
         # Execute using WorkflowExecutor
-        from .workflow_executor import WorkflowExecutor
         
         executor = WorkflowExecutor(self.env, run)
         try:
@@ -455,7 +454,7 @@ class Workflow(models.Model):
                 'title': labels_by_id.get(node_id),
             }
 
-        return {
+        data = {
             'status': 'completed',
             'target_node_id': result.get('target_node_id'),
             'execution_count': result.get('execution_count'),
@@ -463,3 +462,5 @@ class Workflow(models.Model):
             'node_outputs': node_outputs,
             'context_snapshot': result.get('context_snapshot'),
         }
+
+        return data
