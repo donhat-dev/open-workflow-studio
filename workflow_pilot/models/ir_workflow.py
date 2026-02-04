@@ -22,11 +22,22 @@ class Workflow(models.Model):
     Version Control:
         - version increments on each save
         - version_hash computed from draft_snapshot for conflict detection
+        
+    Version History:
+        - Inherits workflow.field.history.mixin for version tracking
+        - Stores parent-object level patches (nodes, connections, metadata)
+        - Supports milestones with full snapshots
+        - FIFO pruning to 50 versions (milestones protected)
     """
     _name = 'ir.workflow'
     _description = 'Workflow'
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread', 'mail.activity.mixin', 'workflow.field.history.mixin']
     _order = 'name'
+    _workflow_field_history_size_limit = 50
+
+    def _get_versioned_fields(self):
+        """Track history for draft_snapshot field."""
+        return ['draft_snapshot']
 
     # === Identity Fields ===
     name = fields.Char(
@@ -503,3 +514,123 @@ class Workflow(models.Model):
                 "message": _("Workflow '%s' has been saved successfully.") % self.name,
             }
         }
+
+    # === Version History RPC Methods ===
+    def get_version_history(self, field_name='draft_snapshot'):
+        """Get version history metadata for frontend.
+        
+        Args:
+            field_name: Field to get history for (default: draft_snapshot)
+            
+        Returns:
+            List of revision metadata dicts
+        """
+        self.ensure_one()
+        self.check_access('read')
+        
+        metadata = self.workflow_field_history_metadata or {}
+        return metadata.get(field_name, [])
+
+    def get_version_content(self, revision_id, field_name='draft_snapshot'):
+        """Get content at specific revision.
+        
+        Args:
+            revision_id: Target revision ID
+            field_name: Field to get content for
+            
+        Returns:
+            Snapshot dict at that revision
+        """
+        self.ensure_one()
+        self.check_access('read')
+        
+        return self.workflow_field_history_get_content_at_revision(
+            field_name, revision_id
+        )
+
+    def get_version_comparison(self, revision_id, field_name='draft_snapshot'):
+        """Get comparison between current and revision.
+        
+        Args:
+            revision_id: Revision ID to compare against
+            field_name: Field to compare
+            
+        Returns:
+            Comparison dict with nodes/connections/metadata diffs
+        """
+        self.ensure_one()
+        self.check_access('read')
+        
+        return self.workflow_field_history_get_comparison(field_name, revision_id)
+
+    def restore_version(self, revision_id, field_name='draft_snapshot'):
+        """Restore workflow to specific revision.
+        
+        Args:
+            revision_id: Revision ID to restore to
+            field_name: Field to restore
+            
+        Returns:
+            True on success
+        """
+        self.ensure_one()
+        self.check_access('write')
+        
+        return self.workflow_field_history_restore(field_name, revision_id)
+
+    def create_milestone(self, name=None, field_name='draft_snapshot'):
+        """Create milestone from current state.
+        
+        Args:
+            name: Optional milestone name
+            field_name: Field to snapshot
+            
+        Returns:
+            New revision_id
+        """
+        self.ensure_one()
+        self.check_access('write')
+        
+        revision_id = self.workflow_field_history_create_milestone(field_name, name)
+        
+        # Create reference record
+        self.env['ir.workflow.milestone'].create({
+            'workflow_id': self.id,
+            'revision_id': revision_id,
+            'name': name or f'Milestone v{revision_id}',
+        })
+        
+        return revision_id
+
+    def mark_milestone(self, revision_id, name=None, field_name='draft_snapshot'):
+        """Mark existing revision as milestone.
+        
+        Args:
+            revision_id: Revision ID to mark
+            name: Optional milestone name
+            field_name: Field the revision belongs to
+            
+        Returns:
+            True on success
+        """
+        self.ensure_one()
+        self.check_access('write')
+        
+        self.workflow_field_history_mark_milestone(field_name, revision_id, name)
+        
+        # Create reference record if not exists
+        existing = self.env['ir.workflow.milestone'].search([
+            ('workflow_id', '=', self.id),
+            ('revision_id', '=', revision_id),
+        ], limit=1)
+        
+        if not existing:
+            self.env['ir.workflow.milestone'].create({
+                'workflow_id': self.id,
+                'revision_id': revision_id,
+                'name': name or f'Milestone v{revision_id}',
+            })
+        elif name:
+            existing.name = name
+        
+        return True

@@ -1,0 +1,87 @@
+// WorkflowHistoryDialog styles
+
+.o_workflow_history_dialog {
+    .wf-history-revisions {
+        .list-group-item {
+            border-radius: 0;
+            border-left: 3px solid transparent;
+            
+            &.active {
+                border-left-color: var(--o-brand-primary);
+                background-color: var(--o-brand-primary);
+            }
+            
+            &:hover:not(.active) {
+                background-color: rgba(0, 0, 0, 0.03);
+            }
+        }
+    }
+    
+    .wf-history-comparison-content {
+        // Diff styling
+        .wf-diff-section {
+            h5 {
+                font-size: 0.9rem;
+                color: #495057;
+                border-bottom: 1px solid #dee2e6;
+                padding-bottom: 0.25rem;
+            }
+        }
+        
+        .wf-diff-added {
+            color: #198754;
+            padding: 2px 4px;
+            border-radius: 2px;
+            
+            &::before {
+                content: "";
+                display: inline-block;
+                width: 3px;
+                height: 1em;
+                background-color: #198754;
+                margin-right: 6px;
+                vertical-align: middle;
+            }
+        }
+        
+        .wf-diff-removed {
+            color: #dc3545;
+            padding: 2px 4px;
+            border-radius: 2px;
+            text-decoration: line-through;
+            opacity: 0.8;
+            
+            &::before {
+                content: "";
+                display: inline-block;
+                width: 3px;
+                height: 1em;
+                background-color: #dc3545;
+                margin-right: 6px;
+                vertical-align: middle;
+            }
+        }
+        
+        .wf-diff-modified {
+            color: #856404;
+            padding: 2px 4px;
+            border-radius: 2px;
+            
+            &::before {
+                content: "";
+                display: inline-block;
+                width: 3px;
+                height: 1em;
+                background-color: #ffc107;
+                margin-right: 6px;
+                vertical-align: middle;
+            }
+        }
+        
+        .wf-diff-empty {
+            font-style: italic;
+            padding: 1rem;
+            text-align: center;
+        }
+    }
+}

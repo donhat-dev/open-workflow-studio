@@ -7,6 +7,7 @@ import { EditorCanvas } from "@workflow_pilot/components/editor_canvas";
 import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
 import { View } from "@web/views/view";
 import { Chatter } from "@mail/chatter/web_portal/chatter";
+import { WorkflowHistoryDialog } from "@workflow_pilot/components/workflow_history_dialog/workflow_history_dialog";
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
  * 
@@ -232,6 +233,36 @@ export class WorkflowEditorApp extends Component {
 
     _exit() {
         this.action.doAction("workflow_pilot.action_ir_workflow");
+    }
+
+    /**
+     * Open version history dialog
+     */
+    openHistory() {
+        this.dialog.add(WorkflowHistoryDialog, {
+            workflowId: this.workflowId,
+            fieldName: "draft_snapshot",
+        });
+    }
+
+    /**
+     * Create a milestone from current state
+     */
+    async createMilestone() {
+        const name = prompt("Enter milestone name:", `Release ${new Date().toLocaleDateString()}`);
+        if (!name) {
+            return;
+        }
+
+        try {
+            await this.orm.call("ir.workflow", "create_milestone", [this.workflowId, name]);
+            this.notification.add("Milestone created.", { type: "success" });
+        } catch (error) {
+            this.dialog.add(AlertDialog, {
+                title: "Failed to create milestone",
+                body: error.message || "Unknown error",
+            });
+        }
     }
     
 }

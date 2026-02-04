@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="workflow_pilot.WorkflowHistoryDialog">
+        <Dialog title="'Version History'" size="'xl'" contentClass="'o_workflow_history_dialog'">
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="props.close">Close</button>
+            </t>
+
+            <div class="d-flex h-100" style="min-height: 500px;">
+                <!-- Left: Revision List -->
+                <div class="wf-history-revisions border-end pe-3" style="width: 280px; overflow-y: auto;">
+                    <h6 class="mb-3 text-muted">Revisions</h6>
+                    
+                    <t t-if="state.loading">
+                        <div class="text-center py-4">
+                            <i class="fa fa-spinner fa-spin fa-2x text-muted"/>
+                        </div>
+                    </t>
+                    
+                    <t t-elif="!state.revisions.length">
+                        <div class="text-muted text-center py-4">
+                            No version history available
+                        </div>
+                    </t>
+                    
+                    <t t-else="">
+                        <div class="list-group list-group-flush">
+                            <t t-foreach="state.revisions" t-as="revision" t-key="revision.revision_id">
+                                <button 
+                                    t-attf-class="list-group-item list-group-item-action py-2 px-2 {{ state.selectedRevisionId === revision.revision_id ? 'active' : '' }}"
+                                    t-on-click="() => this.onRevisionClick(revision.revision_id)">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-medium">
+                                                <t t-if="revision.is_milestone">
+                                                    <i class="fa fa-star text-warning me-1" title="Milestone"/>
+                                                </t>
+                                                v<t t-esc="revision.revision_id"/>
+                                            </div>
+                                            <small class="text-muted d-block">
+                                                <t t-esc="formatDate(revision.create_date)"/>
+                                            </small>
+                                            <small class="text-muted d-block">
+                                                <t t-esc="revision.create_user_name"/>
+                                            </small>
+                                        </div>
+                                        <div>
+                                            <t t-if="revision.is_milestone">
+                                                <span class="badge bg-warning text-dark">Milestone</span>
+                                            </t>
+                                            <t t-elif="revision.type === 'snapshot'">
+                                                <span class="badge bg-info">Snapshot</span>
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <t t-if="revision.note">
+                                        <small class="text-muted fst-italic d-block mt-1">
+                                            <t t-esc="revision.note"/>
+                                        </small>
+                                    </t>
+                                </button>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+
+                <!-- Right: Content/Comparison -->
+                <div class="wf-history-content flex-grow-1 ps-3">
+                    <t t-if="state.contentLoading">
+                        <div class="text-center py-5">
+                            <i class="fa fa-spinner fa-spin fa-2x text-muted"/>
+                            <p class="text-muted mt-2">Loading revision...</p>
+                        </div>
+                    </t>
+                    
+                    <t t-elif="!state.selectedRevisionId">
+                        <div class="text-muted text-center py-5">
+                            Select a revision to view details
+                        </div>
+                    </t>
+                    
+                    <t t-else="">
+                        <!-- Actions -->
+                        <div class="mb-3 d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" t-on-click="onRestoreClick">
+                                <i class="fa fa-undo me-1"/>
+                                Restore
+                            </button>
+                            <button 
+                                class="btn btn-outline-warning btn-sm" 
+                                t-on-click="onMarkMilestoneClick"
+                                t-att-disabled="getSelectedRevision()?.is_milestone ? 'disabled' : undefined">
+                                <i class="fa fa-star me-1"/>
+                                Mark as Milestone
+                            </button>
+                        </div>
+
+                        <!-- Tabs -->
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item">
+                                <a 
+                                    t-attf-class="nav-link {{ state.activeTab === 'comparison' ? 'active' : '' }}"
+                                    href="#"
+                                    t-on-click.prevent="() => this.onTabChange('comparison')">
+                                    Comparison
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a 
+                                    t-attf-class="nav-link {{ state.activeTab === 'content' ? 'active' : '' }}"
+                                    href="#"
+                                    t-on-click.prevent="() => this.onTabChange('content')">
+                                    Content
+                                </a>
+                            </li>
+                        </ul>
+
+                        <!-- Tab Content -->
+                        <div class="tab-content">
+                            <!-- Comparison Tab -->
+                            <div t-attf-class="tab-pane {{ state.activeTab === 'comparison' ? 'show active' : '' }}">
+                                <t t-if="comparisonSummary">
+                                    <div class="alert alert-info py-2 mb-3">
+                                        <small>
+                                            <strong>Changes:</strong>
+                                            <span class="ms-2">
+                                                Nodes: 
+                                                <span class="text-success">+<t t-esc="comparisonSummary.nodes_added"/></span>
+                                                <span class="text-danger ms-1">-<t t-esc="comparisonSummary.nodes_removed"/></span>
+                                                <span class="text-warning ms-1">~<t t-esc="comparisonSummary.nodes_modified"/></span>
+                                            </span>
+                                            <span class="ms-3">
+                                                Connections: 
+                                                <span class="text-success">+<t t-esc="comparisonSummary.connections_added"/></span>
+                                                <span class="text-danger ms-1">-<t t-esc="comparisonSummary.connections_removed"/></span>
+                                            </span>
+                                        </small>
+                                    </div>
+                                </t>
+                                <div 
+                                    class="wf-history-comparison-content border rounded p-3 bg-light" 
+                                    style="max-height: 350px; overflow-y: auto;"
+                                    t-out="comparisonHtml"/>
+                            </div>
+
+                            <!-- Content Tab -->
+                            <div t-attf-class="tab-pane {{ state.activeTab === 'content' ? 'show active' : '' }}">
+                                <t t-if="contentSummary">
+                                    <div class="alert alert-secondary py-2 mb-3">
+                                        <small>
+                                            <strong>Snapshot:</strong>
+                                            <span class="ms-2"><t t-esc="contentSummary.nodeCount"/> nodes</span>
+                                            <span class="ms-2"><t t-esc="contentSummary.connectionCount"/> connections</span>
+                                        </small>
+                                    </div>
+                                </t>
+                                <div class="border rounded p-3 bg-light" style="max-height: 350px; overflow-y: auto;">
+                                    <pre class="mb-0" style="font-size: 11px;"><t t-esc="JSON.stringify(state.content, null, 2)"/></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </Dialog>
+    </t>
+</templates>

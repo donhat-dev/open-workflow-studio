@@ -17,6 +17,23 @@
                 </div>
                 <div class="editor-actions" t-if="state.view === 'editor'">
                     <button 
+                        class="btn btn-outline-secondary" 
+                        t-on-click="openHistory"
+                        title="Version History">
+                        <span class="btn__icon">
+                            <LucideIcon t-props="{ name: 'History', size: 16 }"/>
+                        </span>
+                        History
+                    </button>
+                    <button 
+                        class="btn btn-outline-warning" 
+                        t-on-click="createMilestone"
+                        title="Create Milestone">
+                        <span class="btn__icon">
+                            <LucideIcon t-props="{ name: 'Star', size: 16 }"/>
+                        </span>
+                    </button>
+                    <button 
                         class="btn btn-primary btn-save" 
                         t-on-click="save" 
                         t-att-disabled="state.saving ? 'disabled' : undefined">

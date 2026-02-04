@@ -14,6 +14,7 @@
 | [ADR-003](./003-loop-node-mechanism.md) | Loop Node - SplitInBatches Pattern      | **Accepted ✅** | 2026-01-05 |
 | [ADR-004](./004-editor-state-architecture.md) | Editor State Architecture (Studio-like Patterns) | **Proposed 🟡** | 2026-01-13 |
 | [ADR-005](./005-zero-trust-polp.md)     | Zero Trust + PoLP for Execution & Access | **Accepted ✅** | 2026-02-02 |
+| [ADR-006](./006-version-history.md)     | Workflow Version History (Parent-Object Patch) | **Accepted ✅** | 2026-02-04 |
 
 ---
 
