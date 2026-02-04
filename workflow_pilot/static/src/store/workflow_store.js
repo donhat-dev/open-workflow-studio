@@ -62,6 +62,7 @@ export const workflowEditorService = {
         let adapter = new WorkflowAdapter();
         let versionHash = null;
         let workflowId = null;
+        let autoSave = true;
 
         const state = reactive({
             // Dynamic getter ensures we always point to the current adapter's state
@@ -500,7 +501,14 @@ export const workflowEditorService = {
                 adapter.fromJSON(data.draft_snapshot);
                 versionHash = data.version_hash;
                 workflowId = id;
+                autoSave = data.auto_save !== false;
                 return data;
+            },
+            getAutoSave() {
+                return autoSave;
+            },
+            setAutoSave(value) {
+                autoSave = Boolean(value);
             },
             async loadNodeTypes() {
                 const result = await rpc('/web/dataset/call_kw', {
@@ -524,17 +532,7 @@ export const workflowEditorService = {
                 history.clear();
                 return result;
             },
-            async publishWorkflow() {
-                // Ensure latest snapshot is persisted first
-                await this.saveWorkflow();
-                const result = await rpc('/web/dataset/call_kw', {
-                    model: 'ir.workflow',
-                    method: 'action_publish',
-                    args: [[workflowId]],
-                    kwargs: {},
-                });
-                return result;
-            },
+
             async executeWorkflow(inputData = {}) {
                 if (!workflowId) {
                     throw new Error('No workflow ID loaded');

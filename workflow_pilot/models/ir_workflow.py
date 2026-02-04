@@ -84,6 +84,11 @@ class Workflow(models.Model):
         default='["ir.%"]',
         help='JSON array of model patterns to block. Supports % wildcard. ir.* always blocked.'
     )
+    auto_save = fields.Boolean(
+        string='Auto Save',
+        default=True,
+        help='If true, execute will auto-save before running. Node config save will also trigger workflow save.'
+    )
 
     # === Snapshot Architecture ===
     draft_snapshot = fields.Json(
@@ -277,13 +282,14 @@ class Workflow(models.Model):
             'version': workflow.version,
             'version_hash': workflow.version_hash,
             'is_published': workflow.is_published,
+            'auto_save': workflow.auto_save,
             'draft_snapshot': workflow.draft_snapshot or {},
             'published_snapshot': workflow.published_snapshot or {},
             'node_count': workflow.node_count,
         }
 
     def save_workflow(self, snapshot, expected_hash=None):
-        """Save workflow from editor.
+        """Save workflow from editor (also publishes for execution).
         
         Args:
             snapshot: Full graph snapshot from frontend
@@ -314,13 +320,23 @@ class Workflow(models.Model):
         if 'metadata' not in snapshot or not isinstance(snapshot.get('metadata'), dict):
             snapshot['metadata'] = {}
         
+        # Save draft_snapshot
         self.write({'draft_snapshot': snapshot})
+        
+        # Also publish (save to both draft and published)
+        if snapshot.get('nodes'):
+            self.write({
+                'published_snapshot': snapshot.copy(),
+                'published_version': self.version,
+                'published_at': fields.Datetime.now(),
+            })
         
         return {
             'id': self.id,
             'version': self.version,
             'version_hash': self.version_hash,
             'node_count': self.node_count,
+            'is_published': self.is_published,
         }
 
     # === Execution Methods ===

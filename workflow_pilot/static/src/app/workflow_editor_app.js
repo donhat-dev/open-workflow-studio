@@ -29,7 +29,6 @@ export class WorkflowEditorApp extends Component {
         this.state = useState({
             loading: true,
             saving: false,
-            publishing: false,
             executing: false,
             error: null,
             view: "editor",
@@ -154,13 +153,14 @@ export class WorkflowEditorApp extends Component {
     }
     
     /**
-     * Save workflow to backend
+     * Save workflow to backend (also publishes)
      * Handles conflict errors by showing modal, other errors by showing error state
      */
     async save() {
         this.state.saving = true;
         try {
-            await this.editorService.saveWorkflow();
+            const result = await this.editorService.saveWorkflow();
+            this.workflowInfo.is_published = Boolean(result.is_published);
             this.notification.add("Workflow saved.", { type: "success" });
         } catch (error) {
             // Check if conflict error (message contains "modified by another user")
@@ -182,34 +182,21 @@ export class WorkflowEditorApp extends Component {
             this.state.saving = false;
         }
     }
-
-    /**
-     * Publish current workflow (saves first)
-     */
-    async publish() {
-        this.state.publishing = true;
-        try {
-            await this.editorService.publishWorkflow();
-            this.notification.add("Workflow published.", { type: "success" });
-        } catch (error) {
-            this.dialog.add(AlertDialog, {
-                title: "Publish Failed",
-                body: error.message || "Failed to publish workflow",
-            });
-        } finally {
-            this.state.publishing = false;
-        }
-    }
     
     /**
      * Execute current workflow
+     * If auto_save is enabled, saves workflow first
      */
     async execute() {
         this.state.executing = true;
         try {
+            // Auto-save before execute if enabled
+            if (this.editorService.getAutoSave()) {
+                await this.editorService.saveWorkflow();
+            }
             const result = await this.editorService.executeWorkflow();
             if (result.error){
-                return this.notification.add("Execution erorr: " + result.error, {
+                return this.notification.add("Execution error: " + result.error, {
                     type: "danger",
                     sticky: false,
                 })

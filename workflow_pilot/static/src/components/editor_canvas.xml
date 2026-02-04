@@ -73,10 +73,10 @@
 					<ConnectionToolbar t-if="hoveredConnection.id" position="hoveredConnection.midpoint" connectionId="hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
 					<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
 					<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
-					<!-- Node Config Panel -->
-					<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionState" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 				</div>
 			</div>
+			<!-- Node Config Panel (outside content to avoid transform containment) -->
+			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionState" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
 		</div>
 	</t>
 </templates>

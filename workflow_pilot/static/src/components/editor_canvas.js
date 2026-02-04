@@ -1145,11 +1145,16 @@ export class EditorCanvas extends Component {
 
     /**
      * Save config panel changes
+     * If auto_save is enabled, triggers workflow save via bus
      */
     onConfigPanelSave = (values) => {
         const nodeId = this.editorState.ui.panels.configNodeId;
         if (!nodeId) return;
         this.onConfigPanelClose();
+        // Trigger workflow save if auto_save is enabled
+        if (this.editor.getAutoSave()) {
+            this.env.bus.trigger("save");
+        }
     };
 
     // ============================================
