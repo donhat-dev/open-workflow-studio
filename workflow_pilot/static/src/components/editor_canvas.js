@@ -184,6 +184,9 @@ export class EditorCanvas extends Component {
             editor: this.editor,
             getNodes: () => this.nodes,
             getZoom: () => this.viewportHook.getViewport().zoom,
+            getViewport: () => this.viewportHook.getViewport(),
+            onViewRectUpdate: () => this.viewportHook.updateViewRect(),
+            rootRef: this.rootRef,
         });
 
         // Initialize Keyboard Shortcuts Hook (Delete, Arrows, Undo/Redo, Select All)
