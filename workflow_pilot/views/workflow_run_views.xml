@@ -16,7 +16,7 @@
 				<field name="status" widget="badge" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-info="status == 'pending'" decoration-muted="status == 'cancelled'"/>
 				<field name="started_at"/>
 				<field name="completed_at"/>
-				<field name="duration_seconds" widget="float_time" string="Duration"/>
+				<field name="duration_seconds" string="Duration"/>
 				<field name="node_count_executed"/>
 				<field name="execution_count"/>
 				<field name="error_node_id" optional="hide"/>

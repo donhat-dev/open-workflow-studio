@@ -84,6 +84,7 @@
 			<field name="arch" type="xml">
 				<form string="Workflow">
 					<header>
+						<button name="action_save" string="Save" type="object" class="btn btn-primary"/>
 					</header>
 					<sheet>
 						<group>
@@ -106,6 +107,24 @@
 										<field name="model_allowlist" widget="text" placeholder='["sale.order", "stock.picking"]'/>
 										<field name="model_denylist" widget="text" placeholder='["ir.%", "res.users"]'/>
 									</group>
+								</group>
+							</page>
+							<page string="Run" name="run">
+								<group>
+									<field name="run_ids" readonly="1">
+										<list>
+											<field name="name"/>
+											<field name="status" widget="badge" 
+												decoration-success="status == 'completed'"
+												decoration-danger="status == 'failed'" 
+												decoration-warning="status == 'running'" 
+												decoration-info="status == 'pending'" 
+												decoration-muted="status == 'cancelled'"/>
+											<field name="started_at"/>
+											<field name="completed_at"/>
+											<field name="duration_seconds" string="Duration"/>
+										</list>
+									</field>
 								</group>
 							</page>
 						</notebook>

@@ -470,3 +470,20 @@ class Workflow(models.Model):
         }
 
         return data
+
+    def action_save(self):
+        """Explicit save action to trigger version increment."""
+        self.ensure_one()
+        self.check_access('write')
+        # Writing the same draft_snapshot to trigger version increment
+        self.write({'draft_snapshot': self.draft_snapshot})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                "title": _("Workflow saved"),
+                "type": "success",
+                "sticky": False,
+                "message": _("Workflow '%s' has been saved successfully.") % self.name,
+            }
+        }

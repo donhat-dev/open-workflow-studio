@@ -75,34 +75,63 @@ export class EditorCanvas extends Component {
             _today: null,
         });
 
+        function buildExecutionContext(options) {
+            const execution = options && options.execution
+                ? options.execution
+                : (this.editorState.execution || null);
+            if (!execution) {
+                return emptyExpressionContext();
+            }
+
+            const snapshot = execution.contextSnapshot || null;
+            if (!snapshot) {
+                return emptyExpressionContext();
+            }
+
+            const nodeResults = options && options.nodeResults
+                ? options.nodeResults
+                : (execution.nodeResults || []);
+            const nodeId = options && options.nodeId ? options.nodeId : null;
+
+            const wrappedNode = {};
+            if (Array.isArray(nodeResults) && nodeResults.length) {
+                for (const result of nodeResults) {
+                    wrappedNode[result.node_id] = buildNodeOutputView(result.output_data);
+                }
+            } else {
+                const nodeEntries = snapshot.node || {};
+                for (const [entryId, output] of Object.entries(nodeEntries)) {
+                    wrappedNode[entryId] = buildNodeOutputView(output);
+                }
+            }
+
+            let json = snapshot.json || {};
+            if (nodeId && Array.isArray(nodeResults) && nodeResults.length) {
+                const match = nodeResults.find((result) => result.node_id === nodeId);
+                if (match && match.output_data !== undefined) {
+                    json = match.output_data;
+                }
+            }
+
+            const inputItems = normalizeItems(json);
+            return {
+                _vars: snapshot.vars || {},
+                _node: wrappedNode,
+                _json: json,
+                _loop: null,
+                _input: { item: inputItems[0] || json, json, items: inputItems },
+                _execution: snapshot.execution || null,
+                _workflow: snapshot.workflow || null,
+                _now: snapshot.now || null,
+                _today: snapshot.today || null,
+            };
+        }
+
         this.nodeConfigActions = {
             getControls: (nodeId) => this.editor.getNodeControls(nodeId),
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
-            getExpressionContext: () => {
-                const snapshot = this.editorState.execution?.contextSnapshot || null;
-                if (!snapshot) {
-                    return emptyExpressionContext();
-                }
-                const json = snapshot.json || {};
-                const wrappedNode = {};
-                const nodeEntries = snapshot.node || {};
-                for (const [nodeId, output] of Object.entries(nodeEntries)) {
-                    wrappedNode[nodeId] = buildNodeOutputView(output);
-                }
-                const inputItems = normalizeItems(json);
-                return {
-                    _vars: snapshot.vars || {},
-                    _node: wrappedNode,
-                    _json: json,
-                    _loop: null,
-                    _input: { item: inputItems[0] || json, json, items: inputItems },
-                    _execution: snapshot.execution || null,
-                    _workflow: snapshot.workflow || null,
-                    _now: snapshot.now || null,
-                    _today: snapshot.today || null,
-                };
-            },
+            getExpressionContext: (options) => buildExecutionContext.call(this, options),
             buildContextForNode: () => ({
                 _node: {},
                 _json: {},

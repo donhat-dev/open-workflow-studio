@@ -39,8 +39,8 @@ class CodeNodeRunner(BaseNodeRunner):
             globals_dict.update(locals_dict)
             return locals_dict, globals_dict
         locals_dict = build_eval_context(payload, context, include_input_item=False)
-        locals_dict['_now'] = safe_eval_module.datetime.datetime.now()
-        locals_dict['_today'] = safe_eval_module.datetime.date.today()
+        locals_dict['_now'] = safe_eval_module.datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        locals_dict['_today'] = safe_eval_module.datetime.date.today().strftime('%Y-%m-%d')
         locals_dict['result'] = _RESULT_UNSET
         globals_dict = {
             'datetime': safe_eval_module.datetime,

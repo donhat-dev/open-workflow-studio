@@ -17,7 +17,6 @@ Expression Evaluation:
 
 import logging
 import re
-from copy import deepcopy
 from datetime import datetime, date
 import json
 from odoo import api, fields, models, _
@@ -35,105 +34,11 @@ from .runners import (
     CodeNodeRunner,
     SwitchNodeRunner,
 )
-from .context_objects import to_plain, wrap_mutable, wrap_readonly
+from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
 from .security.secret_broker import SecretBrokerFactory
 
 _logger = logging.getLogger(__name__)
-
-
-class NodeOutputsProxy:
-    """Lazy proxy for _node access to avoid O(n²) dict rebuild.
-    
-    Instead of rebuilding {nid: out.get('json') for ...} each node,
-    this proxy provides O(1) access to node outputs on demand.
-    """
-    __slots__ = ('_outputs', '_cache')
-    
-    def __init__(self, node_outputs):
-        self._outputs = node_outputs
-        self._cache = {}
-
-    def _build_view(self, output):
-        if not isinstance(output, dict):
-            json_value = output
-            meta_value = None
-            error_value = None
-        else:
-            json_value = output.get('json')
-            meta_value = output.get('meta')
-            error_value = output.get('error')
-
-        items_value = None
-        if isinstance(output, dict):
-            items_value = output.get('items')
-
-        if items_value is None:
-            if isinstance(json_value, list):
-                items_value = json_value
-            elif json_value is None:
-                items_value = []
-            else:
-                items_value = [json_value]
-
-        item_value = None
-        if isinstance(output, dict):
-            item_value = output.get('item')
-        if item_value is None:
-            if isinstance(items_value, list) and items_value:
-                item_value = items_value[0]
-            else:
-                item_value = json_value
-
-        view = {
-            'json': json_value,
-            'item': item_value,
-            'items': items_value,
-            'meta': meta_value,
-            'error': error_value,
-        }
-        return wrap_readonly(view)
-
-    def _get_view(self, key):
-        output = self._outputs.get(key)
-        if output is None:
-            return None
-        cached = self._cache.get(key)
-        if cached and cached[0] is output:
-            return cached[1]
-        view = self._build_view(output)
-        self._cache[key] = (output, view)
-        return view
-    
-    def __getitem__(self, key):
-        view = self._get_view(key)
-        if view is None:
-            raise KeyError(key)
-        return view
-    
-    def __contains__(self, key):
-        return key in self._outputs
-    
-    def get(self, key, default=None):
-        view = self._get_view(key)
-        if view is None:
-            return default
-        return view
-    
-    def keys(self):
-        return self._outputs.keys()
-    
-    def values(self):
-        return (self._build_view(out) for out in self._outputs.values())
-    
-    def items(self):
-        return ((nid, self._build_view(out)) for nid, out in self._outputs.items())
-    
-    def __iter__(self):
-        return iter(self._outputs)
-    
-    def __len__(self):
-        return len(self._outputs)
 
 
 # =============================================================================
@@ -188,6 +93,14 @@ class WorkflowExecutor:
         self._vars_dirty_paths = set()
         self.vars = wrap_mutable({}, tracker=self._track_var_path, path="")  # Workflow variables (mutable, dot-access)
         self.executed_order = []
+
+        self.exec_context = ExecutionContext(
+            node_outputs=self.node_outputs,
+            vars_store=self.vars,
+            node_context=self.node_context,
+            execution=self._get_execution_context(),
+            workflow=self._get_workflow_context(),
+        )
         
         # Build lookup structures
         self._build_graph()
@@ -485,15 +398,12 @@ class WorkflowExecutor:
         node_type = node.get('type')
         config = node.get('config', {})
 
-        # Build execution context
-        context = {
-            'current_node_id': node_id,
-            'node': self.node_outputs,
-            'vars': self.vars,
-            'node_context': self.node_context,
-            'execution': self._get_execution_context(),
-            'workflow': self._get_workflow_context(),
-        }
+        # Build execution context (single in-memory context)
+        context = self.exec_context.get_runtime_context(
+            node_id=node_id,
+            execution=self._get_execution_context(),
+            workflow=self._get_workflow_context(),
+        )
 
         if node_type == 'code':
             context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
@@ -635,44 +545,17 @@ class WorkflowExecutor:
             value = self._get_var_path(path, _missing)
             return default if value is _missing else value
 
-        input_payload = input_data or {}
-        if isinstance(input_payload, list):
-            input_items = input_payload
-            input_item = input_payload[0] if input_payload else None
-        else:
-            input_items = [] if input_payload is None else [input_payload]
-            input_item = input_payload
-        input_context = {
-            'json': input_payload,
-            'item': input_item,
-            'items': input_items,
-        }
+        eval_context = self.exec_context.get_eval_context(
+            input_data,
+            include_input_item=True,
+            node_id=node_id,
+        )
 
-        eval_context = {
-            # Standard namespaces
-            '_json': wrap_readonly(input_payload),
-            '_input': wrap_readonly(input_context),
-            '_vars': self.vars,
-            '_node': NodeOutputsProxy(self.node_outputs),  # Lazy proxy - O(1) instead of O(n)
-            '_loop': wrap_readonly(self.node_context.get(node_id, {}).get('loop', {})),
-            
-            # Time
-            '_now': datetime.now(),
-            '_today': date.today(),
-            
-            # Execution metadata
-            '_execution': wrap_readonly(self._get_execution_context() or {}),
-            '_workflow': wrap_readonly(self._get_workflow_context() or {}),
-            
-            # Secure proxies
-            'env': safe_env,
-            'secret': secret,
-            'setvar': setvar,
-            'getvar': getvar,
-            
-            # Output variable
-            'result': None,
-        }
+        eval_context['env'] = safe_env
+        eval_context['secret'] = secret
+        eval_context['setvar'] = setvar
+        eval_context['getvar'] = getvar
+        eval_context['result'] = None
 
         return eval_context
 
@@ -939,6 +822,7 @@ class WorkflowExecutor:
         self._vars_dirty_paths = set()
         if "" in dirty_paths:
             self.vars = self._sanitize_vars(self.vars)
+            self.exec_context.update_vars(self.vars)
             self._vars_dirty_paths.clear()
             return
         _missing = object()
@@ -1019,6 +903,7 @@ class WorkflowExecutor:
             raise UserError(_("Variable path is required"))
         if not isinstance(self.vars, dict):
             self.vars = wrap_mutable({})
+            self.exec_context.update_vars(self.vars)
         current = self.vars
         prefix = ""
         for part in parts[:-1]:
@@ -1031,38 +916,9 @@ class WorkflowExecutor:
         current[parts[-1]] = value
 
     def _build_context_snapshot(self, target_node_id, target_result):
-        """Build context snapshot at target node execution.
-        
-        Includes all context variables matching _get_secure_eval_context:
-        _now, _today, _vars, _execution, _workflow, _node, etc.
-        
-        Performance notes:
-        - node: shallow dict copy (json values are immutable after execution)
-        - vars: deepcopy required (mutable, user can modify)
-        - node_context: shallow copy (loop state is read-only after node completes)
-        """
-        target_json = None
-        if target_result:
-            target_json = target_result.get('json')
-
-        # Shallow copy - json values are already serialized/immutable
-        node_json_snapshot = {
-            node_id: output.get('json')
-            for node_id, output in self.node_outputs.items()
-        }
-
-        # Shallow copy node_context - only deepcopy if loops have mutable state
-        node_context_snapshot = {
-            nid: dict(ctx) for nid, ctx in self.node_context.items()
-        }
-
-        return {
-            'json': target_json,
-            'node': node_json_snapshot,
-            'vars': deepcopy(to_plain(self.vars)),  # Convert proxy to plain dict first
-            'node_context': node_context_snapshot,
-            'execution': self._get_execution_context(),
-            'workflow': self._get_workflow_context(),
-            'now': datetime.now().isoformat(),
-            'today': date.today().isoformat(),
-        }
+        """Build context snapshot at target node execution."""
+        self.exec_context.update_runtime(
+            execution=self._get_execution_context(),
+            workflow=self._get_workflow_context(),
+        )
+        return self.exec_context.build_snapshot(target_node_id, target_result)

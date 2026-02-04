@@ -429,6 +429,21 @@ export class NodeConfigPanel extends Component {
      * - _vars/_loop: from workflowVariable service via adapterService.getExpressionContext()
      */
     get expressionPreviewContext() {
+        const execution = this.props.execution;
+        if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
+            if (!this.actions.getExpressionContext) {
+                throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
+            }
+            return this.actions.getExpressionContext({
+                execution,
+                nodeId: this.props.node.id,
+                nodeResults: execution.nodeResults,
+            });
+        }
+
+        if (!this.actions.getExpressionContext) {
+            throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
+        }
         function normalizeItems(value) {
             if (Array.isArray(value)) {
                 return value;
@@ -437,51 +452,6 @@ export class NodeConfigPanel extends Component {
                 return [];
             }
             return [value];
-        }
-
-        function buildNodeOutputView(output) {
-            const jsonValue = output;
-            const itemsValue = normalizeItems(jsonValue);
-            const itemValue = itemsValue.length ? itemsValue[0] : jsonValue;
-            return {
-                json: jsonValue,
-                item: itemValue,
-                items: itemsValue,
-            };
-        }
-
-        const execution = this.props.execution;
-        if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
-            const nodeMap = {};
-            for (const result of execution.nodeResults) {
-                nodeMap[result.node_id] = result.output_data;
-            }
-            const runResult = this.executionNodeResult;
-            let json = {};
-            if (runResult && runResult.output_data !== undefined) {
-                json = runResult.output_data;
-            }
-            const snapshot = execution.contextSnapshot || {};
-            const wrappedNodeMap = {};
-            for (const [nodeId, output] of Object.entries(nodeMap)) {
-                wrappedNodeMap[nodeId] = buildNodeOutputView(output);
-            }
-            const inputItems = normalizeItems(json);
-            return {
-                _vars: snapshot.vars || {},
-                _loop: null,
-                _node: wrappedNodeMap,
-                _json: json,
-                _input: { item: inputItems[0] || json, json, items: inputItems },
-                _execution: snapshot.execution || null,
-                _workflow: snapshot.workflow || null,
-                _now: snapshot.now || null,
-                _today: snapshot.today || null,
-            };
-        }
-
-        if (!this.actions.getExpressionContext) {
-            throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
         }
         const base = this.actions.getExpressionContext() || {
             _vars: {},
