@@ -17,6 +17,16 @@
 - `nodes.js`: node models (`Rete.ClassicPreset.Node`) exposed as `window.WorkflowNodes`; execution is `async data(inputs)`.
 - `app.js`: OWL UI shell + `SimpleEditor` (custom graph) + `DomRenderer` (manual DOM + SVG `<path>` connections).
 
+## Where to look (core paths)
+- Core architecture: `workflow_pilot/static/src/store/workflow_store.js`
+- Canvas behavior: `workflow_pilot/static/src/components/editor_canvas/`
+- Node system: `workflow_pilot/static/src/core/node.js` + `workflow_pilot/static/src/nodes/`
+- Expression engine: `workflow_pilot/static/src/utils/expression_utils.js`
+- Backend execution: `workflow_pilot/models/workflow_executor.py`
+- Node runners: `workflow_pilot/models/runners/`
+- Controllers: `workflow_pilot/controllers/main.py`
+- Backend views: `workflow_pilot/views/`
+
 ## Overall plan (roadmap)
 1) **Keep the prototype usable** for UX/learning (don’t break `index.html`).
 2) **Migrate graph core to real Rete v2**: replace `SimpleEditor` with `NodeEditor` + plugins (use `rete-owl-test.html` as the reference).
@@ -30,10 +40,70 @@
   - Add node: `window.app.editor.addNode(window.WorkflowNodes.HttpRequestNode, { x: 300, y: 300 })`
   - Export: `window.app.editor.getWorkflow()`
 
-## Project conventions (avoid footguns)
-- **Non-module JS (globals)**: don’t add `import ...` in `app.js`/`nodes.js` unless also migrating HTML to modules.
-- Avoid “already declared”: `ClassicPreset` is declared in `nodes.js`; elsewhere use `Rete.ClassicPreset` or `window.WorkflowNodes.*`.
-- When adding a node type (prototype track): update `nodes.js` + `app.js` (palette/properties) + `styles.css`.
+## Project conventions (must follow)
+- **Language**: Vietnamese in conversation, English for code/docs.
+- **Fail-First**: no optional chaining (`?.`) for service/dependency access.
+- **State mutation**: service is single source of truth; mutate via `workflowEditor.actions.*` only.
+- **Expressions**: only evaluate inside `{{ ... }}`.
+- **Manual save**: no autosave.
+- **Module header**: `/** @odoo-module **/` required on all JS files.
+- **File naming**: `snake_case.js` for files, `PascalCase` for classes.
+- **Template naming**: `module.template_name` (e.g., `workflow_pilot.workflow_editor_app`).
+- **Manifest assets**: use glob patterns; asset order: libs → registries → services → core → nodes → utils → components.
+- **Feature gating**: gate disabled features with a const flag + early return; keep services registered.
+- **Bus usage**: use bus for global events (save/execute) and scoped model/service events; prefer direct actions/callbacks for local UI.
+- **Clipboard**: use `workflowEditor` service (not adapter).
+- **Notifications**: `display_notification` for sticky execution notices; dialog for internal errors.
+- **Execution state**: store execution results in `workflowEditor.state.execution`.
+- **Publish behavior**: publish does not auto-execute.
+- **Node types**: seeded via XML; manual trigger is a start node (no inputs).
+- **Node runners**: keep under `models/runners/`.
+- **t-props**: bundle complex/long props (including callbacks) via `t-props`.
+
+## OWL framework patterns
+- Use `useState(service.state)`; avoid duplicate graph state.
+- Use `useService("serviceName")` (no optional chaining).
+- Use `useSubEnv({ bus, workflowEditor })` for context.
+- Use `onMounted` for async init; `onWillUpdateProps` when props change.
+- Use `useExternalListener` for DOM/global events to ensure cleanup.
+- Disconnect observers (e.g., `ResizeObserver`) on unmount.
+
+## Odoo integration patterns
+- RPC via `/web/dataset/call_kw` with `{ model, method, args, kwargs }`.
+- Client actions: workflow id from `this.props.action.context.active_id`.
+
+## Anti-patterns (forbidden)
+- Optional chaining `?.` for services/dependencies.
+- Duplicate state in `useState` (single source of truth).
+- Autosave.
+
+## Continuity Ledger (compaction-safe)
+Maintain a single Continuity Ledger for this workspace in `CONTINUITY.md`. The ledger is the canonical session briefing designed to survive context compaction; do not rely on earlier chat text unless it's reflected in the ledger.
+
+### How it works
+- At the start of every assistant turn: read `CONTINUITY.md`, update it to reflect the latest goal/constraints/decisions/state, then proceed with the work.
+- Update `CONTINUITY.md` again whenever any of these change: goal, constraints/assumptions, key decisions, progress state (Done/Now/Next), or important tool outcomes.
+- Keep it short and stable: facts only, no transcripts. Prefer bullets. Mark uncertainty as **UNCONFIRMED** (never guess).
+- If you notice missing recall or a compaction/summary event: refresh/rebuild the ledger from visible context, mark gaps **UNCONFIRMED**, ask up to 1-3 targeted questions, then continue.
+
+### `functions.update_plan` vs the Ledger
+- `functions.update_plan` is for short-term execution scaffolding while you work (a small 3-7 step plan with pending/in_progress/completed).
+- `CONTINUITY.md` is for long-running continuity across compaction (the “what/why/current state”), not a step-by-step task list.
+- Keep them consistent: when the plan or state changes, update the ledger at the intent/progress level (not every micro-step).
+
+### In replies
+- Begin with a brief **Ledger Snapshot** (Goal + Now/Next + Open Questions). Print the full ledger only when it materially changes or when the user asks.
+
+### `CONTINUITY.md` format (keep headings)
+- Goal (incl. success criteria):
+- Constraints/Assumptions:
+- Key decisions:
+- State:
+- Done:
+- Now:
+- Next:
+- Open questions (UNCONFIRMED if needed):
+- Working set (files/ids/commands):
 
 ## Non-goals (for this repo)
 - Don’t attempt to fully implement Odoo add-on packaging here; this workspace is for UI/renderer experiments and Rete learning.

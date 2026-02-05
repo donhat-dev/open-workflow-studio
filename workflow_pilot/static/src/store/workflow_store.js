@@ -34,7 +34,7 @@ import {
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
     viewport: { pan: { x: 0, y: 0 }, zoom: 1 },
-    panels: { configOpen: false, configNodeId: null, menuOpen: false },
+    panels: { configOpen: false, configNodeId: null, menuOpen: false, historyOpen: false },
     hoveredConnection: {
         id: null,
         midpoint: { x: 0, y: 0 },
@@ -337,6 +337,9 @@ export const workflowEditorService = {
                 if (panelType === "menu") {
                     state.ui.panels.menuOpen = true;
                 }
+                if (panelType === "history") {
+                    state.ui.panels.historyOpen = true;
+                }
             },
 
             closePanel(panelType) {
@@ -347,6 +350,9 @@ export const workflowEditorService = {
                 }
                 if (panelType === "menu") {
                     state.ui.panels.menuOpen = false;
+                }
+                if (panelType === "history") {
+                    state.ui.panels.historyOpen = false;
                 }
             },
 

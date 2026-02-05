@@ -24,10 +24,6 @@
 				</button>
 				<span class="zoom-label">
 					<t t-esc="zoomPercentage"/>%
-				
-				
-				
-				
 				</span>
 				<button class="canvas-btn" t-on-click="zoomIn" title="Zoom In">
 					<LucideIcon t-props="{ name: 'Plus', size: 16 }"/>

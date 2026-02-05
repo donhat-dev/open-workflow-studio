@@ -22,24 +22,33 @@ export class WorkflowNode extends Component {
         connectedOutputsSet: { type: Object, optional: true },
         dimensionConfig: { type: Object },
         selected: { type: Boolean, optional: true },
+        readonly: { type: Boolean, optional: true },
         // Parent->child callbacks (flat props, bundled via t-props in parent)
-        onDragStart: Function,       // (nodeId, event) => void
-        onExecute: Function,         // (nodeId) => void
-        onSocketMouseDown: Function, // (data) => void
-        onSocketMouseUp: Function,   // (data) => void
-        onSocketQuickAdd: Function,  // (data) => void
+        // Optional in readonly mode
+        onDragStart: { type: Function, optional: true },
+        onExecute: { type: Function, optional: true },
+        onSocketMouseDown: { type: Function, optional: true },
+        onSocketMouseUp: { type: Function, optional: true },
+        onSocketQuickAdd: { type: Function, optional: true },
     };
 
     setup() {
         this.rootRef = useRef("root");
-        this.editor = this.env.workflowEditor;
+        this.editor = this.env.workflowEditor || null;
     }
 
+    /**
+     * Check if component is in readonly mode
+     */
+    get isReadonly() {
+        return this.props.readonly || !this.editor;
+    }
 
     /**
      * Start drag sequence on header mousedown
      */
     onHeaderMouseDown(ev) {
+        if (this.isReadonly) return;
         ev.stopPropagation();
         ev.preventDefault();
 
@@ -66,7 +75,7 @@ export class WorkflowNode extends Component {
         }
 
         // Trigger drag start via callback
-        this.props.onDragStart(this.props.node.id, ev);
+        this.props.onDragStart?.(this.props.node.id, ev);
     }
 
     /**
@@ -74,6 +83,7 @@ export class WorkflowNode extends Component {
      * Only triggers on node zone (header/body), not on toolbar or sockets
      */
     onNodeDoubleClick(ev) {
+        if (this.isReadonly) return;
         if (!ev) return;
         const target = ev.target;
         if (target.closest('.canvas-node-toolbar') ||
@@ -89,6 +99,7 @@ export class WorkflowNode extends Component {
      * Handle delete from toolbar
      */
     onDeleteNode() {
+        if (this.isReadonly) return;
         this.editor.actions.removeNode(this.props.node.id);
     }
 
@@ -96,14 +107,16 @@ export class WorkflowNode extends Component {
      * Handle execute from toolbar
      */
     onExecuteNode() {
+        if (this.isReadonly) return;
         // Trigger via callback for executor service to handle
-        this.props.onExecute(this.props.node.id);
+        this.props.onExecute?.(this.props.node.id);
     }
 
     /**
      * Handle toggle disable from toolbar
      */
     onToggleDisable() {
+        if (this.isReadonly) return;
         this.editor.actions.toggleDisable(this.props.node.id);
     }
 
@@ -134,7 +147,7 @@ export class WorkflowNode extends Component {
      * @returns {boolean}
      */
     get isDisabled() {
-        return this.editor.actions.isNodeDisabled(this.props.node.id);
+        return this.editor?.actions?.isNodeDisabled?.(this.props.node.id) || false;
     }
 
     get socketRows() {
@@ -165,19 +178,19 @@ export class WorkflowNode extends Component {
      */
     getInputSocketProps(socketEntry) {
         const [socketKey, socketDef] = socketEntry;
-        return {
+        const props = {
             type: "input",
             name: socketKey,
             label: socketDef.label,
             nodeId: this.props.node.id,
             isSnapped: this.props.snappedSocketKey === socketKey,
-            onMouseDown: (data) => {
-                this.props.onSocketMouseDown(data);
-            },
-            onMouseUp: (data) => {
-                this.props.onSocketMouseUp(data);
-            },
+            readonly: this.isReadonly,
         };
+        if (!this.isReadonly) {
+            props.onMouseDown = (data) => this.props.onSocketMouseDown?.(data);
+            props.onMouseUp = (data) => this.props.onSocketMouseUp?.(data);
+        }
+        return props;
     }
 
     /**
@@ -187,22 +200,20 @@ export class WorkflowNode extends Component {
      */
     getOutputSocketProps(socketEntry) {
         const [socketKey, socketDef] = socketEntry;
-        return {
+        const props = {
             type: "output",
             name: socketKey,
             label: socketDef.label,
             nodeId: this.props.node.id,
             isConnected: this.isOutputConnected(socketKey),
-            onMouseDown: (data) => {
-                this.props.onSocketMouseDown(data);
-            },
-            onMouseUp: (data) => {
-                this.props.onSocketMouseUp(data);
-            },
-            onQuickAdd: (data) => {
-                this.props.onSocketQuickAdd(data);
-            },
+            readonly: this.isReadonly,
         };
+        if (!this.isReadonly) {
+            props.onMouseDown = (data) => this.props.onSocketMouseDown?.(data);
+            props.onMouseUp = (data) => this.props.onSocketMouseUp?.(data);
+            props.onQuickAdd = (data) => this.props.onSocketQuickAdd?.(data);
+        }
+        return props;
     }
 
     /**
@@ -210,6 +221,7 @@ export class WorkflowNode extends Component {
      * @returns {Object} Props object for CanvasNodeToolbar
      */
     get toolbarProps() {
+        if (this.isReadonly) return null;
         return {
             nodeId: this.props.node.id,
             isDisabled: this.props.node.disabled,
@@ -217,7 +229,7 @@ export class WorkflowNode extends Component {
             onDelete: () => this.onDeleteNode(),
             onToggleDisable: () => this.onToggleDisable(),
             onOpenConfig: () => {
-                this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+                this.editor?.actions?.openPanel?.("config", { nodeId: this.props.node.id });
             },
         };
     }

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from . import workflow_field_history_mixin
+from . import ir_workflow_snapshot_blob
 from . import workflow_milestone
 from . import workflow_type
 from . import ir_workflow

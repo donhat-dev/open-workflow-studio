@@ -9,13 +9,18 @@ import { getNodeBounds } from "../utils/view_utils";
  * 
  * Manages canvas gestures: panning (middle mouse) and box selection (left click on empty area).
  * Follows pattern: hook returns state + handlers.
+ * Supports readonly mode for viewer use case.
  * 
  * @param {{ 
- *   editor: Object, 
+ *   editor?: Object,                   // Optional - not needed in readonly mode
  *   rootRef: { el: HTMLElement },
  *   getViewport: () => { panX: number, panY: number, zoom: number },
  *   getCanvasPosition: (ev: MouseEvent) => { x: number, y: number },
  *   onViewRectUpdate: () => void,
+ *   getDimensions: () => DimensionConfig,
+ *   readonly?: boolean,                // Viewer mode - pan only, no selection
+ *   setViewport?: (viewportUpdate: Object) => void, // For viewer mode pan
+ *   getNodes?: () => Array,            // For readonly selection (if ever needed)
  * }} params
  * @returns {Object} Gesture state and handlers
  */
@@ -25,7 +30,10 @@ export function useCanvasGestures({
     getViewport,
     getCanvasPosition,
     onViewRectUpdate,
-    getDimensions
+    getDimensions,
+    readonly = false,
+    setViewport,
+    getNodes,
 }) {
     // Gesture state
     const state = useState({
@@ -79,7 +87,9 @@ export function useCanvasGestures({
             return;
         }
 
-        // Left click on empty canvas = start selection box
+        // Left click on empty canvas = start selection box (disabled in readonly mode)
+        if (readonly) return;
+
         const isOnNode = ev.target.closest?.('.workflow-node');
         if (ev.button === 0 && isCanvasBackground(ev) && !isOnNode) {
             const pos = getCanvasPosition(ev);
@@ -90,7 +100,9 @@ export function useCanvasGestures({
                 endX: pos.x,
                 endY: pos.y,
             };
-            editor.actions.select([]);
+            if (editor) {
+                editor.actions.select([]);
+            }
         }
     }
 
@@ -103,13 +115,18 @@ export function useCanvasGestures({
         if (state.isPanning && panStart && panInitial) {
             const newPanX = panInitial.x + (ev.clientX - panStart.x);
             const newPanY = panInitial.y + (ev.clientY - panStart.y);
-            editor.actions.setViewport({ pan: { x: newPanX, y: newPanY } });
+            // Use setViewport if provided (viewer mode), otherwise editor
+            if (setViewport) {
+                setViewport({ pan: { x: newPanX, y: newPanY } });
+            } else if (editor) {
+                editor.actions.setViewport({ pan: { x: newPanX, y: newPanY } });
+            }
             onViewRectUpdate?.();
             return true;
         }
 
-        // Selection box gesture
-        if (state.isSelecting && state.selectionBox) {
+        // Selection box gesture (not in readonly mode)
+        if (!readonly && state.isSelecting && state.selectionBox) {
             const pos = getCanvasPosition(ev);
             state.selectionBox.endX = pos.x;
             state.selectionBox.endY = pos.y;
@@ -147,6 +164,8 @@ export function useCanvasGestures({
      * Complete selection - find nodes within selection box
      */
     function completeSelection() {
+        if (readonly) return;
+
         const box = state.selectionBox;
         if (!box) return;
 
@@ -158,8 +177,8 @@ export function useCanvasGestures({
         const dims = getDimensions ? getDimensions() : null;
         if (!dims) return;
 
-        // Get nodes from editor service
-        const nodes = editor.state.graph.nodes;
+        // Get nodes from editor service or via getter
+        const nodes = getNodes ? getNodes() : (editor ? editor.state.graph.nodes : []);
         const selected = nodes.filter((node) => {
             const bounds = getNodeBounds(node, dims);
             const nodeRight = bounds.x + bounds.width;
@@ -167,7 +186,7 @@ export function useCanvasGestures({
             return bounds.x < maxX && nodeRight > minX && bounds.y < maxY && nodeBottom > minY;
         });
 
-        if (selected.length > 0) {
+        if (selected.length > 0 && editor) {
             editor.actions.select(selected.map(n => n.id));
         }
     }

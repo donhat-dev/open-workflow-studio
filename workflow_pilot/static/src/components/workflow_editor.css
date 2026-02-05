@@ -813,6 +813,24 @@
   position: relative;
 }
 
+.editor-split {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-split > .workflow-editor-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-split > .workflow-history-panel {
+  width: 420px;
+  min-width: 360px;
+  max-width: 520px;
+}
+
 .editor-toolbar {
   height: 56px;
   min-height: 56px;

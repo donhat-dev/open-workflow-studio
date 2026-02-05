@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates>
     <t t-name="workflow_pilot.workflow_editor_app">
-        <div class="workflow-editor-app">
+        <div class="workflow-editor-app" t-att-class="{ 'history-open': isHistoryOpen }">
             <div class="editor-toolbar">
                 <div class="editor-toolbar__left">
                     <button t-on-click="exit" class="editor-toolbar__exit btn btn-secondary" title="Back" style="min-width:42px; min-height:42px;">
@@ -70,7 +70,15 @@
                 <t t-else="">
                     <div class="editor-container">
                         <t t-if="state.view === 'editor'">
-                            <EditorCanvas />
+                            <div class="editor-split">
+                                <EditorCanvas />
+                                <WorkflowHistoryPanel
+                                    t-if="isHistoryOpen"
+                                    workflowId="workflowId"
+                                    fieldName="'draft_snapshot'"
+                                    onClose="closeHistory"
+                                    restoreRequested="restoreHistoryRevision"/>
+                            </div>
                         </t>
                         <t t-else="">
                             <div class="workflow-form-container">

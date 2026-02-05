@@ -25,8 +25,8 @@ class Workflow(models.Model):
         
     Version History:
         - Inherits workflow.field.history.mixin for version tracking
-        - Stores parent-object level patches (nodes, connections, metadata)
-        - Supports milestones with full snapshots
+        - Stores full snapshots as compressed, deduplicated blobs
+        - Supports milestones (protected from FIFO prune)
         - FIFO pruning to 50 versions (milestones protected)
     """
     _name = 'ir.workflow'
@@ -593,12 +593,21 @@ class Workflow(models.Model):
         
         revision_id = self.workflow_field_history_create_milestone(field_name, name)
         
-        # Create reference record
-        self.env['ir.workflow.milestone'].create({
-            'workflow_id': self.id,
-            'revision_id': revision_id,
-            'name': name or f'Milestone v{revision_id}',
-        })
+        # Create or update reference record
+        milestone = self.env['ir.workflow.milestone'].search([
+            ('workflow_id', '=', self.id),
+            ('revision_id', '=', revision_id),
+        ], limit=1)
+
+        if milestone:
+            if name:
+                milestone.name = name
+        else:
+            self.env['ir.workflow.milestone'].create({
+                'workflow_id': self.id,
+                'revision_id': revision_id,
+                'name': name or f'Milestone v{revision_id}',
+            })
         
         return revision_id
 

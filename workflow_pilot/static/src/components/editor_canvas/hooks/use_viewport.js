@@ -8,13 +8,26 @@ import { calculateFitView } from "../utils/view_utils";
  * useViewport Hook
  * 
  * Manages viewport state (zoom, pan) and provides viewport-related methods.
+ * Supports both editor mode (via service) and viewer mode (via local state).
  * 
- * @param {{ editor: Object, rootRef: { el: HTMLElement } }} params
+ * @param {{
+ *   editor?: Object,              // Editor service (optional for viewer mode)
+ *   rootRef: { el: HTMLElement },
+ *   getDimensions: () => DimensionConfig,
+ *   readonly?: boolean,           // Viewer mode flag
+ *   initialViewport?: { pan: { x: number, y: number }, zoom: number }, // Initial state for viewer
+ * }} params
  * @returns {Object} Viewport state and methods
  */
-export function useViewport({ editor, rootRef, getDimensions }) {
+export function useViewport({ editor, rootRef, getDimensions, readonly = false, initialViewport }) {
     // RAF frame for throttling wheel zoom
     let scrollFrame = null;
+
+    // Local viewport state for viewer mode
+    const localViewport = useState({
+        pan: initialViewport?.pan || { x: 0, y: 0 },
+        zoom: initialViewport?.zoom || 1,
+    });
 
     // View rect tracking
     const viewRect = useState({
@@ -25,15 +38,34 @@ export function useViewport({ editor, rootRef, getDimensions }) {
     });
 
     /**
-     * Get reactive viewport from editor service state
+     * Get reactive viewport - from editor service or local state
      */
     function getViewport() {
-        const { pan, zoom } = editor.state.ui.viewport;
+        if (editor) {
+            const { pan, zoom } = editor.state.ui.viewport;
+            return { zoom, panX: pan.x, panY: pan.y };
+        }
         return {
-            zoom,
-            panX: pan.x,
-            panY: pan.y,
+            zoom: localViewport.zoom,
+            panX: localViewport.pan.x,
+            panY: localViewport.pan.y,
         };
+    }
+
+    /**
+     * Set viewport - to editor service or local state
+     */
+    function setViewport(viewportUpdate) {
+        if (editor) {
+            editor.actions.setViewport(viewportUpdate);
+        } else {
+            if (viewportUpdate.pan) {
+                localViewport.pan = { ...localViewport.pan, ...viewportUpdate.pan };
+            }
+            if (viewportUpdate.zoom !== undefined) {
+                localViewport.zoom = viewportUpdate.zoom;
+            }
+        }
     }
 
     /**
@@ -119,7 +151,7 @@ export function useViewport({ editor, rootRef, getDimensions }) {
             const newPanX = mouseX - (mouseX - viewport.panX) * factor;
             const newPanY = mouseY - (mouseY - viewport.panY) * factor;
 
-            editor.actions.setViewport({
+            setViewport({
                 pan: { x: newPanX, y: newPanY },
                 zoom: newZoom,
             });
@@ -141,7 +173,11 @@ export function useViewport({ editor, rootRef, getDimensions }) {
     function zoomIn() {
         const currentZoom = getViewport().zoom;
         const newZoom = Math.min(Math.round((currentZoom + 0.1) * 10) / 10, 2);
-        editor.actions.zoomTo(newZoom);
+        if (editor) {
+            editor.actions.zoomTo(newZoom);
+        } else {
+            setViewport({ zoom: newZoom });
+        }
         updateViewRect();
     }
 
@@ -151,7 +187,11 @@ export function useViewport({ editor, rootRef, getDimensions }) {
     function zoomOut() {
         const currentZoom = getViewport().zoom;
         const newZoom = Math.max(Math.round((currentZoom - 0.1) * 10) / 10, 0.25);
-        editor.actions.zoomTo(newZoom);
+        if (editor) {
+            editor.actions.zoomTo(newZoom);
+        } else {
+            setViewport({ zoom: newZoom });
+        }
         updateViewRect();
     }
 
@@ -159,7 +199,11 @@ export function useViewport({ editor, rootRef, getDimensions }) {
      * Reset zoom to 100% and pan to origin
      */
     function resetZoom() {
-        editor.actions.resetViewport();
+        if (editor) {
+            editor.actions.resetViewport();
+        } else {
+            setViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
+        }
         updateViewRect();
     }
 
@@ -179,7 +223,7 @@ export function useViewport({ editor, rootRef, getDimensions }) {
 
         if (!viewState) return;
 
-        editor.actions.setViewport({
+        setViewport({
             pan: { x: viewState.panX, y: viewState.panY },
             zoom: viewState.zoom,
         });

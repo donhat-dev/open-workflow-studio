@@ -26,3 +26,6 @@ access_ir_workflow_logging_admin,ir.workflow.logging.admin,model_ir_workflow_log
 access_ir_workflow_milestone_user,ir.workflow.milestone.user,model_ir_workflow_milestone,workflow_pilot.group_workflow_user,1,0,0,0
 access_ir_workflow_milestone_manager,ir.workflow.milestone.manager,model_ir_workflow_milestone,workflow_pilot.group_workflow_manager,1,1,1,0
 access_ir_workflow_milestone_admin,ir.workflow.milestone.admin,model_ir_workflow_milestone,workflow_pilot.group_workflow_admin,1,1,1,1
+access_ir_workflow_snapshot_blob_user,ir.workflow.snapshot.blob.user,model_ir_workflow_snapshot_blob,workflow_pilot.group_workflow_user,1,0,1,0
+access_ir_workflow_snapshot_blob_manager,ir.workflow.snapshot.blob.manager,model_ir_workflow_snapshot_blob,workflow_pilot.group_workflow_manager,1,0,1,0
+access_ir_workflow_snapshot_blob_admin,ir.workflow.snapshot.blob.admin,model_ir_workflow_snapshot_blob,workflow_pilot.group_workflow_admin,1,1,1,1

@@ -7,7 +7,7 @@ import { EditorCanvas } from "@workflow_pilot/components/editor_canvas";
 import { LucideIcon } from "@workflow_pilot/components/common/lucide_icon";
 import { View } from "@web/views/view";
 import { Chatter } from "@mail/chatter/web_portal/chatter";
-import { WorkflowHistoryDialog } from "@workflow_pilot/components/workflow_history_dialog/workflow_history_dialog";
+import { WorkflowHistoryPanel } from "@workflow_pilot/components/workflow_history_panel/workflow_history_panel";
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
  * 
@@ -16,7 +16,7 @@ import { WorkflowHistoryDialog } from "@workflow_pilot/components/workflow_histo
  */
 export class WorkflowEditorApp extends Component {
     static template = "workflow_pilot.workflow_editor_app";
-    static components = { EditorCanvas, LucideIcon, View, Chatter };
+    static components = { EditorCanvas, LucideIcon, View, Chatter, WorkflowHistoryPanel };
     
     setup() {
         // Services (Fail-First - no optional chaining)
@@ -91,6 +91,10 @@ export class WorkflowEditorApp extends Component {
                 this.state.loading = false;
             }
         });
+    }
+
+    get isHistoryOpen() {
+        return this.editorService.state.ui.panels.historyOpen;
     }
 
     _updateWorkflowInfo(data) {
@@ -220,7 +224,7 @@ export class WorkflowEditorApp extends Component {
      * Reload page to get fresh workflow data
      */
     reload() {
-        window.location.reload();
+        return this.editorService.loadWorkflow(this.workflowId);
     }
 
     exit() {
@@ -236,13 +240,29 @@ export class WorkflowEditorApp extends Component {
     }
 
     /**
-     * Open version history dialog
+     * Toggle version history panel
      */
     openHistory() {
-        this.dialog.add(WorkflowHistoryDialog, {
-            workflowId: this.workflowId,
-            fieldName: "draft_snapshot",
-        });
+        if (this.isHistoryOpen) {
+            this.editorService.actions.closePanel("history");
+            return;
+        }
+        this.editorService.actions.openPanel("history");
+    }
+
+    closeHistory() {
+        this.editorService.actions.closePanel("history");
+    }
+
+    async restoreHistoryRevision(revisionId) {
+        await this.orm.call(
+            "ir.workflow",
+            "restore_version",
+            [[this.workflowId], revisionId, "draft_snapshot"]
+        );
+        await this.editorService.loadWorkflow(this.workflowId);
+        this.notification.add("Version restored.", { type: "success" });
+        this.closeHistory();
     }
 
     /**

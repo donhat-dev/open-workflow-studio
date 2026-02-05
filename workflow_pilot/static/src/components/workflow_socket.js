@@ -18,6 +18,7 @@ export class WorkflowSocket extends Component {
         nodeId: String,
         isConnected: { type: Boolean, optional: true },
         isSnapped: { type: Boolean, optional: true },  // Smart snapping highlight
+        readonly: { type: Boolean, optional: true },   // Disable interactions in readonly mode
         // Callbacks for connection interactions
         onMouseDown: { type: Function, optional: true },
         onMouseUp: { type: Function, optional: true },
@@ -29,6 +30,7 @@ export class WorkflowSocket extends Component {
      * @param {MouseEvent} ev 
      */
     onPointMouseDown(ev) {
+        if (this.props.readonly) return;
         // Only left click starts connection
         if (ev.button !== 0) return;
 
@@ -45,6 +47,7 @@ export class WorkflowSocket extends Component {
      * @param {MouseEvent} ev 
      */
     onPointMouseUp(ev) {
+        if (this.props.readonly) return;
         this.props.onMouseUp?.({
             nodeId: this.props.nodeId,
             socketKey: this.props.name,
@@ -58,6 +61,7 @@ export class WorkflowSocket extends Component {
      * @param {MouseEvent} ev 
      */
     onQuickAddClick(ev) {
+        if (this.props.readonly) return;
         ev.stopPropagation();
         this.props.onQuickAdd?.({
             nodeId: this.props.nodeId,
@@ -72,6 +76,7 @@ export class WorkflowSocket extends Component {
      * @param {MouseEvent} ev 
      */
     onQuickAddMouseDown(ev) {
+        if (this.props.readonly) return;
         // Only left click starts connection
         if (ev.button !== 0) return;
 

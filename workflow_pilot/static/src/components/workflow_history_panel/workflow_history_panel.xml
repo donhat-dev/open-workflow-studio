@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="workflow_pilot.WorkflowHistoryPanel">
+        <div class="workflow-history-panel">
+            <div class="workflow-history-panel__header">
+                <div class="workflow-history-panel__title">
+                    <i class="fa fa-history"/>
+                    <span>Version History</span>
+                </div>
+                <button class="history-panel-close" t-on-click="props.onClose" title="Close">
+                    <i class="fa fa-times"/>
+                </button>
+            </div>
+
+            <div class="workflow-history-panel__body">
+                <div class="workflow-history-panel__sidebar">
+                    <div class="history-sidebar__header">
+                        <span>Revisions</span>
+                    </div>
+
+                    <t t-if="state.loading">
+                        <div class="history-empty">Loading history...</div>
+                    </t>
+                    <t t-elif="!state.revisions.length">
+                        <div class="history-empty">No version history available</div>
+                    </t>
+                    <t t-else="">
+                        <div class="history-list">
+                            <t t-foreach="state.revisions" t-as="revision" t-key="revision.revision_id">
+                                <button
+                                    t-attf-class="history-item {{ state.selectedRevisionId === revision.revision_id ? 'active' : '' }}"
+                                    t-on-click="() => this.onRevisionClick(revision.revision_id)">
+                                    <div class="history-item__row">
+                                        <div class="history-item__main">
+                                            <div class="history-item__title">
+                                                <t t-if="revision.is_milestone">
+                                                    <i class="fa fa-star text-warning me-1" title="Milestone"/>
+                                                </t>
+                                                v<t t-esc="revision.revision_id"/>
+                                            </div>
+                                            <div class="history-item__meta">
+                                                <span><t t-esc="formatDate(revision.create_date)"/></span>
+                                                <span><t t-esc="revision.create_user_name"/></span>
+                                            </div>
+                                        </div>
+                                        <div class="history-item__badge">
+                                            <t t-if="revision.is_milestone">
+                                                <span class="badge bg-warning text-dark">Milestone</span>
+                                            </t>
+                                            <t t-elif="revision.type === 'snapshot'">
+                                                <span class="badge bg-info">Snapshot</span>
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <t t-if="revision.note">
+                                        <div class="history-item__note">
+                                            <t t-esc="revision.note"/>
+                                        </div>
+                                    </t>
+                                </button>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+
+                <div class="workflow-history-panel__content">
+                    <t t-if="!state.selectedRevisionId">
+                        <div class="history-empty">Select a revision to view details</div>
+                    </t>
+                    <t t-else="">
+                        <div class="history-actions">
+                            <button class="btn btn-primary btn-sm" t-on-click="onRestoreClick">
+                                <i class="fa fa-undo me-1"/>Restore
+                            </button>
+                            <button
+                                class="btn btn-outline-warning btn-sm"
+                                t-on-click="onMarkMilestoneClick"
+                                t-att-disabled="getSelectedRevision()?.is_milestone ? 'disabled' : undefined">
+                                <i class="fa fa-star me-1"/>Mark as Milestone
+                            </button>
+                        </div>
+
+                        <div class="history-tabs">
+                            <button
+                                class="history-tab"
+                                t-att-class="{ active: state.activeTab === 'comparison' }"
+                                t-on-click="() => this.onTabChange('comparison')">
+                                Comparison
+                            </button>
+                            <button
+                                class="history-tab"
+                                t-att-class="{ active: state.activeTab === 'content' }"
+                                t-on-click="() => this.onTabChange('content')">
+                                Content
+                            </button>
+                        </div>
+
+                        <div class="history-tab-content">
+                            <div t-if="state.activeTab === 'comparison'">
+                                <t t-if="comparisonSummary">
+                                    <div class="history-summary">
+                                        <span>
+                                            <strong>Nodes:</strong>
+                                            <span class="text-success">+<t t-esc="comparisonSummary.nodes_added"/></span>
+                                            <span class="text-danger">-<t t-esc="comparisonSummary.nodes_removed"/></span>
+                                            <span class="text-warning">~<t t-esc="comparisonSummary.nodes_modified"/></span>
+                                        </span>
+                                        <span>
+                                            <strong>Connections:</strong>
+                                            <span class="text-success">+<t t-esc="comparisonSummary.connections_added"/></span>
+                                            <span class="text-danger">-<t t-esc="comparisonSummary.connections_removed"/></span>
+                                        </span>
+                                    </div>
+                                </t>
+                                <div class="history-comparison" t-out="comparisonHtml"/>
+                            </div>
+                            <div t-if="state.activeTab === 'content'">
+                                <t t-if="contentSummary">
+                                    <div class="history-summary">
+                                        <span><strong>Snapshot:</strong></span>
+                                        <span><t t-esc="contentSummary.nodeCount"/> nodes</span>
+                                        <span><t t-esc="contentSummary.connectionCount"/> connections</span>
+                                    </div>
+                                </t>
+                                <pre class="history-content-json"><t t-esc="content"/></pre>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>
