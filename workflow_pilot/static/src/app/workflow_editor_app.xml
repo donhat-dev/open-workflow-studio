@@ -16,43 +16,17 @@
                     </button>
                 </div>
                 <div class="editor-actions" t-if="state.view === 'editor'">
-                    <button 
-                        class="btn btn-outline-secondary" 
-                        t-on-click="openHistory"
-                        title="Version History">
-                        <span class="btn__icon">
-                            <LucideIcon t-props="{ name: 'History', size: 16 }"/>
-                        </span>
-                        History
-                    </button>
-                    <button 
-                        class="btn btn-outline-warning" 
-                        t-on-click="createMilestone"
-                        title="Create Milestone">
-                        <span class="btn__icon">
-                            <LucideIcon t-props="{ name: 'Star', size: 16 }"/>
-                        </span>
-                    </button>
-                    <button 
-                        class="btn btn-primary btn-save" 
-                        t-on-click="save" 
-                        t-att-disabled="state.saving ? 'disabled' : undefined">
-                        <span class="btn__icon">
-                            <LucideIcon t-props="{ name: 'Save', size: 16 }"/>
-                        </span>
-                        <t t-if="state.saving">Saving...</t>
-                        <t t-else="">Save</t>
-                    </button>
-                    <button 
-                        class="btn btn-secondary btn-execute" 
-                        t-on-click="execute" 
-                        t-att-disabled="state.executing ? 'disabled' : undefined">
-                        <span class="btn__icon">
-                            <LucideIcon t-props="{ name: 'Play', size: 16 }"/>
-                        </span>
-                        <t t-if="state.executing">Executing...</t>
-                        <t t-else="">Execute</t>
-                    </button>
+                    <div class="editor-actions__group">
+                        <button 
+                            class="btn btn-outline-secondary" 
+                            t-on-click="openHistory"
+                            title="Version History">
+                            <span class="btn__icon">
+                                <LucideIcon t-props="{ name: 'History', size: 16 }"/>
+                            </span>
+                            History
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="editor-body">
@@ -70,14 +44,11 @@
                 <t t-else="">
                     <div class="editor-container">
                         <t t-if="state.view === 'editor'">
-                            <div class="editor-split">
-                                <EditorCanvas />
+                                <div class="editor-split">
+                                <EditorCanvas/>
                                 <WorkflowHistoryPanel
                                     t-if="isHistoryOpen"
-                                    workflowId="workflowId"
-                                    fieldName="'draft_snapshot'"
-                                    onClose="closeHistory"
-                                    restoreRequested="restoreHistoryRevision"/>
+                                    t-props="historyPanelProps"/>
                             </div>
                         </t>
                         <t t-else="">

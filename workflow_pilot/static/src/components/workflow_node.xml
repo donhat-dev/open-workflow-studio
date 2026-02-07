@@ -1,30 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_pilot.workflow_node">
-		<div class="workflow-node" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick">
+		<div class="workflow-node cursor-pointer d-flex flex-row" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick" t-on-mousedown="onHeaderMouseDown">
 			<CanvasNodeToolbar t-if="toolbarProps" t-props="toolbarProps"/>
-			<div class="workflow-node__header" t-on-mousedown="onHeaderMouseDown">
-				<span class="workflow-node__icon">
-					<LucideIcon t-props="{ name: nodeIcon, size: 16 }"/>
-				</span>
-				<span class="workflow-node__title">
-					<t t-esc="props.node.title || props.node.type"/>
-				</span>
+			
+			<!-- Input sockets (absolute left) -->
+			<div class="workflow-node__inputs" t-if="inputEntries.length">
+				<t t-foreach="inputEntries" t-as="entry" t-key="entry[0]">
+					<WorkflowSocket t-props="getInputSocketProps(entry)"/>
+				</t>
 			</div>
-			<div class="workflow-node__body">
-				<div class="workflow-node__sockets">
-					<t t-foreach="socketRows" t-as="row" t-key="row_index">
-						<div class="workflow-node__socket-row">
-							<t t-if="row.input">
-								<WorkflowSocket t-props="getInputSocketProps(row.input)"/>
-							</t>
-							<div t-else="" class="workflow-node__socket-spacer"/>
-							<t t-if="row.output">
-								<WorkflowSocket t-props="getOutputSocketProps(row.output)"/>
-							</t>
-							<div t-else="" class="workflow-node__socket-spacer"/></div>
-					</t>
+
+			<!-- Output sockets (absolute right) -->
+			<div class="workflow-node__outputs" t-if="outputEntries.length">
+				<t t-foreach="outputEntries" t-as="entry" t-key="entry[0]">
+					<WorkflowSocket t-props="getOutputSocketProps(entry)"/>
+				</t>
+			</div>
+
+			<!-- Card Content Layout -->
+			<div class="workflow-node__icon-col d-flex flex-column align-items-center justify-content-center ps-2 flex-shrink-0">
+				<div class="workflow-node__icon-box d-flex align-items-center justify-content-center rounded-2">
+					<LucideIcon t-props="{ name: nodeIcon, size: 34 }"/>
 				</div>
+			</div>
+
+			<div class="workflow-node__content-col d-flex flex-column justify-content-center py-2 pe-2 min-w-0">
+				<div class="workflow-node__header-row d-flex justify-content-between align-items-start mb-1">
+					<span class="workflow-node__title o_text_overflow text-body fw-semibold pe-1" t-att-title="props.node.title || props.node.type">
+						<t t-esc="props.node.title || props.node.type"/>
+					</span>
+				</div>
+				
+				<div class="workflow-node__subtitle small text-muted font-monospace o_text_overflow mb-1">
+					<t t-esc="props.node.type"/>
+				</div>
+
+				<!-- Footer actions removed -->
 			</div>
 		</div>
 	</t>

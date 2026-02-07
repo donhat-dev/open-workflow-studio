@@ -18,15 +18,13 @@
 .canvas-node-toolbar__items {
   display: flex;
   gap: 2px;
-  background: var(--node-toolbar-bg, rgba(26, 26, 46, 0.95));
-  border: 1px solid var(--node-border-color, rgba(255, 255, 255, 0.1));
-  border-radius: 6px;
-  padding: 4px 6px;
+  background: var(--o-bg-color, #ffffff);
+  border-color: var(--o-card-border-color, #dee2e6);
   pointer-events: auto;
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.15s ease, transform 0.15s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
 }
 
 /* Show on parent hover or selected state */
@@ -43,21 +41,21 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border: none;
   background: transparent;
-  color: var(--color-text-muted, #8888aa);
+  color: var(--o-gray-600, #6c757d);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
   transition: background 0.1s ease, color 0.1s ease;
+  text-decoration: none;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--color-text, #ffffff);
+    background: var(--o-gray-100, #f8f9fa);
+    color: var(--o-text-color, #212529);
   }
 
   &:active:not(:disabled) {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--o-gray-200, #e9ecef);
   }
 
   &:disabled {
@@ -65,15 +63,10 @@
     cursor: not-allowed;
   }
 
-  /* Execute button - green accent on hover */
-  &:first-child:hover:not(:disabled) {
-    color: var(--color-success, #4ade80);
-  }
-
   /* Danger button - red accent on hover */
   &--danger:hover:not(:disabled) {
-    color: var(--color-danger, #f87171);
-    background: rgba(248, 113, 113, 0.15);
+    color: var(--o-danger, #dc3545);
+    background: rgba(220, 53, 69, 0.12);
   }
 
   .fa {

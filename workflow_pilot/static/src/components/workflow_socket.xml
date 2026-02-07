@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_pilot.workflow_socket">
-		<div class="workflow-node__socket" t-att-class="'workflow-node__socket--' + props.type">
-			<!-- Wrapper for larger hit area (includes point + label) -->
+		<div class="workflow-node__socket d-flex align-items-center gap-1" t-att-class="'workflow-node__socket--' + props.type">
+			<!-- Socket point (dot) + hit area -->
 			<div class="workflow-node__socket-wrapper" t-att-data-socket-key="props.name" t-att-data-socket-type="props.type" t-on-mousedown.stop.prevent="onPointMouseDown" t-on-mouseup="onPointMouseUp">
-				<!-- Socket point -->
 				<div class="workflow-node__socket-point" t-att-class="(props.isConnected ? 'is-connected' : '') + (props.isSnapped ? ' is-snapped' : '')"/>
-				<!-- Socket label -->
-				<span class="workflow-node__socket-label">
-					<t t-esc="props.label || props.name"/>
-				</span>
 			</div>
+			
+			<!-- Socket label (Output only) -->
+			<!-- Positioned with z-index to overlap quick-add connection if present -->
+			<span class="workflow-node__socket-label small text-muted user-select-none" t-if="props.type === 'output' and (props.label or props.name)">
+				<t t-esc="props.label || props.name"/>
+			</span>
+
 			<!-- Quick-add connector: output sockets only, when not connected -->
+			<!-- Rendered BEHIND the label visually -->
 			<t t-if="props.type === 'output' and !props.isConnected and props.onQuickAdd">
 				<div class="socket-quick-add-connector" t-on-mousedown.stop.prevent="onQuickAddMouseDown">
 					<span class="socket-quick-add-line"/>

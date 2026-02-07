@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, reactive, onMounted, onWillUnmount, useEnv } from "@odoo/owl";
+import { Component, useRef, useState, useExternalListener, onMounted, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
@@ -53,12 +53,10 @@ export class EditorCanvas extends Component {
         // Mode 2: Widget/Viewer Mode - graphData prop provided (service optional)
         const hasEditorService = !!this.env.workflowEditor;
         const hasGraphDataProp = !!this.props.graphData;
-        const isReadonly = !!this.props.readonly;
+        const initialReadonly = !!this.props.readonly;
 
         // Store mode flags (immutable after setup)
         this._mode = hasGraphDataProp ? 'widget' : (hasEditorService ? 'editor' : 'error');
-        this._isEditable = this._mode === 'editor' && !isReadonly;
-
         // Get editor service (Fail-First in editor mode)
         if (this._mode === 'editor') {
             this.editor = this.env.workflowEditor;
@@ -72,6 +70,7 @@ export class EditorCanvas extends Component {
         // Local state for widget mode (or fallback defaults if service state unavailable)
         // In editor mode, this.state is used for dimensionConfig only
         this.state = useState({
+            readonly: initialReadonly,
             // Graph data (widget mode only - editor mode reads from service)
             graph: this.props.graphData || { nodes: [], connections: [] },
             // UI defaults for widget mode
@@ -89,15 +88,18 @@ export class EditorCanvas extends Component {
             dimensionConfig: this.props.dimensionConfig || {},
         });
 
+        // Bind to editor service state (editor mode) for reactivity
+        this.editorState = this.isEditorMode ? useState(this.editor.state) : null;
+
         // Expression context builder (editor mode only)
-        const buildExecutionContext = this._isEditable ? this._createExecutionContextBuilder() : null;
+        const buildExecutionContext = this.isEditorMode ? this._createExecutionContextBuilder() : null;
 
         // Node config actions - only available in editor mode
-        this.nodeConfigActions = this._isEditable ? {
+        this.nodeConfigActions = this.isEditorMode ? {
             getControls: (nodeId) => this.editor.getNodeControls(nodeId),
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
-            getExpressionContext: (options) => buildExecutionContext(options),
+            getExpressionContext: (options) => buildExecutionContext ? buildExecutionContext(options) : null,
             buildContextForNode: () => ({
                 _node: {}, _json: {}, _input: { item: null, json: null },
                 _execution: null, _workflow: null,
@@ -106,6 +108,11 @@ export class EditorCanvas extends Component {
                 this.editor.actions.executeUntilNode(nodeId, inputData, configOverrides),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
         } : null;
+
+        if (this.isEditorMode) {
+            this.onSave = () => this.env.bus.trigger("save");
+            this.onRun = () => this.env.bus.trigger("run");
+        }
 
         // Viewport setter for widget mode
         const setViewportLocal = this._mode === 'widget' ? (viewportUpdate) => {
@@ -119,28 +126,29 @@ export class EditorCanvas extends Component {
 
         // Initialize Viewport Hook (zoom, pan, coordinate conversion) - MUST be first
         this.viewportHook = useViewport({
-            editor: this._mode === 'editor' ? this.editor : null,
+            editor: this.isEditorMode ? this.editor : null,
             rootRef: this.rootRef,
             getDimensions: () => this.dimensions,
-            readonly: !this._isEditable,
+            readonly: this.isReadonly,
+            getReadonly: () => this.isReadonly,
             initialViewport: this.props.initialViewport,
         });
 
         // Initialize Canvas Gestures Hook (pan/selection box)
         this.gestures = useCanvasGestures({
-            editor: this._mode === 'editor' ? this.editor : null,
+            editor: this.isEditorMode ? this.editor : null,
             rootRef: this.rootRef,
             getViewport: () => this.viewportHook.getViewport(),
             getCanvasPosition: (ev) => this.viewportHook.getCanvasPosition(ev),
             onViewRectUpdate: () => this.viewportHook.updateViewRect(),
             getDimensions: () => this.dimensions,
-            readonly: !this._isEditable,
+            getReadonly: () => this.isReadonly,
             setViewport: setViewportLocal,
             getNodes: () => this.nodes,
         });
 
-        // Initialize editing hooks only if editable (editor mode + not readonly)
-        if (this._isEditable) {
+        // Initialize editing hooks only in editor mode (readonly handled at runtime)
+        if (this.isEditorMode) {
             // Initialize Connection Drawing Hook
             this.connectionDrawing = useConnectionDrawing({
                 editor: this.editor,
@@ -148,6 +156,7 @@ export class EditorCanvas extends Component {
                 getSocketPositionForNode: (node, key, type) => this.getSocketPositionForNode(node, key, type),
                 getNodes: () => this.nodes,
                 openNodeMenu: (config) => { this.editor.actions.openNodeMenu(config); },
+                getReadonly: () => this.isReadonly,
             });
 
             // Initialize Multi-Node Drag Hook
@@ -158,12 +167,14 @@ export class EditorCanvas extends Component {
                 getViewport: () => this.viewportHook.getViewport(),
                 onViewRectUpdate: () => this.viewportHook.updateViewRect(),
                 rootRef: this.rootRef,
+                getReadonly: () => this.isReadonly,
             });
 
             // Initialize Keyboard Shortcuts Hook
             useKeyboardShortcuts({
                 editor: this.editor,
                 getNodes: () => this.nodes,
+                getReadonly: () => this.isReadonly,
             });
 
             // Initialize Clipboard Hook (Copy/Paste)
@@ -172,6 +183,7 @@ export class EditorCanvas extends Component {
                 getNodes: () => this.nodes,
                 getConnections: () => this.connections,
                 getSelection: () => this.editorUiState.selection,
+                getReadonly: () => this.isReadonly,
             });
         } else {
             // Readonly stubs - static objects (no reactivity needed)
@@ -211,6 +223,13 @@ export class EditorCanvas extends Component {
 
         this.isDebug = typeof odoo !== "undefined" && odoo.debug;
         window.canvas = this.isDebug ? this : null;
+
+        onWillUpdateProps((nextProps) => {
+            const nextReadonly = !!nextProps.readonly;
+            if (nextReadonly !== this.state.readonly) {
+                this.setReadonly(nextReadonly);
+            }
+        });
     }
 
     // ========================================
@@ -292,11 +311,21 @@ export class EditorCanvas extends Component {
     // ========================================
 
     /**
-     * Check if editing is enabled (convenience getter wrapping _isEditable)
+     * Check if editing is enabled
      * Used in templates and event handlers
      */
     get canEdit() {
-        return this._isEditable;
+        return this.isEditorMode && !this.isReadonly;
+    }
+
+    /**
+     * Check if editor is currently readonly (runtime reactive)
+     */
+    get isReadonly() {
+        if (this.isEditorMode) {
+            return !!this.editorUiState.readonly;
+        }
+        return !!this.state.readonly;
     }
 
     /**
@@ -313,6 +342,48 @@ export class EditorCanvas extends Component {
         return !!this.executionState;
     }
 
+    /**
+     * Safe execution prop for NodeConfigPanel (undefined when not available)
+     */
+    get executionProp() {
+        const execution = this.executionState;
+        if (!execution || typeof execution !== "object") {
+            return undefined;
+        }
+        return execution;
+    }
+
+    /**
+     * Update readonly state at runtime
+     * @param {boolean} nextReadonly
+     */
+    setReadonly(nextReadonly) {
+        const value = !!nextReadonly;
+        if (this.isEditorMode) {
+            if (this.editorUiState.readonly === value) return;
+        } else if (this.state.readonly === value) {
+            return;
+        }
+        if (value) {
+            // Cancel in-flight interactions before flipping readonly flag
+            if (this.connectionDrawing && this.connectionDrawing.cancelConnection) {
+                this.connectionDrawing.cancelConnection();
+            }
+            if (this.multiNodeDrag && this.multiNodeDrag.handleMouseUp) {
+                this.multiNodeDrag.handleMouseUp({});
+            }
+            if (this.gestures && this.gestures.handleMouseUp) {
+                this.gestures.handleMouseUp({});
+            }
+        }
+
+        if (this.isEditorMode) {
+            this.editor.actions.setReadonly(value);
+        } else {
+            this.state.readonly = value;
+        }
+    }
+
     // ========================================
     // UNIFIED STATE GETTERS
     // ========================================
@@ -322,7 +393,7 @@ export class EditorCanvas extends Component {
      */
     get graphState() {
         if (this.isEditorMode) {
-            return this.editor.state.graph;
+            return this.editorState.graph;
         }
         return this.state.graph;
     }
@@ -333,7 +404,7 @@ export class EditorCanvas extends Component {
      */
     get uiState() {
         if (this.isEditorMode) {
-            return this.editor.state.ui;
+            return this.editorState.ui;
         }
         return this.state.ui;
     }
@@ -346,7 +417,7 @@ export class EditorCanvas extends Component {
         if (!this.isEditorMode) {
             throw new Error('[EditorCanvas] editorUiState requires editor mode');
         }
-        const ui = this.editor.state.ui;
+        const ui = this.editorState.ui;
         if (!ui) {
             throw new Error('[EditorCanvas] editor.state.ui is undefined');
         }
@@ -358,7 +429,7 @@ export class EditorCanvas extends Component {
      */
     get executionState() {
         if (this.isEditorMode) {
-            return this.editor.state.execution;
+            return this.editorState.execution;
         }
         return this.state.execution;
     }
@@ -411,7 +482,7 @@ export class EditorCanvas extends Component {
      * @returns {Object} Complete props for WorkflowNode
      */
     getWorkflowNodeProps(node) {
-        const snappedSocket = this._isEditable
+        const snappedSocket = this.canEdit
             ? this.connectionDrawing.state.snappedSocket
             : null;
         const props = {
@@ -423,7 +494,7 @@ export class EditorCanvas extends Component {
                 : null,
             connectedOutputsSet: this.connectedOutputsSet,
             dimensionConfig: this.dimensions,
-            readonly: !this._isEditable,
+            readonly: !this.canEdit,
         };
 
         // Add callbacks only if editable
@@ -763,6 +834,7 @@ export class EditorCanvas extends Component {
      * @param {MouseEvent} ev
      */
     onDocumentMouseMove(ev) {
+        if (this.isReadonly) return;
         if (this._mouseMoveFrame) return;
 
         this._mouseMoveFrame = requestAnimationFrame(() => {
@@ -788,6 +860,7 @@ export class EditorCanvas extends Component {
      */
     onDocumentMouseUp(ev) {
         // Delegate pan/selection end to gestures hook
+        if (this.isReadonly) return;
         const gestureType = this.gestures.handleMouseUp(ev);
         if (gestureType) {
             // If selection box just completed, set flag to prevent click from clearing
@@ -804,7 +877,8 @@ export class EditorCanvas extends Component {
         }
 
         // Delegate connection drawing end to hook
-        const canvasRect = this.rootRef.el?.getBoundingClientRect() || { left: 0, top: 0 };
+        const rootEl = this.rootRef.el;
+        const canvasRect = rootEl ? rootEl.getBoundingClientRect() : { left: 0, top: 0 };
         this.connectionDrawing.handleCanvasMouseUp(ev, canvasRect);
     }
 
@@ -813,6 +887,7 @@ export class EditorCanvas extends Component {
      * @param {DragEvent} ev 
      */
     onDragOver(ev) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         ev.preventDefault();
         if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
@@ -823,9 +898,11 @@ export class EditorCanvas extends Component {
      * @param {DragEvent} ev 
      */
     onDrop(ev) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         ev.preventDefault();
-        const type = ev.dataTransfer?.getData("application/x-workflow-node");
+        const dataTransfer = ev.dataTransfer;
+        const type = dataTransfer ? dataTransfer.getData("application/x-workflow-node") : "";
         if (!type) return;
 
         // Use canvas position (accounts for zoom/pan)
@@ -843,9 +920,10 @@ export class EditorCanvas extends Component {
      * @param {MouseEvent} [event] - Mouse event for checking Ctrl key
      */
     onNodeSelect(node, event) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
-        const isCtrlHeld = event?.ctrlKey || event?.metaKey;
-        const currentSelection = this.editor.state.ui.selection.nodeIds || [];
+        const isCtrlHeld = !!event && (event.ctrlKey || event.metaKey);
+        const currentSelection = this.editorUiState.selection.nodeIds || [];
 
         if (isCtrlHeld) {
             // Ctrl+click: Toggle node in selection
@@ -865,6 +943,7 @@ export class EditorCanvas extends Component {
     }
 
     onNodeExecute(nodeId) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
@@ -874,10 +953,11 @@ export class EditorCanvas extends Component {
     }
 
     onNodeDelete(nodeId) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         this.editor.actions.removeNode(nodeId);
         // Deselect if it was the only one or among selected
-        const current = this.editor.state.ui.selection.nodeIds;
+        const current = this.editorUiState.selection.nodeIds;
         if (current.includes(nodeId)) {
             this.editor.actions.select(current.filter(id => id !== nodeId));
         }
@@ -888,6 +968,7 @@ export class EditorCanvas extends Component {
      * @param {string} nodeId 
      */
     onNodeToggleDisable(nodeId) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         // Find node and toggle disabled state
         const node = this.nodes.find(n => n.id === nodeId);
@@ -913,7 +994,9 @@ export class EditorCanvas extends Component {
             return;
         }
         // Check if clicking on background (including specific elements that are part of background)
-        if (ev.target === this.rootRef.el || ev.target.classList?.contains('workflow-editor-canvas__content')) {
+        const target = ev.target;
+        const targetClassList = target && target.classList ? target.classList : null;
+        if (target === this.rootRef.el || (targetClassList && targetClassList.contains('workflow-editor-canvas__content'))) {
             this.clearSelection();
         }
     }
@@ -923,6 +1006,7 @@ export class EditorCanvas extends Component {
      * @param {string} connId 
      */
     onConnectionSelect(connId) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         // Select only this connection (clear node selection)
         this.editor.actions.select([], [connId]);
@@ -951,6 +1035,7 @@ export class EditorCanvas extends Component {
      * Uses service action (source of truth)
      */
     onCanvasContextMenu(ev) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         ev.preventDefault();
         const rect = this.rootRef.el.getBoundingClientRect();
@@ -970,6 +1055,7 @@ export class EditorCanvas extends Component {
      * Handle NodeMenu selection
      */
     onNodeMenuSelect(nodeType, connectionContext) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         let { canvasX, canvasY } = this.nodeMenu;
         const dims = this.dimensions;
@@ -980,17 +1066,20 @@ export class EditorCanvas extends Component {
             y: canvasY
         };
 
-        if (connectionContext?.type === 'quickAdd' || connectionContext?.type === 'dragConnect') {
+        const context = connectionContext || null;
+        if (context && (context.type === 'quickAdd' || context.type === 'dragConnect')) {
             // Quick-add from socket OR drag-connect from canvas:
             // Create node and auto-connect from source socket
-            const { sourceNodeId, sourceSocketKey } = connectionContext;
+            const { sourceNodeId, sourceSocketKey } = context;
             const newNodeId = this.editor.actions.addNode(nodeType, position);
 
             if (newNodeId) {
                 // Use setTimeout to ensure node is in state
                 setTimeout(() => {
                     const newNode = this.nodes.find(n => n.id === newNodeId);
-                    const firstInputKey = Object.keys(newNode?.inputs || {})[0];
+                    if (!newNode) return;
+                    const newInputs = newNode.inputs || {};
+                    const firstInputKey = Object.keys(newInputs)[0];
 
                     if (firstInputKey) {
                         this.editor.actions.addConnection(
@@ -1002,9 +1091,9 @@ export class EditorCanvas extends Component {
                     }
                 }, 0);
             }
-        } else if (connectionContext?.connectionId) {
+        } else if (context && context.connectionId) {
             // Inserting node into existing connection
-            this._insertNodeIntoConnection(nodeType, { connectionId: connectionContext.connectionId, position });
+            this._insertNodeIntoConnection(nodeType, { connectionId: context.connectionId, position });
         } else {
             // Adding new node at position
             this.editor.actions.addNode(nodeType, position);
@@ -1016,6 +1105,7 @@ export class EditorCanvas extends Component {
      * Uses service action (source of truth)
      */
     onNodeMenuClose() {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         // Cancel any pending connection drawing from drag-connect flow
         this.connectionDrawing.cancelConnection();
@@ -1031,6 +1121,7 @@ export class EditorCanvas extends Component {
      * @param {Object} conn - Connection object from renderedConnections
      */
     handleConnectionEnter(ev, conn) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         // Clear any pending leave timeout
         if (this._connectionHoverTimeout) {
@@ -1055,6 +1146,7 @@ export class EditorCanvas extends Component {
      * Handle connection hover - show toolbar (legacy, kept for compatibility)
      */
     onConnectionMouseEnter(connectionId, midpoint) {
+        if (this.isReadonly) return;
         if (!this.canEdit) return;
         this.editor.actions.setHoveredConnection({
             id: connectionId,
@@ -1321,6 +1413,18 @@ export class EditorCanvas extends Component {
      */
     get canRedo() {
         return this.uiState.history.canRedo || false;
+    }
+
+    get hasCanvasActions() {
+        return this.isEditorMode;
+    }
+
+    get isSaving() {
+        return this.isEditorMode ? this.editorState.ui.saving : false;
+    }
+
+    get isExecuting() {
+        return this.isEditorMode ? this.editorState.ui.executing : false;
     }
 
     /**

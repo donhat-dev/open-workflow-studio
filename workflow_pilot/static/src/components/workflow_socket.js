@@ -33,8 +33,9 @@ export class WorkflowSocket extends Component {
         if (this.props.readonly) return;
         // Only left click starts connection
         if (ev.button !== 0) return;
-
-        this.props.onMouseDown?.({
+        const onMouseDown = this.props.onMouseDown;
+        if (!onMouseDown) return;
+        onMouseDown({
             nodeId: this.props.nodeId,
             socketKey: this.props.name,
             socketType: this.props.type,
@@ -48,7 +49,9 @@ export class WorkflowSocket extends Component {
      */
     onPointMouseUp(ev) {
         if (this.props.readonly) return;
-        this.props.onMouseUp?.({
+        const onMouseUp = this.props.onMouseUp;
+        if (!onMouseUp) return;
+        onMouseUp({
             nodeId: this.props.nodeId,
             socketKey: this.props.name,
             socketType: this.props.type,
@@ -63,7 +66,9 @@ export class WorkflowSocket extends Component {
     onQuickAddClick(ev) {
         if (this.props.readonly) return;
         ev.stopPropagation();
-        this.props.onQuickAdd?.({
+        const onQuickAdd = this.props.onQuickAdd;
+        if (!onQuickAdd) return;
+        onQuickAdd({
             nodeId: this.props.nodeId,
             socketKey: this.props.name,
             event: ev,
@@ -79,9 +84,11 @@ export class WorkflowSocket extends Component {
         if (this.props.readonly) return;
         // Only left click starts connection
         if (ev.button !== 0) return;
+        const onMouseDown = this.props.onMouseDown;
+        if (!onMouseDown) return;
 
         // Trigger the same flow as socket point mousedown
-        this.props.onMouseDown?.({
+        onMouseDown({
             nodeId: this.props.nodeId,
             socketKey: this.props.name,
             socketType: this.props.type,

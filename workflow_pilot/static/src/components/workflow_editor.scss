@@ -1,0 +1,802 @@
+/* ============================================================
+   Workflow Pilot - Core Component Styles (Retool-inspired Dark Mode)
+   ============================================================ */
+
+/* 1. Editor Canvas */
+.workflow-editor-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background-color: #ffffff;
+  overflow: hidden;
+  border-radius: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  font-family: var(--o-font-family, var(--#{$variable-prefix}font-sans-serif, system-ui));
+  color: var(--o-text-color, #212529);
+
+  /* Subtle light dots for dark mode (moved to parent for infinite coverage) */
+  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 0);
+  /* background-size and background-position are updated dynamically in JS */
+}
+
+.workflow-editor-canvas__content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.workflow-editor-canvas__hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* 2. SVG Connections */
+.workflow-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
+  will-change: transform;
+}
+
+.workflow-connection {
+  stroke: var(--o-gray-500, #6c757d);
+  color: var(--o-gray-500, #6c757d);
+  /* transition: stroke 0.1s ease, stroke-width 0.1s ease; DISABLED */
+  pointer-events: visibleStroke;
+}
+
+.workflow-connection-group {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.workflow-connection-group:hover .workflow-connection {
+  stroke: var(--o-gray-700, #495057);
+  color: var(--o-gray-700, #495057);
+  stroke-width: 2.5;
+}
+
+.workflow-connection-group.selected .workflow-connection {
+  stroke: var(--o-brand-600, #0d6efd);
+  color: var(--o-brand-600, #0d6efd);
+  stroke-width: 3;
+}
+
+.workflow-connection-hitarea {
+  cursor: pointer;
+  pointer-events: all;
+  stroke: transparent;
+}
+
+.workflow-connection--temp {
+  opacity: 0.6;
+  pointer-events: none;
+  stroke-dasharray: 6, 4;
+  stroke: var(--o-gray-500, #6c757d);
+  color: var(--o-gray-500, #6c757d);
+}
+
+.workflow-connection--back-edge {
+  stroke: var(--o-warning, #ffc107);
+  stroke-dasharray: 8 4;
+}
+
+/* 3. Workflow Node (Odoo Card Style) */
+/* CSS Custom Properties for Dimensions */
+.workflow-node {
+  /* Default dimension variables */
+  --node-width: 220px; /* Wider for card layout */
+  --node-header-height: auto;
+  --node-body-padding: 10px;
+  --socket-spacing: 24px;
+  --socket-radius: 5px;
+  --socket-offset-y: 12px;
+
+  position: absolute;
+  min-width: var(--node-width);
+  background: var(--o-card-bg, #ffffff);
+  border: 1px solid var(--o-card-border-color, #dee2e6);
+  border-radius: 8px;
+  box-shadow: var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
+  z-index: 10;
+  cursor: default;
+  will-change: left, top;
+  overflow: visible;
+}
+
+/* Colored left border indicator */
+.workflow-node::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--o-gray-500, #6c757d);
+  border-radius: 8px 0 0 8px;
+  opacity: 1;
+  z-index: 1;
+}
+
+/* --- Left Column: Icon --- */
+.workflow-node__icon-col {
+  width: 60px; /* Slightly wider for larger icon */
+  flex-shrink: 0;
+}
+
+.workflow-node__icon-box {
+  width: 44px;
+  height: 44px;
+  background: var(--o-gray-100, #f8f9fa);
+}
+
+.workflow-node__icon-box .lucide {
+  color: inherit;
+  stroke-width: 1.5;
+}
+
+/* --- Right Column: Content --- */
+.workflow-node__content-col {
+  flex: 1;
+}
+
+.workflow-node__header-row {
+  margin-bottom: 2px;
+}
+
+.workflow-node__title {
+  font-size: 0.95rem;
+}
+
+.workflow-node__menu-btn {
+  color: #71717a;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.workflow-node__menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.workflow-node__subtitle {
+  color: var(--o-info, #0dcaf0);
+}
+
+/* --- Footer Actions --- */
+.workflow-node__footer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.node-action-btn {
+  flex: 1;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.node-action-btn:hover {
+  opacity: 0.9;
+}
+
+.node-action-btn.primary {
+  background: #713bed; /* Odoo/Brand purple-ish */
+  color: white;
+}
+
+.node-action-btn.secondary {
+  background: #2a2d33;
+  color: #a1a1aa;
+  border: 1px solid #3f3f46;
+}
+
+.node-action-btn.secondary:hover {
+  background: #3f3f46;
+  color: white;
+}
+
+/* --- Shared / Legacy Styles Needed --- */
+
+/* Node Width Utility Classes */
+.workflow-node.nw-90 {
+  --node-width: 220px; /* Override to prevent breaking card layout */
+}
+.workflow-node.nw-180 {
+  --node-width: 220px;
+}
+.workflow-node.nw-360 {
+  --node-width: 360px;
+}
+
+.workflow-node:hover {
+  border-color: var(--o-gray-400, #ced4da);
+  box-shadow: var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
+}
+
+.workflow-node.selected {
+  border-color: var(--o-brand-600, #0d6efd);
+  box-shadow: 0 0 0 1px var(--o-brand-600, #0d6efd), var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
+}
+
+.workflow-node.dragging {
+  z-index: 100 !important;
+  box-shadow: var(--o-card-shadow, 0 6px 16px rgba(0, 0, 0, 0.12));
+  cursor: grabbing;
+}
+
+/* Disabled Node State */
+.workflow-node.disabled {
+  opacity: 0.5;
+  filter: grayscale(80%);
+  border-style: dashed;
+  border-color: var(--o-gray-400, #ced4da);
+}
+
+.workflow-node.disabled::before {
+  opacity: 0.3;
+}
+
+.workflow-node.disabled .workflow-node__title::after {
+  content: " (disabled)";
+  font-size: 0.7rem;
+  color: var(--o-gray-500, #6c757d);
+}
+
+/* Update indicator colors based on type */
+.workflow-node--http::before { background: #10b981; }
+.workflow-node--validation::before { background: #f43f5e; }
+.workflow-node--loop::before { background: #8b5cf6; }
+.workflow-node--if::before { background: #f59e0b; }
+.workflow-node--switch::before { background: #f97316; }
+.workflow-node--code::before { background: #10b981; }
+
+/* Socket Columns (positioned outside node border) */
+.workflow-node__inputs,
+.workflow-node__outputs {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  z-index: 1;
+}
+
+.workflow-node__inputs {
+  right: calc(100% - var(--socket-radius) * 2);
+}
+
+.workflow-node__outputs {
+  left: calc(100% - var(--socket-radius) * 2);
+}
+
+/* Individual socket element */
+.workflow-node__socket {
+  height: var(--socket-spacing);
+}
+
+/* First socket vertical alignment (matches getSocketPosition) */
+.workflow-node__socket:first-child {
+  margin-top: calc(
+    var(--node-body-padding)
+    + var(--socket-offset-y)
+    - var(--socket-spacing) / 2
+  );
+}
+
+
+/* Input sockets: reverse so dot is rightmost (touching core edge) */
+.workflow-node__socket--input {
+  flex-direction: row-reverse;
+}
+
+/* Output sockets: normal order, dot is leftmost (touching core edge) */
+.workflow-node__socket--output {
+  flex-direction: row;
+  position: relative; /* Context for quick-add overlay */
+  overflow: visible;  /* Allow line to extend */
+}
+
+/* Socket Label */
+.workflow-node__socket-label {
+  white-space: nowrap;
+  
+  /* Output styling for overlap */
+  position: relative;
+  z-index: 2; /* Sit above the line */
+  background: var(--o-card-bg, #ffffff); /* Match node bg to mask line */
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.workflow-node__socket--output .workflow-node__socket-label {
+    margin-left: 24px; /* Push label out to overlapping area */
+}
+
+/* Socket Quick-Add Connector (output only) */
+.socket-quick-add-connector {
+  position: absolute; /* Take out of flow to sit behind label */
+  left: 10px; /* Start from center of socket dot radius*2 */
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  z-index: 1; /* Below label */
+  pointer-events: auto;
+}
+
+.socket-quick-add-line {
+  width: 80px; /* Long dash line to reach button */
+  height: 0;
+  border-top: 2px dashed var(--o-gray-400, #ced4da);
+}
+
+.socket-quick-add-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px; /* Square with slight radius per screenshot */
+  border: 1px solid var(--o-gray-400, #ced4da);
+  background: var(--o-card-bg, #ffffff);
+  color: var(--o-gray-500, #6c757d);
+  font-size: 10px; /* slightly larger plus */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.socket-quick-add-btn:hover {
+  background: var(--o-brand-600, #0d6efd);
+  border-color: var(--o-brand-600, #0d6efd);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* 5. Canvas Controls */
+.workflow-editor-canvas__controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.controls-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--o-gray-300, #dee2e6);
+  margin: 0 6px;
+}
+
+.zoom-label {
+  min-width: 44px;
+  text-align: center;
+}
+
+/* 6. Selection Box */
+.workflow-editor-canvas__selection-box {
+  position: absolute;
+  border: 1px dashed var(--o-brand-600, #0d6efd);
+  background: rgba(13, 110, 253, 0.1);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* Node Type Icons Overrides (Bright accents on dark bg) */
+.workflow-node--http .workflow-node__icon {
+  color: var(--o-success, #198754);
+}
+.workflow-node--validation .workflow-node__icon {
+  color: var(--o-danger, #dc3545);
+}
+.workflow-node--loop .workflow-node__icon {
+  color: var(--o-info, #0dcaf0);
+}
+.workflow-node--if .workflow-node__icon {
+  color: var(--o-warning, #ffc107);
+}
+.workflow-node--switch .workflow-node__icon {
+  color: var(--o-warning, #ffc107);
+}
+.workflow-node--code .workflow-node__icon {
+  color: var(--o-success, #198754);
+}
+
+/* ========================================= */
+/* 7. Node Menu (Context Menu for Adding Nodes) */
+/* ========================================= */
+
+.node-menu {
+  position: absolute;
+  z-index: 1000;
+  width: 280px;
+  max-height: 400px;
+  background: var(--o-card-bg, #ffffff);
+  border: 1px solid var(--o-card-border-color, #dee2e6);
+  border-radius: 8px;
+  box-shadow: var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* animation: nodeMenuFadeIn 0.15s ease-out; DISABLED */
+}
+
+.node-menu--large {
+  width: 500px;
+  max-height: 600px;
+  animation: none; /* Handled by MotionHelpers.animateDropdownIn */
+}
+
+.node-menu--large .node-menu__item {
+  padding: 16px;
+}
+
+.node-menu--large .node-menu__item-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 1.5rem;
+}
+
+.node-menu--large .node-menu__item-title {
+  font-size: 1.1rem;
+}
+
+.node-menu--large .node-menu__item-description {
+  font-size: 0.9rem;
+}
+
+/* @keyframes nodeMenuFadeIn DISABLED
+@keyframes nodeMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+*/
+
+/* Search Bar */
+.node-menu__search {
+  padding: 12px;
+  border-bottom: 1px solid var(--o-card-border-color, #dee2e6);
+}
+
+.node-menu__search-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--o-input-bg, #ffffff);
+  border: 1px solid var(--o-input-border-color, #ced4da);
+  border-radius: 6px;
+  color: var(--o-text-color, #212529);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  /* transition: border-color 0.15s ease, box-shadow 0.15s ease; DISABLED */
+}
+
+.node-menu__search-input:focus {
+  border-color: var(--o-brand-600, #0d6efd);
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+}
+
+.node-menu__search-input::placeholder {
+  color: var(--o-gray-500, #6c757d);
+}
+
+/* Content Area */
+.node-menu__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+/* Category */
+.node-menu__category {
+  margin-bottom: 4px;
+}
+
+.node-menu__category-title {
+  padding: 8px 12px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--o-gray-500, #6c757d);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Node Item */
+.node-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  /* transition: background 0.1s ease; DISABLED */
+}
+
+.node-menu__item:hover {
+  background: rgba(13, 110, 253, 0.08);
+}
+
+.node-menu__item-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--o-gray-100, #f8f9fa);
+  border-radius: 6px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.node-menu__item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.node-menu__item-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--o-text-color, #212529);
+  margin-bottom: 2px;
+}
+
+.node-menu__item-description {
+  font-size: 0.75rem;
+  color: var(--o-gray-500, #6c757d);
+  line-height: 1.3;
+}
+
+/* Empty State */
+.node-menu__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--o-gray-500, #6c757d);
+  font-size: 0.85rem;
+}
+
+/* ========================================= */
+/* 8. Connection Toolbar */
+/* ========================================= */
+
+.connection-toolbar {
+  position: absolute;
+  z-index: 500;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--o-card-bg, #ffffff);
+  border: 1px solid var(--o-card-border-color, #dee2e6);
+  border-radius: 6px;
+  box-shadow: var(--o-card-shadow, 0 2px 8px rgba(0, 0, 0, 0.08));
+  /* transform is set dynamically via JS for zoom scaling */
+  transform-origin: center center;
+}
+
+/* @keyframes toolbarFadeIn DISABLED
+@keyframes toolbarFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+*/
+
+.connection-toolbar__btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--o-gray-600, #6c757d);
+  font-size: 1rem;
+  cursor: pointer;
+  /* transition: all 0.1s ease; DISABLED */
+}
+
+.connection-toolbar__btn:hover {
+  background: var(--o-gray-100, #f8f9fa);
+  color: var(--o-text-color, #212529);
+}
+
+.connection-toolbar__btn--add:hover {
+  background: rgba(13, 110, 253, 0.15);
+  color: var(--o-brand-600, #0d6efd);
+}
+
+.connection-toolbar__btn--delete:hover {
+  background: rgba(220, 53, 69, 0.15);
+  color: var(--o-danger, #dc3545);
+}
+
+/* ========================================= */
+/* 9. Workflow Editor App (Production Layout) */
+/* ========================================= */
+
+.workflow-editor-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--o-webclient-background-color, #f8f9fa);
+  color: var(--o-text-color, #212529);
+  overflow: hidden; /* Prevent double scrollbars */
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-split {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-split > .workflow-history-panel {
+  width: 420px;
+  min-width: 360px;
+  max-width: 520px;
+  order: 0;
+}
+
+.editor-split > .workflow-editor-canvas {
+  flex: 1;
+  min-width: 0;
+  order: 1;
+}
+
+.editor-toolbar {
+  height: 56px;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--o-card-border-color, #dee2e6);
+  background: var(--o-webclient-background-color, #f8f9fa);
+  z-index: 20;
+}
+
+.editor-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.editor-toolbar__exit {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.editor-title-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.editor-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--o-text-color, #212529);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.editor-subtitle {
+  font-size: 0.75rem;
+  color: var(--o-gray-500, #6c757d);
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-actions__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--o-gray-100, #f8f9fa);
+  border: 1px solid var(--o-card-border-color, #dee2e6);
+}
+
+.editor-toolbar .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  /* Override Odoo btn styles only if needed, or rely on btn-primary */
+}
+
+.editor-toolbar .btn__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Ensure canvas takes remaining height */
+.editor-container .workflow-editor-canvas {
+  flex: 1;
+  height: auto !important; /* Allow flex to control height */
+  min-height: 0 !important; /* Allow shrinking */
+}
+
+.workflow-form-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Loading and Error states should also fill screen */
+.workflow-editor-app .loading-spinner,
+.workflow-editor-app .error-message {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}

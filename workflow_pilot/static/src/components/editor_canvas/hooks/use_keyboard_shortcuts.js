@@ -16,10 +16,16 @@ import { useExternalListener } from "@odoo/owl";
  * @param {Object} options
  * @param {Object} options.editor - workflowEditor service
  * @param {Function} options.getNodes - () => nodes array
+ * @param {Function} [options.getReadonly] - () => boolean - runtime readonly
  */
-export function useKeyboardShortcuts({ editor, getNodes }) {
+export function useKeyboardShortcuts({ editor, getNodes, getReadonly }) {
+
+    function isReadonlyActive() {
+        return getReadonly ? !!getReadonly() : false;
+    }
 
     function handleKeyDown(ev) {
+        if (isReadonlyActive()) return;
         // Skip if typing in an input/textarea
         const targetTag = ev.target.tagName;
         if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || ev.target.isContentEditable) {

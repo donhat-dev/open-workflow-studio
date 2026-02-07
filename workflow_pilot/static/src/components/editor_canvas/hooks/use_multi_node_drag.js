@@ -18,9 +18,14 @@ import { useState } from "@odoo/owl";
  * @param {Function} options.getViewport - () => { panX: number, panY: number, zoom: number }
  * @param {Function} options.onViewRectUpdate - () => void
  * @param {Object} options.rootRef - owl ref for canvas root
+ * @param {Function} [options.getReadonly] - () => boolean - runtime readonly
  */
 export function useMultiNodeDrag(options) {
-    const { editor, getNodes, getZoom, getViewport, onViewRectUpdate, rootRef } = options;
+     const { editor, getNodes, getZoom, getViewport, onViewRectUpdate, rootRef, getReadonly } = options;
+    function isReadonlyActive() {
+        return getReadonly ? !!getReadonly() : false;
+    }
+
 
     const state = useState({
         isDragging: false,
@@ -169,6 +174,7 @@ export function useMultiNodeDrag(options) {
      * @param {{ nodeId: string, event: MouseEvent }} data
      */
     function onNodeDragStart(data) {
+        if (isReadonlyActive()) return;
         const { nodeId, event } = data;
 
         // Ensure the dragged node is selected (if not already)
@@ -210,6 +216,7 @@ export function useMultiNodeDrag(options) {
      * @returns {boolean} true if handled
      */
     function handleMouseMove(ev) {
+        if (isReadonlyActive()) return false;
         if (!state.isDragging) return false;
 
         lastPointer = { x: ev.clientX, y: ev.clientY };
@@ -237,6 +244,7 @@ export function useMultiNodeDrag(options) {
      * @returns {boolean} true if handled
      */
     function handleMouseUp(ev) {
+        if (isReadonlyActive()) return false;
         if (!state.isDragging) return false;
 
         state.isDragging = false;

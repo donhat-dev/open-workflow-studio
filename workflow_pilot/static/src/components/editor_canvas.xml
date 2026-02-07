@@ -3,32 +3,51 @@
 	<t t-name="workflow_pilot.editor_canvas">
 		<div class="workflow-editor-canvas" t-ref="root" t-att-style="canvasBackgroundStyle" t-on-dragover="onDragOver" t-on-drop="onDrop" t-on-click="onCanvasClick" t-on-mousedown="onCanvasMouseDown" t-on-wheel="onWheel" t-on-contextmenu="onCanvasContextMenu">
 			<!-- Controls Bar (Top-Left) -->
-			<div class="workflow-editor-canvas__controls">
-				<button class="canvas-btn" t-on-click="onUndo" t-att-disabled="!canUndo" title="Undo (Ctrl+Z)">
-					<LucideIcon t-props="{ name: 'Undo2', size: 16 }"/>
-				</button>
-				<button class="canvas-btn" t-on-click="onRedo" t-att-disabled="!canRedo" title="Redo (Ctrl+Y)">
-					<LucideIcon t-props="{ name: 'Redo2', size: 16 }"/>
-				</button>
-				<div class="controls-divider"/>
-				<button class="canvas-btn" t-on-click="tidyUp" title="Tidy Up">
-					<LucideIcon t-props="{ name: 'Sparkles', size: 16 }"/>
-				</button>
-				<button class="canvas-btn add-node-btn" t-on-click="(ev) => this.onAddNodeClick(ev)" title="Add Node">+ Node</button>
-				<button class="canvas-btn" t-on-click="fitToView" title="Fit to View">
+			<div class="workflow-editor-canvas__controls d-flex align-items-center gap-1 p-2 rounded border shadow-sm bg-white">
+				<t t-if="hasCanvasActions">
+					<button
+						class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
+						t-on-click="onSave"
+						t-att-disabled="isSaving or isExecuting or isReadonly ? 'disabled' : undefined">
+						<LucideIcon t-props="{ name: 'Save', size: 14 }"/>
+						<span>Save</span>
+					</button>
+					<button
+						class="btn btn-success btn-sm d-inline-flex align-items-center gap-1"
+						t-on-click="onRun"
+						t-att-disabled="isExecuting or isSaving or isReadonly ? 'disabled' : undefined">
+						<LucideIcon t-props="{ name: 'Play', size: 14 }"/>
+						<span>Run</span>
+					</button>
+					<div class="controls-divider"/>
+				</t>
+				<t t-if="!isReadonly">
+					<button class="btn btn-light btn-sm" t-on-click="onUndo" t-att-disabled="!canUndo" title="Undo (Ctrl+Z)">
+						<LucideIcon t-props="{ name: 'Undo2', size: 16 }"/>
+					</button>
+					<button class="btn btn-light btn-sm" t-on-click="onRedo" t-att-disabled="!canRedo" title="Redo (Ctrl+Y)">
+						<LucideIcon t-props="{ name: 'Redo2', size: 16 }"/>
+					</button>
+					<div class="controls-divider"/>
+					<button class="btn btn-light btn-sm" t-on-click="tidyUp" title="Tidy Up">
+						<LucideIcon t-props="{ name: 'Sparkles', size: 16 }"/>
+					</button>
+					<button class="btn btn-primary btn-sm" t-on-click="(ev) => this.onAddNodeClick(ev)" title="Add Node">+ Node</button>
+					<div class="controls-divider"/>
+				</t>
+				<button class="btn btn-light btn-sm" t-on-click="fitToView" title="Fit to View">
 					<LucideIcon t-props="{ name: 'Maximize', size: 16 }"/>
 				</button>
-				<div class="controls-divider"/>
-				<button class="canvas-btn" t-on-click="zoomOut" title="Zoom Out">
+				<button class="btn btn-light btn-sm" t-on-click="zoomOut" title="Zoom Out">
 					<LucideIcon t-props="{ name: 'Minus', size: 16 }"/>
 				</button>
-				<span class="zoom-label">
+				<span class="zoom-label small text-muted fw-medium text-center px-1">
 					<t t-esc="zoomPercentage"/>%
 				</span>
-				<button class="canvas-btn" t-on-click="zoomIn" title="Zoom In">
+				<button class="btn btn-light btn-sm" t-on-click="zoomIn" title="Zoom In">
 					<LucideIcon t-props="{ name: 'Plus', size: 16 }"/>
 				</button>
-				<button class="canvas-btn" t-on-click="resetZoom" title="Reset View">
+				<button class="btn btn-light btn-sm" t-on-click="resetZoom" title="Reset View">
 					<LucideIcon t-props="{ name: 'RefreshCw', size: 16 }"/>
 				</button>
 			</div>
@@ -44,7 +63,7 @@
 					<!-- Render connection paths -->
 					<t t-foreach="renderedConnections" t-as="conn" t-key="conn.id">
 						<g class="workflow-connection-group" t-att-class="{ 'selected': selectedConnectionIds.includes(conn.id), 'vertical-stack': conn.isVerticalStack }" t-on-click.stop="() => this.onConnectionSelect(conn.id)" t-on-mouseenter="(ev) => this.handleConnectionEnter(ev, conn)" t-on-mouseleave="onConnectionMouseLeave">
-							<t t-foreach="conn.paths" t-as="pathD" t-key="pathD_index">
+							<t t-foreach="conn.paths" t-as="pathD" t-key="conn.id + '_' + pathD_index">
 								<!-- Thicker invisible path for easier clicking -->
 								<path t-att-d="pathD" class="workflow-connection-hitarea" stroke="transparent" stroke-width="12" fill="none" />
 								<!-- Visible path (arrow only on last segment) -->
@@ -55,7 +74,7 @@
 					<!-- Temp connection line while drawing -->
 					<path t-if="isDrawingConnection" t-att-d="tempConnectionPath" class="workflow-connection workflow-connection--temp" stroke-width="2" fill="none"/>
 				</svg>
-				<div class="workflow-editor-canvas__hint" t-if="nodes.length === 0">
+				<div class="workflow-editor-canvas__hint small text-muted text-center" t-if="nodes.length === 0">
 					Drop nodes here (or click in the palette)
 				</div>
 				<t t-foreach="visibleNodes" t-as="node" t-key="node.id">
@@ -72,7 +91,7 @@
 				</div>
 			</div>
 			<!-- Node Config Panel (outside content to avoid transform containment) -->
-			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionState" onClose="onConfigPanelClose" onSave="onConfigPanelSave" onExecute="onConfigPanelExecute"/>
+			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionProp" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
 		</div>
 	</t>
 </templates>

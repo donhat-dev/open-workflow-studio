@@ -40,6 +40,10 @@ const DEFAULT_UI_STATE = () => ({
         midpoint: { x: 0, y: 0 },
         canvasMidpoint: null,
     },
+    readonly: false,
+    saving: false,
+    executing: false,
+    historyPreview: { active: false, revisionId: null },
     history: { canUndo: false, canRedo: false },
     // NodeMenu state (source of truth)
     nodeMenu: {
@@ -63,6 +67,11 @@ export const workflowEditorService = {
         let versionHash = null;
         let workflowId = null;
         let autoSave = true;
+        const historyPreview = {
+            active: false,
+            revisionId: null,
+            originalSnapshot: null,
+        };
 
         const state = reactive({
             // Dynamic getter ensures we always point to the current adapter's state
@@ -181,6 +190,12 @@ export const workflowEditorService = {
             },
             clearExecution() {
                 state.execution = null;
+            },
+            setSaving(value) {
+                state.ui.saving = !!value;
+            },
+            setExecuting(value) {
+                state.ui.executing = !!value;
             },
             setNodeTypes(types) {
                 state.nodeTypes = Array.isArray(types) ? types : [];
@@ -326,6 +341,61 @@ export const workflowEditorService = {
              */
             resetViewport() {
                 state.ui.viewport = { pan: { x: 0, y: 0 }, zoom: 1 };
+            },
+
+            setReadonly(value) {
+                state.ui.readonly = !!value;
+            },
+
+            startHistoryPreview(revisionId, snapshot) {
+                if (!snapshot) {
+                    return;
+                }
+                if (!historyPreview.active) {
+                    historyPreview.originalSnapshot = adapter.toJSON();
+                }
+
+                historyPreview.active = true;
+                historyPreview.revisionId = revisionId || null;
+                state.ui.historyPreview = { active: true, revisionId: revisionId || null };
+                state.ui.readonly = true;
+                state.ui.selection = { nodeIds: [], connectionIds: [] };
+                state.ui.hoveredConnection = {
+                    id: null,
+                    midpoint: { x: 0, y: 0 },
+                    canvasMidpoint: null,
+                };
+                state.ui.panels.configOpen = false;
+                state.ui.panels.configNodeId = null;
+                state.ui.nodeMenu = {
+                    visible: false,
+                    x: 0,
+                    y: 0,
+                    canvasX: 0,
+                    canvasY: 0,
+                    variant: 'default',
+                    connectionContext: null,
+                };
+
+                adapter.fromJSON(snapshot);
+            },
+
+            endHistoryPreview({ restoreOriginal = true } = {}) {
+                if (historyPreview.active && restoreOriginal && historyPreview.originalSnapshot) {
+                    adapter.fromJSON(historyPreview.originalSnapshot);
+                }
+
+                historyPreview.active = false;
+                historyPreview.revisionId = null;
+                historyPreview.originalSnapshot = null;
+                state.ui.historyPreview = { active: false, revisionId: null };
+                state.ui.readonly = false;
+                state.ui.selection = { nodeIds: [], connectionIds: [] };
+                state.ui.hoveredConnection = {
+                    id: null,
+                    midpoint: { x: 0, y: 0 },
+                    canvasMidpoint: null,
+                };
             },
 
             openPanel(panelType, context = {}) {

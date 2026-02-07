@@ -16,9 +16,14 @@ import { useState } from "@odoo/owl";
  * @param {Function} options.getSocketPositionForNode - (node, key, type) => { x, y }
  * @param {Function} options.getNodes - () => nodes array
  * @param {Function} options.openNodeMenu - (config) => void - called when dragging to empty space
+ * @param {Function} [options.getReadonly] - () => boolean - runtime readonly
  */
 export function useConnectionDrawing(options) {
-    const { editor, getCanvasPosition, getSocketPositionForNode, getNodes, openNodeMenu } = options;
+     const { editor, getCanvasPosition, getSocketPositionForNode, getNodes, openNodeMenu, getReadonly } = options;
+    function isReadonlyActive() {
+        return getReadonly ? !!getReadonly() : false;
+    }
+
 
     const state = useState({
         isConnecting: false,
@@ -65,6 +70,7 @@ export function useConnectionDrawing(options) {
      * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
      */
     function onSocketMouseDown(data) {
+        if (isReadonlyActive()) return;
         const { nodeId, socketKey, socketType, event } = data;
 
         // Only start connection from output sockets
@@ -86,13 +92,15 @@ export function useConnectionDrawing(options) {
      * @returns {boolean} - true if handled (connection is being drawn)
      */
     function handleMouseMove(ev) {
+        if (isReadonlyActive()) return false;
         if (!state.isConnecting) return false;
 
         const pos = getCanvasPosition(ev);
         state.tempLineEndpoint = pos;
 
         // Smart snapping: find nearest socket
-        const sourceNodeId = state.connectionStart?.nodeId;
+        const start = state.connectionStart;
+        const sourceNodeId = start ? start.nodeId : null;
         state.snappedSocket = findNearestSocket(pos.x, pos.y, sourceNodeId);
 
         return true;
@@ -103,6 +111,7 @@ export function useConnectionDrawing(options) {
      * @param {{ nodeId: string, socketKey: string, socketType: string, event: MouseEvent }} data
      */
     function onSocketMouseUp(data) {
+        if (isReadonlyActive()) return;
         if (!state.isConnecting) return;
 
         const { nodeId, socketKey, socketType } = data;
@@ -133,6 +142,7 @@ export function useConnectionDrawing(options) {
      * @returns {boolean} - true if handled
      */
     function handleCanvasMouseUp(ev, canvasRect) {
+        if (isReadonlyActive()) return false;
         if (!state.isConnecting) return false;
 
         // Smart snapping: if snapped to a socket, create connection
@@ -152,8 +162,8 @@ export function useConnectionDrawing(options) {
 
         // Check if released on an input socket directly (let onSocketMouseUp handle it)
         const target = ev.target;
-        const isSocket = target.classList?.contains('workflow-node__socket-point');
-        const socketType = target.dataset?.socketType;
+        const isSocket = target.classList && target.classList.contains('workflow-node__socket-point');
+        const socketType = target.dataset ? target.dataset.socketType : null;
 
         if (isSocket && socketType === 'input') {
             return false; // Will be handled by onSocketMouseUp

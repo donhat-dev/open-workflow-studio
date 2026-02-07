@@ -15,23 +15,23 @@
 // Node Width Presets
 // =========================================
 export const NODE_WIDTH = {
-    SMALL: 90,
-    NORMAL: 180,
+    SMALL: 120,
+    NORMAL: 240, // Wider for Odoo Card layout (Icon Left + Content Right)
     LARGE: 360,
 };
 
 // =========================================
 // Node Height Components
 // =========================================
-export const NODE_HEADER_HEIGHT = 44;  // Header padding + content
-export const NODE_BODY_PADDING = 12;   // Body vertical padding (top/bottom each)
+export const NODE_HEADER_HEIGHT = 44;  // Deprecated for positioning, kept for ref
+export const NODE_BODY_PADDING = 10;   // Updated for Card layout
 
 // =========================================
 // Socket Dimensions
 // =========================================
 export const SOCKET_RADIUS = 5;        // Socket point radius
-export const SOCKET_SPACING = 28;      // Vertical gap between socket rows
-export const SOCKET_OFFSET_Y = 14;     // First socket offset from body top
+export const SOCKET_SPACING = 24;      // Vertical gap between socket rows
+export const SOCKET_OFFSET_Y = 12;     // First socket offset from body top
 
 // =========================================
 // Connection Path Constants
@@ -104,9 +104,9 @@ export class DimensionConfig {
             ? node.x + this.socketRadius
             : node.x + this.nodeWidth - this.socketRadius;
 
-        // Y position: header + body padding + socket offset + row spacing
+        // Y position: body padding + socket offset + row spacing
+        // (header height intentionally excluded for socket alignment)
         const y = node.y
-            + this.nodeHeaderHeight
             + this.nodeBodyPadding
             + this.socketOffsetY
             + (rowIndex * this.socketSpacing);
@@ -125,6 +125,7 @@ export class DimensionConfig {
             '--node-body-padding': `${this.nodeBodyPadding}px`,
             '--socket-radius': `${this.socketRadius}px`,
             '--socket-spacing': `${this.socketSpacing}px`,
+            '--socket-offset-y': `${this.socketOffsetY}px`,
             '--grid-size': `${this.gridSize}px`,
         };
     }

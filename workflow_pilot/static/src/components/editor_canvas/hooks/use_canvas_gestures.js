@@ -19,6 +19,7 @@ import { getNodeBounds } from "../utils/view_utils";
  *   onViewRectUpdate: () => void,
  *   getDimensions: () => DimensionConfig,
  *   readonly?: boolean,                // Viewer mode - pan only, no selection
+ *   getReadonly?: () => boolean,       // Runtime readonly getter (overrides readonly)
  *   setViewport?: (viewportUpdate: Object) => void, // For viewer mode pan
  *   getNodes?: () => Array,            // For readonly selection (if ever needed)
  * }} params
@@ -32,6 +33,7 @@ export function useCanvasGestures({
     onViewRectUpdate,
     getDimensions,
     readonly = false,
+    getReadonly,
     setViewport,
     getNodes,
 }) {
@@ -46,6 +48,13 @@ export function useCanvasGestures({
     let panStart = null;
     let panInitial = null;
     let mouseMoveFrame = null;
+
+    function isReadonlyActive() {
+        if (getReadonly) {
+            return !!getReadonly();
+        }
+        return !!readonly;
+    }
 
     /**
      * Check if event target is UI overlay that should not trigger gestures
@@ -65,9 +74,9 @@ export function useCanvasGestures({
         if (!rootRef.el) return false;
         return (
             ev.target === rootRef.el ||
-            ev.target.classList?.contains('workflow-editor-canvas__content') ||
-            ev.target.classList?.contains('workflow-connections') ||
-            ev.target.classList?.contains('workflow-editor-canvas')
+            ev.target.classList && ev.target.classList.contains('workflow-editor-canvas__content') ||
+            ev.target.classList && ev.target.classList.contains('workflow-connections') ||
+            ev.target.classList && ev.target.classList.contains('workflow-editor-canvas')
         );
     }
 
@@ -88,9 +97,10 @@ export function useCanvasGestures({
         }
 
         // Left click on empty canvas = start selection box (disabled in readonly mode)
-        if (readonly) return;
+        if (isReadonlyActive()) return;
 
-        const isOnNode = ev.target.closest?.('.workflow-node');
+        const target = ev.target;
+        const isOnNode = target && target.closest ? target.closest('.workflow-node') : null;
         if (ev.button === 0 && isCanvasBackground(ev) && !isOnNode) {
             const pos = getCanvasPosition(ev);
             state.isSelecting = true;
@@ -121,12 +131,14 @@ export function useCanvasGestures({
             } else if (editor) {
                 editor.actions.setViewport({ pan: { x: newPanX, y: newPanY } });
             }
-            onViewRectUpdate?.();
+            if (onViewRectUpdate) {
+                onViewRectUpdate();
+            }
             return true;
         }
 
         // Selection box gesture (not in readonly mode)
-        if (!readonly && state.isSelecting && state.selectionBox) {
+        if (!isReadonlyActive() && state.isSelecting && state.selectionBox) {
             const pos = getCanvasPosition(ev);
             state.selectionBox.endX = pos.x;
             state.selectionBox.endY = pos.y;
@@ -164,7 +176,7 @@ export function useCanvasGestures({
      * Complete selection - find nodes within selection box
      */
     function completeSelection() {
-        if (readonly) return;
+        if (isReadonlyActive()) return;
 
         const box = state.selectionBox;
         if (!box) return;

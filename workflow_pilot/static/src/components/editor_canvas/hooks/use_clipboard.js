@@ -10,11 +10,17 @@ import { useEnv, useExternalListener } from "@odoo/owl";
  * @param {Function} params.getNodes - Getter for current nodes
  * @param {Function} params.getConnections - Getter for current connections
  * @param {Function} params.getSelection - Getter for current selection { nodeIds: [] }
+ * @param {Function} [params.getReadonly] - () => boolean - runtime readonly
  */
-export function useClipboard({ editor, getNodes, getConnections, getSelection }) {
+export function useClipboard({ editor, getNodes, getConnections, getSelection, getReadonly }) {
     const env = useEnv();
 
+    function isReadonlyActive() {
+        return getReadonly ? !!getReadonly() : false;
+    }
+
     async function copySelectedNodes() {
+        if (isReadonlyActive()) return;
         // Prioritize multiple selection list
         const selection = getSelection();
         const selectedNodeIds = selection.nodeIds || [];
@@ -55,6 +61,7 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
     }
 
     async function pasteNodes() {
+        if (isReadonlyActive()) return;
         try {
             const text = await navigator.clipboard.readText();
             const data = JSON.parse(text);
@@ -114,6 +121,7 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection })
      * @param {KeyboardEvent} ev 
      */
     function onKeyDown(ev) {
+        if (isReadonlyActive()) return;
         // Skip if in input field
         if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable) {
             return;

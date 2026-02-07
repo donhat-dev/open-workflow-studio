@@ -15,18 +15,22 @@ import { calculateFitView } from "../utils/view_utils";
  *   rootRef: { el: HTMLElement },
  *   getDimensions: () => DimensionConfig,
  *   readonly?: boolean,           // Viewer mode flag
+ *   getReadonly?: () => boolean,  // Runtime readonly getter
  *   initialViewport?: { pan: { x: number, y: number }, zoom: number }, // Initial state for viewer
  * }} params
  * @returns {Object} Viewport state and methods
  */
-export function useViewport({ editor, rootRef, getDimensions, readonly = false, initialViewport }) {
+export function useViewport({ editor, rootRef, getDimensions, readonly = false, getReadonly, initialViewport }) {
     // RAF frame for throttling wheel zoom
     let scrollFrame = null;
 
     // Local viewport state for viewer mode
+    const defaultPan = initialViewport && initialViewport.pan ? initialViewport.pan : { x: 0, y: 0 };
+    const defaultZoom = initialViewport && typeof initialViewport.zoom === "number" ? initialViewport.zoom : 1;
+
     const localViewport = useState({
-        pan: initialViewport?.pan || { x: 0, y: 0 },
-        zoom: initialViewport?.zoom || 1,
+        pan: defaultPan,
+        zoom: defaultZoom,
     });
 
     // View rect tracking
@@ -128,6 +132,9 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
      * Handle wheel event for zoom
      */
     function onWheel(ev) {
+        if (getReadonly ? getReadonly() : readonly) {
+            return;
+        }
         // Skip if over overlays
         if (ev.target.closest('.node-menu') || ev.target.closest('.connection-toolbar')) {
             return;

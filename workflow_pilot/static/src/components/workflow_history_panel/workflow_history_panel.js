@@ -4,7 +4,7 @@
  * WorkflowHistoryPanel - Version history panel for workflows (docked UI).
  */
 
-import { Component, useState, onMounted, markup } from "@odoo/owl";
+import { Component, useState, onMounted } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { formatDateTime } from "@web/core/l10n/dates";
 import { _t } from "@web/core/l10n/translation";
@@ -13,13 +13,14 @@ import { memoize } from "@web/core/utils/functions";
 import { user } from "@web/core/user";
 
 const { DateTime } = luxon;
-
 export class WorkflowHistoryPanel extends Component {
     static template = "workflow_pilot.WorkflowHistoryPanel";
     static props = {
         workflowId: Number,
         onClose: Function,
         restoreRequested: Function,
+        previewRequested: { type: Function, optional: true },
+        currentRequested: { type: Function, optional: true },
         historyMetadata: { type: Array, optional: true },
         fieldName: { type: String, optional: true },
     };
@@ -31,10 +32,9 @@ export class WorkflowHistoryPanel extends Component {
     state = useState({
         revisions: [],
         selectedRevisionId: null,
-        activeTab: "comparison",
-        content: null,
-        comparison: null,
         loading: false,
+        previewing: false,
+        followLatest: true,
     });
 
     setup() {
@@ -48,9 +48,6 @@ export class WorkflowHistoryPanel extends Component {
 
     async init() {
         await this.refreshHistory();
-        if (this.state.revisions.length > 0) {
-            await this.selectRevision(this.state.revisions[0].revision_id);
-        }
     }
 
     async refreshHistory() {
@@ -64,6 +61,10 @@ export class WorkflowHistoryPanel extends Component {
                     "get_version_history",
                     [[this.props.workflowId], this.props.fieldName]
                 );
+            }
+            this.state.revisions = this.normalizeRevisionNotes(this.state.revisions || []);
+            if (!this.state.selectedRevisionId || this.state.followLatest) {
+                await this.selectCurrentRevision();
             }
         } catch (error) {
             this.notification.add(
@@ -79,11 +80,19 @@ export class WorkflowHistoryPanel extends Component {
         if (this.state.selectedRevisionId === revisionId) {
             return;
         }
+        if (revisionId === this.getLatestRevisionId()) {
+            await this.selectCurrentRevision();
+            return;
+        }
         try {
+            this.state.previewing = true;
             this.ui.block();
+            this.state.followLatest = false;
             this.state.selectedRevisionId = revisionId;
-            this.state.content = await this.getRevisionContent(revisionId);
-            this.state.comparison = await this.getRevisionComparison(revisionId);
+            const snapshot = await this.getRevisionContent(revisionId);
+            if (this.props.previewRequested) {
+                await this.props.previewRequested(revisionId, snapshot);
+            }
         } catch (error) {
             this.notification.add(
                 _t("Failed to load revision data: %s", error.message),
@@ -91,6 +100,17 @@ export class WorkflowHistoryPanel extends Component {
             );
         } finally {
             this.ui.unblock();
+            this.state.previewing = false;
+        }
+    }
+
+    async selectCurrentRevision() {
+        const latestRevisionId = this.getLatestRevisionId();
+        this.state.previewing = false;
+        this.state.selectedRevisionId = latestRevisionId;
+        this.state.followLatest = true;
+        if (this.props.currentRequested) {
+            await this.props.currentRequested();
         }
     }
 
@@ -100,18 +120,6 @@ export class WorkflowHistoryPanel extends Component {
             "get_version_content",
             [[this.props.workflowId], revisionId, this.props.fieldName]
         );
-    }.bind(this));
-
-    getRevisionComparison = memoize(async function (revisionId) {
-        const comparison = await this.orm.call(
-            "ir.workflow",
-            "get_version_comparison",
-            [[this.props.workflowId], revisionId, this.props.fieldName]
-        );
-        return {
-            html: comparison.html ? markup(comparison.html) : "",
-            summary: comparison.summary || null,
-        };
     }.bind(this));
 
     formatDate(isoString) {
@@ -129,29 +137,77 @@ export class WorkflowHistoryPanel extends Component {
         );
     }
 
-    get contentSummary() {
-        const content = this.state.content;
-        if (!content) {
-            return null;
-        }
-        return {
-            nodeCount: (content.nodes || []).length,
-            connectionCount: (content.connections || []).length,
+    get displayRevisions() {
+        return this.state.revisions || [];
+    }
+
+    get groupedRevisions() {
+        const groups = {
+            today: { label: _t("Today"), revisions: [] },
+            yesterday: { label: _t("Yesterday"), revisions: [] },
+            lastWeek: { label: _t("Last Week"), revisions: [] },
+            older: { label: _t("Older"), revisions: [] },
         };
+
+        const now = DateTime.now();
+        const startOfToday = now.startOf("day");
+        const startOfYesterday = startOfToday.minus({ days: 1 });
+        const startOfLastWeek = startOfToday.minus({ weeks: 1 });
+        const latestRevisionId = this.getLatestRevisionId();
+
+        for (const revision of this.displayRevisions) {
+            const date = DateTime.fromISO(revision.create_date, { zone: "utc" }).setZone(user.tz);
+
+            const richRevision = {
+                ...revision,
+                is_current: revision.revision_id === latestRevisionId,
+                readableTime: date.toFormat("HH:mm:ss dd/LL/yyyy"),
+                avatarUrl: this.getAvatarUrl(revision.create_uid),
+                rawDate: date,
+            };
+
+            if (date >= startOfToday) {
+                groups.today.revisions.push(richRevision);
+            } else if (date >= startOfYesterday) {
+                groups.yesterday.revisions.push(richRevision);
+            } else if (date >= startOfLastWeek) {
+                groups.lastWeek.revisions.push(richRevision);
+            } else {
+                groups.older.revisions.push(richRevision);
+            }
+        }
+
+        return Object.values(groups).filter(g => g.revisions.length > 0);
     }
 
-    get comparisonHtml() {
-        return this.state.comparison && this.state.comparison.html
-            ? this.state.comparison.html
-            : "";
+    getAvatarUrl(uid) {
+        if (!uid) return "";
+        return `/web/image?model=res.users&field=avatar_128&id=${uid}`;
     }
 
-    get comparisonSummary() {
-        return this.state.comparison ? this.state.comparison.summary : null;
+    get isCurrentSelected() {
+        return this.state.selectedRevisionId === this.getLatestRevisionId();
     }
 
-    get content() {
-        return JSON.stringify(this.state.content, null, 2);
+    get canRestore() {
+        return Boolean(this.state.selectedRevisionId) && !this.state.previewing && !this.isCurrentSelected;
+    }
+
+    getLatestRevisionId() {
+        const latest = this.state.revisions?.[0];
+        return latest ? latest.revision_id : null;
+    }
+
+    normalizeRevisionNotes(revisions) {
+        return revisions.map((revision) => {
+            if (revision.note) {
+                return revision;
+            }
+            return {
+                ...revision,
+                note: _t("Manual save"),
+            };
+        });
     }
 
     onRevisionClick(revisionId) {
@@ -159,6 +215,9 @@ export class WorkflowHistoryPanel extends Component {
     }
 
     async onRestoreClick() {
+        if (this.isCurrentSelected) {
+            return;
+        }
         const revision = this.getSelectedRevision();
         if (!revision) {
             return;
@@ -170,36 +229,9 @@ export class WorkflowHistoryPanel extends Component {
             confirmLabel: _t("Restore"),
             confirm: async () => {
                 this.ui.block();
-                await this.props.restoreRequested(revision.revision_id, this.props.onClose);
+                await this.props.restoreRequested(revision.revision_id);
                 this.ui.unblock();
             },
         });
-    }
-
-    async onMarkMilestoneClick() {
-        const revision = this.getSelectedRevision();
-        if (!revision || revision.is_milestone) {
-            return;
-        }
-
-        const name = prompt(_t("Enter milestone name:"), `Milestone v${revision.revision_id}`);
-        if (!name) {
-            return;
-        }
-
-        this.env.services.ui.block();
-        await this.orm.call(
-            "ir.workflow",
-            "mark_milestone",
-            [[this.props.workflowId], revision.revision_id, name, this.props.fieldName]
-        );
-        this.notification.add(_t("Marked as milestone"), { type: "success" });
-
-        await this.refreshHistory();
-        this.env.services.ui.unblock();
-    }
-
-    onTabChange(tabId) {
-        this.state.activeTab = tabId;
     }
 }

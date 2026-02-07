@@ -254,10 +254,7 @@ export class NodeConfigPanel extends Component {
         if (!this.actions.buildContextForNode) {
             throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
         }
-        const context = this.actions.buildContextForNode(
-            workflow,
-            this.props.node.id
-        );
+        const context = this.actions.buildContextForNode();
 
         const nodeContext = context._node || {};
         const entries = Object.entries(nodeContext);
@@ -485,7 +482,7 @@ export class NodeConfigPanel extends Component {
         if (!this.actions.buildContextForNode) {
             throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
         }
-        const wfContext = this.actions.buildContextForNode(workflow, this.props.node.id);
+        const wfContext = this.actions.buildContextForNode();
         const json = wfContext._json || {};
         const inputItems = normalizeItems(json);
 

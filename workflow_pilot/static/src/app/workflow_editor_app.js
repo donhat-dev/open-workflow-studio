@@ -19,7 +19,6 @@ export class WorkflowEditorApp extends Component {
     static components = { EditorCanvas, LucideIcon, View, Chatter, WorkflowHistoryPanel };
     
     setup() {
-        // Services (Fail-First - no optional chaining)
         this.editorService = useEditor();
         this.notification = useService("notification");
         this.dialog = useService("dialog");
@@ -29,8 +28,6 @@ export class WorkflowEditorApp extends Component {
         // State
         this.state = useState({
             loading: true,
-            saving: false,
-            executing: false,
             error: null,
             view: "editor",
         });
@@ -72,6 +69,7 @@ export class WorkflowEditorApp extends Component {
         });
 
         useBus(this.editorService.bus, "save", () => this.save());
+        useBus(this.editorService.bus, "run", () => this.execute());
         
         // Load on mount
         onMounted(async () => {
@@ -95,6 +93,22 @@ export class WorkflowEditorApp extends Component {
 
     get isHistoryOpen() {
         return this.editorService.state.ui.panels.historyOpen;
+    }
+
+    get isReadonly() {
+        return this.editorService.state.ui.readonly;
+    }
+
+    get historyPanelProps() {
+        return {
+            workflowId: this.workflowId,
+            fieldName: "draft_snapshot",
+            onClose: () => this.closeHistory(),
+            previewRequested: (revisionId, snapshot) =>
+                this.previewHistoryRevision(revisionId, snapshot),
+            currentRequested: () => this.exitHistoryPreview(),
+            restoreRequested: (revisionId) => this.restoreHistoryRevision(revisionId),
+        };
     }
 
     _updateWorkflowInfo(data) {
@@ -162,7 +176,7 @@ export class WorkflowEditorApp extends Component {
      * Handles conflict errors by showing modal, other errors by showing error state
      */
     async save() {
-        this.state.saving = true;
+        this.editorService.actions.setSaving(true);
         try {
             const result = await this.editorService.saveWorkflow();
             this.workflowInfo.is_published = Boolean(result.is_published);
@@ -184,7 +198,7 @@ export class WorkflowEditorApp extends Component {
                 });
             }
         } finally {
-            this.state.saving = false;
+            this.editorService.actions.setSaving(false);
         }
     }
     
@@ -193,7 +207,7 @@ export class WorkflowEditorApp extends Component {
      * If auto_save is enabled, saves workflow first
      */
     async execute() {
-        this.state.executing = true;
+        this.editorService.actions.setExecuting(true);
         try {
             // Auto-save before execute if enabled
             if (this.editorService.getAutoSave()) {
@@ -216,7 +230,7 @@ export class WorkflowEditorApp extends Component {
                 body: error.message || "Failed to execute workflow",
             });
         } finally {
-            this.state.executing = false;
+            this.editorService.actions.setExecuting(false);
         }
     }
     
@@ -244,17 +258,19 @@ export class WorkflowEditorApp extends Component {
      */
     openHistory() {
         if (this.isHistoryOpen) {
-            this.editorService.actions.closePanel("history");
+            this.closeHistory();
             return;
         }
         this.editorService.actions.openPanel("history");
     }
 
     closeHistory() {
+        this.editorService.actions.endHistoryPreview({ restoreOriginal: true });
         this.editorService.actions.closePanel("history");
     }
 
     async restoreHistoryRevision(revisionId) {
+        this.editorService.actions.endHistoryPreview({ restoreOriginal: false });
         await this.orm.call(
             "ir.workflow",
             "restore_version",
@@ -265,24 +281,13 @@ export class WorkflowEditorApp extends Component {
         this.closeHistory();
     }
 
-    /**
-     * Create a milestone from current state
-     */
-    async createMilestone() {
-        const name = prompt("Enter milestone name:", `Release ${new Date().toLocaleDateString()}`);
-        if (!name) {
-            return;
-        }
-
-        try {
-            await this.orm.call("ir.workflow", "create_milestone", [this.workflowId, name]);
-            this.notification.add("Milestone created.", { type: "success" });
-        } catch (error) {
-            this.dialog.add(AlertDialog, {
-                title: "Failed to create milestone",
-                body: error.message || "Unknown error",
-            });
-        }
+    async previewHistoryRevision(revisionId, snapshot) {
+        this.editorService.actions.startHistoryPreview(revisionId, snapshot);
     }
+
+    exitHistoryPreview() {
+        this.editorService.actions.endHistoryPreview({ restoreOriginal: true });
+    }
+
     
 }
