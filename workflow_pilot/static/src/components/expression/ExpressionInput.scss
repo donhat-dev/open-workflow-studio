@@ -1,4 +1,5 @@
-/* ExpressionInput Component Styles - n8n Style */
+// ExpressionInput Component Styles
+// Using Odoo SCSS variables for light/dark mode compatibility
 
 .expression-input {
   display: flex;
@@ -6,9 +7,9 @@
   gap: 0;
 }
 
-/* ============================================
-   HEADER with Label & Toggle
-   ============================================ */
+// ============================================
+// HEADER with Label & Toggle
+// ============================================
 
 .expression-input__header {
   display: flex;
@@ -20,14 +21,14 @@
 .expression-input__label {
   font-size: 12px;
   font-weight: 500;
-  color: #71717a;
+  color: $o-gray-600;
 }
 
-/* Mode Toggle Buttons (n8n style) */
+// Mode Toggle Buttons
 .expression-input__mode-toggle {
   display: flex;
   gap: 0;
-  border: 1px solid #3a3a3e;
+  border: 1px solid $o-gray-400;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -37,28 +38,28 @@
   border: none;
   padding: 3px 10px;
   font-size: 11px;
-  color: #71717a;
+  color: $o-gray-600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .mode-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba($o-black, 0.05);
 }
 
 .mode-btn.active {
-  background: #27272a;
-  color: #e4e4e7;
+  background: $o-gray-300;
+  color: $o-gray-900;
 }
 
 .mode-btn--expression.active {
-  background: #431407;
-  color: #fb923c;
+  background: rgba($o-warning, 0.15);
+  color: $o-warning;
 }
 
-/* ============================================
-   INPUT FIELD
-   ============================================ */
+// ============================================
+// INPUT FIELD
+// ============================================
 
 .expression-input__field {
   position: relative;
@@ -71,26 +72,28 @@
   align-items: center;
   justify-content: center;
   width: 28px;
-  background: #27272a;
-  border: 1px solid #3a3a3e;
+  background: $o-gray-300;
+  border: 1px solid $o-gray-400;
   border-right: none;
   border-radius: 6px 0 0 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #f97316;
+  color: $o-warning;
   flex-shrink: 0;
 }
 
 .expression-input__text,
 .expression-input__textarea {
   flex: 1;
-  background: #18181b;
-  border: 1px solid #3a3a3e;
+  background: $o-view-background-color;
+  border: 1px solid $o-gray-400;
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 13px;
-  color: #e4e4e7;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  color: $o-main-text-color;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .expression-input__field:has(.expression-input__fx) .expression-input__text,
@@ -102,8 +105,8 @@
 .expression-input__text:focus,
 .expression-input__textarea:focus {
   outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  border-color: $o-action;
+  box-shadow: 0 0 0 2px rgba($o-action, 0.15);
 }
 
 .expression-input__textarea {
@@ -114,27 +117,27 @@
   line-height: 1.5;
 }
 
-/* Expression mode styling - Orange border */
+// Expression mode styling - Warning/Orange border
 .expression-input.expression-mode .expression-input__text,
 .expression-input.expression-mode .expression-input__textarea {
-  border-color: #f97316;
-  background: #1c1917;
+  border-color: $o-warning;
+  background: mix($o-warning, $o-view-background-color, 5%);
 }
 
 .expression-input.expression-mode .expression-input__fx {
-  border-color: #f97316;
+  border-color: $o-warning;
 }
 
 .expression-input.expression-mode .expression-input__text:focus,
 .expression-input.expression-mode .expression-input__textarea:focus {
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 0 0 2px rgba($o-warning, 0.15);
 }
 
-/* Drag-over state */
+// Drag-over state
 .expression-input.drag-over .expression-input__text,
 .expression-input.drag-over .expression-input__textarea {
-  border: 2px dashed #6366f1;
-  background: rgba(99, 102, 241, 0.08);
+  border: 2px dashed $o-action;
+  background: rgba($o-action, 0.08);
 }
 
 .expression-input__drop-indicator {
@@ -142,8 +145,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(99, 102, 241, 0.95);
-  color: #fff;
+  background: rgba($o-action, 0.95);
+  color: $o-black;
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 11px;
@@ -155,13 +158,13 @@
   white-space: nowrap;
 }
 
-/* ============================================
-   RESULT PREVIEW (n8n style)
-   ============================================ */
+// ============================================
+// RESULT PREVIEW
+// ============================================
 
 .expression-input__result {
-  background: #fafafa;
-  border: 1px solid #e4e4e7;
+  background: $o-gray-100;
+  border: 1px solid $o-gray-300;
   border-top: none;
   border-radius: 0 0 6px 6px;
   overflow: hidden;
@@ -172,26 +175,26 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: #f4f4f5;
-  border-bottom: 1px solid #e4e4e7;
+  background: $o-gray-200;
+  border-bottom: 1px solid $o-gray-300;
 }
 
 .result-label {
   font-size: 11px;
   font-weight: 600;
-  color: #3f3f46;
+  color: $o-gray-800;
 }
 
 .result-tip {
   font-size: 10px;
-  color: #a1a1aa;
+  color: $o-gray-600;
 }
 
 .result-value {
   padding: 8px 10px;
   font-family: "JetBrains Mono", "Fira Code", monospace;
   font-size: 12px;
-  color: #18181b;
+  color: $o-main-text-color;
   min-height: 20px;
   max-height: 60px;
   overflow-y: auto;
@@ -199,11 +202,11 @@
 }
 
 .result-value .empty {
-  color: #a1a1aa;
+  color: $o-gray-600;
   font-style: italic;
   font-family: inherit;
 }
 
 .result-value .error {
-  color: #dc2626;
+  color: $o-danger;
 }

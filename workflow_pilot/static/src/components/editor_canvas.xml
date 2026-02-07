@@ -5,17 +5,11 @@
 			<!-- Controls Bar (Top-Left) -->
 			<div class="workflow-editor-canvas__controls d-flex align-items-center gap-1 p-2 rounded border shadow-sm bg-white">
 				<t t-if="hasCanvasActions">
-					<button
-						class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
-						t-on-click="onSave"
-						t-att-disabled="isSaving or isExecuting or isReadonly ? 'disabled' : undefined">
+					<button class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1" t-on-click="onSave" t-att-disabled="isSaving or isExecuting or isReadonly ? 'disabled' : undefined">
 						<LucideIcon t-props="{ name: 'Save', size: 14 }"/>
 						<span>Save</span>
 					</button>
-					<button
-						class="btn btn-success btn-sm d-inline-flex align-items-center gap-1"
-						t-on-click="onRun"
-						t-att-disabled="isExecuting or isSaving or isReadonly ? 'disabled' : undefined">
+					<button class="btn btn-success btn-sm d-inline-flex align-items-center gap-1" t-on-click="onRun" t-att-disabled="isExecuting or isSaving or isReadonly ? 'disabled' : undefined">
 						<LucideIcon t-props="{ name: 'Play', size: 14 }"/>
 						<span>Run</span>
 					</button>
@@ -43,6 +37,7 @@
 				</button>
 				<span class="zoom-label small text-muted fw-medium text-center px-1">
 					<t t-esc="zoomPercentage"/>%
+				
 				</span>
 				<button class="btn btn-light btn-sm" t-on-click="zoomIn" title="Zoom In">
 					<LucideIcon t-props="{ name: 'Plus', size: 16 }"/>
@@ -81,14 +76,13 @@
 					<WorkflowNode t-props="getWorkflowNodeProps(node)"/>
 				</t>
 				<!-- Selection box -->
-				<div t-if="gestures.state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/>
-				<!-- Fixed-size overlays (independent of zoom/pan) -->
-				<div class="workflow-editor-canvas__overlays">
-					<!-- Connection Toolbar (on hover) -->
-					<ConnectionToolbar t-if="hoveredConnection.id" position="hoveredConnection.midpoint" connectionId="hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
-					<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
-					<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
-				</div>
+				<div t-if="gestures.state.isSelecting and selectionBoxStyle" class="workflow-editor-canvas__selection-box" t-att-style="selectionBoxStyle"/></div>
+			<!-- Fixed-size overlays (positioned relative to canvas root, NOT affected by zoom/pan) -->
+			<div class="workflow-editor-canvas__overlays">
+				<!-- Connection Toolbar (on hover) -->
+				<ConnectionToolbar t-if="hoveredConnection.id" position="hoveredConnection.midpoint" connectionId="hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
+				<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
+				<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 			</div>
 			<!-- Node Config Panel (outside content to avoid transform containment) -->
 			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionProp" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>

@@ -189,8 +189,8 @@ export class EditorCanvas extends Component {
             // Readonly stubs - static objects (no reactivity needed)
             this.connectionDrawing = {
                 state: { isConnecting: false, snappedSocket: null },
-                handleMouseMove: () => {},
-                cancelConnection: () => {},
+                handleMouseMove: () => { },
+                cancelConnection: () => { },
             };
             this.multiNodeDrag = {
                 handleMouseMove: () => false,
@@ -1129,6 +1129,9 @@ export class EditorCanvas extends Component {
             this._connectionHoverTimeout = null;
         }
 
+        // Mark that we're hovering connection
+        this._isHoveringConnection = true;
+
         // Only update if connection changed (debounce rapid hovers)
         if (this.hoveredConnection.id === conn.id) return;
 
@@ -1155,26 +1158,64 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Handle connection hover end - hide toolbar
+     * Handle connection hover end - schedule potential hide
+     * Toolbar persists while user is in hover zone
      */
     onConnectionMouseLeave() {
         if (!this.canEdit) return;
-        // Small delay to allow clicking on toolbar
+
+        // Don't hide immediately - user may be moving to toolbar
+        // Toolbar will hide when:
+        // 1. User hovers a different connection (handleConnectionEnter clears old one)
+        // 2. User leaves toolbar (onToolbarHoverChange handles this)
+        // 3. User clicks elsewhere on canvas (handled by canvas click)
+
+        // Only set a long timeout as fallback safety net
+        if (this._connectionHoverTimeout) {
+            clearTimeout(this._connectionHoverTimeout);
+        }
+
         this._connectionHoverTimeout = setTimeout(() => {
-            if (!this._isHoveringToolbar) {
-                this.editor.actions.setHoveredConnection();
+            // After 500ms, check if user is still engaged with toolbar
+            if (this._isHoveringToolbar) {
+                return; // User is on toolbar, don't hide
             }
+            // Check if mouse is still reasonably close to canvas
+            // If toolbar still exists and user is engaged, don't hide
+            if (document.querySelector('.connection-toolbar:hover')) {
+                return;
+            }
+            this.editor.actions.setHoveredConnection();
+            this._connectionHoverTimeout = null;
         }, 100);
     }
 
     /**
      * Handle toolbar hover state
+     * Simply prevents hide when hovering, allows hide when leaving
      */
     onToolbarHoverChange(isHovering) {
         if (!this.canEdit) return;
         this._isHoveringToolbar = isHovering;
-        if (!isHovering) {
-            this.editor.actions.setHoveredConnection();
+
+        if (isHovering) {
+            // Cancel any pending hide when entering toolbar
+            if (this._connectionHoverTimeout) {
+                clearTimeout(this._connectionHoverTimeout);
+                this._connectionHoverTimeout = null;
+            }
+        } else {
+            // When leaving toolbar, start hide timeout
+            // If user moves to connection, handleConnectionEnter will cancel it
+            if (this._connectionHoverTimeout) {
+                clearTimeout(this._connectionHoverTimeout);
+            }
+            this._connectionHoverTimeout = setTimeout(() => {
+                if (!this._isHoveringToolbar) {
+                    this.editor.actions.setHoveredConnection();
+                }
+                this._connectionHoverTimeout = null;
+            }, 100);
         }
     }
 

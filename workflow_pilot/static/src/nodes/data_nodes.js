@@ -165,10 +165,10 @@ export class CodeNode extends BaseNode {
         super();
 
         // Inputs
-        this.addInput('data', DataSocket, 'Input Data');
+        this.addInput('data', DataSocket, '');
 
         // Outputs
-        this.addOutput('output', DataSocket, 'Output');
+        this.addOutput('output', DataSocket, '');
 
         // Code editor control
         this.addControl('code', new CodeControl('code', {

@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, xml, useEnv } from "@odoo/owl";
+import { Component, xml, useEnv, useRef, onMounted } from "@odoo/owl";
 
 /**
  * ConnectionToolbar Component
@@ -13,6 +13,7 @@ import { Component, xml, useEnv } from "@odoo/owl";
 export class ConnectionToolbar extends Component {
     static template = xml`
         <div class="connection-toolbar" 
+             t-ref="root"
              t-att-style="toolbarStyle"
              t-on-mouseenter="onMouseEnter"
              t-on-mouseleave="onMouseLeave"
@@ -43,6 +44,14 @@ export class ConnectionToolbar extends Component {
     setup() {
         this.env = useEnv();
         this.editor = this.env.workflowEditor;
+        this.rootRef = useRef("root");
+
+        // On mount, immediately notify parent to prevent premature hide
+        // This handles the case where toolbar renders under the mouse
+        onMounted(() => {
+            // Immediately signal that toolbar is active to prevent timeout from hiding it
+            this.props.onHoverChange(true);
+        });
     }
 
     /**
@@ -72,10 +81,22 @@ export class ConnectionToolbar extends Component {
      * Keep toolbar visible while hovering over it
      */
     onMouseEnter() {
+        // Clear any pending leave
+        if (this._leaveTimeout) {
+            clearTimeout(this._leaveTimeout);
+            this._leaveTimeout = null;
+        }
         this.props.onHoverChange(true);
     }
 
     onMouseLeave() {
-        this.props.onHoverChange(false);
+        // Debounce leave to prevent flickering at edges
+        if (this._leaveTimeout) {
+            clearTimeout(this._leaveTimeout);
+        }
+        this._leaveTimeout = setTimeout(() => {
+            this.props.onHoverChange(false);
+            this._leaveTimeout = null;
+        }, 100);
     }
 }

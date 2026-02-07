@@ -1,15 +1,16 @@
-/* InputDataPanel & JsonTreeNode Styles */
+// InputDataPanel & JsonTreeNode Styles
+// Using Odoo SCSS variables for light/dark mode compatibility
 
-/* ============================================
-   INPUT DATA PANEL
-   ============================================ */
+// ============================================
+// INPUT DATA PANEL
+// ============================================
 
 .input-data-panel {
   display: flex;
   flex-direction: column;
-  background: #1a1a1a;
+  background: $o-gray-100;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid $o-gray-300;
   overflow: hidden;
 }
 
@@ -18,18 +19,18 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #242424;
+  background: $o-gray-200;
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid $o-gray-300;
 }
 
 .input-data-panel__header:hover {
-  background: #2a2a2a;
+  background: $o-gray-300;
 }
 
 .input-data-panel__header > i {
-  color: #666;
+  color: $o-gray-600;
   font-size: 10px;
   width: 12px;
 }
@@ -41,11 +42,11 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #e0e0e0;
+  color: $o-main-text-color;
 }
 
 .input-data-panel__title i {
-  color: #6366f1;
+  color: $o-action;
 }
 
 .input-data-panel__badge {
@@ -53,8 +54,8 @@
   font-weight: 600;
   text-transform: uppercase;
   padding: 2px 6px;
-  background: #3a3a3a;
-  color: #888;
+  background: $o-gray-400;
+  color: $o-gray-700;
   border-radius: 4px;
 }
 
@@ -69,12 +70,12 @@
   align-items: center;
   gap: 8px;
   padding: 16px;
-  color: #666;
+  color: $o-gray-600;
   font-size: 12px;
 }
 
 .input-data-panel__empty i {
-  color: #4a4a4a;
+  color: $o-gray-500;
 }
 
 .input-data-panel__hint {
@@ -82,19 +83,19 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: #0d0d0d;
-  border-top: 1px solid #2a2a2a;
+  background: $o-view-background-color;
+  border-top: 1px solid $o-gray-300;
   font-size: 11px;
-  color: #555;
+  color: $o-gray-600;
 }
 
 .input-data-panel__hint i {
-  color: #444;
+  color: $o-gray-500;
 }
 
-/* ============================================
-   JSON TREE NODE
-   ============================================ */
+// ============================================
+// JSON TREE NODE
+// ============================================
 
 .json-tree-node {
   font-family: "JetBrains Mono", "Fira Code", monospace;
@@ -112,12 +113,12 @@
 }
 
 .json-tree-node__row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba($o-black, 0.03);
 }
 
 .json-tree-node__toggle {
   width: 16px;
-  color: #666;
+  color: $o-gray-600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -126,7 +127,7 @@
 }
 
 .json-tree-node__toggle:hover {
-  color: #aaa;
+  color: $o-gray-800;
 }
 
 .json-tree-node__spacer {
@@ -134,9 +135,9 @@
   flex-shrink: 0;
 }
 
-/* ============================================
-   KEY BADGE (Draggable)
-   ============================================ */
+// ============================================
+// KEY BADGE (Draggable)
+// ============================================
 
 .json-tree-node__key-badge {
   display: inline-flex;
@@ -144,9 +145,9 @@
   gap: 4px;
   padding: 2px 8px 2px 6px;
   background: transparent;
-  border: 1px dashed #71717a;
+  border: 1px dashed $o-gray-500;
   border-radius: 4px;
-  color: #a1a1aa;
+  color: $o-gray-700;
   font-size: 12px;
   font-weight: 400;
   cursor: grab;
@@ -156,15 +157,15 @@
 
 .json-tree-node__key-badge .type-icon {
   font-size: 10px;
-  color: #71717a;
+  color: $o-gray-600;
   width: 14px;
   text-align: center;
 }
 
 .json-tree-node__key-badge:hover {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.08);
-  color: #c4b5fd;
+  border-color: $o-action;
+  background: rgba($o-action, 0.08);
+  color: $o-gray-900;
 }
 
 .json-tree-node__key-badge:active {
@@ -175,46 +176,48 @@
 .json-tree-node__key-badge.dragging {
   opacity: 0.5;
   border-style: solid;
-  border-color: #6366f1;
+  border-color: $o-action;
 }
 
-/* ============================================
-   VALUE DISPLAY
-   ============================================ */
+// ============================================
+// VALUE DISPLAY
+// ============================================
 
 .json-tree-node__value {
   flex: 1;
   font-size: 11px;
-  color: #888;
+  color: $o-gray-700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+// Semantic JSON value colors (using Odoo semantic colors)
 .json-value--string {
-  color: #ce9178;
+  color: $o-danger;
 }
 
 .json-value--number {
-  color: #b5cea8;
+  color: $o-success;
 }
 
 .json-value--boolean {
-  color: #569cd6;
+  color: $o-info;
 }
 
 .json-value--null {
-  color: #808080;
+  color: $o-gray-600;
   font-style: italic;
 }
 
 .json-value--array,
 .json-value--object {
-  color: #dcdcaa;
+  color: $o-warning;
 }
 
 .json-tree-node__drag-handle {
   opacity: 0;
-  color: #555;
+  color: $o-gray-600;
   padding: 0 4px;
   transition: opacity 0.15s ease;
 }
@@ -223,9 +226,9 @@
   opacity: 1;
 }
 
-/* Children indentation */
+// Children indentation
 .json-tree-node__children {
   padding-left: 16px;
-  border-left: 1px solid #2a2a2a;
+  border-left: 1px solid $o-gray-300;
   margin-left: 7px;
 }

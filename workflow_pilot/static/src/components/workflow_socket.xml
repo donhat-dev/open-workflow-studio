@@ -10,7 +10,7 @@
 			<!-- Socket label (Output only) -->
 			<!-- Positioned with z-index to overlap quick-add connection if present -->
 			<span class="workflow-node__socket-label small text-muted user-select-none" t-if="props.type === 'output' and (props.label or props.name)">
-				<t t-esc="props.label || props.name"/>
+				<t t-esc="props.label || ''"/>
 			</span>
 
 			<!-- Quick-add connector: output sockets only, when not connected -->
