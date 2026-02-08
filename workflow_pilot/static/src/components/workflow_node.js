@@ -35,6 +35,49 @@ export class WorkflowNode extends Component {
     setup() {
         this.rootRef = useRef("root");
         this.editor = this.env.workflowEditor || null;
+        this._toolbarPropsCache = null;
+        this._toolbarPropsNodeId = null; 
+        this._toolbarPropsDisabled = null;
+
+        this._onInputSocketMouseDown = (data) => {
+            const onSocketMouseDown = this.props.onSocketMouseDown;
+            if (onSocketMouseDown) {
+                onSocketMouseDown(data);
+            }
+        };
+        this._onInputSocketMouseUp = (data) => {
+            const onSocketMouseUp = this.props.onSocketMouseUp;
+            if (onSocketMouseUp) {
+                onSocketMouseUp(data);
+            }
+        };
+        this._onOutputSocketMouseDown = (data) => {
+            const onSocketMouseDown = this.props.onSocketMouseDown;
+            if (onSocketMouseDown) {
+                onSocketMouseDown(data);
+            }
+        };
+        this._onOutputSocketMouseUp = (data) => {
+            const onSocketMouseUp = this.props.onSocketMouseUp;
+            if (onSocketMouseUp) {
+                onSocketMouseUp(data);
+            }
+        };
+        this._onOutputSocketQuickAdd = (data) => {
+            const onSocketQuickAdd = this.props.onSocketQuickAdd;
+            if (onSocketQuickAdd) {
+                onSocketQuickAdd(data);
+            }
+        };
+
+        this._onToolbarExecute = () => this.onExecuteNode();
+        this._onToolbarDelete = () => this.onDeleteNode();
+        this._onToolbarToggleDisable = () => this.onToggleDisable();
+        this._onToolbarOpenConfig = () => {
+            if (this.editor && this.editor.actions && this.editor.actions.openPanel) {
+                this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+            }
+        };
     }
 
     /**
@@ -197,18 +240,8 @@ export class WorkflowNode extends Component {
             readonly: this.isReadonly,
         };
         if (!this.isReadonly) {
-            const onSocketMouseDown = this.props.onSocketMouseDown;
-            const onSocketMouseUp = this.props.onSocketMouseUp;
-            props.onMouseDown = (data) => {
-                if (onSocketMouseDown) {
-                    onSocketMouseDown(data);
-                }
-            };
-            props.onMouseUp = (data) => {
-                if (onSocketMouseUp) {
-                    onSocketMouseUp(data);
-                }
-            };
+            props.onMouseDown = this._onInputSocketMouseDown;
+            props.onMouseUp = this._onInputSocketMouseUp;
         }
         return props;
     }
@@ -229,24 +262,9 @@ export class WorkflowNode extends Component {
             readonly: this.isReadonly,
         };
         if (!this.isReadonly) {
-            const onSocketMouseDown = this.props.onSocketMouseDown;
-            const onSocketMouseUp = this.props.onSocketMouseUp;
-            const onSocketQuickAdd = this.props.onSocketQuickAdd;
-            props.onMouseDown = (data) => {
-                if (onSocketMouseDown) {
-                    onSocketMouseDown(data);
-                }
-            };
-            props.onMouseUp = (data) => {
-                if (onSocketMouseUp) {
-                    onSocketMouseUp(data);
-                }
-            };
-            props.onQuickAdd = (data) => {
-                if (onSocketQuickAdd) {
-                    onSocketQuickAdd(data);
-                }
-            };
+            props.onMouseDown = this._onOutputSocketMouseDown;
+            props.onMouseUp = this._onOutputSocketMouseUp;
+            props.onQuickAdd = this._onOutputSocketQuickAdd;
         }
         return props;
     }
@@ -257,18 +275,23 @@ export class WorkflowNode extends Component {
      */
     get toolbarProps() {
         if (this.isReadonly) return null;
-        return {
-            nodeId: this.props.node.id,
-            isDisabled: this.props.node.disabled,
-            onExecute: () => this.onExecuteNode(),
-            onDelete: () => this.onDeleteNode(),
-            onToggleDisable: () => this.onToggleDisable(),
-            onOpenConfig: () => {
-                if (this.editor && this.editor.actions && this.editor.actions.openPanel) {
-                    this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
-                }
-            },
-        };
+        const nodeId = this.props.node.id;
+        const isDisabled = this.props.node.disabled;
+
+        if (!this._toolbarPropsCache || this._toolbarPropsNodeId !== nodeId || this._toolbarPropsDisabled !== isDisabled) {
+            this._toolbarPropsNodeId = nodeId;
+            this._toolbarPropsDisabled = isDisabled;
+            this._toolbarPropsCache = {
+                nodeId,
+                isDisabled,
+                onExecute: this._onToolbarExecute,
+                onDelete: this._onToolbarDelete,
+                onToggleDisable: this._onToolbarToggleDisable,
+                onOpenConfig: this._onToolbarOpenConfig,
+            };
+        }
+
+        return this._toolbarPropsCache;
     }
 
     get nodeStyle() {

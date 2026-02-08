@@ -28,7 +28,8 @@ export class NodeMenu extends Component {
              t-att-class="{ 'node-menu--large': props.variant === 'large' }"
              t-ref="menuRoot"
              t-on-keydown="onKeyDown"
-             t-on-wheel.stop="">
+             t-on-wheel.stop=""
+             t-on-contextmenu.stop.prevent="">
             <!-- Search Bar -->
             <div class="node-menu__search">
                 <input type="text" 

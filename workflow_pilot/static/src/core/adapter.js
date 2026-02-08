@@ -46,7 +46,14 @@ export class WorkflowAdapter {
         });
 
         // Sync editor events to reactive state
-        this.editor.on('onChange', () => this._syncState());
+        this.editor.on('onChange', (payload) => {
+            const eventName = payload && payload.event ? payload.event : null;
+            // Node move is updated incrementally in updatePosition() to avoid full graph allocations per frame.
+            if (eventName === 'onNodeMove') {
+                return;
+            }
+            this._syncState();
+        });
     }
 
     /**
@@ -164,6 +171,17 @@ export class WorkflowAdapter {
      * Update node position
      */
     updatePosition(nodeId, position) {
+        const coreNode = this.editor.getNode(nodeId);
+        if (!coreNode || !coreNode.position) {
+            return false;
+        }
+
+        const currentX = coreNode.position.x;
+        const currentY = coreNode.position.y;
+        if (currentX === position.x && currentY === position.y) {
+            return true;
+        }
+
         const result = this.editor.updateNodePosition(nodeId, position);
         // Direct reactive update for smooth dragging (bypasses full refresh)
         const node = this.state.nodes.find(n => n.id === nodeId);

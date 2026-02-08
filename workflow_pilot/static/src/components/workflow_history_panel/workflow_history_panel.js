@@ -4,7 +4,7 @@
  * WorkflowHistoryPanel - Version history panel for workflows (docked UI).
  */
 
-import { Component, useState, onMounted } from "@odoo/owl";
+import { Component, useState, onMounted, useExternalListener } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { formatDateTime } from "@web/core/l10n/dates";
 import { _t } from "@web/core/l10n/translation";
@@ -44,6 +44,7 @@ export class WorkflowHistoryPanel extends Component {
         this.ui = useService("ui");
 
         onMounted(() => this.init());
+        useExternalListener(this.env.bus, "save", () => this.refreshHistory());
     }
 
     async init() {

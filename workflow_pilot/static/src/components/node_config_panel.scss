@@ -1,4 +1,4 @@
-﻿/* Node Config Panel Styles */
+/* Node Config Panel Styles */
 
 /* Backdrop */
 .node-config-backdrop {
@@ -17,10 +17,12 @@
 .node-config-panel {
   width: 90vw;
   min-width: 700px;
-  height: 100vh; /* Use viewport height for guaranteed full height */
+  height: 100%; /* Use 100% of backdrop container, not viewport */
+  max-height: 100vh; /* Safety cap at viewport height */
   background: $o-view-background-color;
   border-left: 1px solid $o-gray-300;
   box-shadow: -6px 0 18px rgba($o-black, 0.12);
+  overflow: hidden; /* Ensure content doesn't push footer out */
 }
 
 /* Header */
@@ -139,19 +141,22 @@
 /* Content - Two Column Layout */
 .node-config-content {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0; /* Critical for flex scrollability */
+  overflow: hidden; /* Children handle their own scrolling */
   gap: 0;
 }
 
 .node-config-left-panel {
   width: 30%;
+  min-height: 0; /* Critical for nested flex scrollability */
   border-right: 1px solid $o-gray-300;
   background: $o-gray-100;
 }
 
 .node-config-right-panel {
   width: 70%;
-  overflow-y: auto;
+  min-height: 0; /* Critical for nested flex scrollability */
+  overflow: hidden; /* Tab content handles scrolling */
 }
 
 .node-config-right-panel .node-config-tabs {
@@ -184,7 +189,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 12px;
-  min-height: 300px;
+  min-height: 0; /* Allow flex to shrink */
 }
 
 .left-panel-footer {
@@ -291,6 +296,7 @@
 
 /* Footer */
 .node-config-footer {
+  flex-shrink: 0; /* Prevent footer from being squeezed */
   padding: 16px 20px;
   background: $o-view-background-color;
 }

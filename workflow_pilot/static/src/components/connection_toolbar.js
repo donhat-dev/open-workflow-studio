@@ -17,7 +17,8 @@ export class ConnectionToolbar extends Component {
              t-att-style="toolbarStyle"
              t-on-mouseenter="onMouseEnter"
              t-on-mouseleave="onMouseLeave"
-             t-on-wheel.stop="">
+             t-on-wheel.stop=""
+             t-on-contextmenu.stop.prevent="">
             <!-- Add Node Button -->
             <button class="connection-toolbar__btn connection-toolbar__btn--add" 
                     t-on-click.stop="onAddClick"

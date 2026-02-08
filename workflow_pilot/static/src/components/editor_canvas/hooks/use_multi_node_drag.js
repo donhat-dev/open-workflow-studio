@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { useState } from "@odoo/owl";
+import { onWillUnmount, useState } from "@odoo/owl";
 
 /**
  * useMultiNodeDrag Hook
@@ -8,7 +8,7 @@ import { useState } from "@odoo/owl";
  * Manages dragging of multiple selected nodes.
  * - Listens for NODE:DRAG_START
  * - Moves all selected nodes by the same delta
- * - Handles history batching
+ * - Commits a single history action on drag end
  * - Optimized with requestAnimationFrame
  *
  * @param {Object} options
@@ -21,7 +21,7 @@ import { useState } from "@odoo/owl";
  * @param {Function} [options.getReadonly] - () => boolean - runtime readonly
  */
 export function useMultiNodeDrag(options) {
-     const { editor, getNodes, getZoom, getViewport, onViewRectUpdate, rootRef, getReadonly } = options;
+    const { editor, getNodes, getZoom, getViewport, onViewRectUpdate, rootRef, getReadonly } = options;
     function isReadonlyActive() {
         return getReadonly ? !!getReadonly() : false;
     }
@@ -36,6 +36,7 @@ export function useMultiNodeDrag(options) {
         startX: 0,
         startY: 0,
         initialPositions: new Map(), // nodeId -> { x, y }
+        lastPositions: new Map(),    // nodeId -> { x, y }
         nodeIds: [],
     };
     let dragFrame = null;
@@ -110,6 +111,8 @@ export function useMultiNodeDrag(options) {
         const dy = (clientY - dragState.startY) / zoom;
         const GRID_SIZE = 20;
 
+        const updates = {};
+
         dragState.nodeIds.forEach((id) => {
             const initial = dragState.initialPositions.get(id);
             if (initial) {
@@ -118,9 +121,12 @@ export function useMultiNodeDrag(options) {
                 const snappedX = Math.round(targetX / GRID_SIZE) * GRID_SIZE;
                 const snappedY = Math.round(targetY / GRID_SIZE) * GRID_SIZE;
 
-                editor.actions.moveNode(id, { x: snappedX, y: snappedY });
+                updates[id] = { x: snappedX, y: snappedY };
+                dragState.lastPositions.set(id, { x: snappedX, y: snappedY });
             }
         });
+
+        editor.actions.moveNodesTransient(updates);
     }
 
     function autoScrollStep() {
@@ -201,13 +207,13 @@ export function useMultiNodeDrag(options) {
             startX: event.clientX,
             startY: event.clientY,
             initialPositions,
+            lastPositions: new Map(initialPositions),
             nodeIds: nodesToMove,
         };
 
         lastPointer = { x: event.clientX, y: event.clientY };
 
         state.isDragging = true;
-        editor.actions.beginBatch();
     }
 
     /**
@@ -255,9 +261,40 @@ export function useMultiNodeDrag(options) {
             dragFrame = null;
         }
 
-        editor.actions.endBatch("Move nodes");
+        const nodeMoves = [];
+        dragState.nodeIds.forEach((id) => {
+            const oldPosition = dragState.initialPositions.get(id);
+            const newPosition = dragState.lastPositions.get(id) || oldPosition;
+            if (!oldPosition || !newPosition) {
+                return;
+            }
+            if (oldPosition.x === newPosition.x && oldPosition.y === newPosition.y) {
+                return;
+            }
+            nodeMoves.push({
+                nodeId: id,
+                oldPosition,
+                newPosition,
+            });
+        });
+        if (nodeMoves.length > 0) {
+            editor.actions.recordMoveNodes(nodeMoves);
+        }
+
+        dragState.initialPositions.clear();
+        dragState.lastPositions.clear();
+        dragState.nodeIds = [];
+
         return true;
     }
+
+    onWillUnmount(() => {
+        stopAutoScroll();
+        if (dragFrame) {
+            cancelAnimationFrame(dragFrame);
+            dragFrame = null;
+        }
+    });
 
     return {
         state,

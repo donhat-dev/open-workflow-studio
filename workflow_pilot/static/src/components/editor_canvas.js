@@ -14,7 +14,7 @@ import {
 } from "./editor_canvas/utils/connection_path";
 import { calculateFitView } from "./editor_canvas/utils/view_utils";
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
-import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useKeyboardShortcuts, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
+import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
 
 /**
@@ -47,6 +47,21 @@ export class EditorCanvas extends Component {
         this.svgRef = useRef("svgConnections");
         this.contentRef = useRef("content");
         this.env = useEnv();
+
+        this._mouseMoveFrame = null;
+        this._connectionHoverTimeout = null;
+        this._justCompletedSelectionTimeout = null;
+        this._deferredInsertNodeTimeout = null;
+        this._deferredConnectTimeout = null;
+        this._connectionToolbarPropsCache = null;
+        this._nodeMenuPropsCache = null;
+        this._nodeActionCallbacksCache = null;
+        this._selectionSetSource = null;
+        this._selectionSetCache = new Set();
+        this._connectedOutputsSource = null;
+        this._connectedOutputsSetCache = new Set();
+        this._dimensionsConfigSource = null;
+        this._dimensionsCache = null;
 
         // Determine operating mode FIRST (before any state/hooks)
         // Mode 1: Editor Mode - service exists, no graphData prop
@@ -170,11 +185,14 @@ export class EditorCanvas extends Component {
                 getReadonly: () => this.isReadonly,
             });
 
-            // Initialize Keyboard Shortcuts Hook
-            useKeyboardShortcuts({
+            // Initialize Workflow Commands Hook (Ctrl+K palette + scoped hotkeys)
+            useWorkflowCommands({
                 editor: this.editor,
                 getNodes: () => this.nodes,
                 getReadonly: () => this.isReadonly,
+                onSave: this.onSave,
+                onRun: this.onRun,
+                getRootEl: () => this.rootRef.el,
             });
 
             // Initialize Clipboard Hook (Copy/Paste)
@@ -215,6 +233,26 @@ export class EditorCanvas extends Component {
         });
         onWillUnmount(() => {
             this._resizeObserver.disconnect();
+            if (this._mouseMoveFrame) {
+                cancelAnimationFrame(this._mouseMoveFrame);
+                this._mouseMoveFrame = null;
+            }
+            if (this._connectionHoverTimeout) {
+                clearTimeout(this._connectionHoverTimeout);
+                this._connectionHoverTimeout = null;
+            }
+            if (this._justCompletedSelectionTimeout) {
+                clearTimeout(this._justCompletedSelectionTimeout);
+                this._justCompletedSelectionTimeout = null;
+            }
+            if (this._deferredInsertNodeTimeout) {
+                clearTimeout(this._deferredInsertNodeTimeout);
+                this._deferredInsertNodeTimeout = null;
+            }
+            if (this._deferredConnectTimeout) {
+                clearTimeout(this._deferredConnectTimeout);
+                this._deferredConnectTimeout = null;
+            }
         });
 
         // Global mouse listeners
@@ -443,14 +481,13 @@ export class EditorCanvas extends Component {
      * @returns {Object} { onInsertNode, onHoverChange }
      */
     get connectionToolbarProps() {
-        return {
-            onInsertNode: (connectionId, position) => {
-                this.onConnectionAddNode(connectionId, position);
-            },
-            onHoverChange: (isHovering) => {
-                this.onToolbarHoverChange(isHovering);
-            },
-        };
+        if (!this._connectionToolbarPropsCache) {
+            this._connectionToolbarPropsCache = {
+                onInsertNode: this.onConnectionAddNode.bind(this),
+                onHoverChange: this.onToolbarHoverChange.bind(this),
+            };
+        }
+        return this._connectionToolbarPropsCache;
     }
 
     get hoveredConnection() {
@@ -466,14 +503,13 @@ export class EditorCanvas extends Component {
      * @returns {Object} { onNodeSelected, onClose }
      */
     get nodeMenuProps() {
-        return {
-            onNodeSelected: (nodeType, connectionContext) => {
-                this.onNodeMenuSelect(nodeType, connectionContext);
-            },
-            onClose: () => {
-                this.onNodeMenuClose();
-            },
-        };
+        if (!this._nodeMenuPropsCache) {
+            this._nodeMenuPropsCache = {
+                onNodeSelected: this.onNodeMenuSelect.bind(this),
+                onClose: this.onNodeMenuClose.bind(this),
+            };
+        }
+        return this._nodeMenuPropsCache;
     }
 
     /**
@@ -485,6 +521,27 @@ export class EditorCanvas extends Component {
         const snappedSocket = this.canEdit
             ? this.connectionDrawing.state.snappedSocket
             : null;
+
+        if (!this._nodeActionCallbacksCache) {
+            this._nodeActionCallbacksCache = {
+                onDragStart: (nodeId, event) => {
+                    this.multiNodeDrag.onNodeDragStart({ nodeId, event });
+                },
+                onExecute: (nodeId) => {
+                    this.editor.actions.openPanel("config", { nodeId });
+                },
+                onSocketMouseDown: (data) => {
+                    this.connectionDrawing.onSocketMouseDown(data);
+                },
+                onSocketMouseUp: (data) => {
+                    this.connectionDrawing.onSocketMouseUp(data);
+                },
+                onSocketQuickAdd: (data) => {
+                    this.onSocketQuickAdd(data);
+                },
+            };
+        }
+
         const props = {
             node,
             zoom: this.viewport.zoom,
@@ -499,21 +556,11 @@ export class EditorCanvas extends Component {
 
         // Add callbacks only if editable
         if (this.canEdit) {
-            props.onDragStart = (nodeId, event) => {
-                this.multiNodeDrag.onNodeDragStart({ nodeId, event });
-            };
-            props.onExecute = async (nodeId) => {
-                this.editor.actions.openPanel("config", { nodeId });
-            };
-            props.onSocketMouseDown = (data) => {
-                this.connectionDrawing.onSocketMouseDown(data);
-            };
-            props.onSocketMouseUp = (data) => {
-                this.connectionDrawing.onSocketMouseUp(data);
-            };
-            props.onSocketQuickAdd = (data) => {
-                this.onSocketQuickAdd(data);
-            };
+            props.onDragStart = this._nodeActionCallbacksCache.onDragStart;
+            props.onExecute = this._nodeActionCallbacksCache.onExecute;
+            props.onSocketMouseDown = this._nodeActionCallbacksCache.onSocketMouseDown;
+            props.onSocketMouseUp = this._nodeActionCallbacksCache.onSocketMouseUp;
+            props.onSocketQuickAdd = this._nodeActionCallbacksCache.onSocketQuickAdd;
         }
 
         return props;
@@ -524,7 +571,12 @@ export class EditorCanvas extends Component {
      * @returns {DimensionConfig}
      */
     get dimensions() {
-        return new DimensionConfig(this.state.dimensionConfig);
+        const currentConfig = this.state.dimensionConfig;
+        if (this._dimensionsConfigSource !== currentConfig || !this._dimensionsCache) {
+            this._dimensionsConfigSource = currentConfig;
+            this._dimensionsCache = new DimensionConfig(this.state.dimensionConfig);
+        }
+        return this._dimensionsCache;
     }
 
     /**
@@ -556,7 +608,12 @@ export class EditorCanvas extends Component {
      */
     get selectionSet() {
         const selection = this.uiState.selection;
-        return new Set(selection.nodeIds || []);
+        const nodeIds = selection.nodeIds || [];
+        if (this._selectionSetSource !== nodeIds) {
+            this._selectionSetSource = nodeIds;
+            this._selectionSetCache = new Set(nodeIds);
+        }
+        return this._selectionSetCache;
     }
 
     /**
@@ -573,11 +630,17 @@ export class EditorCanvas extends Component {
      * Used by WorkflowNode to show/hide quick-add buttons
      */
     get connectedOutputsSet() {
-        const set = new Set();
-        for (const c of this.connections) {
-            set.add(`${c.source}:${c.sourceHandle}`);
+        const connections = this.connections;
+        if (this._connectedOutputsSource !== connections) {
+            this._connectedOutputsSource = connections;
+            const connected = new Set();
+            for (const connection of connections) {
+                connected.add(`${connection.source}:${connection.sourceHandle}`);
+            }
+            this._connectedOutputsSetCache = connected;
         }
-        return set;
+
+        return this._connectedOutputsSetCache;
     }
 
     /**
@@ -866,7 +929,13 @@ export class EditorCanvas extends Component {
             // If selection box just completed, set flag to prevent click from clearing
             if (gestureType === 'selection') {
                 this._justCompletedSelection = true;
-                setTimeout(() => { this._justCompletedSelection = false; }, 0);
+                if (this._justCompletedSelectionTimeout) {
+                    clearTimeout(this._justCompletedSelectionTimeout);
+                }
+                this._justCompletedSelectionTimeout = setTimeout(() => {
+                    this._justCompletedSelection = false;
+                    this._justCompletedSelectionTimeout = null;
+                }, 0);
             }
             return;
         }
@@ -1075,7 +1144,10 @@ export class EditorCanvas extends Component {
 
             if (newNodeId) {
                 // Use setTimeout to ensure node is in state
-                setTimeout(() => {
+                if (this._deferredInsertNodeTimeout) {
+                    clearTimeout(this._deferredInsertNodeTimeout);
+                }
+                this._deferredInsertNodeTimeout = setTimeout(() => {
                     const newNode = this.nodes.find(n => n.id === newNodeId);
                     if (!newNode) return;
                     const newInputs = newNode.inputs || {};
@@ -1089,6 +1161,7 @@ export class EditorCanvas extends Component {
                             firstInputKey
                         );
                     }
+                    this._deferredInsertNodeTimeout = null;
                 }, 0);
             }
         } else if (context && context.connectionId) {
@@ -1275,7 +1348,10 @@ export class EditorCanvas extends Component {
         this.editor.actions.removeConnection(connectionId);
 
         // 3. Use setTimeout to ensure the new node is available in state
-        setTimeout(() => {
+        if (this._deferredConnectTimeout) {
+            clearTimeout(this._deferredConnectTimeout);
+        }
+        this._deferredConnectTimeout = setTimeout(() => {
             const newNode = this.nodes.find(n => n.id === newNodeId);
             if (!newNode) return;
 
@@ -1301,6 +1377,7 @@ export class EditorCanvas extends Component {
                     originalTargetHandle
                 );
             }
+            this._deferredConnectTimeout = null;
         }, 0);
     }
 

@@ -16,6 +16,7 @@ import {
     createAddNodeAction,
     createRemoveNodeAction,
     createMoveNodeAction,
+    createMoveNodesAction,
     createAddConnectionAction,
     createRemoveConnectionAction,
 } from "../core/history";
@@ -242,12 +243,84 @@ export const workflowEditorService = {
             moveNode(nodeId, position) {
                 const node = getNode(nodeId);
                 const oldPosition = node ? { x: node.x, y: node.y } : null;
+                if (oldPosition && oldPosition.x === position.x && oldPosition.y === position.y) {
+                    return;
+                }
                 adapter.updatePosition(nodeId, position);
                 if (oldPosition) {
                     history.push(
                         createMoveNodeAction(adapter, nodeId, oldPosition, position)
                     );
                 }
+            },
+
+            /**
+             * Move many nodes in one history action.
+             * @param {Object<string, {x:number, y:number}>} updates
+             */
+            moveNodes(updates = {}) {
+                const entries = Object.entries(updates);
+                if (!entries.length) {
+                    return;
+                }
+
+                const nodeMoves = [];
+                for (const [nodeId, position] of entries) {
+                    const node = getNode(nodeId);
+                    if (!node) {
+                        continue;
+                    }
+
+                    const oldPosition = { x: node.x, y: node.y };
+                    if (oldPosition.x === position.x && oldPosition.y === position.y) {
+                        continue;
+                    }
+
+                    adapter.updatePosition(nodeId, position);
+                    nodeMoves.push({
+                        nodeId,
+                        oldPosition,
+                        newPosition: { x: position.x, y: position.y },
+                    });
+                }
+
+                if (nodeMoves.length > 0) {
+                    history.push(createMoveNodesAction(adapter, nodeMoves));
+                }
+            },
+
+            /**
+             * Move many nodes without creating history entries.
+             * Used by drag loops to keep per-frame updates cheap.
+             * @param {Object<string, {x:number, y:number}>} updates
+             */
+            moveNodesTransient(updates = {}) {
+                const entries = Object.entries(updates);
+                if (!entries.length) {
+                    return;
+                }
+
+                for (const [nodeId, position] of entries) {
+                    const node = getNode(nodeId);
+                    if (!node) {
+                        continue;
+                    }
+                    if (node.x === position.x && node.y === position.y) {
+                        continue;
+                    }
+                    adapter.updatePosition(nodeId, position);
+                }
+            },
+
+            /**
+             * Record final multi-node move into history once.
+             * @param {Array<{nodeId:string, oldPosition:{x:number,y:number}, newPosition:{x:number,y:number}}>} nodeMoves
+             */
+            recordMoveNodes(nodeMoves = []) {
+                if (!Array.isArray(nodeMoves) || nodeMoves.length === 0) {
+                    return;
+                }
+                history.push(createMoveNodesAction(adapter, nodeMoves));
             },
 
             removeNode(nodeId) {

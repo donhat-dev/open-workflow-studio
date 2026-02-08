@@ -2,7 +2,6 @@
 
 /**
  * HistoryManager - Undo/Redo functionality using Command pattern
- * Inspired by n8n's history.ts implementation
  * 
  * Uses simple action objects instead of class hierarchy for simplicity.
  */
@@ -216,6 +215,29 @@ export function createMoveNodeAction(adapter, nodeId, oldPosition, newPosition) 
         description: `Move node`,
         undo: () => adapter.updatePosition(nodeId, oldPosition),
         redo: () => adapter.updatePosition(nodeId, newPosition),
+    };
+}
+
+/**
+ * Create an action for moving multiple nodes in one command
+ * @param {WorkflowAdapter} adapter
+ * @param {Array<{nodeId:string, oldPosition:{x:number,y:number}, newPosition:{x:number,y:number}}>} nodeMoves
+ */
+export function createMoveNodesAction(adapter, nodeMoves) {
+    return {
+        description: `Move nodes`,
+        undo: () => {
+            for (let i = 0; i < nodeMoves.length; i++) {
+                const move = nodeMoves[i];
+                adapter.updatePosition(move.nodeId, move.oldPosition);
+            }
+        },
+        redo: () => {
+            for (let i = 0; i < nodeMoves.length; i++) {
+                const move = nodeMoves[i];
+                adapter.updatePosition(move.nodeId, move.newPosition);
+            }
+        },
     };
 }
 

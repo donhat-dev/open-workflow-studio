@@ -67,6 +67,9 @@
 - Use `onMounted` for async init; `onWillUpdateProps` when props change.
 - Use `useExternalListener` for DOM/global events to ensure cleanup.
 - Disconnect observers (e.g., `ResizeObserver`) on unmount.
+- Use `useCommand` for discoverable actions (Save, Run, Undo/Redo); auto-registers in Ctrl+K palette with hotkey display.
+- Use `useHotkey` for navigation/continuous keys (arrow move, Delete, Escape); set `allowRepeat` for held keys, `area` for scope.
+- Use `useActiveElement(refName)` to scope hotkeys/commands to a component subtree; prevents conflicts with Odoo forms/dialogs.
 
 ## Odoo integration patterns
 - RPC via `/web/dataset/call_kw` with `{ model, method, args, kwargs }`.
@@ -76,6 +79,7 @@
 - Optional chaining `?.` for services/dependencies.
 - Duplicate state in `useState` (single source of truth).
 - Autosave.
+- Raw `window` keyboard listeners (`window.addEventListener("keydown", ...)`); use `useCommand`/`useHotkey` instead.
 
 ## Continuity Ledger (compaction-safe)
 Maintain a single Continuity Ledger for this workspace in `CONTINUITY.md`. The ledger is the canonical session briefing designed to survive context compaction; do not rely on earlier chat text unless it's reflected in the ledger.

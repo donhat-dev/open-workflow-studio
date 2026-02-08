@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { useState, useEnv, onWillUpdateProps } from "@odoo/owl";
+import { onWillUnmount } from "@odoo/owl";
 import { detectConnectionType } from "../../../core/dimensions";
 import { getConnectionPath } from "../utils/connection_path";
 
@@ -18,12 +18,13 @@ import { getConnectionPath } from "../utils/connection_path";
  * @param {Function} params.getSocketPosition - Function to calculate socket position(node, key, type)
  */
 export function useConnectionCulling({ getNodes, getConnections, getViewRect, getSocketPosition }) {
-    const env = useEnv();
-
-    // Cache for memoized paths
-    // Key: `${connId}:${srcX},${srcY}:${tgtX},${tgtY}`
-    // Value: { paths: string[], isBackEdge, isVerticalStack }
+    // Cache only latest geometry per connection (prevents unbounded key growth while dragging)
+    // Value: { key: string, value: { paths, isBackEdge, isVerticalStack } }
     const pathCache = new Map();
+
+    // Reused collections to avoid allocations in hot getter path
+    const nodeById = new Map();
+    const visibleNodeIds = new Set();
 
     // Performance constants
     const MAX_NODE_WIDTH = 500;
@@ -50,30 +51,25 @@ export function useConnectionCulling({ getNodes, getConnections, getViewRect, ge
         const sourcePos = getSocketPosition(sourceNode, conn.sourceHandle, 'output');
         const targetPos = getSocketPosition(targetNode, conn.targetHandle, 'input');
 
-        // Create cache key based on positions (rounded to avoid micro-mismatches?)
-        // Actually, strictly equal is better for cache hit. 
-        // If position changes even by 0.1, path needs update.
         const key = `${conn.id}:${sourcePos.x},${sourcePos.y}:${targetPos.x},${targetPos.y}`;
 
-        if (pathCache.has(key)) {
-            return pathCache.get(key);
+        const cached = pathCache.get(conn.id);
+        if (cached && cached.key === key) {
+            return cached.value;
         }
 
-        // Calculate new path
         const connectionType = detectConnectionType(sourcePos, targetPos);
         const result = getConnectionPath(sourcePos, targetPos, connectionType);
 
-        // Store in cache
-        // Limit cache size? If positions change frequently (drag), cache grows.
-        // We could clear cache if it gets too big, or use WeakMap (not possible with string keys).
-        // For now, simple Map. We could clear it occasionally.
-        if (pathCache.size > 2000) {
-            pathCache.clear();
-        }
-
-        pathCache.set(key, result);
+        pathCache.set(conn.id, { key, value: result });
         return result;
     }
+
+    onWillUnmount(() => {
+        pathCache.clear();
+        nodeById.clear();
+        visibleNodeIds.clear();
+    });
 
     return {
         /**
@@ -85,15 +81,13 @@ export function useConnectionCulling({ getNodes, getConnections, getViewRect, ge
             const nodes = getNodes();
             const connections = getConnections();
 
-            const nodeById = new Map();
+            nodeById.clear();
             for (const node of nodes) {
                 nodeById.set(node.id, node);
             }
 
             // 1. Identify visible nodes
-            // We do this inside the loop or pre-calculate?
-            // Pre-calculate visible node IDs for O(1) lookup
-            const visibleNodeIds = new Set();
+            visibleNodeIds.clear();
             for (const node of nodes) {
                 if (isNodeVisible(node, rect)) {
                     visibleNodeIds.add(node.id);

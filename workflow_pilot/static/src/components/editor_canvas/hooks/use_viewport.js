@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { useState, useRef, onMounted } from "@odoo/owl";
+import { onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { screenToCanvas, canvasToScreen, clamp } from "../utils/geometry";
 import { calculateFitView } from "../utils/view_utils";
 
@@ -241,6 +241,13 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
     // Initialize view rect on mount
     onMounted(() => {
         updateViewRect();
+    });
+
+    onWillUnmount(() => {
+        if (scrollFrame) {
+            cancelAnimationFrame(scrollFrame);
+            scrollFrame = null;
+        }
     });
 
     return {
