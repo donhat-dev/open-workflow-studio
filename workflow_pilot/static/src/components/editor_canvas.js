@@ -398,6 +398,61 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Map of nodeId → execution status ('success' | 'error' | null)
+     * Built from execution.nodeResults after a run completes.
+     * @returns {Map<string, string>}
+     */
+    get nodeExecutionStatusMap() {
+        const execution = this.executionState;
+        if (!execution || !Array.isArray(execution.nodeResults)) {
+            return this._emptyExecutionMap || (this._emptyExecutionMap = new Map());
+        }
+        // Rebuild only when nodeResults reference changes
+        if (this._lastNodeResults === execution.nodeResults) {
+            return this._nodeExecMap;
+        }
+        this._lastNodeResults = execution.nodeResults;
+        const map = new Map();
+        for (const result of execution.nodeResults) {
+            if (!result || !result.node_id) continue;
+            map.set(result.node_id, result.error_message ? 'error' : 'success');
+        }
+        this._nodeExecMap = map;
+        return map;
+    }
+
+    /**
+     * Set of connectionIds that represent the execution path.
+     * A connection is "executed" if both source and target nodes appear in executedOrder.
+     * @returns {Set<string>}
+     */
+    get executedConnectionIds() {
+        const execution = this.executionState;
+        if (!execution || !Array.isArray(execution.executedOrder) || execution.executedOrder.length < 2) {
+            return this._emptyExecConnSet || (this._emptyExecConnSet = new Set());
+        }
+        // Rebuild only when executedOrder reference changes
+        if (this._lastExecutedOrder === execution.executedOrder) {
+            return this._execConnSet;
+        }
+        this._lastExecutedOrder = execution.executedOrder;
+        
+        const executedSet = new Set(execution.executedOrder);
+        const connSet = new Set();
+        const connections = this.connections;
+        
+        for (const conn of connections) {
+            if (!conn || !conn.source || !conn.target) continue;
+            // Connection is executed if both endpoints are in the executed list
+            if (executedSet.has(conn.source) && executedSet.has(conn.target)) {
+                connSet.add(conn.id);
+            }
+        }
+        this._execConnSet = connSet;
+        return connSet;
+    }
+
+    /**
      * Safe execution prop for NodeConfigPanel (undefined when not available)
      */
     get executionProp() {
@@ -559,10 +614,12 @@ export class EditorCanvas extends Component {
             };
         }
 
+        const executionMap = this.nodeExecutionStatusMap;
         const props = {
             node,
             zoom: this.viewport.zoom,
             selected: this.selectionSet.has(node.id),
+            executionStatus: executionMap.get(node.id) || null,
             snappedSocketKey: snappedSocket && snappedSocket.nodeId === node.id
                 ? snappedSocket.socketKey
                 : null,
@@ -1096,6 +1153,15 @@ export class EditorCanvas extends Component {
         if (!this.canEdit) return;
         // Select only this connection (clear node selection)
         this.editor.actions.select([], [connId]);
+    }
+
+    /**
+     * Check if a connection is part of the execution path
+     * @param {string} connId - Connection ID
+     * @returns {boolean}
+     */
+    isConnectionExecuted(connId) {
+        return this.executedConnectionIds.has(connId);
     }
 
     /**

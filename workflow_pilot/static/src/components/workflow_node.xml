@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_pilot.workflow_node">
-		<div class="workflow-node cursor-pointer d-flex flex-row" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick" t-on-mousedown="onHeaderMouseDown">
+		<div class="workflow-node cursor-pointer d-flex flex-row" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '') + (executionClass ? ' ' + executionClass : '')" t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick" t-on-mousedown="onHeaderMouseDown">
 			<CanvasNodeToolbar t-if="toolbarProps" t-props="toolbarProps"/>
 			
 			<!-- Input sockets (absolute left) -->
@@ -37,6 +37,11 @@
 				</div>
 
 				<!-- Footer actions removed -->
+			</div>
+
+			<!-- Execution Status Badge (bottom-right) -->
+			<div t-if="props.executionStatus" t-att-class="'workflow-node__exec-badge workflow-node__exec-badge--' + props.executionStatus">
+				<i t-att-class="'ms-1 fa ' + (props.executionStatus === 'success' ? 'fa-check' : 'fa-times-circle')"/>
 			</div>
 		</div>
 	</t>

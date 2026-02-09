@@ -54,6 +54,17 @@ class WorkflowExecutor:
     - Route outputs based on connections and output data
     """
     
+    # Pre-compiled patterns for sensitive data masking.
+    # Avoids re.compile overhead on every _mask_sensitive_data call.
+    _MASK_PATTERNS = [
+        (re.compile(r'(sk-[a-zA-Z0-9]{20,})', re.IGNORECASE), '********'),
+        (re.compile(r'(key-[a-zA-Z0-9]{20,})', re.IGNORECASE), '********'),
+        (re.compile(r'(password["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
+        (re.compile(r'(token["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
+        (re.compile(r'(secret["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
+        (re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', re.IGNORECASE), '***@***.***'),
+    ]
+
     # Node runner registry
     NODE_RUNNERS = {
         'http': HttpNodeRunner,
@@ -93,6 +104,7 @@ class WorkflowExecutor:
         self._vars_dirty_paths = set()
         self.vars = wrap_mutable({}, tracker=self._track_var_path, path="")  # Workflow variables (mutable, dot-access)
         self.executed_order = []
+        self._node_record_cache = {}  # node_id -> record (avoids N+1 queries)
 
         self.exec_context = ExecutionContext(
             node_outputs=self.node_outputs,
@@ -101,6 +113,8 @@ class WorkflowExecutor:
             execution=self._get_execution_context(),
             workflow=self._get_workflow_context(),
         )
+
+        self.node_output_sockets = self._load_node_output_sockets()
         
         # Build lookup structures
         self._build_graph()
@@ -110,21 +124,50 @@ class WorkflowExecutor:
             node_type: runner_class(self)
             for node_type, runner_class in self.NODE_RUNNERS.items()
         }
+
+    def _load_node_output_sockets(self):
+        """Load cached output socket mapping from workflow.type model.
+
+        Delegates to workflow.type._get_output_socket_mapping() which is
+        backed by ormcache (no DB query after first call until cache is
+        cleared by workflow.type CRUD).
+
+        If the model is unavailable (e.g. during module install),
+        returns an empty dict and _socket_to_index will fall through
+        to pattern-matching / generic fallback.
+        """
+        try:
+            return self.env['workflow.type']._get_output_socket_mapping()
+        except Exception:
+            return {}
     
     def _build_graph(self):
-        """Build node and connection lookup structures."""
+        """Build node and connection lookup structures.
+
+        Pre-computes adjacency lists and start-node sets so that
+        execute / execute_until never iterate connections again.
+        """
         self.nodes = {}
         self.connections = []
         self.connections_by_source = {}
-        
+        self._reverse_adj = {}   # target -> [source, ...]
+        self._forward_adj = {}   # source -> [target, ...]
+        self._nodes_with_incoming = set()
+
         for node in self.snapshot.get('nodes', []):
             self.nodes[node['id']] = node
         
         for conn in self.snapshot.get('connections', []):
             self.connections.append(conn)
             source = conn.get('source')
+            target = conn.get('target')
             if source:
                 self.connections_by_source.setdefault(source, []).append(conn)
+            if source and target:
+                self._forward_adj.setdefault(source, []).append(target)
+                self._reverse_adj.setdefault(target, []).append(source)
+            if target:
+                self._nodes_with_incoming.add(target)
     
     def execute(self, input_data=None):
         """Execute workflow from start to completion.
@@ -303,21 +346,18 @@ class WorkflowExecutor:
     
     def _find_start_nodes(self):
         """Find nodes with no incoming connections."""
-        nodes_with_incoming = set()
-        for conn in self.connections:
-            target = conn.get('target')
-            if target:
-                nodes_with_incoming.add(target)
-        
-        start_nodes = []
-        for node_id in self.nodes:
-            if node_id not in nodes_with_incoming:
-                start_nodes.append(node_id)
-        
-        return start_nodes
+        return [
+            node_id for node_id in self.nodes
+            if node_id not in self._nodes_with_incoming
+        ]
 
     def _find_start_nodes_for_target(self, target_node_id):
-        """Find start nodes that lead to target node (preview flow)."""
+        """Find start nodes that lead to target node (preview flow).
+
+        Uses pre-built reverse adjacency (_reverse_adj) for BFS.
+        _get_node_ancestors already returns ALL nodes that can reach
+        target, so a separate forward-path check is unnecessary.
+        """
         start_nodes = self._find_start_nodes()
         if not target_node_id:
             return start_nodes
@@ -327,7 +367,7 @@ class WorkflowExecutor:
 
         filtered = [
             node_id for node_id in start_nodes
-            if node_id in ancestors or self._has_path_to_node(node_id, target_node_id)
+            if node_id in ancestors
         ]
 
         if not filtered:
@@ -338,60 +378,34 @@ class WorkflowExecutor:
         return filtered
 
     def _get_node_ancestors(self, target_node_id):
-        """Get all ancestor node IDs of a target node (BFS backwards)."""
+        """Get all ancestor node IDs of a target node (BFS backwards).
+
+        Uses pre-built _reverse_adj from _build_graph.
+        """
         ancestors = set()
         visited = set()
         queue = [target_node_id]
 
-        reverse_adj = {}
-        for conn in self.connections:
-            target = conn.get('target')
-            source = conn.get('source')
-            if not target or not source:
-                continue
-            reverse_adj.setdefault(target, []).append(source)
-
         while queue:
             current = queue.pop(0)
-            parents = reverse_adj.get(current, [])
-            for parent in parents:
-                if parent in visited:
-                    continue
-                visited.add(parent)
-                ancestors.add(parent)
-                queue.append(parent)
+            for parent in self._reverse_adj.get(current, []):
+                if parent not in visited:
+                    visited.add(parent)
+                    ancestors.add(parent)
+                    queue.append(parent)
 
         return ancestors
-
-    def _has_path_to_node(self, source_node_id, target_node_id):
-        """Check if there's a path from source node to target node."""
-        visited = set()
-        queue = [source_node_id]
-
-        forward_adj = {}
-        for conn in self.connections:
-            source = conn.get('source')
-            target = conn.get('target')
-            if not source or not target:
-                continue
-            forward_adj.setdefault(source, []).append(target)
-
-        while queue:
-            current = queue.pop(0)
-            if current == target_node_id:
-                return True
-            if current in visited:
-                continue
-            visited.add(current)
-            for child in forward_adj.get(current, []):
-                if child not in visited:
-                    queue.append(child)
-
-        return False
     
-    def _execute_node_core(self, node_id, input_data):
-        """Execute a single node (no persistence)."""
-        node = self.nodes.get(node_id)
+    def _execute_node_core(self, node_id, input_data, node=None):
+        """Execute a single node (no persistence).
+
+        Args:
+            node_id: Node ID to execute
+            input_data: Input data for node
+            node: Pre-fetched node dict (avoids duplicate lookup)
+        """
+        if node is None:
+            node = self.nodes.get(node_id)
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
 
@@ -449,23 +463,22 @@ class WorkflowExecutor:
         return None
 
     def _get_env_with_user(self, user):
-        with_user = getattr(self.env, 'with_user', None)
-        if callable(with_user):
-            return with_user(user)
-        try:
-            return self.env(user=user)
-        except TypeError as exc:
-            raise UserError(
-                _("Environment does not support with_user or env(user=...) for run_as_user")
-            ) from exc
+        """Return env switched to *user*.  Odoo 16+ always has with_user."""
+        return self.env.with_user(user)
 
     def _get_node_record(self, node_id):
+        """Get workflow.node record, cached per execution to avoid N+1."""
         if not self.run or not self.run.workflow_id:
             return None
-        return self.env['workflow.node'].search([
+        cached = self._node_record_cache.get(node_id)
+        if cached is not None:
+            return cached
+        record = self.env['workflow.node'].search([
             ('workflow_id', '=', self.run.workflow_id.id),
             ('node_id', '=', node_id),
         ], limit=1)
+        self._node_record_cache[node_id] = record
+        return record
 
     def _get_secure_eval_context(self, node_id, input_data):
         """
@@ -600,28 +613,12 @@ class WorkflowExecutor:
             return str(output)
 
     def _mask_sensitive_data(self, value):
+        """Mask sensitive patterns (API keys, passwords, tokens, emails).
+
+        Uses pre-compiled _MASK_PATTERNS to avoid re.compile overhead.
+        Expects *value* to already be plain (no DotDict wrappers); callers
+        that pass raw output should call to_plain() beforehand.
         """
-        Mask sensitive patterns in text.
-
-        Patterns masked:
-        - API keys (sk-..., key-..., etc.)
-        - Passwords
-        - Tokens
-        - Email addresses
-        """
-        import re
-
-        patterns = [
-            (r'(sk-[a-zA-Z0-9]{20,})', '********'),  # OpenAI-style keys
-            (r'(key-[a-zA-Z0-9]{20,})', '********'),  # Generic API keys
-            (r'(password["\s:=]+)[^\s,"]+', r'\1********'),  # Passwords
-            (r'(token["\s:=]+)[^\s,"]+', r'\1********'),  # Tokens
-            (r'(secret["\s:=]+)[^\s,"]+', r'\1********'),  # Secrets
-            (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '***@***.***'),  # Emails
-        ]
-
-        value = to_plain(value)
-
         if isinstance(value, dict):
             return {
                 key: self._mask_sensitive_data(item)
@@ -633,8 +630,8 @@ class WorkflowExecutor:
             return value
 
         result = value
-        for pattern, replacement in patterns:
-            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+        for compiled, replacement in self._MASK_PATTERNS:
+            result = compiled.sub(replacement, result)
 
         return result
 
@@ -656,7 +653,7 @@ class WorkflowExecutor:
             raise UserError(_("Node not found: %s") % node_id)
 
         if not persist:
-            return self._execute_node_core(node_id, input_data)
+            return self._execute_node_core(node_id, input_data, node=node)
 
         node_type = node.get('type')
 
@@ -674,7 +671,7 @@ class WorkflowExecutor:
         })
 
         try:
-            result = self._execute_node_core(node_id, input_data)
+            result = self._execute_node_core(node_id, input_data, node=node)
 
             redacted = self._redact_output(result.get('json'), node_id)
 
@@ -749,6 +746,10 @@ class WorkflowExecutor:
             # Map socket name to output index
             output_index = self._socket_to_index(node, source_handle)
             
+            # Skip unmatched sockets (-1 means socket name not found)
+            if output_index < 0:
+                continue
+            
             if output_index < len(outputs):
                 output_data = outputs[output_index]
                 
@@ -762,32 +763,47 @@ class WorkflowExecutor:
                         'inputData': input_data,
                     })
     
-    def _socket_to_index(self, node, socket_name):
-        """Map socket name to output index.
-        
-        Conventions:
-            - 'output', 'result', 'data' -> 0
-            - 'true', 'done' -> 0
-            - 'false', 'loop' -> 1
-        """
-        if socket_name:
-            match = re.match(r'case_?(\d+)$', socket_name)
-            if match:
-                index = int(match.group(1)) - 1
-                return max(index, 0)
-            if socket_name == 'default':
-                return 3
+    # Pre-compiled pattern for dynamic switch sockets (case_1, case_2, etc.)
+    _CASE_SOCKET_RE = re.compile(r'case_?(\d+)$')
 
-        socket_map = {
-            'output': 0,
-            'result': 0,
-            'data': 0,
-            'true': 0,
-            'done': 0,
-            'false': 1,
-            'loop': 1,
-        }
-        return socket_map.get(socket_name, 0)
+    # Generic fallback for common socket names when node type is unknown.
+    _GENERIC_SOCKET_MAP = {'output': 0, 'result': 0, 'data': 0}
+
+    def _socket_to_index(self, node, socket_name):
+        """Map socket name to output index based on node type definition.
+
+        Lookup chain:
+        1. Runtime mapping from workflow.type (ormcache-backed)
+        2. Pattern match for dynamic sockets (case_N, default)
+        3. Generic fallback for common names
+        4. -1 (unknown → skipped by _route_outputs)
+
+        Returns:
+            int: Socket index (>= 0) or -1 if socket is unknown.
+        """
+        if not socket_name:
+            return -1
+
+        node_type = node.get('type', '')
+
+        # 1. Try node-type-aware lookup first
+        sockets = self.node_output_sockets.get(node_type)
+        if sockets:
+            try:
+                return sockets.index(socket_name)
+            except ValueError:
+                pass  # Fall through to pattern matching
+
+        # 2. Pattern matching for dynamic sockets (switch case_N)
+        match = self._CASE_SOCKET_RE.match(socket_name)
+        if match:
+            index = int(match.group(1)) - 1
+            return max(index, 0)
+        if socket_name == 'default':
+            return 3
+
+        # 3. Generic fallback for common names (unknown node types)
+        return self._GENERIC_SOCKET_MAP.get(socket_name, -1)
     
     def _collect_final_output(self):
         """Collect final output from leaf nodes."""

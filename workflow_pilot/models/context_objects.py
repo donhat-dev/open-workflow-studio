@@ -97,9 +97,11 @@ class ReadonlyDotDict(ReadonlyDict):
     """Readonly dict with dot-notation access."""
 
     def __getattr__(self, attrib):
+        if attrib.startswith('__') or attrib.startswith('_ReadonlyDict'):
+            raise AttributeError(attrib)
         try:
             val = self[attrib]
-        except KeyError as e:
+        except KeyError:
             return None
         return wrap_readonly(val)
 

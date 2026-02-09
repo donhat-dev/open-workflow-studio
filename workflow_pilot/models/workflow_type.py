@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import json
+import re
+
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+from odoo.tools import ormcache
 
 
 class WorkflowType(models.Model):
@@ -92,6 +96,8 @@ class WorkflowType(models.Model):
         help='Group required to add/configure this node type'
     )
 
+    _NODE_TYPE_RE = re.compile(r'^[a-z][a-z0-9_]*$')
+
     _sql_constraints = [
         ('node_type_uniq', 'UNIQUE(node_type)', 
          'Node type key must be unique!'),
@@ -100,10 +106,8 @@ class WorkflowType(models.Model):
     @api.constrains('node_type')
     def _check_node_type_format(self):
         """Ensure node_type follows snake_case convention."""
-        import re
-        pattern = re.compile(r'^[a-z][a-z0-9_]*$')
         for record in self:
-            if not pattern.match(record.node_type):
+            if not self._NODE_TYPE_RE.match(record.node_type):
                 raise ValidationError(_(
                     "Node type key '%(key)s' must be lowercase snake_case "
                     "(start with letter, only letters/numbers/underscores)",
@@ -117,6 +121,58 @@ class WorkflowType(models.Model):
             name = f"[{record.category}] {record.name}"
             result.append((record.id, name))
         return result
+
+    # ------------------------------------------------------------------
+    # CRUD overrides – invalidate ormcache on changes
+    # ------------------------------------------------------------------
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        self.env.registry.clear_cache()
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if set(vals) & {'node_type', 'output_schema', 'active'}:
+            self.env.registry.clear_cache()
+        return super().write(vals)
+
+    def unlink(self):
+        self.env.registry.clear_cache()
+        return super().unlink()
+
+    # ------------------------------------------------------------------
+    # Cached socket mapping (consumed by WorkflowExecutor)
+    # ------------------------------------------------------------------
+
+    @api.model
+    @ormcache()
+    def _get_output_socket_mapping(self):
+        """Return {node_type_key: [socket_name, ...]} from output_schema.
+
+        Cached via ormcache; invalidated on create/write/unlink of
+        workflow.type records.  The mapping drives output routing in
+        WorkflowExecutor._socket_to_index.
+        """
+        self.flush_model(['node_type', 'output_schema', 'active'])
+        self.env.cr.execute(
+            "SELECT node_type, output_schema "
+            "FROM workflow_type "
+            "WHERE active = true AND output_schema IS NOT NULL"
+        )
+        mapping = {}
+        for node_type_key, raw_schema in self.env.cr.fetchall():
+            schema = raw_schema
+            if isinstance(schema, str):
+                try:
+                    schema = json.loads(schema)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+            if not isinstance(schema, dict) or not schema:
+                continue
+            sockets = [str(k) for k in schema if k]
+            if sockets:
+                mapping[node_type_key] = sockets
+        return mapping
 
     @api.model
     def get_available_types(self):

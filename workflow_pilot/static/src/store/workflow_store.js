@@ -133,7 +133,7 @@ export const workflowEditorService = {
                 error: run.error_message || (result && result.error) || null,
                 errorNodeId: run.error_node_id || null,
                 outputData: run.output_data || null,
-                executedOrder: run.executed_order || [],
+                executedOrder: run.executed_order || result.executed_order || [],
                 executionCount: run.execution_count || null,
                 inputData: run.input_data || normalizeInputData(inputData),
                 contextSnapshot: (result && result.context_snapshot) || null,

@@ -91,6 +91,25 @@
   stroke-width: 3;
 }
 
+/* Executed Connection Highlighting */
+.workflow-connection--executed {
+  stroke: $o-success;
+  color: $o-success;
+  stroke-width: 2.5;
+  opacity: 0.9;
+}
+
+.workflow-connection-group:hover .workflow-connection--executed {
+  stroke-width: 3;
+}
+
+.workflow-connection-group.selected .workflow-connection--executed {
+  stroke: $o-success;
+  color: $o-success;
+  stroke-width: 3;
+  opacity: 1;
+}
+
 .workflow-connection-hitarea {
   cursor: pointer;
   pointer-events: all;
@@ -107,7 +126,6 @@
 
 .workflow-connection--back-edge {
   stroke: $o-warning;
-  stroke-dasharray: 8 4;
 }
 
 /* 3. Workflow Node (Odoo Card Style) */
@@ -278,6 +296,61 @@
   content: " (disabled)";
   font-size: 0.7rem;
   color: $o-gray-500;
+}
+
+/* Execution Status States (n8n-style) */
+.workflow-node.execution-success {
+  border-color: $o-success;
+  box-shadow: 0 0 0 1px $o-success, 0 2px 8px rgba($o-success, 0.15);
+}
+
+.workflow-node.execution-success::before {
+  background: $o-success;
+}
+
+.workflow-node.execution-error {
+  border-color: $o-danger;
+  box-shadow: 0 0 0 1px $o-danger, 0 2px 8px rgba($o-danger, 0.15);
+}
+
+.workflow-node.execution-error::before {
+  background: $o-danger;
+}
+
+/* Keep execution styles when also selected */
+.workflow-node.execution-success.selected {
+  border-color: $o-success;
+  box-shadow: 0 0 0 2px $o-success, 0 4px 12px rgba($o-success, 0.2);
+  border-width: 1px;
+}
+
+.workflow-node.execution-error.selected {
+  border-color: $o-danger;
+  box-shadow: 0 0 0 2px $o-danger, 0 4px 12px rgba($o-danger, 0.2);
+}
+
+/* Execution Status Icon Badge (bottom-right) */
+.workflow-node__exec-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 10;
+  backdrop-filter: blur(2px);
+}
+
+.workflow-node__exec-badge--success {
+  color: rgba($o-success, 0.95);
+}
+
+.workflow-node__exec-badge--error {
+  color: rgba($o-danger, 0.95);
 }
 
 // Deleted

@@ -13,6 +13,7 @@ from datetime import datetime
 from odoo import http
 from odoo.http import request
 
+from ..models.context_objects import to_plain
 from ..schemas import (
     ExecutionResultSchema,
     ExecutionErrorSchema,
@@ -58,12 +59,14 @@ class WorkflowPilotController(http.Controller):
             # Fetch node results from run record (single iteration for performance)
             node_results = []
             node_outputs_map = {}
+            executed_order = []
             context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
             if run_id:
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
-                    # Single pass: build both node_results and node_outputs_map
-                    for node_run in run.node_run_ids:
+                    # Single pass: build node_results, node_outputs_map, and executed_order
+                    # Sort by sequence to maintain execution order
+                    for node_run in run.node_run_ids.sorted('sequence'):
                         node_results.append(NodeResultSchema(
                             node_id=node_run.node_id,
                             node_type=node_run.node_type,
@@ -74,6 +77,7 @@ class WorkflowPilotController(http.Controller):
                             error_message=node_run.error_message,
                         ))
                         node_outputs_map[node_run.node_id] = node_run.output_data
+                        executed_order.append(node_run.node_id)
                     
                     if not context_snapshot:
                         # Build context snapshot using pre-built map (fallback)
@@ -102,6 +106,7 @@ class WorkflowPilotController(http.Controller):
                 execution_count=result.get('execution_count'),
                 node_count_executed=result.get('node_count_executed'),
                 duration_seconds=result.get('duration_seconds'),
+                executed_order=executed_order,
                 input_data=input_data or {},
                 output_data=result.get('output_data'),
                 node_results=node_results,
@@ -127,7 +132,9 @@ class WorkflowPilotController(http.Controller):
             return ExecutionErrorSchema(error='Run not found').model_dump()
         
         node_results = []
-        for node_run in run.node_run_ids:
+        executed_order = []
+        # Sort by sequence to maintain execution order
+        for node_run in run.node_run_ids.sorted('sequence'):
             node_results.append(NodeResultSchema(
                 node_id=node_run.node_id,
                 node_type=node_run.node_type,
@@ -137,6 +144,7 @@ class WorkflowPilotController(http.Controller):
                 output_data=node_run.output_data,
                 error_message=node_run.error_message,
             ))
+            executed_order.append(node_run.node_id)
         
         workflow = run.workflow_id
         context_snapshot = ContextSnapshotSchema(
@@ -164,8 +172,7 @@ class WorkflowPilotController(http.Controller):
             error_node_id=run.error_node_id,
             execution_count=run.execution_count,
             node_count_executed=run.node_count_executed,
-            duration_seconds=run.duration_seconds,
-            input_data=run.input_data or {},
+            duration_seconds=run.duration_seconds,            executed_order=executed_order,            input_data=run.input_data or {},
             output_data=run.output_data,
             node_results=node_results,
             context_snapshot=context_snapshot,
@@ -215,8 +222,8 @@ class WorkflowPilotController(http.Controller):
                 snapshot=snapshot,
             )
 
-            # Convert node_outputs to node_results
-            node_outputs = result.get('node_outputs') or {}
+            # Convert node_outputs to plain dicts (strip DotDict wrappers)
+            node_outputs = to_plain(result.get('node_outputs') or {})
             executed_order = result.get('executed_order') or []
             status = result.get('status', 'completed')
             error_message = result.get('error')
@@ -236,8 +243,8 @@ class WorkflowPilotController(http.Controller):
                     meta=output.get('meta'),
                 ))
             
-            # Build context snapshot
-            raw_snapshot = result.get('context_snapshot') or {}
+            # Build context snapshot (strip DotDict wrappers)
+            raw_snapshot = to_plain(result.get('context_snapshot') or {})
             context_snapshot = ContextSnapshotSchema(
                 json=raw_snapshot.get('json'),
                 node=raw_snapshot.get('node', {}),

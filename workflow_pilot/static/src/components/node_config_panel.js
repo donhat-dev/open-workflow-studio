@@ -665,6 +665,12 @@ export class NodeConfigPanel extends Component {
             throw new Error("[NodeConfigPanel] Missing executeUntilNode action");
         }
 
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+            this._saveDebounceTimer = null;
+        }
+        this._syncToAdapter();
+
         const nodeId = this.props.node.id;
         const configOverrides = this.state.controlValues
             ? { [nodeId]: this.state.controlValues }
@@ -695,26 +701,25 @@ export class NodeConfigPanel extends Component {
             }
         }
 
-        this._debouncedSave();
+        this._debouncedLocalSave();
     };
 
-    _debouncedSave() {
+    _debouncedLocalSave() {
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
         }
         this._saveDebounceTimer = setTimeout(() => {
-            this._autoSave();
+            this._syncToAdapter();
             this._saveDebounceTimer = null;
         }, 300);
     }
 
-    _autoSave() {
+    _syncToAdapter() {
         const nodeId = this.props.node.id;
         if (!this.actions.setNodeConfig) {
             throw new Error("[NodeConfigPanel] Missing actions.setNodeConfig");
         }
         this.actions.setNodeConfig(nodeId, this.state.controlValues);
-        this.props.onSave(this.state.controlValues);
     }
 
     onTabClick(tabName) {
@@ -734,7 +739,8 @@ export class NodeConfigPanel extends Component {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
         }
-        this._autoSave();
+        this._syncToAdapter();
+        this.props.onSave(this.state.controlValues);
     }
 
     onClose() {

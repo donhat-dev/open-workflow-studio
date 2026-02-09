@@ -26,7 +26,9 @@ class ExpressionEvaluator:
     Expressions are evaluated only inside {{ ... }} blocks.
     The expression content is passed through as-is (no translation).
     """
-    
+
+    _TEMPLATE_RE = re.compile(r'\{\{(.+?)\}\}')
+
     @classmethod
     def translate_expression(cls, expr):
         """Return expression as-is (no translation)."""
@@ -50,8 +52,7 @@ class ExpressionEvaluator:
             return expr
             
         # Check for template syntax {{ ... }}
-        template_pattern = re.compile(r'\{\{(.+?)\}\}')
-        if template_pattern.search(expr):
+        if cls._TEMPLATE_RE.search(expr):
             # String interpolation mode
             def replace_template(match):
                 inner_expr = match.group(1).strip()
@@ -62,7 +63,7 @@ class ExpressionEvaluator:
                     _logger.warning(f"Expression evaluation failed: {inner_expr} -> {e}")
                     return ''
             
-            return template_pattern.sub(replace_template, expr)
+            return cls._TEMPLATE_RE.sub(replace_template, expr)
         
         # Return as-is if not an explicit template expression
         return expr

@@ -23,6 +23,7 @@ export class WorkflowNode extends Component {
         dimensionConfig: { type: Object },
         selected: { type: Boolean, optional: true },
         readonly: { type: Boolean, optional: true },
+        executionStatus: { type: [String, { value: null }], optional: true },
         // Parent->child callbacks (flat props, bundled via t-props in parent)
         // Optional in readonly mode
         onDragStart: { type: Function, optional: true },
@@ -189,6 +190,17 @@ export class WorkflowNode extends Component {
 
     get nodeTypeClass() {
         return `workflow-node--${this.props.node.type || "default"}`;
+    }
+
+    /**
+     * CSS class for execution status visualisation (n8n-style).
+     * Returns 'execution-success' | 'execution-error' | '' based on last run result.
+     */
+    get executionClass() {
+        const status = this.props.executionStatus;
+        if (status === 'success') return 'execution-success';
+        if (status === 'error') return 'execution-error';
+        return '';
     }
 
     /**
