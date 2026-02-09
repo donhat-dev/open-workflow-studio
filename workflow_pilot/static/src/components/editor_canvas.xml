@@ -4,47 +4,22 @@
 		<div class="workflow-editor-canvas" t-ref="root" tabindex="0" t-att-style="canvasBackgroundStyle" t-on-dragover="onDragOver" t-on-drop="onDrop" t-on-click="onCanvasClick" t-on-mousedown="onCanvasMouseDown" t-on-wheel="onWheel" t-on-contextmenu="onCanvasContextMenu">
 			<!-- Controls Bar (Top-Left) -->
 			<div class="workflow-editor-canvas__controls d-flex align-items-center gap-1 p-2 rounded border shadow-sm bg-white">
-				<t t-if="hasCanvasActions">
-					<button class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1" t-on-click="onSave" t-att-disabled="isSaving or isExecuting or isReadonly ? 'disabled' : undefined">
-						<LucideIcon t-props="{ name: 'Save', size: 14 }"/>
-						<span>Save</span>
-					</button>
-					<button class="btn btn-success btn-sm d-inline-flex align-items-center gap-1" t-on-click="onRun" t-att-disabled="isExecuting or isSaving or isReadonly ? 'disabled' : undefined">
-						<LucideIcon t-props="{ name: 'Play', size: 14 }"/>
-						<span>Run</span>
-					</button>
-					<div class="controls-divider"/>
+				<t t-foreach="getButtonsWithDividers()" t-as="btn" t-key="btn.name">
+					<t t-if="btn.divider">
+						<div class="controls-divider"/>
+					</t>
+					<t t-else="">
+						<button t-att-class="btn.classes" t-on-click="btn.callback" t-att-disabled="btn.disabled ? 'disabled' : undefined" t-att-title="btn.title or ''">
+							<t t-if="btn.icon">
+								<LucideIcon t-props="{ name: btn.icon, size: btn.label ? 14 : 16 }"/>
+							</t>
+							<t t-if="btn.label"><span t-esc="btn.label"/></t>
+						</button>
+					</t>
 				</t>
-				<t t-if="!isReadonly">
-					<button class="btn btn-light btn-sm" t-on-click="onUndo" t-att-disabled="!canUndo" title="Undo (Ctrl+Z)">
-						<LucideIcon t-props="{ name: 'Undo2', size: 16 }"/>
-					</button>
-					<button class="btn btn-light btn-sm" t-on-click="onRedo" t-att-disabled="!canRedo" title="Redo (Ctrl+Y)">
-						<LucideIcon t-props="{ name: 'Redo2', size: 16 }"/>
-					</button>
-					<div class="controls-divider"/>
-					<button class="btn btn-light btn-sm" t-on-click="tidyUp" title="Tidy Up">
-						<LucideIcon t-props="{ name: 'Sparkles', size: 16 }"/>
-					</button>
-					<button class="btn btn-primary btn-sm" t-on-click="(ev) => this.onAddNodeClick(ev)" title="Add Node">+ Node</button>
-					<div class="controls-divider"/>
-				</t>
-				<button class="btn btn-light btn-sm" t-on-click="fitToView" title="Fit to View">
-					<LucideIcon t-props="{ name: 'Maximize', size: 16 }"/>
-				</button>
-				<button class="btn btn-light btn-sm" t-on-click="zoomOut" title="Zoom Out">
-					<LucideIcon t-props="{ name: 'Minus', size: 16 }"/>
-				</button>
 				<span class="zoom-label small text-muted fw-medium text-center px-1">
 					<t t-esc="zoomPercentage"/>%
-				
 				</span>
-				<button class="btn btn-light btn-sm" t-on-click="zoomIn" title="Zoom In">
-					<LucideIcon t-props="{ name: 'Plus', size: 16 }"/>
-				</button>
-				<button class="btn btn-light btn-sm" t-on-click="resetZoom" title="Reset View">
-					<LucideIcon t-props="{ name: 'RefreshCw', size: 16 }"/>
-				</button>
 			</div>
 			<!-- Transformable content wrapper -->
 			<div class="workflow-editor-canvas__content" t-att-style="viewportTransformStyle" t-ref="content">

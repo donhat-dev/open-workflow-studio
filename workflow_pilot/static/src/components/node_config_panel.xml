@@ -14,7 +14,18 @@
 						<i t-att-class="'fa ' + nodeIcon"/>
 						<span t-esc="nodeTitle"/>
 					</div>
-					<div class="node-config-actions d-flex align-items-center gap-1">
+					<div class="node-config-actions d-flex align-items-center gap-2">
+						<!-- Execution Status Badge -->
+						<t t-if="executionStatus !== 'idle'">
+							<span class="execution-status-badge" t-att-class="'status-' + executionStatus">
+								<i t-att-class="executionStatus === 'success' ? 'fa fa-check-circle' : executionStatus === 'error' ? 'fa fa-exclamation-circle' : 'fa fa-spinner fa-spin'"/>
+								<span t-esc="executionStatus === 'success' ? 'Success' : executionStatus === 'error' ? 'Error' : 'Running'"/>
+							</span>
+						</t>
+						<!-- Execute Node Button -->
+						<button class="node-config-execute-btn btn btn-sm btn-success d-flex align-items-center gap-1" t-on-click="onExecute" type="button" title="Execute up to this node">
+							<i class="fa fa-play"/> Execute
+						</button>
 						<!-- Expand/Collapse Toggle Button -->
 						<button class="node-config-icon-btn node-config-expand-btn btn btn-sm btn-link p-0 border-0" t-on-click="onToggleExpand" t-att-title="state.isExpanded ? 'Collapse panel' : 'Expand to full width'" type="button">
 							<i t-att-class="'fa ' + (state.isExpanded ? 'fa-compress' : 'fa-expand')"/>
@@ -24,15 +35,15 @@
 						</button>
 					</div>
 				</div>
-				<!-- Two Column Content -->
+				<!-- Three Column Content -->
 				<div class="node-config-content d-flex">
-					<!-- LEFT PANEL: Ancestor Node Outputs -->
-					<div class="node-config-left-panel d-flex flex-column">
-						<div class="left-panel-header d-flex align-items-center gap-2 text-uppercase small fw-semibold">
+					<!-- LEFT COLUMN: Ancestor Node Outputs (Input) -->
+					<div class="node-config-col-input d-flex flex-column">
+						<div class="col-panel-header d-flex align-items-center gap-2 text-uppercase small fw-semibold">
 							<i class="fa fa-database"/>
 							<span>INPUT</span>
 						</div>
-						<div class="left-panel-content">
+						<div class="col-panel-content">
 							<!-- Show predecessor nodes with their outputs -->
 							<t t-if="leftPanelData and leftPanelData.length > 0">
 								<t t-foreach="leftPanelData" t-as="item" t-key="item.nodeId">
@@ -79,25 +90,16 @@
 								</div>
 							</t>
 						</div>
-						<div class="left-panel-footer"/></div>
-					<!-- RIGHT PANEL: Node Configuration -->
-					<div class="node-config-right-panel d-flex flex-column">
-						<!-- Tabs -->
+					</div>
+					<!-- CENTER COLUMN: Node Configuration -->
+					<div class="node-config-col-config d-flex flex-column">
+						<!-- Tabs (Parameters | Settings only — Output moved to right column) -->
 						<div class="node-config-tabs d-flex">
 							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')" type="button">
 								<i class="fa fa-sliders"/> Parameters
-							
-							
-							</button>
-							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'output' }" t-on-click="() => this.onTabClick('output')" type="button">
-								<i class="fa fa-code"/> Output
-							
-							
 							</button>
 							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')" type="button">
 								<i class="fa fa-cog"/> Settings
-							
-							
 							</button>
 						</div>
 						<!-- Tab Content -->
@@ -118,27 +120,6 @@
 									</div>
 								</t>
 							</t>
-							<!-- Output Tab -->
-							<t t-if="state.activeTab === 'output'">
-								<div class="node-config-section">
-									<div class="node-config-section-title">Execution Output</div>
-									<t t-if="executionDisplayResult">
-										<t t-if="executionDisplayResult.error">
-											<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
-										</t>
-										<t t-else="">
-											<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
-										</t>
-									</t>
-									<t t-else="">
-										<div class="input-data-empty">
-											<i class="fa fa-terminal"/>
-											<p>No output yet</p>
-											<span>Click Execute to run this node</span>
-										</div>
-									</t>
-								</div>
-							</t>
 							<!-- Settings Tab -->
 							<t t-if="state.activeTab === 'settings'">
 								<div class="node-config-section">
@@ -151,16 +132,47 @@
 							</t>
 						</div>
 					</div>
+					<!-- RIGHT COLUMN: Output (always visible) -->
+					<div class="node-config-col-output d-flex flex-column">
+						<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
+							<div class="d-flex align-items-center gap-2">
+								<i class="fa fa-terminal"/>
+								<span>OUTPUT</span>
+							</div>
+							<t t-if="executionDisplayResult">
+								<span class="output-item-count" t-if="outputItemCount !== null">
+									<t t-esc="outputItemCount"/> item<t t-if="outputItemCount !== 1">s</t>
+								</span>
+							</t>
+						</div>
+						<div class="col-panel-content">
+							<t t-if="executionDisplayResult">
+								<t t-if="executionDisplayResult.error">
+									<div class="output-error-banner">
+										<i class="fa fa-exclamation-triangle"/>
+										<span>Execution failed</span>
+									</div>
+									<div class="output-tree-container">
+										<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
+									</div>
+								</t>
+								<t t-else="">
+									<div class="output-tree-container">
+										<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
+									</div>
+								</t>
+							</t>
+							<t t-else="">
+								<div class="input-data-empty output-empty-hint">
+									<i class="fa fa-terminal"/>
+									<p>No output yet</p>
+									<span>Click <b>Execute</b> to run this node</span>
+								</div>
+							</t>
+						</div>
+					</div>
 				</div>
-				<!-- Footer -->
-				<div class="node-config-footer d-flex justify-content-end gap-2 border-top">
-					<button class="node-config-btn btn btn-secondary" t-on-click="onClose" type="button">
-						Cancel
-					</button>
-					<button class="node-config-btn btn btn-primary" t-on-click="onSave" t-att-disabled="!state.isDirty" type="button">
-						Save
-					</button>
-				</div>
+				<!-- No footer — auto-save on config change -->
 			</div>
 		</div>
 	</t>

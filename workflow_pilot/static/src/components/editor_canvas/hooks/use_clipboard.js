@@ -1,19 +1,24 @@
 /** @odoo-module **/
 
-import { useEnv, useExternalListener } from "@odoo/owl";
+import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
 
 /**
- * Hook to manage Copy/Paste operations via System Clipboard
- * 
+ * Hook to manage Copy/Paste operations via System Clipboard.
+ *
+ * Uses Odoo-native `useHotkey` with `area` scoping so hotkeys only fire
+ * when the canvas root element (or a descendant) is focused. This avoids
+ * the anti-pattern of raw `window` keydown listeners that block native
+ * browser copy/paste in text inputs, the NodeConfigPanel, etc.
+ *
  * @param {Object} params
  * @param {Object} params.editor - Editor service instance (for actions)
  * @param {Function} params.getNodes - Getter for current nodes
  * @param {Function} params.getConnections - Getter for current connections
  * @param {Function} params.getSelection - Getter for current selection { nodeIds: [] }
  * @param {Function} [params.getReadonly] - () => boolean - runtime readonly
+ * @param {Function} params.getRootEl - () => HTMLElement - canvas root for area scoping
  */
-export function useClipboard({ editor, getNodes, getConnections, getSelection, getReadonly }) {
-    const env = useEnv();
+export function useClipboard({ editor, getNodes, getConnections, getSelection, getReadonly, getRootEl }) {
 
     function isReadonlyActive() {
         return getReadonly ? !!getReadonly() : false;
@@ -116,40 +121,20 @@ export function useClipboard({ editor, getNodes, getConnections, getSelection, g
         }
     }
 
-    /**
-     * Handle keydown events
-     * @param {KeyboardEvent} ev 
-     */
-    function onKeyDown(ev) {
-        if (isReadonlyActive()) return;
-        // Skip if in input field
-        if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable) {
-            return;
-        }
-        // If input is not likely in canvas, we should skip them
-        if (!ev.target.classList.contains('o_web_client')){
-            return;
-        }
+    // ========================================
+    // SCOPED HOTKEYS (area = canvas root)
+    // ========================================
+    // Copy (Ctrl+C) - scoped to canvas, won't intercept text inputs
+    useHotkey("control+c", () => copySelectedNodes(), {
+        bypassEditableProtection: false,
+        area: getRootEl,
+    });
 
-        const ctrl = ev.ctrlKey || ev.metaKey;
-        const key = ev.key.toLowerCase();
-
-        // Copy
-        if (ctrl && key === 'c') {
-            ev.preventDefault();
-            copySelectedNodes();
-            return;
-        }
-
-        // Paste
-        if (ctrl && key === 'v') {
-            ev.preventDefault();
-            pasteNodes();
-            return;
-        }
-    }
-
-    useExternalListener(window, "keydown", onKeyDown);
+    // Paste (Ctrl+V) - scoped to canvas, won't intercept text inputs
+    useHotkey("control+v", () => pasteNodes(), {
+        bypassEditableProtection: false,
+        area: getRootEl,
+    });
 
     return {
         copySelectedNodes,

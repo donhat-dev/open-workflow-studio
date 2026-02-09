@@ -79,6 +79,9 @@ export function useWorkflowCommands({ editor, getNodes, getReadonly, onSave, onR
     useHotkey("control+y", () => {
         if (isReadonlyActive()) return;
         editor.actions.redo();
+    }, {
+        bypassEditableProtection: false,
+        area: getRootEl,
     });
 
     // Select All (Ctrl+A)

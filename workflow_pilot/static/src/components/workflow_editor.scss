@@ -399,6 +399,12 @@
   z-index: 100;
   -webkit-user-select: none;
   user-select: none;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 .controls-divider {

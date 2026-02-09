@@ -120,7 +120,7 @@ export class EditorCanvas extends Component {
                 _execution: null, _workflow: null,
             }),
             executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
-                this.editor.actions.executeUntilNode(nodeId, inputData, configOverrides),
+                this.editor.executeUntilNode(nodeId, inputData, configOverrides),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
         } : null;
 
@@ -202,6 +202,7 @@ export class EditorCanvas extends Component {
                 getConnections: () => this.connections,
                 getSelection: () => this.editorUiState.selection,
                 getReadonly: () => this.isReadonly,
+                getRootEl: () => this.rootRef.el,
             });
         } else {
             // Readonly stubs - static objects (no reactivity needed)
@@ -286,6 +287,22 @@ export class EditorCanvas extends Component {
             return [value];
         };
 
+        const buildInputContext = (value) => {
+            const itemsValue = normalizeItems(value);
+            const inputContext = {
+                item: itemsValue[0] || value,
+                json: value,
+                items: itemsValue,
+            };
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                return {
+                    ...value,
+                    ...inputContext,
+                };
+            }
+            return inputContext;
+        };
+
         const buildNodeOutputView = (output) => {
             const jsonValue = output;
             const itemsValue = normalizeItems(jsonValue);
@@ -295,7 +312,7 @@ export class EditorCanvas extends Component {
 
         const emptyContext = () => ({
             _vars: {}, _node: {}, _json: {}, _loop: null,
-            _input: { item: null, json: null, items: [] },
+            _input: buildInputContext(null),
             _execution: null, _workflow: null, _now: null, _today: null,
         });
 
@@ -335,7 +352,7 @@ export class EditorCanvas extends Component {
                 _node: wrappedNode,
                 _json: json,
                 _loop: null,
-                _input: { item: inputItems[0] || json, json, items: inputItems },
+                _input: buildInputContext(json),
                 _execution: snapshot.execution || null,
                 _workflow: snapshot.workflow || null,
                 _now: snapshot.now || null,
@@ -1106,8 +1123,16 @@ export class EditorCanvas extends Component {
     onCanvasContextMenu(ev) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
+
+        const target = ev.target;
+        const rootEl = this.rootRef.el;
+        const contentEl = this.contentRef.el;
+        const svgEl = rootEl.querySelector('.workflow-connections');
+        const isCanvasBackground = target === rootEl || target === contentEl || target === svgEl;
+        if (!isCanvasBackground) return;
+
         ev.preventDefault();
-        const rect = this.rootRef.el.getBoundingClientRect();
+        const rect = rootEl.getBoundingClientRect();
         const canvasPos = this.getCanvasPosition(ev);
 
         this.editor.actions.openNodeMenu({
@@ -1560,5 +1585,265 @@ export class EditorCanvas extends Component {
         if (!this.canEdit) return;
         this.editor.actions.redo();
     };
+
+    /**
+     * Get button definitions for the controls bar
+     * Returns array of button config objects with properties:
+     * - name: unique identifier
+     * - label: display text
+     * - icon: lucide icon name
+     * - callback: handler function
+     * - visible: boolean or getter function
+     * - disabled: boolean or getter function
+     * - title: tooltip text
+     * - classes: CSS classes
+     * - divider: insert divider after this button
+     */
+    getButtons() {
+        const buttons = [];
+
+        // Canvas Actions Group (save/run)
+        if (this.hasCanvasActions) {
+            buttons.push(
+                {
+                    name: 'save',
+                    label: 'Save',
+                    icon: 'Save',
+                    callback: () => this.onSave(),
+                    visible: true,
+                    disabled: this.isSaving || this.isExecuting || this.isReadonly,
+                    classes: 'btn btn-primary btn-sm d-inline-flex align-items-center gap-1',
+                },
+                {
+                    name: 'run',
+                    label: 'Run',
+                    icon: 'Play',
+                    callback: () => this.onRun(),
+                    visible: true,
+                    disabled: this.isExecuting || this.isSaving || this.isReadonly,
+                    classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
+                }
+            );
+            buttons.push({ name: 'divider-1', divider: true });
+        }
+
+        // Edit Actions Group (undo/redo)
+        if (!this.isReadonly) {
+            buttons.push(
+                {
+                    name: 'undo',
+                    icon: 'Undo2',
+                    callback: () => this.onUndo(),
+                    visible: true,
+                    disabled: !this.canUndo,
+                    title: 'Undo (Ctrl+Z)',
+                    classes: 'btn btn-light btn-sm',
+                },
+                {
+                    name: 'redo',
+                    icon: 'Redo2',
+                    callback: () => this.onRedo(),
+                    visible: true,
+                    disabled: !this.canRedo,
+                    title: 'Redo (Ctrl+Y)',
+                    classes: 'btn btn-light btn-sm',
+                }
+            );
+            buttons.push({ name: 'divider-2', divider: true });
+
+            // Node Management Group
+            buttons.push(
+                {
+                    name: 'tidyup',
+                    icon: 'Sparkles',
+                    callback: () => this.tidyUp(),
+                    visible: true,
+                    disabled: this.nodes.length === 0,
+                    title: 'Tidy Up',
+                    classes: 'btn btn-light btn-sm',
+                },
+                {
+                    name: 'add-node',
+                    label: '+ Node',
+                    callback: (ev) => this.onAddNodeClick(ev),
+                    visible: true,
+                    disabled: false,
+                    title: 'Add Node',
+                    classes: 'btn btn-primary btn-sm',
+                }
+            );
+            buttons.push({ name: 'divider-3', divider: true });
+        }
+
+        // View Control Group (always available)
+        buttons.push(
+            {
+                name: 'fit-view',
+                icon: 'Maximize',
+                callback: () => this.fitToView(),
+                visible: true,
+                disabled: false,
+                title: 'Fit to View',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'zoom-out',
+                icon: 'Minus',
+                callback: () => this.zoomOut(),
+                visible: true,
+                disabled: false,
+                title: 'Zoom Out',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'zoom-in',
+                icon: 'Plus',
+                callback: () => this.zoomIn(),
+                visible: true,
+                disabled: false,
+                title: 'Zoom In',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'reset-zoom',
+                icon: 'RefreshCw',
+                callback: () => this.resetZoom(),
+                visible: true,
+                disabled: false,
+                title: 'Reset View',
+                classes: 'btn btn-light btn-sm',
+            }
+        );
+
+        return buttons.filter(btn => !btn.divider && btn.visible);
+    }
+
+    /**
+     * Get button dividers for grouping
+     * Returns divider positions based on button list
+     */
+    getButtonDividers() {
+        const allButtons = this.getButtonsWithDividers();
+        return allButtons.filter(btn => btn.divider);
+    }
+
+    /**
+     * Get buttons including dividers
+     * Helper for template that needs to render dividers
+     */
+    getButtonsWithDividers() {
+        const buttons = [];
+
+        // Canvas Actions Group (save/run)
+        if (this.hasCanvasActions) {
+            buttons.push(
+                {
+                    name: 'save',
+                    label: 'Save',
+                    icon: 'Save',
+                    callback: () => this.onSave(),
+                    visible: true,
+                    disabled: this.isSaving || this.isExecuting || this.isReadonly,
+                    classes: 'btn btn-primary btn-sm d-inline-flex align-items-center gap-1',
+                },
+                {
+                    name: 'run',
+                    label: 'Run',
+                    icon: 'Play',
+                    callback: () => this.onRun(),
+                    visible: true,
+                    disabled: this.isExecuting || this.isSaving || this.isReadonly,
+                    classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
+                },
+                { name: 'divider-1', divider: true }
+            );
+        }
+
+        // Edit Actions Group (undo/redo)
+        if (!this.isReadonly) {
+            buttons.push(
+                {
+                    name: 'undo',
+                    icon: 'Undo2',
+                    callback: () => this.onUndo(),
+                    visible: true,
+                    disabled: !this.canUndo,
+                    title: 'Undo (Ctrl+Z)',
+                    classes: 'btn btn-light btn-sm',
+                },
+                {
+                    name: 'redo',
+                    icon: 'Redo2',
+                    callback: () => this.onRedo(),
+                    visible: true,
+                    disabled: !this.canRedo,
+                    title: 'Redo (Ctrl+Y)',
+                    classes: 'btn btn-light btn-sm',
+                },
+                { name: 'divider-2', divider: true },
+                {
+                    name: 'tidyup',
+                    icon: 'Sparkles',
+                    callback: () => this.tidyUp(),
+                    visible: true,
+                    disabled: this.nodes.length === 0,
+                    title: 'Tidy Up',
+                    classes: 'btn btn-light btn-sm',
+                },
+                {
+                    name: 'add-node',
+                    label: '+ Node',
+                    callback: (ev) => this.onAddNodeClick(ev),
+                    visible: true,
+                    disabled: false,
+                    title: 'Add Node',
+                    classes: 'btn btn-primary btn-sm',
+                },
+                { name: 'divider-3', divider: true }
+            );
+        }
+
+        // View Control Group (always available)
+        buttons.push(
+            {
+                name: 'fit-view',
+                icon: 'Maximize',
+                callback: () => this.fitToView(),
+                visible: true,
+                disabled: false,
+                title: 'Fit to View',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'zoom-out',
+                icon: 'Minus',
+                callback: () => this.zoomOut(),
+                visible: true,
+                disabled: false,
+                title: 'Zoom Out',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'zoom-in',
+                icon: 'Plus',
+                callback: () => this.zoomIn(),
+                visible: true,
+                disabled: false,
+                title: 'Zoom In',
+                classes: 'btn btn-light btn-sm',
+            },
+            {
+                name: 'reset-zoom',
+                icon: 'RefreshCw',
+                callback: () => this.resetZoom(),
+                visible: true,
+                disabled: false,
+                title: 'Reset View',
+                classes: 'btn btn-light btn-sm',
+            }
+        );
+
+        return buttons;
+    }
 
 }

@@ -99,14 +99,14 @@ class ReadonlyDotDict(ReadonlyDict):
     def __getattr__(self, attrib):
         try:
             val = self[attrib]
-        except KeyError:
+        except KeyError as e:
             return None
         return wrap_readonly(val)
 
     def get(self, key, default=None):
         try:
             return self[key]
-        except KeyError:
+        except KeyError as e:
             return default
 
     def keys(self):
@@ -172,6 +172,32 @@ def to_plain(value):
     if isinstance(value, tuple):
         return [to_plain(item) for item in value]
     return value
+
+
+def build_input_context(payload, include_input_item=False):
+    """Build `_input` context view.
+
+    When `include_input_item=True`, `_input` exposes both:
+    - metadata keys: `json`, `item`, `items`
+    - top-level payload keys (for dict payloads), making `_input` an alias-like
+      convenience for `_json` in expression paths.
+    """
+    if not include_input_item:
+        return payload
+
+    items_value = payload if isinstance(payload, list) else ([] if payload is None else [payload])
+    input_context = {
+        "json": payload,
+        "item": items_value[0] if items_value else None,
+        "items": items_value,
+    }
+
+    if isinstance(payload, dict):
+        merged = dict(payload)
+        merged.update(input_context)
+        return merged
+
+    return input_context
 
 
 class NodeOutputsProxy:
@@ -332,16 +358,7 @@ class ExecutionContext:
 
     def get_eval_context(self, input_data, include_input_item=False, node_id=None):
         payload = input_data if input_data is not None else {}
-        items_value = self._normalize_items(payload)
-
-        if include_input_item:
-            input_context = {
-                "json": payload,
-                "item": items_value[0] if items_value else None,
-                "items": items_value,
-            }
-        else:
-            input_context = payload
+        input_context = build_input_context(payload, include_input_item=include_input_item)
 
         loop_context = {}
         if node_id:
@@ -396,15 +413,7 @@ def build_eval_context(payload, context, include_input_item=False):
         node_id = base_context.get("current_node_id") if isinstance(base_context, dict) else None
         return exec_context.get_eval_context(payload, include_input_item=include_input_item, node_id=node_id)
 
-    if include_input_item:
-        items_value = payload if isinstance(payload, list) else ([] if payload is None else [payload])
-        input_context = {
-            "item": items_value[0] if items_value else None,
-            "json": payload,
-            "items": items_value,
-        }
-    else:
-        input_context = payload
+    input_context = build_input_context(payload, include_input_item=include_input_item)
 
     eval_context = {
         '_json': wrap_readonly(payload),

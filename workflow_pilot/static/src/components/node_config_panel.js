@@ -37,7 +37,6 @@ export class NodeConfigPanel extends Component {
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
-            isDirty: false,
             controlValues: {},  // Local copy of control values
             controls: [],  // Control metadata from adapter
             // Expression UI modes (persisted in node.meta.ui)
@@ -52,6 +51,7 @@ export class NodeConfigPanel extends Component {
         });
 
         this.panelRef = useRef("panel");
+        this._saveDebounceTimer = null;
 
         // Initialize control values from adapter
         onMounted(() => {
@@ -61,7 +61,6 @@ export class NodeConfigPanel extends Component {
         onWillUpdateProps((nextProps) => {
             if (nextProps.node.id !== this.props.node.id) {
                 this.state.activeTab = "parameters";
-                this.state.isDirty = false;
                 this.state.controlValues = {};
                 this.state.controls = [];
                 this.state.controlModes = {};
@@ -375,6 +374,15 @@ export class NodeConfigPanel extends Component {
         };
     }
 
+    get outputItemCount() {
+        const result = this.executionDisplayResult;
+        if (!result || result.error) return null;
+        const output = result.output;
+        if (Array.isArray(output)) return output.length;
+        if (output && typeof output === 'object') return Object.keys(output).length;
+        return null;
+    }
+
     /**
      * Initialize collapse state for ancestor sections.
      * Immediate input node expanded, others collapsed.
@@ -450,12 +458,29 @@ export class NodeConfigPanel extends Component {
             }
             return [value];
         }
+
+        function buildInputContext(value) {
+            const itemsValue = normalizeItems(value);
+            const inputContext = {
+                item: itemsValue.length ? itemsValue[0] : value,
+                json: value,
+                items: itemsValue,
+            };
+            if (value && typeof value === 'object' && !Array.isArray(value)) {
+                return {
+                    ...value,
+                    ...inputContext,
+                };
+            }
+            return inputContext;
+        }
+
         const base = this.actions.getExpressionContext() || {
             _vars: {},
             _node: {},
             _json: {},
             _loop: null,
-            _input: { item: null, json: null, items: [] },
+            _input: buildInputContext(null),
             _execution: null,
             _workflow: null,
             _now: null,
@@ -465,13 +490,12 @@ export class NodeConfigPanel extends Component {
         const workflow = this._getWorkflowFromContext();
         if (!workflow) {
             const json = this.inputData || {};
-            const inputItems = normalizeItems(json);
             return {
                 _vars: base._vars || {},
                 _loop: base._loop || null,
                 _node: base._node || {},
                 _json: json,
-                _input: { item: inputItems[0] || json, json, items: inputItems },
+                _input: buildInputContext(json),
                 _execution: base._execution || null,
                 _workflow: base._workflow || null,
                 _now: base._now || null,
@@ -484,7 +508,6 @@ export class NodeConfigPanel extends Component {
         }
         const wfContext = this.actions.buildContextForNode();
         const json = wfContext._json || {};
-        const inputItems = normalizeItems(json);
 
         return {
             _vars: base._vars || {},
@@ -492,7 +515,7 @@ export class NodeConfigPanel extends Component {
             // Prefer workflow-scoped node outputs for this node (ancestors)
             _node: wfContext._node || base._node || {},
             _json: json,
-            _input: { item: inputItems[0] || json, json, items: inputItems },
+            _input: buildInputContext(json),
             _execution: base._execution || null,
             _workflow: base._workflow || null,
             _now: base._now || null,
@@ -663,9 +686,7 @@ export class NodeConfigPanel extends Component {
 
     onControlChange = (controlKey, value) => {
         this.state.controlValues[controlKey] = value;
-        this.state.isDirty = true;
 
-        // Also update the control in state.controls for UI sync
         const control = this.state.controls.find(c => c.key === controlKey);
         if (control) {
             control.value = value;
@@ -673,7 +694,28 @@ export class NodeConfigPanel extends Component {
                 this._reconcilePairModes(controlKey, value);
             }
         }
+
+        this._debouncedSave();
     };
+
+    _debouncedSave() {
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+        }
+        this._saveDebounceTimer = setTimeout(() => {
+            this._autoSave();
+            this._saveDebounceTimer = null;
+        }, 300);
+    }
+
+    _autoSave() {
+        const nodeId = this.props.node.id;
+        if (!this.actions.setNodeConfig) {
+            throw new Error("[NodeConfigPanel] Missing actions.setNodeConfig");
+        }
+        this.actions.setNodeConfig(nodeId, this.state.controlValues);
+        this.props.onSave(this.state.controlValues);
+    }
 
     onTabClick(tabName) {
         this.state.activeTab = tabName;
@@ -687,21 +729,12 @@ export class NodeConfigPanel extends Component {
         return !!this.state.collapsedSections[nodeId];
     }
 
-    /**
-     * Save config to Core layer via adapterService
-     */
     onSave() {
-        const nodeId = this.props.node.id;
-
-        // Phase 3: Save via adapterService (updates Core layer)
-        if (!this.actions.setNodeConfig) {
-            throw new Error("[NodeConfigPanel] Missing actions.setNodeConfig");
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+            this._saveDebounceTimer = null;
         }
-        this.actions.setNodeConfig(nodeId, this.state.controlValues);
-        console.log('[NodeConfigPanel] Config saved via adapterService');
-
-        this.props.onSave(this.state.controlValues);
-        this.state.isDirty = false;
+        this._autoSave();
     }
 
     onClose() {
