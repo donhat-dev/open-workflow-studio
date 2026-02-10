@@ -8,11 +8,22 @@ const nodeCategoryRegistry = registry.category("workflow_node_categories");
 const MAX_RECENT = 10;
 let recentNodeKeys = [];
 
+function getNodeTypeKey(entry) {
+    if (!entry || typeof entry !== "object") {
+        return "";
+    }
+    const key = entry.node_type || entry.nodeType || entry.key;
+    if (typeof key !== "string") {
+        return "";
+    }
+    return key.trim();
+}
+
 export function getAllNodeTypes(backendTypes = null) {
     const hasBackendTypes = Array.isArray(backendTypes) && backendTypes.length > 0;
     if (hasBackendTypes) {
         return backendTypes.map((entry) => {
-            const key = entry.node_type || entry.nodeType || entry.key;
+            const key = getNodeTypeKey(entry);
             if (!key) {
                 return null;
             }
@@ -81,6 +92,15 @@ export function getNodeClass(key) {
     }
     const value = nodeTypeRegistry.get(key);
     return value.class || value;
+}
+
+export function pruneRecentNodes(validKeys = []) {
+    const valid = new Set(Array.isArray(validKeys) ? validKeys : []);
+    if (!valid.size) {
+        recentNodeKeys = [];
+        return;
+    }
+    recentNodeKeys = recentNodeKeys.filter((nodeKey) => valid.has(nodeKey));
 }
 
 export function getCategories() {
@@ -160,7 +180,7 @@ function findBackendType(backendTypes, key) {
         return null;
     }
     for (const entry of backendTypes) {
-        const entryKey = entry.node_type || entry.nodeType || entry.key;
+        const entryKey = getNodeTypeKey(entry);
         if (entryKey === key) {
             return entry;
         }

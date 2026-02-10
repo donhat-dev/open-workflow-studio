@@ -77,7 +77,8 @@ class WorkflowExecutor:
         'switch': SwitchNodeRunner,
     }
     
-    def __init__(self, env, workflow_run=None, snapshot=None, persist=True):
+    def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
+                 notify_channel=None, rollback_on_failure=False):
         """Initialize executor.
 
         Args:
@@ -85,10 +86,18 @@ class WorkflowExecutor:
             workflow_run: workflow.run record being executed
             snapshot: Workflow snapshot dict (used when persist=False)
             persist: Whether to persist run/node records
+            notify_channel: res.partner record to send bus notifications to
+                            (used for manual UI runs for real-time progress)
+            rollback_on_failure: If True, rollback all DB side effects
+                                 (ORM writes from code nodes, etc.) when
+                                 execution fails.  Run/node records are
+                                 re-persisted from in-memory state.
         """
         self.env = env
         self.run = workflow_run
         self.persist = bool(persist)
+        self._notify_channel = notify_channel
+        self._rollback_on_failure = bool(rollback_on_failure)
 
         if self.persist:
             if not self.run:
@@ -104,6 +113,8 @@ class WorkflowExecutor:
         self._vars_dirty_paths = set()
         self.vars = wrap_mutable({}, tracker=self._track_var_path, path="")  # Workflow variables (mutable, dot-access)
         self.executed_order = []
+        self.executed_connections = []  # [{connection_id, source, source_socket, target, target_socket, output_index, sequence}]
+        self._last_error_node_id = None
         self._node_record_cache = {}  # node_id -> record (avoids N+1 queries)
 
         self.exec_context = ExecutionContext(
@@ -124,6 +135,119 @@ class WorkflowExecutor:
             node_type: runner_class(self)
             for node_type, runner_class in self.NODE_RUNNERS.items()
         }
+
+    # ========================================================================
+    # Bus Notification (real-time UI progress)
+    # ========================================================================
+
+    def _send_bus_notification(self, notification_type, message):
+        """Send a bus notification on a **separate cursor**.
+
+        Using an independent cursor ensures the notification is committed
+        and dispatched immediately (via pg NOTIFY) without affecting the
+        main workflow transaction.  This preserves execution atomicity:
+        if a later node fails the main transaction can still roll back
+        while earlier progress notifications have already reached the UI.
+        """
+        try:
+            with self.env.registry.cursor() as cr:
+                env = self.env(cr=cr)
+                env['bus.bus']._sendone(
+                    self._notify_channel,
+                    notification_type,
+                    message,
+                )
+                # cursor auto-commits on context-manager exit →
+                # precommit fires (bus.bus.create) → postcommit fires (NOTIFY)
+        except Exception:
+            _logger.debug(
+                "Bus notification '%s' could not be sent on a separate cursor. Skipping.",
+                notification_type,
+                exc_info=True,
+            )
+
+
+    def _notify_node_start(self, node_id):
+        """Send bus notification when a node begins execution.
+
+        The UI uses this to show a spinner/running indicator on the node
+        before the result arrives via ``_notify_node_done``.
+
+        Notification type: ``workflow.execution/node_start``
+        """
+        if not self._notify_channel:
+            return
+        node = self.nodes.get(node_id, {})
+        self._send_bus_notification(
+            'workflow.execution/node_start',
+            {
+                'run_id': self.run.id if self.run else None,
+                'node_id': node_id,
+                'node_type': node.get('type'),
+                'node_label': node.get('label', ''),
+            },
+        )
+
+    def _notify_node_done(self, node_id, result, routed_connections=None):
+        """Send bus notification after a node finishes execution.
+
+        Only sends when ``_notify_channel`` is set (manual UI runs).
+        Uses a separate DB cursor so the main transaction is untouched.
+
+        Notification type: ``workflow.execution/node_done``
+        """
+        if not self._notify_channel:
+            return
+        node = self.nodes.get(node_id, {})
+        has_error = bool(result.get('error'))
+        routed_connections = routed_connections or []
+        self._send_bus_notification(
+            'workflow.execution/node_done',
+            {
+                'run_id': self.run.id if self.run else None,
+                'node_id': node_id,
+                'node_type': node.get('type'),
+                'node_label': node.get('label', ''),
+                'status': 'error' if has_error else 'success',
+                'error': result.get('error') if has_error else None,
+                'executed_order': list(self.executed_order),
+                'routed_connections': routed_connections,
+                'connection_ids': [
+                    entry.get('connection_id')
+                    for entry in routed_connections
+                    if entry.get('connection_id')
+                ],
+                'sequence': len(self.executed_order) - 1,
+            },
+        )
+
+    def _notify_execution_done(self, status='completed', error=None):
+        """Send bus notification when the full execution finishes.
+
+        Notification type: ``workflow.execution/done``
+        """
+        if not self._notify_channel:
+            return
+        self._send_bus_notification(
+            'workflow.execution/done',
+            {
+                'run_id': self.run.id if self.run else None,
+                'status': status,
+                'error': error,
+                'executed_order': list(self.executed_order),
+                'executed_connections': list(self.executed_connections),
+                'executed_connection_ids': self._get_executed_connection_ids(),
+                'node_count': len(self.executed_order),
+            },
+        )
+
+    def _get_executed_connection_ids(self):
+        """Return traversed connection IDs in execution order."""
+        return [
+            entry.get('connection_id')
+            for entry in self.executed_connections
+            if entry.get('connection_id')
+        ]
 
     def _load_node_output_sockets(self):
         """Load cached output socket mapping from workflow.type model.
@@ -168,7 +292,83 @@ class WorkflowExecutor:
                 self._reverse_adj.setdefault(target, []).append(source)
             if target:
                 self._nodes_with_incoming.add(target)
-    
+
+    def _is_node_disabled(self, node_id):
+        """Check if a node is disabled via its meta.disabled flag."""
+        node = self.nodes.get(node_id, {})
+        meta = node.get('meta') or {}
+        return bool(meta.get('disabled'))
+
+    # ========================================================================
+    # Savepoint helpers (rollback-on-failure)
+    # ========================================================================
+
+    @staticmethod
+    def _release_savepoint(savepoint, rollback=False):
+        """Close or rollback a savepoint safely.
+
+        Args:
+            savepoint: Savepoint object or None.
+            rollback: If True, rollback (discard changes);
+                      otherwise release (keep changes).
+
+        Returns:
+            None — convenient for ``sp = self._release_savepoint(sp)``.
+        """
+        if not savepoint:
+            return None
+        try:
+            # NOTE:
+            # In Odoo, savepoint.close() defaults to rollback=True.
+            # Always pass the rollback flag explicitly; otherwise successful
+            # runs would rollback node_run records (executed_order becomes
+            # empty when fetching /workflow_pilot/run/<id>).
+            savepoint.close(rollback=bool(rollback))
+        except Exception:
+            _logger.debug(
+                "Savepoint %s failed",
+                "rollback" if rollback else "close",
+                exc_info=True,
+            )
+        return None
+
+    def _persist_node_runs_from_memory(self):
+        """Re-create workflow.run.node records from in-memory execution state.
+
+        Called after a savepoint rollback to preserve execution history
+        for debugging while all business-logic side effects (ORM writes
+        performed by code nodes, etc.) have been discarded.
+
+        ``executed_order`` and ``node_outputs`` survive the rollback
+        because they are plain Python dicts/lists, not ORM records.
+        """
+        if not self.run:
+            return
+        RunNode = self.env['workflow.run.node']
+        now = fields.Datetime.now()
+        for seq, node_id in enumerate(self.executed_order):
+            node = self.nodes.get(node_id, {})
+            output = self.node_outputs.get(node_id, {})
+            has_error = bool(output.get('error'))
+            output_json = output.get('json')
+            output_display = (
+                self._mask_sensitive_data(to_plain(output_json))
+                if output_json is not None else None
+            )
+            RunNode.create({
+                'run_id': self.run.id,
+                'node_id': node_id,
+                'node_type': node.get('type'),
+                'node_label': node.get('label', ''),
+                'status': 'failed' if has_error else 'completed',
+                'started_at': now,
+                'completed_at': now,
+                'output_data': output_display,
+                'output_socket': self._get_primary_output_socket(node, output),
+                'error_message': output.get('error') if has_error else None,
+                'sequence': seq,
+            })
+
     def execute(self, input_data=None):
         """Execute workflow from start to completion.
         
@@ -181,6 +381,7 @@ class WorkflowExecutor:
         Raises:
             UserError: On execution failure
         """
+        savepoint = None
         try:
             # Update run status
             if self.persist:
@@ -202,6 +403,13 @@ class WorkflowExecutor:
                     'inputData': input_data or {},
                 })
             
+            # Savepoint: when rollback_on_failure is enabled, wrap
+            # the execution loop so all ORM side effects can be undone
+            # on failure while run/node records are re-persisted from
+            # in-memory state for debugging.
+            if self._rollback_on_failure:
+                savepoint = self.env.cr.savepoint(flush=True)
+            
             # Execute until stack empty
             iteration = 0
             max_iterations = 1000
@@ -211,19 +419,48 @@ class WorkflowExecutor:
                 entry = self.stack.pop()
                 node_id = entry['nodeId']
                 input_data = entry['inputData']
+
+                # Skip disabled nodes (stop path propagation)
+                if self._is_node_disabled(node_id):
+                    _logger.debug("Skipping disabled node %s", node_id)
+                    continue
                 
+                # Notify frontend that a node is about to run (spinner)
+                self._notify_node_start(node_id)
+
                 # Execute node
-                result = self._execute_node(node_id, input_data)
+                try:
+                    result = self._execute_node(node_id, input_data)
+                except Exception as exc:
+                    self._last_error_node_id = node_id
+                    failed_result = {
+                        'outputs': [],
+                        'json': None,
+                        'error': str(exc),
+                    }
+                    self.node_outputs[node_id] = failed_result
+                    self.executed_order.append(node_id)
+                    # Emit a final node status for UI before global done(failed)
+                    self._notify_node_done(node_id, failed_result, [])
+                    raise
 
                 # Store output
                 self.node_outputs[node_id] = result
                 self.executed_order.append(node_id)
-                
+
                 # Route outputs to connected nodes
-                self._route_outputs(node_id, result)
+                routed_connections = self._route_outputs(node_id, result)
+
+                # Notify frontend of node completion (real-time progress).
+                # Uses a separate DB cursor so the main transaction stays
+                # intact (no mid-loop commit needed).
+                self._notify_node_done(node_id, result, routed_connections)
             
             if iteration >= max_iterations:
                 raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
+            
+            # Success: release savepoint (keep all changes)
+            savepoint = self._release_savepoint(savepoint)
             
             # Complete run
             output_data_raw = self._collect_final_output()
@@ -233,21 +470,38 @@ class WorkflowExecutor:
                     'status': 'completed',
                     'completed_at': fields.Datetime.now(),
                     'output_data': output_data_display,
+                    'executed_connections': list(self.executed_connections),
                     'node_count_executed': len(self.node_outputs),
                     'execution_count': iteration,
                 })
 
+            # Notify frontend that execution is done
+            self._notify_execution_done(status='completed')
+
             return output_data_display
             
         except Exception as e:
+            # Rollback DB side effects when enabled
+            if savepoint:
+                self._release_savepoint(savepoint, rollback=True)
+                savepoint = None
+                # Re-persist execution records for debugging
+                if self.persist:
+                    self._persist_node_runs_from_memory()
             # Mark run as failed
             if self.persist:
-                self.run.write({
+                values = {
                     'status': 'failed',
                     'completed_at': fields.Datetime.now(),
                     'error_message': str(e),
-                })
+                    'executed_connections': list(self.executed_connections),
+                }
+                if self._last_error_node_id:
+                    values['error_node_id'] = self._last_error_node_id
+                self.run.write(values)
                 self.env.cr.commit()
+            # Notify frontend that execution failed
+            self._notify_execution_done(status='failed', error=str(e))
             raise
 
     def execute_until(self, target_node_id, input_data=None, max_iterations=1000):
@@ -276,6 +530,11 @@ class WorkflowExecutor:
                 'inputData': input_data or {},
             })
 
+        # Savepoint for rollback-on-failure
+        savepoint = None
+        if self._rollback_on_failure:
+            savepoint = self.env.cr.savepoint(flush=True)
+
         # Execute until target node or stack empty
         iteration = 0
         target_reached = False
@@ -288,10 +547,17 @@ class WorkflowExecutor:
             node_id = entry['nodeId']
             node_input = entry['inputData']
 
+            # Skip disabled nodes (stop path propagation)
+            if self._is_node_disabled(node_id):
+                _logger.debug("Skipping disabled node %s (preview)", node_id)
+                continue
+
             # Execute node
             try:
                 result = self._execute_node(node_id, node_input, persist=False)
             except Exception as exc:
+                # Rollback side effects on failure
+                savepoint = self._release_savepoint(savepoint, rollback=True)
                 error_message = str(exc)
                 error_node_id = node_id
                 result = {
@@ -318,6 +584,7 @@ class WorkflowExecutor:
             self._route_outputs(node_id, result)
 
         if iteration >= max_iterations:
+            savepoint = self._release_savepoint(savepoint, rollback=True)
             raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
 
         if error_message:
@@ -327,29 +594,54 @@ class WorkflowExecutor:
                 'error_node_id': error_node_id,
                 'node_outputs': self.node_outputs,
                 'executed_order': self.executed_order,
+                'executed_connections': self.executed_connections,
+                'executed_connection_ids': self._get_executed_connection_ids(),
                 'execution_count': iteration,
                 'target_node_id': target_node_id,
                 'context_snapshot': self._build_context_snapshot(error_node_id, target_result),
             }
 
         if not target_reached:
+            savepoint = self._release_savepoint(savepoint, rollback=True)
             raise UserError(_("Target node %s was not reached") % target_node_id)
+
+        # Success: release savepoint (keep changes)
+        savepoint = self._release_savepoint(savepoint)
 
         return {
             'status': 'completed',
             'node_outputs': self.node_outputs,
             'executed_order': self.executed_order,
+            'executed_connections': self.executed_connections,
+            'executed_connection_ids': self._get_executed_connection_ids(),
             'execution_count': iteration,
             'target_node_id': target_node_id,
             'context_snapshot': self._build_context_snapshot(target_node_id, target_result),
         }
     
     def _find_start_nodes(self):
-        """Find nodes with no incoming connections."""
-        return [
+        """Find enabled nodes with no incoming connections.
+
+        Disabled start nodes are excluded — they (and their downstream
+        paths) are not executed.
+
+        Raises:
+            UserError: If no enabled start nodes remain after filtering.
+        """
+        start_nodes = [
             node_id for node_id in self.nodes
             if node_id not in self._nodes_with_incoming
+            and not self._is_node_disabled(node_id)
         ]
+        if not start_nodes:
+            all_starts = [
+                node_id for node_id in self.nodes
+                if node_id not in self._nodes_with_incoming
+            ]
+            if all_starts:
+                raise UserError(_("All start nodes are disabled. Enable at least one start node to execute."))
+            raise UserError(_("Workflow must have at least one start node (a node without incoming connections)."))
+        return start_nodes
 
     def _find_start_nodes_for_target(self, target_node_id):
         """Find start nodes that lead to target node (preview flow).
@@ -463,8 +755,8 @@ class WorkflowExecutor:
         return None
 
     def _get_env_with_user(self, user):
-        """Return env switched to *user*.  Odoo 16+ always has with_user."""
-        return self.env.with_user(user)
+        """Return env switched to *user*"""
+        return self.env(user=user)
 
     def _get_node_record(self, node_id):
         """Get workflow.node record, cached per execution to avoid N+1."""
@@ -667,7 +959,10 @@ class WorkflowExecutor:
             'status': 'running',
             'started_at': started_at,
             'input_data': input_data,
-            'sequence': len(self.node_outputs),
+            # Sequence must track execution events, not unique node ids.
+            # Using executed_order length preserves correct order for loops
+            # where a node can run multiple times.
+            'sequence': len(self.executed_order),
         })
 
         try:
@@ -680,12 +975,7 @@ class WorkflowExecutor:
             duration_ms = (completed_at - started_at).total_seconds() * 1000
 
             # Determine output socket used
-            output_socket = None
-            if result.get('outputs'):
-                for i, output in enumerate(result['outputs']):
-                    if output:
-                        output_socket = str(i)
-                        break
+            output_socket = self._get_primary_output_socket(node, result)
 
             node_run.write({
                 'status': 'completed',
@@ -729,9 +1019,13 @@ class WorkflowExecutor:
         Args:
             node_id: Source node ID
             result: NodeOutput from execution
+
+        Returns:
+            list[dict]: Routed connection entries for this node.
         """
         outputs = result.get('outputs', [[result.get('json')]])
         connections = self.connections_by_source.get(node_id, [])
+        routed_connections = []
         
         # Get node to determine socket names
         node = self.nodes.get(node_id, {})
@@ -757,11 +1051,41 @@ class WorkflowExecutor:
                 if output_data:
                     # Get first item for single input
                     input_data = output_data[0] if len(output_data) == 1 else output_data
+
+                    connection_event = {
+                        'connection_id': conn.get('id'),
+                        'source': node_id,
+                        'source_socket': source_handle,
+                        'target': target_id,
+                        'target_socket': conn.get('targetHandle'),
+                        'output_index': output_index,
+                        'sequence': len(self.executed_connections),
+                    }
+                    self.executed_connections.append(connection_event)
+                    routed_connections.append(connection_event)
                     
                     self.stack.append({
                         'nodeId': target_id,
                         'inputData': input_data,
                     })
+
+        return routed_connections
+
+    def _get_primary_output_socket(self, node, result):
+        """Return first non-empty output socket name for persistence."""
+        outputs = (result or {}).get('outputs') or []
+        for index, output_data in enumerate(outputs):
+            if output_data:
+                return self._output_index_to_socket_name(node, index)
+        return None
+
+    def _output_index_to_socket_name(self, node, index):
+        """Convert output index to socket name for a node."""
+        node_type = (node or {}).get('type', '')
+        sockets = self.node_output_sockets.get(node_type) or []
+        if 0 <= index < len(sockets):
+            return sockets[index]
+        return str(index)
     
     # Pre-compiled pattern for dynamic switch sockets (case_1, case_2, etc.)
     _CASE_SOCKET_RE = re.compile(r'case_?(\d+)$')

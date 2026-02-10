@@ -36,6 +36,7 @@ class NodeResultSchema:
     status: str = "completed"
     duration_ms: Optional[float] = None
     output_data: Any = None
+    output_socket: Optional[str] = None
     error_message: Optional[str] = None
     title: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
@@ -84,6 +85,8 @@ class ExecutionResultSchema:
     node_count_executed: Optional[int] = None
     duration_seconds: Optional[float] = None
     executed_order: List[str] = field(default_factory=list)
+    executed_connection_ids: List[str] = field(default_factory=list)
+    executed_connections: List[Dict[str, Any]] = field(default_factory=list)
     
     # Data
     input_data: Dict[str, Any] = field(default_factory=dict)
@@ -114,6 +117,8 @@ class ExecutionResultSchema:
             'node_count_executed': self.node_count_executed,
             'duration_seconds': self.duration_seconds,
             'executed_order': self.executed_order,
+            'executed_connection_ids': self.executed_connection_ids,
+            'executed_connections': self.executed_connections,
             'input_data': self.input_data,
             'output_data': self.output_data,
             'node_results': [

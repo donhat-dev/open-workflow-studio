@@ -7,7 +7,7 @@
     'author': '',
     'website': '',
     'category': '',
-    'depends': ['base', 'web', 'mail'],
+    'depends': ['base', 'web', 'mail', 'bus'],
     'data': [
         'security/groups.xml',
         'security/ir.model.access.csv',
@@ -34,10 +34,10 @@
             'workflow_pilot/static/src/app/**/*',
             # Store (workflowEditor service)
             'workflow_pilot/static/src/store/**/*',
+            # Services (bus integration, etc.)
+            'workflow_pilot/static/src/services/**/*',
             # Core classes (pure JS, minimal deps)
             'workflow_pilot/static/src/core/**/*',
-            # Node definitions (register to node registry)
-            'workflow_pilot/static/src/nodes/**/*',
             # Utilities
             'workflow_pilot/static/src/utils/**/*',
             # Components (use services)

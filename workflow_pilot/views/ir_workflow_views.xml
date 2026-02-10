@@ -116,6 +116,7 @@
 						<group>
 							<field name="active"/>
 							<field name="auto_save"/>
+							<field name="rollback_on_failure"/>
 							<field name="is_published" readonly="1"/>
 							<field name="version" readonly="1"/>
 							<field name="node_count" readonly="1"/>

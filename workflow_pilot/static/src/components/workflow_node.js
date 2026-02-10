@@ -198,6 +198,7 @@ export class WorkflowNode extends Component {
      */
     get executionClass() {
         const status = this.props.executionStatus;
+        if (status === 'running') return 'execution-running';
         if (status === 'success') return 'execution-success';
         if (status === 'error') return 'execution-error';
         return '';

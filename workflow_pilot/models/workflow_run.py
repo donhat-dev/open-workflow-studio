@@ -99,6 +99,11 @@ class WorkflowRun(models.Model):
         default=lambda self: {},
         help='Final output from workflow execution'
     )
+    executed_connections = fields.Json(
+        string='Executed Connections',
+        default=lambda self: [],
+        help='Traversed connections in execution order (source socket -> target socket)'
+    )
 
     # === Error Handling ===
     error_message = fields.Text(

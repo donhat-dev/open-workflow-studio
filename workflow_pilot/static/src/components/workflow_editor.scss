@@ -353,6 +353,25 @@
   color: rgba($o-danger, 0.95);
 }
 
+.workflow-node__exec-badge--running {
+  color: rgba($o-info, 0.95);
+}
+
+/* Running / executing state (info border + pulse) */
+.workflow-node.execution-running {
+  border-color: $o-info;
+  box-shadow: 0 0 0 1px $o-info, 0 2px 8px rgba($o-info, 0.15);
+}
+
+.workflow-node.execution-running::before {
+  background: $o-info;
+}
+
+.workflow-node.execution-running.selected {
+  border-color: $o-info;
+  box-shadow: 0 0 0 2px $o-info, 0 4px 12px rgba($o-info, 0.2);
+}
+
 // Deleted
 // /* Update indicator colors based on type */
 // .workflow-node--http::before { background: #10b981; }

@@ -28,9 +28,11 @@ import {
     getNodeClass as getRegistryNodeClass,
     getNodeType,
     getRecentNodes,
+    pruneRecentNodes,
     searchNodes,
     trackNodeUsage,
 } from "../utils/node_registry";
+import { registerBackendNodeTypes } from "../utils/dynamic_node_factory";
 
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
@@ -80,7 +82,29 @@ export const workflowEditorService = {
                 return adapter.state;
             },
             ui: DEFAULT_UI_STATE(),
-            execution: null,
+            /**
+             * Unified execution progress tracker.
+             * Updated incrementally by bus events (node-by-node) and
+             * in bulk when the execute RPC completes.
+             * Shape: {
+             *     runId: string|null,
+             *     status: 'running'|'completed'|'failed',
+             *     nodeStatuses: { [nodeId]: 'running'|'success'|'error' },
+             *     executedOrder: string[],
+             *     executedConnectionIds: string[],
+             *     executedConnections: Array<{ connection_id, source, source_socket, target, target_socket, output_index, sequence }>,
+             *     nodeResults: Array<{ node_id, output_data, error_message, ... }>,
+             *     nodeOutputs: Object|null,
+             *     error: string|null,
+             *     errorNodeId: string|null,
+             *     outputData: any,
+             *     inputData: Object,
+             *     contextSnapshot: Object|null,
+             *     executionCount: number|null,
+             * }
+             * Reset to null when a new execution starts or graph is mutated.
+             */
+            executionProgress: null,
             nodeTypes: [],
         });
 
@@ -90,7 +114,7 @@ export const workflowEditorService = {
         });
 
         // ===============
-        // Execution result helpers
+        // Execution helpers
         // ===============
         function normalizeInputData(inputData) {
             if (inputData && typeof inputData === "object") {
@@ -99,80 +123,62 @@ export const workflowEditorService = {
             return {};
         }
 
-        function createExecutionResult(fields) {
-            const base = {
-                runId: null,
-                status: "failed",
+        /**
+         * Create a fresh execution progress with idle/running state.
+         * All rich fields start empty and get filled when execute completes.
+         */
+        function createFreshProgress(runId = null) {
+            return {
+                runId,
+                status: 'running',
+                nodeStatuses: {},
+                executedOrder: [],
+                executedConnectionIds: [],
+                executedConnections: [],
+                // Rich data — populated when execution finishes
+                nodeResults: [],
+                nodeOutputs: null,
                 error: null,
                 errorNodeId: null,
                 outputData: null,
-                executedOrder: [],
-                executionCount: null,
                 inputData: {},
-                nodeResults: [],
-                nodeOutputs: null,
                 contextSnapshot: null,
-                updatedAt: new Date().toISOString(),
+                executionCount: null,
             };
-            return Object.assign(base, fields);
         }
 
-        function buildExecutionError(message, inputData, overrides) {
-            const fields = Object.assign({
-                status: "failed",
-                error: message,
-                inputData: normalizeInputData(inputData),
-            }, overrides || {});
-            return createExecutionResult(fields);
-        }
-
-        function buildExecutionFromRun(run, result, inputData) {
-            return createExecutionResult({
-                runId: run.id || (result ? result.run_id : null),
-                status: run.status || (result && result.status) || "completed",
-                error: run.error_message || (result && result.error) || null,
-                errorNodeId: run.error_node_id || null,
-                outputData: run.output_data || null,
-                executedOrder: run.executed_order || result.executed_order || [],
-                executionCount: run.execution_count || null,
-                inputData: run.input_data || normalizeInputData(inputData),
-                contextSnapshot: (result && result.context_snapshot) || null,
-                nodeResults: run.node_results || [],
-            });
-        }
-
-        function buildNodeResultsFromOutputs(result) {
-            const nodeOutputs = (result && result.node_outputs) || {};
-            const executedOrder = Array.isArray(result && result.executed_order)
-                ? result.executed_order
-                : [];
-            let nodeResults = [];
-
-            if (executedOrder.length) {
-                nodeResults = executedOrder.map((nodeId) => {
-                    const output = nodeOutputs[nodeId] || {};
-                    return {
-                        node_id: nodeId,
-                        output_data: output.json,
-                        error_message: output.error || null,
-                        title: output.title,
-                        meta: output.meta || null,
-                    };
-                });
-            } else {
-                nodeResults = Object.entries(nodeOutputs).map(([nodeId, output]) => {
-                    const safeOutput = output || {};
-                    return {
-                        node_id: nodeId,
-                        output_data: safeOutput.json,
-                        error_message: safeOutput.error || null,
-                        title: safeOutput.title,
-                        meta: safeOutput.meta || null,
-                    };
-                });
+        /**
+         * Build nodeStatuses map from nodeResults array.
+         * @param {Array} nodeResults - [{ node_id, error_message, ... }]
+         * @returns {Object} { nodeId: 'success'|'error' }
+         */
+        function buildNodeStatusesFromResults(nodeResults) {
+            const statuses = {};
+            for (const r of nodeResults) {
+                if (r && r.node_id) {
+                    statuses[r.node_id] = r.error_message ? 'error' : 'success';
+                }
             }
+            return statuses;
+        }
 
-            return { nodeResults, nodeOutputs, executedOrder };
+        /**
+         * Build nodeResults from raw node_outputs (used by executeUntilNode).
+         */
+        function buildNodeResultsFromOutputs(nodeOutputs, executedOrder) {
+            const outputs = nodeOutputs || {};
+            const order = Array.isArray(executedOrder) ? executedOrder : [];
+            const source = order.length ? order : Object.keys(outputs);
+            return source.map((nodeId) => {
+                const output = outputs[nodeId] || {};
+                return {
+                    node_id: nodeId,
+                    output_data: output.json,
+                    error_message: output.error || null,
+                    title: output.title,
+                    meta: output.meta || null,
+                };
+            });
         }
 
         // ===============
@@ -186,11 +192,120 @@ export const workflowEditorService = {
         // Actions (graph via adapter, UI local)
         // ===============
         const actions = {
-            setExecutionResult(result) {
-                state.execution = result;
+            /**
+             * Merge final execution data into the current progress.
+             * If no progress exists, creates one from scratch.
+             */
+            setExecutionResult(fields) {
+                if (!state.executionProgress) {
+                    state.executionProgress = createFreshProgress();
+                }
+                Object.assign(state.executionProgress, fields);
+                // Derive nodeStatuses from nodeResults when not already set
+                if (Array.isArray(fields.nodeResults) && fields.nodeResults.length) {
+                    Object.assign(
+                        state.executionProgress.nodeStatuses,
+                        buildNodeStatusesFromResults(fields.nodeResults),
+                    );
+                }
+
+                if (
+                    (!Array.isArray(state.executionProgress.executedConnectionIds)
+                        || !state.executionProgress.executedConnectionIds.length)
+                    && Array.isArray(state.executionProgress.executedConnections)
+                    && state.executionProgress.executedConnections.length
+                ) {
+                    const executedConnectionIds = [];
+                    for (const entry of state.executionProgress.executedConnections) {
+                        if (entry && entry.connection_id) {
+                            executedConnectionIds.push(entry.connection_id);
+                        }
+                    }
+                    state.executionProgress.executedConnectionIds = executedConnectionIds;
+                }
             },
             clearExecution() {
-                state.execution = null;
+                state.executionProgress = null;
+            },
+            // ---- Bus-driven real-time execution progress ----
+            /**
+             * Called by workflow_bus_service when backend reports a node done.
+             * @param {Object} payload - { run_id, node_id, node_type, node_label, status, error, executed_order, sequence }
+             */
+            onNodeExecutionProgress(payload) {
+                if (!payload || !payload.node_id) {
+                    return;
+                }
+                if (!state.executionProgress) {
+                    state.executionProgress = createFreshProgress(payload.run_id);
+                }
+                // Guard: only accept events for the current run
+                if (state.executionProgress.runId && payload.run_id && state.executionProgress.runId !== payload.run_id) {
+                    return;
+                }
+
+                // Append to executed order (avoid duplicates)
+                const order = state.executionProgress.executedOrder;
+                if (order[order.length - 1] !== payload.node_id) {
+                    order.push(payload.node_id);
+                }
+
+                // Update node status
+                state.executionProgress.nodeStatuses[payload.node_id] = payload.status || 'success';
+
+                if (Array.isArray(payload.connection_ids) && payload.connection_ids.length) {
+                    for (const connectionId of payload.connection_ids) {
+                        if (connectionId) {
+                            state.executionProgress.executedConnectionIds.push(connectionId);
+                        }
+                    }
+                }
+
+                if (Array.isArray(payload.routed_connections) && payload.routed_connections.length) {
+                    for (const routedConnection of payload.routed_connections) {
+                        if (routedConnection && typeof routedConnection === 'object') {
+                            state.executionProgress.executedConnections.push(routedConnection);
+                        }
+                    }
+                }
+            },
+            /**
+             * Called by workflow_bus_service when backend reports a node starting.
+             * Shows a spinner / "running" indicator on the node.
+             * @param {Object} payload - { run_id, node_id, node_type, node_label }
+             */
+            onNodeExecutionStart(payload) {
+                if (!payload || !payload.node_id) {
+                    return;
+                }
+                if (!state.executionProgress) {
+                    state.executionProgress = createFreshProgress(payload.run_id);
+                }
+                if (state.executionProgress.runId && payload.run_id && state.executionProgress.runId !== payload.run_id) {
+                    return;
+                }
+                state.executionProgress.nodeStatuses[payload.node_id] = 'running';
+            },
+            /**
+             * Called by workflow_bus_service when backend reports execution done.
+             * @param {Object} payload - { run_id, status, error, executed_order, node_count }
+             */
+            onExecutionDone(payload) {
+                if (!state.executionProgress) {
+                    return;
+                }
+                state.executionProgress.status = (payload && payload.status) || 'completed';
+                state.executionProgress.error = (payload && payload.error) || null;
+                // Use the final executed_order from backend as authoritative
+                if (payload && Array.isArray(payload.executed_order)) {
+                    state.executionProgress.executedOrder = payload.executed_order;
+                }
+                if (payload && Array.isArray(payload.executed_connection_ids)) {
+                    state.executionProgress.executedConnectionIds = payload.executed_connection_ids;
+                }
+                if (payload && Array.isArray(payload.executed_connections)) {
+                    state.executionProgress.executedConnections = payload.executed_connections;
+                }
             },
             setSaving(value) {
                 state.ui.saving = !!value;
@@ -204,6 +319,8 @@ export const workflowEditorService = {
             addNode(type, position) {
                 const nodeId = adapter.addNode(type, position);
                 if (!nodeId) return null;
+                // Graph changed → stale execution highlights no longer valid
+                actions.clearExecution();
 
                 const config = adapter.getNodeConfig(nodeId);
                 history.push(
@@ -326,6 +443,8 @@ export const workflowEditorService = {
             removeNode(nodeId) {
                 const node = getNode(nodeId);
                 if (!node) return false;
+                // Graph changed → stale execution highlights no longer valid
+                actions.clearExecution();
 
                 const relatedConnections = state.graph.connections.filter(
                     (c) => c.source === nodeId || c.target === nodeId
@@ -353,6 +472,8 @@ export const workflowEditorService = {
                     targetHandle
                 );
                 if (conn) {
+                    // Graph changed → stale execution highlights no longer valid
+                    actions.clearExecution();
                     history.push(createAddConnectionAction(adapter, conn));
                     return conn.id;
                 }
@@ -362,6 +483,8 @@ export const workflowEditorService = {
             removeConnection(connectionId) {
                 const conn = getConnection(connectionId);
                 if (!conn) return false;
+                // Graph changed → stale execution highlights no longer valid
+                actions.clearExecution();
 
                 adapter.removeConnection(connectionId);
                 history.push(createRemoveConnectionAction(adapter, conn));
@@ -562,6 +685,8 @@ export const workflowEditorService = {
                 const isDisabled = !currentMeta.disabled;
                 adapter.setNodeMeta(nodeId, { disabled: isDisabled });
                 editorBus.trigger("NODE:DISABLED_CHANGED", { nodeId, disabled: isDisabled });
+                // Persist to backend so execution uses the updated snapshot
+                editorBus.trigger("save");
             },
 
             /**
@@ -666,8 +791,12 @@ export const workflowEditorService = {
                     args: [],
                     kwargs: {},
                 });
-                actions.setNodeTypes(result || []);
-                return result;
+                const backendTypes = Array.isArray(result) ? result : [];
+                const registeredKeys = registerBackendNodeTypes(backendTypes);
+                pruneRecentNodes(registeredKeys);
+                adapter.refreshNodeRegistry();
+                actions.setNodeTypes(backendTypes);
+                return backendTypes;
             },
             async saveWorkflow() {
                 const snapshot = adapter.toJSON();
@@ -687,6 +816,11 @@ export const workflowEditorService = {
                     throw new Error('No workflow ID loaded');
                 }
                 const safeInput = normalizeInputData(inputData);
+                // Reset to fresh progress — clears old highlights,
+                // bus events will fill nodeStatuses incrementally.
+                state.executionProgress = createFreshProgress();
+                state.executionProgress.inputData = safeInput;
+
                 const result = await rpc('/workflow_pilot/execute', {
                     workflow_id: workflowId,
                     input_data: safeInput,
@@ -695,17 +829,40 @@ export const workflowEditorService = {
                     const run = await rpc(`/workflow_pilot/run/${result.run_id}`, {});
                     if (run && run.error) {
                         const message = run.error || result.error || 'Failed to load run details';
-                        actions.setExecutionResult(buildExecutionError(message, safeInput, {
+                        actions.setExecutionResult({
                             runId: result.run_id,
                             status: result.status || 'failed',
-                        }));
+                            error: message,
+                            inputData: safeInput,
+                        });
                         return result;
                     }
-                    actions.setExecutionResult(buildExecutionFromRun(run, result, safeInput));
+                    actions.setExecutionResult({
+                        runId: run.id || result.run_id,
+                        status: run.status || result.status || 'completed',
+                        error: run.error_message || result.error || null,
+                        errorNodeId: run.error_node_id || null,
+                        outputData: run.output_data || null,
+                        executedOrder: run.executed_order || result.executed_order || [],
+                        executedConnectionIds:
+                            run.executed_connection_ids
+                            || result.executed_connection_ids
+                            || [],
+                        executedConnections:
+                            run.executed_connections
+                            || result.executed_connections
+                            || [],
+                        executionCount: run.execution_count || null,
+                        inputData: run.input_data || safeInput,
+                        contextSnapshot: result.context_snapshot || null,
+                        nodeResults: run.node_results || [],
+                    });
                 } else if (result && result.error) {
-                    actions.setExecutionResult(buildExecutionError(result.error, safeInput, {
+                    actions.setExecutionResult({
                         status: result.status || 'failed',
-                    }));
+                        error: result.error,
+                        inputData: safeInput,
+                    });
                 }
                 return result;
             },
@@ -716,8 +873,11 @@ export const workflowEditorService = {
                 if (!targetNodeId) {
                     throw new Error('Target node ID is required');
                 }
+                // Reset to fresh progress
+                state.executionProgress = createFreshProgress();
                 try {
                     const safeInput = normalizeInputData(inputData);
+                    state.executionProgress.inputData = safeInput;
                     const result = await rpc('/workflow_pilot/execute_until', {
                         workflow_id: workflowId,
                         target_node_id: targetNodeId,
@@ -726,25 +886,32 @@ export const workflowEditorService = {
                         config_overrides: configOverrides,
                     });
                     if (result && (result.status === 'completed' || result.status === 'failed')) {
-                        const outputResult = buildNodeResultsFromOutputs(result);
-                        actions.setExecutionResult(createExecutionResult({
-                            runId: null,
+                        const nodeResults = buildNodeResultsFromOutputs(
+                            result.node_outputs,
+                            result.executed_order,
+                        );
+                        actions.setExecutionResult({
                             status: result.status,
                             error: result.error || null,
                             errorNodeId: result.error_node_id || null,
-                            outputData: null,
-                            executedOrder: outputResult.executedOrder,
+                            executedOrder: result.executed_order || [],
+                            executedConnectionIds: result.executed_connection_ids || [],
+                            executedConnections: result.executed_connections || [],
                             executionCount: result.execution_count || null,
                             inputData: safeInput,
-                            nodeResults: outputResult.nodeResults,
-                            nodeOutputs: outputResult.nodeOutputs,
+                            nodeResults,
+                            nodeOutputs: result.node_outputs || null,
                             contextSnapshot: result.context_snapshot || null,
-                        }));
+                        });
                     }
                     return result;
                 } catch (error) {
                     const errorMessage = error && error.message ? error.message : 'Execution failed';
-                    actions.setExecutionResult(buildExecutionError(errorMessage, inputData));
+                    actions.setExecutionResult({
+                        status: 'failed',
+                        error: errorMessage,
+                        inputData,
+                    });
                     throw error;
                 }
             },

@@ -4,12 +4,13 @@
 Code Node Runner
 
 Executes user-provided expressions using safe_eval.
+Globals (available libraries) are provided by ir.workflow._get_eval_globals()
+so other modules can extend them via standard Odoo inheritance.
 """
 
-import math
 import re
+from datetime import datetime, date
 
-from odoo.tools import safe_eval as safe_eval_module
 from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
@@ -24,30 +25,23 @@ class CodeNodeRunner(BaseNodeRunner):
 
     node_type = 'code'
 
+    def _get_globals(self):
+        """Fetch eval globals from ir.workflow (single source of truth)."""
+        return self.executor.env['ir.workflow']._get_eval_globals()
+
     def get_eval_context(self, input_data, context):
         payload = input_data if input_data is not None else {}
         secure_context = context.get('secure_eval_context') if isinstance(context, dict) else None
         if isinstance(secure_context, dict):
             locals_dict = dict(secure_context)
             locals_dict['result'] = _RESULT_UNSET
-            globals_dict = {
-                'datetime': safe_eval_module.datetime,
-                'dateutil': safe_eval_module.dateutil,
-                'time': safe_eval_module.time,
-                'json': safe_eval_module.json,
-            }
-            globals_dict.update(locals_dict)
-            return locals_dict, globals_dict
-        locals_dict = build_eval_context(payload, context, include_input_item=True)
-        locals_dict['_now'] = safe_eval_module.datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
-        locals_dict['_today'] = safe_eval_module.datetime.date.today().strftime('%Y-%m-%d')
-        locals_dict['result'] = _RESULT_UNSET
-        globals_dict = {
-            'datetime': safe_eval_module.datetime,
-            'dateutil': safe_eval_module.dateutil,
-            'time': safe_eval_module.time,
-            'json': safe_eval_module.json,
-        }
+        else:
+            locals_dict = build_eval_context(payload, context, include_input_item=True)
+            locals_dict['_now'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+            locals_dict['_today'] = date.today().strftime('%Y-%m-%d')
+            locals_dict['result'] = _RESULT_UNSET
+
+        globals_dict = self._get_globals()
         globals_dict.update(locals_dict)
         return locals_dict, globals_dict
 

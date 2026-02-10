@@ -9,7 +9,6 @@ import { DataSocket, ErrorSocket, SocketRegistry } from './socket';
 
 /**
  * BaseNode - Abstract base class for all workflow nodes
- * Inspired by Rete.js ClassicPreset.Node and n8n's node structure
  * 
  * Nodes are the building blocks of workflows. Each node type
  * extends BaseNode and defines its inputs, outputs, and controls.

@@ -8,6 +8,37 @@ from .workflow_executor import WorkflowExecutor
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
 from odoo.tools import safe_eval
+from odoo.tools import safe_eval as safe_eval_module
+from odoo.tools.safe_eval import wrap_module
+
+
+# ---------------------------------------------------------------------------
+# Wrapped modules for code-node eval context.
+# Raw modules are rejected by safe_eval.check_values; wrap_module exposes
+# only the whitelisted attributes.  New functions can be added here or via
+# _get_eval_globals() inheritance in downstream modules.
+# ---------------------------------------------------------------------------
+_workflow_time = wrap_module(
+    __import__('time'),
+    ['time', 'strptime', 'strftime', 'sleep', 'perf_counter'],
+)
+_workflow_base64 = wrap_module(
+    __import__('base64'),
+    ['b64encode', 'b64decode'],
+)
+_workflow_math = wrap_module(
+    __import__('math'),
+    [
+        'ceil', 'floor', 'trunc', 'log', 'log2', 'log10', 'sqrt',
+        'pow', 'exp', 'fabs', 'factorial', 'gcd',
+        'pi', 'e', 'inf', 'nan',
+        'isnan', 'isinf', 'isfinite',
+    ],
+)
+_workflow_re = wrap_module(
+    __import__('re'),
+    ['search', 'match', 'fullmatch', 'findall', 'sub', 'split', 'compile', 'escape'],
+)
 
 
 class Workflow(models.Model):
@@ -99,6 +130,13 @@ class Workflow(models.Model):
         string='Auto Save',
         default=True,
         help='If true, execute will auto-save before running. Node config save will also trigger workflow save.'
+    )
+    rollback_on_failure = fields.Boolean(
+        string='Rollback on Failure',
+        default=False,
+        help='When enabled, all database side effects from executed nodes '
+             '(ORM operations in Code nodes) are rolled back '
+             'if any node fails. Execution logs are preserved for debugging.',
     )
 
     # === Snapshot Architecture ===
@@ -294,6 +332,7 @@ class Workflow(models.Model):
             'version_hash': workflow.version_hash,
             'is_published': workflow.is_published,
             'auto_save': workflow.auto_save,
+            'rollback_on_failure': workflow.rollback_on_failure,
             'draft_snapshot': workflow.draft_snapshot or {},
             'published_snapshot': workflow.published_snapshot or {},
             'node_count': workflow.node_count,
@@ -351,7 +390,7 @@ class Workflow(models.Model):
         }
 
     # === Execution Methods ===
-    def execute_workflow(self, input_data=None):
+    def execute_workflow(self, input_data=None, notify_user=False):
         """Execute published workflow synchronously.
         
         Creates a workflow.run record and executes all nodes from start
@@ -359,6 +398,8 @@ class Workflow(models.Model):
         
         Args:
             input_data: Initial input data for workflow (optional)
+            notify_user: If True, send bus notifications per-node for
+                         real-time UI progress (manual runs only)
             
         Returns:
             dict with run_id and output_data
@@ -385,8 +426,12 @@ class Workflow(models.Model):
         })
         
         # Execute using WorkflowExecutor
-        
-        executor = WorkflowExecutor(self.env, run)
+        notify_channel = self.env.user.partner_id if notify_user else None
+        executor = WorkflowExecutor(
+            self.env, run,
+            notify_channel=notify_channel,
+            rollback_on_failure=self.rollback_on_failure,
+        )
         try:
             output_data = executor.execute(input_data)
             last_node_id = executor.executed_order[-1] if executor.executed_order else None
@@ -461,7 +506,10 @@ class Workflow(models.Model):
                     node['config'] = {**existing, **override}
 
 
-        executor = WorkflowExecutor(self.env, workflow_run=None, snapshot=working_snapshot, persist=False)
+        executor = WorkflowExecutor(
+            self.env, workflow_run=None, snapshot=working_snapshot,
+            persist=False, rollback_on_failure=self.rollback_on_failure,
+        )
         result = executor.execute_until(
             target_node_id=target_node_id,
             input_data=input_data or {},
@@ -497,6 +545,39 @@ class Workflow(models.Model):
         }
 
         return data
+
+    # === Eval Context (extensible) ===
+
+    @api.model
+    def _get_eval_globals(self):
+        """Return globals dict for safe_eval in code nodes.
+
+        This is the single source of truth for libraries available to
+        user-written code expressions.  Other modules can extend the
+        set by inheriting ``ir.workflow`` and calling ``super()``:
+
+            class Workflow(models.Model):
+                _inherit = 'ir.workflow'
+
+                @api.model
+                def _get_eval_globals(self):
+                    ctx = super()._get_eval_globals()
+                    ctx['my_lib'] = wrap_module(my_lib, ['fn1', 'fn2'])
+                    return ctx
+
+        All values **must** be wrapped via ``wrap_module`` (or be plain
+        objects/functions).  Raw ``types.ModuleType`` will be rejected
+        by ``safe_eval.check_values``.
+        """
+        return {
+            'datetime': safe_eval_module.datetime,
+            'dateutil': safe_eval_module.dateutil,
+            'time': _workflow_time,
+            'json': safe_eval_module.json,
+            'base64': _workflow_base64,
+            'math': _workflow_math,
+            're': _workflow_re,
+        }
 
     def action_save(self):
         """Explicit save action to trigger version increment."""

@@ -53,17 +53,19 @@ class WorkflowPilotController(http.Controller):
             return ExecutionErrorSchema(error='Workflow not found').model_dump()
         
         try:
-            result = workflow.execute_workflow(input_data or {})
+            result = workflow.execute_workflow(input_data or {}, notify_user=True)
             run_id = result.get('run_id')
             
             # Fetch node results from run record (single iteration for performance)
             node_results = []
             node_outputs_map = {}
             executed_order = []
+            executed_connections = []
             context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
             if run_id:
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
+                    executed_connections = run.executed_connections or []
                     # Single pass: build node_results, node_outputs_map, and executed_order
                     # Sort by sequence to maintain execution order
                     for node_run in run.node_run_ids.sorted('sequence'):
@@ -74,6 +76,7 @@ class WorkflowPilotController(http.Controller):
                             status=node_run.status,
                             duration_ms=node_run.duration_ms,
                             output_data=node_run.output_data,
+                            output_socket=node_run.output_socket,
                             error_message=node_run.error_message,
                         ))
                         node_outputs_map[node_run.node_id] = node_run.output_data
@@ -107,6 +110,12 @@ class WorkflowPilotController(http.Controller):
                 node_count_executed=result.get('node_count_executed'),
                 duration_seconds=result.get('duration_seconds'),
                 executed_order=executed_order,
+                executed_connection_ids=[
+                    entry.get('connection_id')
+                    for entry in executed_connections
+                    if isinstance(entry, dict) and entry.get('connection_id')
+                ],
+                executed_connections=executed_connections,
                 input_data=input_data or {},
                 output_data=result.get('output_data'),
                 node_results=node_results,
@@ -133,6 +142,7 @@ class WorkflowPilotController(http.Controller):
         
         node_results = []
         executed_order = []
+        executed_connections = run.executed_connections or []
         # Sort by sequence to maintain execution order
         for node_run in run.node_run_ids.sorted('sequence'):
             node_results.append(NodeResultSchema(
@@ -142,6 +152,7 @@ class WorkflowPilotController(http.Controller):
                 status=node_run.status,
                 duration_ms=node_run.duration_ms,
                 output_data=node_run.output_data,
+                output_socket=node_run.output_socket,
                 error_message=node_run.error_message,
             ))
             executed_order.append(node_run.node_id)
@@ -172,7 +183,15 @@ class WorkflowPilotController(http.Controller):
             error_node_id=run.error_node_id,
             execution_count=run.execution_count,
             node_count_executed=run.node_count_executed,
-            duration_seconds=run.duration_seconds,            executed_order=executed_order,            input_data=run.input_data or {},
+            duration_seconds=run.duration_seconds,
+            executed_order=executed_order,
+            executed_connection_ids=[
+                entry.get('connection_id')
+                for entry in executed_connections
+                if isinstance(entry, dict) and entry.get('connection_id')
+            ],
+            executed_connections=executed_connections,
+            input_data=run.input_data or {},
             output_data=run.output_data,
             node_results=node_results,
             context_snapshot=context_snapshot,
@@ -264,6 +283,8 @@ class WorkflowPilotController(http.Controller):
                 execution_count=result.get('execution_count', 0),
                 node_count_executed=len(executed_order),
                 executed_order=executed_order,
+                executed_connection_ids=result.get('executed_connection_ids') or [],
+                executed_connections=result.get('executed_connections') or [],
                 input_data=input_data or {},
                 node_results=node_results,
                 node_outputs=node_outputs,  # Keep for backward compatibility

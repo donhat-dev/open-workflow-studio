@@ -62,6 +62,10 @@ export class EditorCanvas extends Component {
         this._connectedOutputsSetCache = new Set();
         this._dimensionsConfigSource = null;
         this._dimensionsCache = null;
+        this._executedConnectionIdsSource = null;
+        this._executedConnectionIdsCache = null;
+        this._executedConnectionIdsLength = 0;
+        this._lastExecutedOrderLength = 0;
 
         // Determine operating mode FIRST (before any state/hooks)
         // Mode 1: Editor Mode - service exists, no graphData prop
@@ -391,59 +395,90 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Check if execution features are available
+     * Check if execution features are available.
      */
     get hasExecution() {
         return !!this.executionState;
     }
 
     /**
-     * Map of nodeId → execution status ('success' | 'error' | null)
-     * Built from execution.nodeResults after a run completes.
+     * Unified execution state — from service (editor) or local (widget).
+     * Contains both live progress fields (nodeStatuses, executedOrder)
+     * and rich final data (nodeResults, contextSnapshot, etc.).
+     * @returns {Object|null}
+     */
+    get executionState() {
+        if (this.isEditorMode) {
+            return this.editorState.executionProgress;
+        }
+        return this.state.execution;
+    }
+
+    /**
+     * Map of nodeId → execution status ('running' | 'success' | 'error').
+     * Reads directly from executionProgress.nodeStatuses.
      * @returns {Map<string, string>}
      */
     get nodeExecutionStatusMap() {
-        const execution = this.executionState;
-        if (!execution || !Array.isArray(execution.nodeResults)) {
+        const progress = this.executionState;
+        if (!progress || !progress.nodeStatuses) {
             return this._emptyExecutionMap || (this._emptyExecutionMap = new Map());
         }
-        // Rebuild only when nodeResults reference changes
-        if (this._lastNodeResults === execution.nodeResults) {
-            return this._nodeExecMap;
-        }
-        this._lastNodeResults = execution.nodeResults;
+        const statuses = progress.nodeStatuses;
         const map = new Map();
-        for (const result of execution.nodeResults) {
-            if (!result || !result.node_id) continue;
-            map.set(result.node_id, result.error_message ? 'error' : 'success');
+        for (const nodeId of Object.keys(statuses)) {
+            map.set(nodeId, statuses[nodeId]);
         }
-        this._nodeExecMap = map;
         return map;
     }
 
     /**
-     * Set of connectionIds that represent the execution path.
-     * A connection is "executed" if both source and target nodes appear in executedOrder.
+     * Set of connectionIds on the execution path.
+     * Uses backend-provided socket-level routing data when available.
+     * Fallback to node-order heuristic for backward compatibility.
      * @returns {Set<string>}
      */
     get executedConnectionIds() {
-        const execution = this.executionState;
-        if (!execution || !Array.isArray(execution.executedOrder) || execution.executedOrder.length < 2) {
+        const progress = this.executionState;
+        const explicitConnectionIds = progress
+            && Array.isArray(progress.executedConnectionIds)
+            && progress.executedConnectionIds.length
+            ? progress.executedConnectionIds
+            : null;
+
+        if (explicitConnectionIds) {
+            if (
+                this._executedConnectionIdsSource !== explicitConnectionIds
+                || this._executedConnectionIdsLength !== explicitConnectionIds.length
+            ) {
+                this._executedConnectionIdsSource = explicitConnectionIds;
+                this._executedConnectionIdsLength = explicitConnectionIds.length;
+                this._executedConnectionIdsCache = new Set(explicitConnectionIds);
+            }
+            return this._executedConnectionIdsCache;
+        }
+
+        const executedOrder = progress && Array.isArray(progress.executedOrder) && progress.executedOrder.length >= 2
+            ? progress.executedOrder
+            : null;
+
+        if (!executedOrder) {
             return this._emptyExecConnSet || (this._emptyExecConnSet = new Set());
         }
-        // Rebuild only when executedOrder reference changes
-        if (this._lastExecutedOrder === execution.executedOrder) {
+
+        if (
+            this._lastExecutedOrder === executedOrder
+            && this._lastExecutedOrderLength === executedOrder.length
+        ) {
             return this._execConnSet;
         }
-        this._lastExecutedOrder = execution.executedOrder;
-        
-        const executedSet = new Set(execution.executedOrder);
+        this._lastExecutedOrder = executedOrder;
+        this._lastExecutedOrderLength = executedOrder.length;
+
+        const executedSet = new Set(executedOrder);
         const connSet = new Set();
-        const connections = this.connections;
-        
-        for (const conn of connections) {
+        for (const conn of this.connections) {
             if (!conn || !conn.source || !conn.target) continue;
-            // Connection is executed if both endpoints are in the executed list
             if (executedSet.has(conn.source) && executedSet.has(conn.target)) {
                 connSet.add(conn.id);
             }
@@ -453,7 +488,8 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Safe execution prop for NodeConfigPanel (undefined when not available)
+     * Execution data for NodeConfigPanel.
+     * Returns the unified progress or undefined.
      */
     get executionProp() {
         const execution = this.executionState;
@@ -532,16 +568,6 @@ export class EditorCanvas extends Component {
             throw new Error('[EditorCanvas] editor.state.ui is undefined');
         }
         return ui;
-    }
-
-    /**
-     * Get execution state - from service (editor mode) or local state (widget mode)
-     */
-    get executionState() {
-        if (this.isEditorMode) {
-            return this.editorState.execution;
-        }
-        return this.state.execution;
     }
 
     // ========================================

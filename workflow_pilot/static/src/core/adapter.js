@@ -331,6 +331,14 @@ export class WorkflowAdapter {
         return reg;
     }
 
+    /**
+     * Refresh editor node registry from current Odoo runtime registry.
+     * Needed after backend-driven node types are (re)registered.
+     */
+    refreshNodeRegistry() {
+        this.editor.nodeRegistry = this._buildNodeRegistryFromOdoo();
+    }
+
     // ============================================
     // CONNECTION MANAGEMENT
     // ============================================
