@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates>
+    <t t-name="workflow_studio.WorkflowHistoryPanel">
+        <div class="workflow-history-panel">
+            <div class="workflow-history-panel__header d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                <div class="workflow-history-panel__title d-flex align-items-center gap-2 fw-semibold">
+                    <i class="fa fa-history"/>
+                    <span>Version History</span>
+                </div>
+                <button class="btn btn-light btn-sm" t-on-click="props.onClose" title="Close">
+                    <i class="fa fa-times"/>
+                </button>
+            </div>
+
+            <div class="workflow-history-panel__toolbar d-flex align-items-center justify-content-between px-3 py-2">
+                <div class="history-toolbar__info">
+                    <div class="history-toolbar__label small text-muted">Preview</div>
+                    <t t-if="state.selectedRevisionId">
+                        <div class="history-toolbar__value fw-semibold">
+                            <t t-if="isCurrentSelected">Current version</t>
+                            <t t-else="">Version v<t t-esc="state.selectedRevisionId"/></t>
+                        </div>
+                        <div class="history-toolbar__meta">
+                            <span class="history-toolbar__tag badge text-bg-light">Read-only</span>
+                            <t t-if="state.previewing">
+                                <span class="history-toolbar__status small text-muted">Loading…</span>
+                            </t>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div class="history-toolbar__value text-muted">Select a version to preview</div>
+                        <div class="history-toolbar__meta">
+                            <span class="history-toolbar__tag badge text-bg-light">Read-only</span>
+                        </div>
+                    </t>
+                </div>
+                <button
+                    class="btn btn-primary btn-sm history-restore-btn"
+                    t-on-click="onRestoreClick"
+                    t-att-disabled="!canRestore ? 'disabled' : undefined">
+                    <i class="fa fa-undo me-1"/>Restore
+                </button>
+            </div>
+
+            <div class="workflow-history-panel__body">
+                <t t-if="state.loading">
+                    <div class="history-empty text-muted small text-center py-4">Loading history...</div>
+                </t>
+                <t t-elif="!displayRevisions.length">
+                    <div class="history-empty text-muted small text-center py-4">No version history available</div>
+                </t>
+                <t t-else="">
+                    <div class="history-timeline">
+                        <t t-foreach="groupedRevisions" t-as="group" t-key="group.label">
+                            <div class="history-group">
+                                <div class="history-group__label text-uppercase small text-muted fw-semibold">
+                                    <t t-esc="group.label"/>
+                                </div>
+                                <div class="history-group__items">
+                                    <t t-foreach="group.revisions" t-as="revision" t-key="revision.revision_id">
+                                        <button
+                                            t-attf-class="history-item {{ state.selectedRevisionId === revision.revision_id ? 'active' : '' }}"
+                                            t-on-click="() => this.onRevisionClick(revision.revision_id)">
+                                            
+                                            <!-- Timeline Visuals -->
+                                            <div class="history-item__timeline-col">
+                                                <div class="history-item__line_top"/>
+                                                <div class="history-item__dot">
+                                                    <t t-if="state.selectedRevisionId === revision.revision_id">
+                                                        <i class="fa fa-play history-item__dot-icon"/>
+                                                    </t>
+                                                </div>
+                                                <div class="history-item__line_bottom"/>
+                                            </div>
+
+                                            <div class="history-item__card">
+                                                <div class="history-item__header">
+                                                    <div class="history-item__info">
+                                                        <time class="history-item__time" t-att-title="formatDate(revision.create_date)">
+                                                            <t t-esc="revision.readableTime"/>
+                                                        </time>
+                                                        <div class="history-item__author">
+                                                            <small>by
+                                                                <t t-if="revision.is_current"> You</t>
+                                                                <t t-else=""> <t t-esc="revision.create_user_name"/></t>
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="history-item__avatar-wrap">
+                                                        <t t-if="revision.avatarUrl">
+                                                            <img t-att-src="revision.avatarUrl" class="history-item__avatar" alt="User"/>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span class="history-item__avatar history-item__avatar--placeholder"/>
+                                                        </t>
+                                                    </div>
+                                                </div>
+
+                                                <div class="history-item__main">
+                                                    <span class="history-item__title">v<t t-esc="revision.revision_id"/></span>
+                                                </div>
+
+                                                <div class="history-item__badges">
+                                                    <t t-if="revision.is_current">
+                                                        <span class="history-badge history-badge--current">Active</span>
+                                                    </t>
+                                                    <t t-elif="revision.is_milestone">
+                                                        <span class="history-badge history-badge--milestone">Milestone</span>
+                                                    </t>
+                                                    <t t-elif="revision.type and revision.type !== 'snapshot'">
+                                                        <span class="history-badge"><t t-esc="revision.type"/></span>
+                                                    </t>
+                                                </div>
+
+                                                <t t-if="revision.note">
+                                                    <div class="history-item__note">
+                                                        <t t-esc="revision.note"/>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </button>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

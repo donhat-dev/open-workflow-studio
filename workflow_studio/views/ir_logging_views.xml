@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Workflow Audit Log List View -->
+    <record id="view_ir_workflow_logging_list" model="ir.ui.view">
+        <field name="name">ir.workflow.logging.list</field>
+        <field name="model">ir.workflow.logging</field>
+        <field name="arch" type="xml">
+            <list string="Workflow Logs" default_order="create_date desc">
+                <field name="create_date" string="Time"/>
+                <field name="workflow_run" string="Run"/>
+                <field name="event_type"/>
+                <field name="model_name"/>
+                <field name="method_name"/>
+                <field name="message_display"/>
+                <field name="duration_ms"/>
+                <field name="success"/>
+                <field name="level" decoration-danger="level == 'ERROR'" decoration-warning="level == 'WARNING'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Workflow Audit Log Form View -->
+    <record id="view_ir_workflow_logging_form" model="ir.ui.view">
+        <field name="name">ir.workflow.logging.form</field>
+        <field name="model">ir.workflow.logging</field>
+        <field name="arch" type="xml">
+            <form string="Workflow Log Entry">
+                <sheet>
+                    <group>
+                        <group string="Context">
+                            <field name="workflow_run" string="Run"/>
+                            <field name="workflow_node" string="Node"/>
+                            <field name="event_type"/>
+                        </group>
+                        <group string="Details">
+                            <field name="create_date" string="Time"/>
+                            <field name="level"/>
+                            <field name="success"/>
+                            <field name="duration_ms"/>
+                        </group>
+                    </group>
+                    <group string="Model Access" invisible="event_type != 'model_access'">
+                        <field name="model_name"/>
+                        <field name="method_name"/>
+                    </group>
+                    <group string="Secret Access" invisible="event_type != 'secret_access'">
+                        <field name="secret_key"/>
+                    </group>
+                    <group string="Message">
+                        <field name="message_display" string="Display Message" widget="text"/>
+                        <field name="message" string="Raw Message" widget="text" groups="base.group_system"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Workflow Audit Log Search View -->
+    <record id="view_ir_workflow_logging_search" model="ir.ui.view">
+        <field name="name">ir.workflow.logging.search</field>
+        <field name="model">ir.workflow.logging</field>
+        <field name="arch" type="xml">
+            <search string="Workflow Logs">
+                <field name="workflow_run_id"/>
+                <field name="event_type"/>
+                <field name="model_name"/>
+                <field name="message_display"/>
+                <separator/>
+                <filter name="errors" string="Errors" domain="[('level', '=', 'ERROR')]"/>
+                <filter name="model_access" string="Model Access" domain="[('event_type', '=', 'model_access')]"/>
+                <filter name="secret_access" string="Secret Access" domain="[('event_type', '=', 'secret_access')]"/>
+                <separator/>
+                <filter name="today" string="Today" domain="[('create_date', '>=', (context_today()).strftime('%Y-%m-%d'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_run" string="Run" context="{'group_by': 'workflow_run_id'}"/>
+                    <filter name="group_event" string="Event Type" context="{'group_by': 'event_type'}"/>
+                    <filter name="group_model" string="Model" context="{'group_by': 'model_name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Workflow Audit Log Action -->
+    <record id="action_ir_workflow_logging" model="ir.actions.act_window">
+        <field name="name">Workflow Audit Logs</field>
+        <field name="res_model">ir.workflow.logging</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Menu Item under Workflow Pilot -->
+    <menuitem id="menu_ir_workflow_logging"
+        name="Audit Logs"
+        parent="workflow_studio.menu_workflow_pilot_root"
+        action="action_ir_workflow_logging"
+        sequence="50"
+        groups="workflow_studio.group_workflow_admin"/>
+</odoo>

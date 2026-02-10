@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+	<!-- =====================================================================
+         WORKFLOW RUN VIEWS
+         Backend views for viewing workflow execution logs
+         ===================================================================== -->
+	<!-- ===================== WORKFLOW RUN ===================== -->
+	<!-- list View -->
+	<record id="view_workflow_run_list" model="ir.ui.view">
+		<field name="name">workflow.run.list</field>
+		<field name="model">workflow.run</field>
+		<field name="arch" type="xml">
+			<list string="Workflow Runs" default_order="started_at desc" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-info="status == 'pending'" decoration-muted="status == 'cancelled'">
+				<field name="name"/>
+				<field name="workflow_id"/>
+				<field name="status" widget="badge" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-info="status == 'pending'" decoration-muted="status == 'cancelled'"/>
+				<field name="started_at"/>
+				<field name="completed_at"/>
+				<field name="duration_seconds" string="Duration"/>
+				<field name="node_count_executed"/>
+				<field name="execution_count"/>
+				<field name="error_node_id" optional="hide"/>
+				<field name="company_id" groups="base.group_multi_company"/>
+			</list>
+		</field>
+	</record>
+	<!-- Form View -->
+	<record id="view_workflow_run_form" model="ir.ui.view">
+		<field name="name">workflow.run.form</field>
+		<field name="model">workflow.run</field>
+		<field name="arch" type="xml">
+			<form string="Workflow Run" create="false">
+				<header>
+					<field name="status" widget="statusbar" statusbar_visible="pending,running,completed,failed"/>
+				</header>
+				<sheet>
+					<div class="oe_title">
+						<h1>
+							<field name="name"/>
+						</h1>
+					</div>
+					<group>
+						<group string="Execution Info">
+							<field name="workflow_id"/>
+							<field name="executed_version"/>
+							<field name="company_id" groups="base.group_multi_company"/>
+						</group>
+						<group string="Timing">
+							<field name="started_at"/>
+							<field name="completed_at"/>
+							<field name="duration_seconds" widget="float_time"/>
+						</group>
+					</group>
+					<group>
+						<group string="Statistics">
+							<field name="node_count_executed"/>
+							<field name="execution_count"/>
+						</group>
+						<group string="Error Info" invisible="status != 'failed'">
+							<field name="error_node_id"/>
+							<field name="error_message"/>
+						</group>
+					</group>
+					<notebook>
+						<page string="Node Results" name="node_results">
+							<field name="node_run_ids">
+								<list decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-muted="status == 'skipped'">
+									<field name="sequence"/>
+									<field name="node_label"/>
+									<field name="node_type"/>
+									<field name="status" widget="badge" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-muted="status == 'skipped'"/>
+									<field name="duration_ms" string="Time (ms)"/>
+									<field name="iteration"/>
+									<field name="output_socket"/>
+									<field name="error_message" optional="hide"/>
+								</list>
+							</field>
+						</page>
+						<page string="Input Data" name="input_data">
+							<field name="input_data" widget="flight_json"/>
+						</page>
+						<page string="Output Data" name="output_data">
+							<field name="output_data" widget="flight_json"/>
+						</page>
+						<page string="Executed Snapshot" name="snapshot">
+							<field name="executed_snapshot" widget="flight_json"/>
+						</page>
+					</notebook>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<!-- Search View -->
+	<record id="view_workflow_run_search" model="ir.ui.view">
+		<field name="name">workflow.run.search</field>
+		<field name="model">workflow.run</field>
+		<field name="arch" type="xml">
+			<search string="Search Workflow Runs">
+				<field name="name"/>
+				<field name="workflow_id"/>
+				<field name="status"/>
+				<field name="error_node_id"/>
+				<separator/>
+				<filter name="pending" string="Pending" domain="[('status', '=', 'pending')]"/>
+				<filter name="running" string="Running" domain="[('status', '=', 'running')]"/>
+				<filter name="completed" string="Completed" domain="[('status', '=', 'completed')]"/>
+				<filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
+				<filter name="cancelled" string="Cancelled" domain="[('status', '=', 'cancelled')]"/>
+				<separator/>
+				<filter name="today" string="Today" domain="[('started_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
+				<filter name="last_7_days" string="Last 7 Days" domain="[('started_at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
+				<separator/>
+				<group expand="0" string="Group By">
+					<filter name="group_workflow" string="Workflow" context="{'group_by': 'workflow_id'}"/>
+					<filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+					<filter name="group_date" string="Start Date" context="{'group_by': 'started_at:day'}"/>
+				</group>
+			</search>
+		</field>
+	</record>
+	<!-- Action -->
+	<record id="action_workflow_run" model="ir.actions.act_window">
+		<field name="name">Execution Logs</field>
+		<field name="res_model">workflow.run</field>
+		<field name="view_mode">list,form</field>
+		<field name="search_view_id" ref="view_workflow_run_search"/>
+		<field name="context">{}</field>
+		<field name="help" type="html">
+			<p class="o_view_nocontent_smiling_face">                No workflow executions yet            </p>
+			<p>                Workflow execution logs will appear here when workflows are run.                You can view input/output data, timing, and per-node results.            </p>
+		</field>
+	</record>
+	<!-- Menu Item -->
+	<menuitem id="menu_workflow_run" name="Execution Logs" parent="workflow_studio.menu_workflow_pilot_root" action="action_workflow_run" sequence="20"/>
+	<!-- ===================== WORKFLOW RUN NODE ===================== -->
+	<!-- list View for standalone access -->
+	<record id="view_workflow_run_node_list" model="ir.ui.view">
+		<field name="name">workflow.run.node.list</field>
+		<field name="model">workflow.run.node</field>
+		<field name="arch" type="xml">
+			<list string="Node Execution Results" default_order="sequence" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-muted="status == 'skipped'">
+				<field name="run_id"/>
+				<field name="sequence"/>
+				<field name="node_label"/>
+				<field name="node_type"/>
+				<field name="node_id"/>
+				<field name="status" widget="badge" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-muted="status == 'skipped'"/>
+				<field name="started_at"/>
+				<field name="duration_ms"/>
+				<field name="iteration"/>
+				<field name="output_socket"/>
+			</list>
+		</field>
+	</record>
+	<!-- Form View -->
+	<record id="view_workflow_run_node_form" model="ir.ui.view">
+		<field name="name">workflow.run.node.form</field>
+		<field name="model">workflow.run.node</field>
+		<field name="arch" type="xml">
+			<form string="Node Execution Result" create="false">
+				<header>
+					<field name="status" widget="statusbar"/>
+				</header>
+				<sheet>
+					<div class="oe_title">
+						<h1>
+							<field name="node_label"/>
+							<span class="text-muted">(																
+								<field name="node_type"/>)														
+							</span>
+						</h1>
+					</div>
+					<group>
+						<group string="Execution Info">
+							<field name="run_id"/>
+							<field name="node_id"/>
+							<field name="sequence"/>
+							<field name="iteration"/>
+						</group>
+						<group string="Timing">
+							<field name="started_at"/>
+							<field name="completed_at"/>
+							<field name="duration_ms"/>
+							<field name="output_socket"/>
+						</group>
+					</group>
+					<group invisible="status != 'failed'">
+						<field name="error_message"/>
+					</group>
+					<notebook>
+						<page string="Input Data" name="input_data">
+							<field name="input_data" widget="flight_json"/>
+						</page>
+						<page string="Output Data" name="output_data">
+							<field name="output_data" widget="flight_json"/>
+						</page>
+					</notebook>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<!-- Search View -->
+	<record id="view_workflow_run_node_search" model="ir.ui.view">
+		<field name="name">workflow.run.node.search</field>
+		<field name="model">workflow.run.node</field>
+		<field name="arch" type="xml">
+			<search string="Search Node Results">
+				<field name="run_id"/>
+				<field name="node_label"/>
+				<field name="node_type"/>
+				<field name="node_id"/>
+				<separator/>
+				<filter name="completed" string="Completed" domain="[('status', '=', 'completed')]"/>
+				<filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
+				<filter name="skipped" string="Skipped" domain="[('status', '=', 'skipped')]"/>
+				<separator/>
+				<group expand="0" string="Group By">
+					<filter name="group_run" string="Run" context="{'group_by': 'run_id'}"/>
+					<filter name="group_type" string="Node Type" context="{'group_by': 'node_type'}"/>
+					<filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+				</group>
+			</search>
+		</field>
+	</record>
+</odoo>

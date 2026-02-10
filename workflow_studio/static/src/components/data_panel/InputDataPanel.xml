@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<t t-name="workflow_studio.input_data_panel">
+		<div class="input-data-panel">
+			<!-- Header -->
+			<div class="input-data-panel__header" t-on-click="toggleCollapse">
+				<i t-att-class="state.isCollapsed ? 'fa fa-chevron-right' : 'fa fa-chevron-down'"/>
+				<span class="input-data-panel__title">
+					<i class="fa fa-database"/>
+					<t t-esc="nodeDisplayName"/>
+				</span>
+				<span class="input-data-panel__badge">Input</span>
+			</div>
+			<!-- Content -->
+			<div t-if="!state.isCollapsed" class="input-data-panel__content">
+				<t t-if="hasData">
+					<JsonTreeNode data="props.data" path="[]" onItemClick="onNodeClick"/>
+				</t>
+				<t t-else="">
+					<div class="input-data-panel__empty">
+						<i class="fa fa-info-circle"/>
+                        No input data available
+                    
+					</div>
+				</t>
+			</div>
+			<!-- Hint -->
+			<div class="input-data-panel__hint">
+				<i class="fa fa-hand-pointer-o"/>
+                Drag items to map data
+            
+			</div>
+		</div>
+	</t>
+</templates>

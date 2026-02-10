@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<t t-name="workflow_studio.json_tree_node">
+		<div class="json-tree-node" t-att-class="{ 'expanded': state.isExpanded, 'has-children': hasChildren }">
+			<!-- Node row -->
+			<div class="json-tree-node__row">
+				<!-- Expand/collapse icon -->
+				<span t-if="hasChildren" class="json-tree-node__toggle" t-on-click.stop="toggleExpand">
+					<i t-att-class="state.isExpanded ? 'fa fa-caret-down' : 'fa fa-caret-right'"/>
+				</span>
+				<span t-else="" class="json-tree-node__spacer"/>
+				<!-- Key Badge (draggable) -->
+				<t t-if="props.keyName !== undefined">
+					<span class="json-tree-node__key-badge" t-att-draggable="isDraggable ? 'true' : 'false'" t-att-data-path="expressionPath" t-att-data-expression="expressionTemplate" t-on-dragstart="onDragStart" t-on-dragend="onDragEnd" t-att-title="isDraggable ? ('Drag to map: ' + expressionPath) : 'Preview (read-only)'">
+						<span class="type-icon" t-esc="typeIcon"/>
+						<t t-esc="props.keyName"/>
+					</span>
+				</t>
+				<!-- Value display (not draggable) -->
+				<span t-att-class="'json-tree-node__value ' + valueClass">
+					<t t-esc="displayValue"/>
+				</span>
+			</div>
+			<!-- Children (recursive) -->
+			<div t-if="hasChildren and state.isExpanded" class="json-tree-node__children">
+				<t t-foreach="children" t-as="child" t-key="child.key">
+					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="props.draggable" isContextRoot="props.isContextRoot"/>
+				</t>
+			</div>
+		</div>
+	</t>
+</templates>

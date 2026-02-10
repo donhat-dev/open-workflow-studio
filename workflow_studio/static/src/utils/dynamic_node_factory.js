@@ -1,0 +1,382 @@
+/** @odoo-module **/
+
+import { registry } from "@web/core/registry";
+import { BaseNode } from "../core/node";
+import {
+    CheckboxControl,
+    CodeControl,
+    KeyValueControl,
+    NumberControl,
+    SelectControl,
+    TextInputControl,
+} from "../core/control";
+import { DataSocket, ErrorSocket, TriggerSocket } from "../core/socket";
+
+const nodeTypeRegistry = registry.category("workflow_node_types");
+const nodeCategoryRegistry = registry.category("workflow_node_categories");
+
+const DEFAULT_NODE_ICON = "fa-cube";
+const DEFAULT_NODE_CATEGORY = "transform";
+const DEFAULT_CATEGORY_ICON = "fa-cube";
+const DEFAULT_CATEGORY_SEQUENCE = 100;
+
+const SOCKET_BY_NAME = {
+    data: DataSocket,
+    error: ErrorSocket,
+    trigger: TriggerSocket,
+};
+
+const CATEGORY_LABELS = {
+    trigger: "Triggers",
+    action: "Actions",
+    flow: "Flow Control",
+    data: "Data",
+    integration: "Integrations",
+    transform: "Transform",
+};
+
+function getNodeTypeKey(entry) {
+    if (!entry || typeof entry !== "object") {
+        return "";
+    }
+    const key = entry.node_type || entry.nodeType || entry.key;
+    if (typeof key !== "string") {
+        return "";
+    }
+    return key.trim();
+}
+
+function humanizeKey(key) {
+    return String(key || "")
+        .split("_")
+        .filter(Boolean)
+        .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+        .join(" ");
+}
+
+function normalizeSchema(rawSchema) {
+    if (!rawSchema) {
+        return {};
+    }
+    if (typeof rawSchema === "string") {
+        try {
+            const parsed = JSON.parse(rawSchema);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                return parsed;
+            }
+            return {};
+        } catch {
+            return {};
+        }
+    }
+    if (typeof rawSchema === "object" && !Array.isArray(rawSchema)) {
+        return rawSchema;
+    }
+    return {};
+}
+
+function normalizeControlSchema(rawSchema) {
+    if (!rawSchema) {
+        return {};
+    }
+    if (typeof rawSchema === "string") {
+        return { type: rawSchema };
+    }
+    if (typeof rawSchema === "object" && !Array.isArray(rawSchema)) {
+        return rawSchema;
+    }
+    return {};
+}
+
+function normalizeSocketName(rawType) {
+    if (typeof rawType !== "string") {
+        return "data";
+    }
+    let normalized = rawType.trim().toLowerCase();
+    if (normalized.endsWith("socket")) {
+        normalized = normalized.slice(0, -6);
+    }
+    if (!normalized) {
+        return "data";
+    }
+    return normalized;
+}
+
+function resolveSocket(socketDefinition) {
+    let socketType = "data";
+
+    if (typeof socketDefinition === "string") {
+        socketType = normalizeSocketName(socketDefinition);
+    } else if (socketDefinition && typeof socketDefinition === "object" && !Array.isArray(socketDefinition)) {
+        if (typeof socketDefinition.type === "string") {
+            socketType = normalizeSocketName(socketDefinition.type);
+        } else if (typeof socketDefinition.socket === "string") {
+            socketType = normalizeSocketName(socketDefinition.socket);
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(SOCKET_BY_NAME, socketType)) {
+        return SOCKET_BY_NAME[socketType];
+    }
+    return DataSocket;
+}
+
+function getDefaultValue(schema, fallback) {
+    if (Object.prototype.hasOwnProperty.call(schema, "default")) {
+        return schema.default;
+    }
+    if (Object.prototype.hasOwnProperty.call(schema, "defaultValue")) {
+        return schema.defaultValue;
+    }
+    return fallback;
+}
+
+function normalizeControlType(rawType) {
+    if (typeof rawType !== "string") {
+        return "text";
+    }
+    const normalized = rawType.trim().toLowerCase();
+    if (!normalized) {
+        return "text";
+    }
+    return normalized;
+}
+
+function normalizeSelectOptions(rawOptions) {
+    if (!Array.isArray(rawOptions)) {
+        return [];
+    }
+
+    const normalized = [];
+    for (const option of rawOptions) {
+        if (option && typeof option === "object" && !Array.isArray(option)) {
+            const hasValue = Object.prototype.hasOwnProperty.call(option, "value");
+            const hasLabel = Object.prototype.hasOwnProperty.call(option, "label");
+            const value = hasValue ? option.value : option.label;
+            const label = hasLabel ? option.label : option.value;
+            if (value !== undefined && value !== null) {
+                normalized.push({
+                    value: String(value),
+                    label: String(label !== undefined && label !== null ? label : value),
+                });
+            }
+            continue;
+        }
+
+        if (option !== undefined && option !== null) {
+            normalized.push({ value: String(option), label: String(option) });
+        }
+    }
+
+    return normalized;
+}
+
+function createControl(controlKey, rawSchema) {
+    const schema = normalizeControlSchema(rawSchema);
+    const controlType = normalizeControlType(schema.type);
+    const label = typeof schema.label === "string" && schema.label ? schema.label : humanizeKey(controlKey);
+    const placeholder = typeof schema.placeholder === "string" ? schema.placeholder : "";
+
+    let control;
+
+    switch (controlType) {
+        case "select": {
+            control = new SelectControl(controlKey, {
+                label,
+                options: normalizeSelectOptions(schema.options),
+                default: getDefaultValue(schema, undefined),
+            });
+            break;
+        }
+        case "number": {
+            control = new NumberControl(controlKey, {
+                label,
+                min: schema.min,
+                max: schema.max,
+                step: schema.step,
+                default: getDefaultValue(schema, 0),
+            });
+            break;
+        }
+        case "boolean":
+        case "checkbox": {
+            control = new CheckboxControl(controlKey, {
+                label,
+                default: Boolean(getDefaultValue(schema, false)),
+            });
+            break;
+        }
+        case "keyvalue": {
+            control = new KeyValueControl(controlKey, {
+                label,
+                keyPlaceholder:
+                    typeof schema.keyPlaceholder === "string" ? schema.keyPlaceholder : "Key",
+                valuePlaceholder:
+                    typeof schema.valuePlaceholder === "string" ? schema.valuePlaceholder : "Value",
+                default: getDefaultValue(schema, []),
+            });
+            break;
+        }
+        case "code": {
+            control = new CodeControl(controlKey, {
+                label,
+                language: typeof schema.language === "string" ? schema.language : "python",
+                height: typeof schema.height === "number" ? schema.height : 200,
+                placeholder,
+                default: getDefaultValue(schema, ""),
+            });
+            break;
+        }
+        case "json":
+        case "text":
+        case "expression":
+        case "string":
+        default: {
+            const defaultMultiline = controlType === "text" || controlType === "json";
+            control = new TextInputControl(controlKey, {
+                label,
+                placeholder,
+                multiline: schema.multiline === true || defaultMultiline,
+                default: getDefaultValue(schema, ""),
+            });
+            break;
+        }
+    }
+
+    if (typeof schema.section === "string" && schema.section) {
+        control.section = schema.section;
+    }
+
+    return control;
+}
+
+function ensureCategory(categoryKey) {
+    if (typeof categoryKey !== "string" || !categoryKey) {
+        return;
+    }
+    if (nodeCategoryRegistry.contains(categoryKey)) {
+        return;
+    }
+
+    nodeCategoryRegistry.add(
+        categoryKey,
+        {
+            name: CATEGORY_LABELS[categoryKey] || humanizeKey(categoryKey),
+            icon: DEFAULT_CATEGORY_ICON,
+            description: "",
+        },
+        { sequence: DEFAULT_CATEGORY_SEQUENCE }
+    );
+}
+
+function createDynamicNodeClass(typeDef) {
+    const nodeType = getNodeTypeKey(typeDef);
+    const nodeLabel =
+        typeof typeDef.name === "string" && typeDef.name ? typeDef.name : humanizeKey(nodeType);
+    const nodeIcon =
+        typeof typeDef.icon === "string" && typeDef.icon ? typeDef.icon : DEFAULT_NODE_ICON;
+    const nodeCategory =
+        typeof typeDef.category === "string" && typeDef.category
+            ? typeDef.category
+            : DEFAULT_NODE_CATEGORY;
+    const nodeDescription =
+        typeof typeDef.description === "string" ? typeDef.description : "";
+
+    const configSchema = normalizeSchema(typeDef.config_schema);
+    const inputSchema = normalizeSchema(typeDef.input_schema);
+    const outputSchema = normalizeSchema(typeDef.output_schema);
+
+    class DynamicNode extends BaseNode {
+        constructor() {
+            super();
+
+            for (const [socketKey, socketDef] of Object.entries(inputSchema)) {
+                if (!socketKey) {
+                    continue;
+                }
+                const label =
+                    socketDef && typeof socketDef === "object" && !Array.isArray(socketDef)
+                        ? socketDef.label || humanizeKey(socketKey)
+                        : humanizeKey(socketKey);
+                const multiple =
+                    Boolean(
+                        socketDef
+                        && typeof socketDef === "object"
+                        && !Array.isArray(socketDef)
+                        && socketDef.multiple === true
+                    );
+                this.addInput(socketKey, resolveSocket(socketDef), label, { multiple });
+            }
+
+            for (const [socketKey, socketDef] of Object.entries(outputSchema)) {
+                if (!socketKey) {
+                    continue;
+                }
+                const label =
+                    socketDef && typeof socketDef === "object" && !Array.isArray(socketDef)
+                        ? socketDef.label || humanizeKey(socketKey)
+                        : humanizeKey(socketKey);
+                this.addOutput(socketKey, resolveSocket(socketDef), label);
+            }
+
+            for (const [controlKey, controlDef] of Object.entries(configSchema)) {
+                if (!controlKey) {
+                    continue;
+                }
+                this.addControl(controlKey, createControl(controlKey, controlDef));
+            }
+        }
+    }
+
+    DynamicNode.nodeType = nodeType;
+    DynamicNode.label = nodeLabel;
+    DynamicNode.icon = nodeIcon;
+    DynamicNode.category = nodeCategory;
+    DynamicNode.description = nodeDescription;
+
+    return DynamicNode;
+}
+
+/**
+ * Register backend-defined node types as runtime-generated node classes.
+ * This is backend-driven by design: node types not returned by backend are
+ * removed from frontend registry on each refresh.
+ *
+ * @param {Array<Object>} typeDefs
+ * @returns {string[]} registered node type keys
+ */
+export function registerBackendNodeTypes(typeDefs = []) {
+    const safeTypeDefs = Array.isArray(typeDefs) ? typeDefs : [];
+    const nextKeys = new Set();
+
+    for (const typeDef of safeTypeDefs) {
+        const nodeType = getNodeTypeKey(typeDef);
+        if (!nodeType) {
+            continue;
+        }
+
+        nextKeys.add(nodeType);
+        ensureCategory(typeDef.category || DEFAULT_NODE_CATEGORY);
+
+        const DynamicNodeClass = createDynamicNodeClass(typeDef);
+        nodeTypeRegistry.add(
+            nodeType,
+            {
+                class: DynamicNodeClass,
+                name: DynamicNodeClass.label,
+                icon: DynamicNodeClass.icon,
+                category: DynamicNodeClass.category,
+                description: DynamicNodeClass.description || "",
+            },
+            { force: true }
+        );
+    }
+
+    for (const [registeredKey] of nodeTypeRegistry.getEntries()) {
+        if (!nextKeys.has(registeredKey)) {
+            nodeTypeRegistry.remove(registeredKey);
+        }
+    }
+
+    return Array.from(nextKeys);
+}
