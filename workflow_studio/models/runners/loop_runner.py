@@ -55,10 +55,13 @@ class LoopNodeRunner(BaseNodeRunner):
         
         # Get items to iterate
         items_expr = node_config.get('inputItems', '{{ _json }}')
-        try:
-            items = ExpressionEvaluator.evaluate(items_expr, eval_context)
-        except Exception as e:
-            raise ValueError(f"Loop items expression failed: {e}")
+        if items_expr:
+            try:
+                items = ExpressionEvaluator.evaluate(items_expr, eval_context)
+            except Exception as e:
+                raise ValueError(f"Loop items expression failed when evaluating '{items_expr}': {e}")
+        else:
+            items = input_data
         
         if not isinstance(items, (list, tuple)):
             if items is None:

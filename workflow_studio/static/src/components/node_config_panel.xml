@@ -46,7 +46,7 @@
 						<div class="col-panel-content">
 							<!-- Show predecessor nodes with their outputs -->
 							<t t-if="leftPanelData and leftPanelData.length > 0">
-								<t t-foreach="leftPanelData" t-as="item" t-key="item.nodeId">
+								<t t-foreach="leftPanelData" t-as="item" t-key="item.rowKey">
 									<div class="ancestor-node-section" t-att-class="{ collapsed: isSectionCollapsed(item.nodeId) }">
 										<div class="ancestor-node-header" t-on-click="() => this.toggleAncestorSection(item.nodeId)">
 											<i t-att-class="'fa ' + (isSectionCollapsed(item.nodeId) ? 'fa-chevron-right' : 'fa-chevron-down')"/>
@@ -61,7 +61,7 @@
 											</t>
 										</div>
 										<div class="ancestor-node-data" t-if="!isSectionCollapsed(item.nodeId) and item.data.json !== undefined">
-											<JsonTreeNode data="item.data.json" path="[]" isInputNode="item.isInputNode" sourceNodeId="item.isInputNode ? null : item.nodeId"/>
+											<JsonTreeNode data="item.data.json" path="[]" level="0" initialExpandDepth="inputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" isInputNode="item.isInputNode" sourceNodeId="item.isInputNode ? null : item.nodeId"/>
 										</div>
 										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(item.nodeId)">
 											<div class="input-data-empty">
@@ -78,7 +78,7 @@
 										<span>Variables and context</span>
 									</div>
 									<div class="ancestor-node-data" t-if="!isSectionCollapsed('_context')">
-										<JsonTreeNode data="contextVariables" path="[]" draggable="true" isContextRoot="true"/>
+										<JsonTreeNode data="contextVariables" path="[]" level="0" initialExpandDepth="contextTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="true" isContextRoot="true"/>
 									</div>
 								</div>
 							</t>
@@ -153,12 +153,12 @@
 										<span>Execution failed</span>
 									</div>
 									<div class="output-tree-container">
-										<JsonTreeNode data="executionDisplayResult.error" path="[]" draggable="false"/>
+										<JsonTreeNode data="executionDisplayResult.error" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false"/>
 									</div>
 								</t>
 								<t t-else="">
 									<div class="output-tree-container">
-										<JsonTreeNode data="executionDisplayResult.output" path="[]" draggable="false"/>
+										<JsonTreeNode data="executionDisplayResult.output" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false"/>
 									</div>
 								</t>
 							</t>

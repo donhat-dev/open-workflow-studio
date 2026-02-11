@@ -87,7 +87,7 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- Menu Item under Workflow Pilot -->
+    <!-- Menu Item under Workflow Studio -->
     <menuitem id="menu_ir_workflow_logging"
         name="Audit Logs"
         parent="workflow_studio.menu_workflow_pilot_root"

@@ -169,7 +169,16 @@ export const workflowEditorService = {
             const outputs = nodeOutputs || {};
             const order = Array.isArray(executedOrder) ? executedOrder : [];
             const source = order.length ? order : Object.keys(outputs);
-            return source.map((nodeId) => {
+            const seen = new Set();
+            const results = [];
+            for (let i = source.length - 1; i >= 0; i--) {
+                const nodeId = source[i];
+                if (seen.has(nodeId)) continue;
+                seen.add(nodeId);
+                results.push(nodeId);
+            }
+            results.reverse();
+            return results.map((nodeId) => {
                 const output = outputs[nodeId] || {};
                 return {
                     node_id: nodeId,
@@ -229,82 +238,70 @@ export const workflowEditorService = {
             },
             // ---- Bus-driven real-time execution progress ----
             /**
-             * Called by workflow_bus_service when backend reports a node done.
-             * @param {Object} payload - { run_id, node_id, node_type, node_label, status, error, executed_order, sequence }
+             * Called by workflow_bus_service for batched execution progress.
+             * Handles completed nodes, connections, next running node, and final status
+             * in a single event — replacing the former node_start / node_done / done triplet.
+             * @param {Object} payload
+             *   - completed_nodes: [{node_id, status, node_type, node_label}, ...]
+             *   - connections: [routed_connection entries]
+             *   - next_running_node_id: string|null
+             *   - status: 'completed'|'failed'|undefined  (final only)
+             *   - error: string|null                       (final only)
+             *   - executed_order, executed_connection_ids, executed_connections (final only)
              */
-            onNodeExecutionProgress(payload) {
-                if (!payload || !payload.node_id) {
+            onExecutionProgress(payload) {
+                if (!payload) {
                     return;
                 }
                 if (!state.executionProgress) {
                     state.executionProgress = createFreshProgress(payload.run_id);
                 }
-                // Guard: only accept events for the current run
                 if (state.executionProgress.runId && payload.run_id && state.executionProgress.runId !== payload.run_id) {
                     return;
                 }
 
-                // Append to executed order (avoid duplicates)
                 const order = state.executionProgress.executedOrder;
-                if (order[order.length - 1] !== payload.node_id) {
-                    order.push(payload.node_id);
-                }
 
-                // Update node status
-                state.executionProgress.nodeStatuses[payload.node_id] = payload.status || 'success';
-
-                if (Array.isArray(payload.connection_ids) && payload.connection_ids.length) {
-                    for (const connectionId of payload.connection_ids) {
-                        if (connectionId) {
-                            state.executionProgress.executedConnectionIds.push(connectionId);
+                if (Array.isArray(payload.completed_nodes)) {
+                    for (const node of payload.completed_nodes) {
+                        if (!node || !node.node_id) {
+                            continue;
                         }
+                        if (order[order.length - 1] !== node.node_id) {
+                            order.push(node.node_id);
+                        }
+                        state.executionProgress.nodeStatuses[node.node_id] = node.status || 'success';
                     }
                 }
 
-                if (Array.isArray(payload.routed_connections) && payload.routed_connections.length) {
-                    for (const routedConnection of payload.routed_connections) {
-                        if (routedConnection && typeof routedConnection === 'object') {
-                            state.executionProgress.executedConnections.push(routedConnection);
+                if (Array.isArray(payload.connections)) {
+                    for (const conn of payload.connections) {
+                        if (!conn || typeof conn !== 'object') {
+                            continue;
                         }
+                        if (conn.connection_id) {
+                            state.executionProgress.executedConnectionIds.push(conn.connection_id);
+                        }
+                        state.executionProgress.executedConnections.push(conn);
                     }
                 }
-            },
-            /**
-             * Called by workflow_bus_service when backend reports a node starting.
-             * Shows a spinner / "running" indicator on the node.
-             * @param {Object} payload - { run_id, node_id, node_type, node_label }
-             */
-            onNodeExecutionStart(payload) {
-                if (!payload || !payload.node_id) {
-                    return;
+
+                if (payload.next_running_node_id) {
+                    state.executionProgress.nodeStatuses[payload.next_running_node_id] = 'running';
                 }
-                if (!state.executionProgress) {
-                    state.executionProgress = createFreshProgress(payload.run_id);
-                }
-                if (state.executionProgress.runId && payload.run_id && state.executionProgress.runId !== payload.run_id) {
-                    return;
-                }
-                state.executionProgress.nodeStatuses[payload.node_id] = 'running';
-            },
-            /**
-             * Called by workflow_bus_service when backend reports execution done.
-             * @param {Object} payload - { run_id, status, error, executed_order, node_count }
-             */
-            onExecutionDone(payload) {
-                if (!state.executionProgress) {
-                    return;
-                }
-                state.executionProgress.status = (payload && payload.status) || 'completed';
-                state.executionProgress.error = (payload && payload.error) || null;
-                // Use the final executed_order from backend as authoritative
-                if (payload && Array.isArray(payload.executed_order)) {
-                    state.executionProgress.executedOrder = payload.executed_order;
-                }
-                if (payload && Array.isArray(payload.executed_connection_ids)) {
-                    state.executionProgress.executedConnectionIds = payload.executed_connection_ids;
-                }
-                if (payload && Array.isArray(payload.executed_connections)) {
-                    state.executionProgress.executedConnections = payload.executed_connections;
+
+                if (payload.status) {
+                    state.executionProgress.status = payload.status;
+                    state.executionProgress.error = payload.error || null;
+                    if (Array.isArray(payload.executed_order)) {
+                        state.executionProgress.executedOrder = payload.executed_order;
+                    }
+                    if (Array.isArray(payload.executed_connection_ids)) {
+                        state.executionProgress.executedConnectionIds = payload.executed_connection_ids;
+                    }
+                    if (Array.isArray(payload.executed_connections)) {
+                        state.executionProgress.executedConnections = payload.executed_connections;
+                    }
                 }
             },
             setSaving(value) {

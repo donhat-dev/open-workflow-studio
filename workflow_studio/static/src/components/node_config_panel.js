@@ -29,6 +29,11 @@ export class NodeConfigPanel extends Component {
     static _predecessorCache = new Map();  // "workflowId:nodeId" -> Set<predecessorId>
     static _reverseAdjCache = new Map();   // workflowId -> reverseAdj map
 
+    static INPUT_TREE_EXPAND_DEPTH = 1;
+    static OUTPUT_TREE_EXPAND_DEPTH = 1;
+    static CONTEXT_TREE_EXPAND_DEPTH = 1;
+    static TREE_AUTO_COLLAPSE_CHILD_THRESHOLD = 40;
+
     setup() {
         this.actions = this.props.actions;
         if (!this.actions) {
@@ -214,7 +219,13 @@ export class NodeConfigPanel extends Component {
         if (!execution || !Array.isArray(execution.nodeResults)) {
             return null;
         }
-        return execution.nodeResults.find((result) => result.node_id === this.props.node.id) || null;
+        for (let i = execution.nodeResults.length - 1; i >= 0; i--) {
+            const result = execution.nodeResults[i];
+            if (result && result.node_id === this.props.node.id) {
+                return result;
+            }
+        }
+        return null;
     }
 
     /**
@@ -233,16 +244,18 @@ export class NodeConfigPanel extends Component {
                 execution.nodeResults,
                 currentNodeId
             );
-            
-            if (predecessorResults.length === 0) return null;
-            
-            return predecessorResults.map((result, index) => ({
-                nodeId: result.node_id,
+
+            const unique = this._getLastExecutionByNode(predecessorResults);
+            if (unique.length === 0) return null;
+
+            return unique.map((result, index) => ({
+                nodeId: String(result.node_id),
+                rowKey: String(result.node_id),
                 data: {
                     json: result.output_data,
                     title: result.title || result.node_label || result.node_type || result.node_id,
                 },
-                isInputNode: index === predecessorResults.length - 1,
+                isInputNode: index === unique.length - 1,
             }));
         }
 
@@ -269,6 +282,22 @@ export class NodeConfigPanel extends Component {
             isInputNode: index === entries.length - 1,
         }));
     }
+
+    get inputTreeExpandDepth() {
+        return NodeConfigPanel.INPUT_TREE_EXPAND_DEPTH;
+    }
+
+    get outputTreeExpandDepth() {
+        return NodeConfigPanel.OUTPUT_TREE_EXPAND_DEPTH;
+    }
+
+    get contextTreeExpandDepth() {
+        return NodeConfigPanel.CONTEXT_TREE_EXPAND_DEPTH;
+    }
+
+    get treeAutoCollapseChildrenThreshold() {
+        return NodeConfigPanel.TREE_AUTO_COLLAPSE_CHILD_THRESHOLD;
+    }
     
     /**
      * Filter execution results to show only predecessors of the current node.
@@ -288,6 +317,32 @@ export class NodeConfigPanel extends Component {
         
         // Filter results to only include predecessors, maintaining execution order
         return nodeResults.filter(r => predecessorIds.has(r.node_id));
+    }
+
+    /**
+     * Keep only the latest execution result for each node.
+     * Preserves insertion order by last occurrence (important for loop nodes).
+     * @param {Array} nodeResults
+     * @returns {Array}
+     * @private
+     */
+    _getLastExecutionByNode(nodeResults) {
+        if (!Array.isArray(nodeResults) || nodeResults.length === 0) {
+            return [];
+        }
+
+        const uniqueByNode = new Map();
+        for (const result of nodeResults) {
+            if (!result || result.node_id === undefined || result.node_id === null) {
+                continue;
+            }
+            const nodeId = String(result.node_id);
+            if (uniqueByNode.has(nodeId)) {
+                uniqueByNode.delete(nodeId);
+            }
+            uniqueByNode.set(nodeId, result);
+        }
+        return Array.from(uniqueByNode.values());
     }
     
     /**

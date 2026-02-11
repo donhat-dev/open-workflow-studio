@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Workflow Pilot Schemas
+Workflow Studio Schemas
 
 Pydantic models for API request/response validation.
 Provides unified data structures for frontend-backend communication.

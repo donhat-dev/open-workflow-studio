@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 /**
- * Workflow Pilot - Unified Dimension Constants
+ * Workflow Studio - Unified Dimension Constants
  * 
  * Centralized configuration for all node/component dimensions.
  * These values are used for:

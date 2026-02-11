@@ -48,7 +48,7 @@
 						<group string="Timing">
 							<field name="started_at"/>
 							<field name="completed_at"/>
-							<field name="duration_seconds" widget="float_time"/>
+							<field name="duration_seconds"/>
 						</group>
 					</group>
 					<group>

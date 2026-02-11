@@ -162,7 +162,7 @@
 			<field name="view_mode">kanban,list,form</field>
 			<field name="view_id" ref="view_ir_workflow_kanban"/>
 		</record>
-		<menuitem id="menu_workflow_pilot_root" name="Workflow Pilot"/>
+		<menuitem id="menu_workflow_pilot_root" name="Workflow Studio"/>
 		<menuitem id="menu_ir_workflow" name="Workflows" parent="menu_workflow_pilot_root" action="action_ir_workflow" sequence="10"/>
 	</data>
 </odoo>

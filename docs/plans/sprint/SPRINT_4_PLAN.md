@@ -74,6 +74,21 @@
 - **Sprint 4 Targets**: ~40% complete. Backend execution (E10.*) now has RPC + executor pieces in place, UI wiring is in progress, node registry refactor pivoted from frontend execution to calling backend. Remaining work centers on snapshot consumption in the UI, parity checks, and ensuring `workflowEditor` toggles between runtimes cleanly.
 - **Confidence**: Medium. Core primitives exist, but UI/UX integration (NodeConfigPanel preview + expression panel) still requires testing + polish before declaring the sprint done.
 
+## PERFORMANCE VALIDATION UPDATE (Feb 10, 2026)
+- **Trace files**
+  - Baseline editor: `tmp/perf_baseline_editor.json`
+  - Pre-patch stress (expanded loop payload): `tmp/perf_node_panel_stress.json`
+  - Toggle/collapse validation: `tmp/perf_toggle_loop_section.json`
+  - Post-patch validation: `tmp/perf_node_panel_post_patch.json`
+- **Measured outcome (same loop-node config scenario)**
+  - INP: `1117ms` (pre-patch stress) → `55ms` (post-patch)
+  - CLS: `0.00` (unchanged)
+  - DOM footprint in panel view: ~`467` elements / ~`15` `.json-tree-node` by default; ~`439` / ~`3` when collapsed
+- **Interpretation**
+  - Main bottleneck was eager rendering of deep JSON trees in NodeConfigPanel.
+  - Depth-aware + size-aware lazy expansion in `JsonTreeNode` removed most presentation delay and stabilized interaction latency.
+  - No new JS/Owl runtime errors observed in post-patch console checks (only existing minor accessibility warnings).
+
 ---
 
 ## SUCCESS CRITERIA

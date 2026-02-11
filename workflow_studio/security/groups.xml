@@ -7,7 +7,7 @@
         
         <!-- Module Category -->
         <record id="module_category_workflow_pilot" model="ir.module.category">
-            <field name="name">Workflow Pilot</field>
+            <field name="name">Workflow Studio</field>
             <field name="description">Workflow automation and integration</field>
             <field name="sequence">50</field>
         </record>

@@ -3,7 +3,7 @@
 /**
  * WorkflowGraph - Core Graph Utilities using Dagre.js
  * 
- * Provides foundation for graph manipulation and layout in Workflow Pilot.
+ * Provides foundation for graph manipulation and layout in Workflow Studio.
  * Handles cycle detection for loop nodes.
  * 
  * @core - This is a pure utility class with dependency injection for dagre.

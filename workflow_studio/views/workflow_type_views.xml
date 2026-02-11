@@ -13,6 +13,7 @@
 				<field name="sequence" widget="handle"/>
 				<field name="name"/>
 				<field name="node_type"/>
+				<field name="is_custom" widget="boolean_toggle" optional="show"/>
 				<field name="category" widget="badge" decoration-info="category == 'trigger'" decoration-success="category == 'integration'" decoration-warning="category == 'flow'" decoration-danger="category == 'transform'" decoration-muted="category == 'data'"/>
 				<field name="icon"/>
 				<field name="color" widget="color"/>
@@ -39,7 +40,8 @@
 					</div>
 					<group>
 						<group string="Basic Info">
-							<field name="node_type" placeholder="e.g., http_request"/>
+							<field name="node_type" placeholder="e.g., x_my_custom_node"/>
+							<field name="is_custom" readonly="1"/>
 							<field name="category"/>
 							<field name="sequence"/>
 						</group>
@@ -53,14 +55,17 @@
 						<field name="description" placeholder="Description shown in node palette..."/>
 					</group>
 					<notebook>
+						<page string="Runtime Code" name="runtime_code" invisible="not is_custom">
+							<field name="code" widget="code" options='{"mode": "python"}'/>
+						</page>
 						<page string="Configuration Schema" name="config_schema">
-							<field name="config_schema" widget="code"/>
+							<field name="config_schema" widget="code" options='{"mode": "python"}'/>
 						</page>
 						<page string="Input Schema" name="input_schema">
-							<field name="input_schema" widget="code"/>
+							<field name="input_schema" widget="code" options='{"mode": "python"}'/>
 						</page>
 						<page string="Output Schema" name="output_schema">
-							<field name="output_schema" widget="code"/>
+							<field name="output_schema" widget="code" options='{"mode": "python"}'/>
 						</page>
 					</notebook>
 				</sheet>
@@ -106,10 +111,13 @@
 			<search string="Search Node Types">
 				<field name="name"/>
 				<field name="node_type"/>
+				<field name="is_custom"/>
 				<field name="category"/>
 				<separator/>
 				<filter name="active" string="Active" domain="[('active', '=', True)]"/>
 				<filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+				<filter name="custom" string="Custom (x_)" domain="[('is_custom', '=', True)]"/>
+				<filter name="builtin" string="Built-in" domain="[('is_custom', '=', False)]"/>
 				<separator/>
 				<filter name="trigger" string="Trigger" domain="[('category', '=', 'trigger')]"/>
 				<filter name="flow" string="Flow Control" domain="[('category', '=', 'flow')]"/>

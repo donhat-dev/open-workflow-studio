@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import api, fields, models, _
+from odoo import fields, models, _
 
 
 class WorkflowRun(models.Model):
@@ -72,8 +72,8 @@ class WorkflowRun(models.Model):
     )
     duration_seconds = fields.Float(
         string='Duration (s)',
-        compute='_compute_duration',
-        store=True,
+        default=0.0,
+        digits=(8, 4),
         help='Total execution duration in seconds'
     )
 
@@ -134,16 +134,6 @@ class WorkflowRun(models.Model):
         string='Node Results',
         help='Per-node execution results'
     )
-
-    # === Computed Fields ===
-    @api.depends('started_at', 'completed_at')
-    def _compute_duration(self):
-        for record in self:
-            if record.started_at and record.completed_at:
-                delta = record.completed_at - record.started_at
-                record.duration_seconds = delta.total_seconds()
-            else:
-                record.duration_seconds = 0.0
 
     # === Display ===
     def name_get(self):
@@ -237,6 +227,8 @@ class WorkflowRunNode(models.Model):
     )
     duration_ms = fields.Float(
         string='Duration (ms)',
+        default=0.0,
+        digits=(8, 4),
         help='Node execution time in milliseconds'
     )
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Workflow Pilot Controllers
+Workflow Studio Controllers
 
 Provides HTTP endpoints for workflow execution.
 Uses Pydantic schemas for consistent response structure.
@@ -68,19 +68,38 @@ class WorkflowPilotController(http.Controller):
                     executed_connections = run.executed_connections or []
                     # Single pass: build node_results, node_outputs_map, and executed_order
                     # Sort by sequence to maintain execution order
+                    seen_nodes = set()
                     for node_run in run.node_run_ids.sorted('sequence'):
-                        node_results.append(NodeResultSchema(
-                            node_id=node_run.node_id,
-                            node_type=node_run.node_type,
-                            node_label=node_run.node_label,
-                            status=node_run.status,
-                            duration_ms=node_run.duration_ms,
-                            output_data=node_run.output_data,
-                            output_socket=node_run.output_socket,
-                            error_message=node_run.error_message,
-                        ))
-                        node_outputs_map[node_run.node_id] = node_run.output_data
-                        executed_order.append(node_run.node_id)
+                        nid = node_run.node_id
+                        node_outputs_map[nid] = node_run.output_data
+                        if nid in seen_nodes:
+                            # Loop iteration: overwrite last entry
+                            for i in range(len(node_results) - 1, -1, -1):
+                                if node_results[i].node_id == nid:
+                                    node_results[i] = NodeResultSchema(
+                                        node_id=nid,
+                                        node_type=node_run.node_type,
+                                        node_label=node_run.node_label,
+                                        status=node_run.status,
+                                        duration_ms=node_run.duration_ms,
+                                        output_data=node_run.output_data,
+                                        output_socket=node_run.output_socket,
+                                        error_message=node_run.error_message,
+                                    )
+                                    break
+                        else:
+                            seen_nodes.add(nid)
+                            node_results.append(NodeResultSchema(
+                                node_id=nid,
+                                node_type=node_run.node_type,
+                                node_label=node_run.node_label,
+                                status=node_run.status,
+                                duration_ms=node_run.duration_ms,
+                                output_data=node_run.output_data,
+                                output_socket=node_run.output_socket,
+                                error_message=node_run.error_message,
+                            ))
+                            executed_order.append(nid)
                     
                     if not context_snapshot:
                         # Build context snapshot using pre-built map (fallback)
@@ -143,19 +162,36 @@ class WorkflowPilotController(http.Controller):
         node_results = []
         executed_order = []
         executed_connections = run.executed_connections or []
-        # Sort by sequence to maintain execution order
+        seen_nodes = set()
         for node_run in run.node_run_ids.sorted('sequence'):
-            node_results.append(NodeResultSchema(
-                node_id=node_run.node_id,
-                node_type=node_run.node_type,
-                node_label=node_run.node_label,
-                status=node_run.status,
-                duration_ms=node_run.duration_ms,
-                output_data=node_run.output_data,
-                output_socket=node_run.output_socket,
-                error_message=node_run.error_message,
-            ))
-            executed_order.append(node_run.node_id)
+            nid = node_run.node_id
+            if nid in seen_nodes:
+                for i in range(len(node_results) - 1, -1, -1):
+                    if node_results[i].node_id == nid:
+                        node_results[i] = NodeResultSchema(
+                            node_id=nid,
+                            node_type=node_run.node_type,
+                            node_label=node_run.node_label,
+                            status=node_run.status,
+                            duration_ms=node_run.duration_ms,
+                            output_data=node_run.output_data,
+                            output_socket=node_run.output_socket,
+                            error_message=node_run.error_message,
+                        )
+                        break
+            else:
+                seen_nodes.add(nid)
+                node_results.append(NodeResultSchema(
+                    node_id=nid,
+                    node_type=node_run.node_type,
+                    node_label=node_run.node_label,
+                    status=node_run.status,
+                    duration_ms=node_run.duration_ms,
+                    output_data=node_run.output_data,
+                    output_socket=node_run.output_socket,
+                    error_message=node_run.error_message,
+                ))
+                executed_order.append(nid)
         
         workflow = run.workflow_id
         context_snapshot = ContextSnapshotSchema(
@@ -248,6 +284,18 @@ class WorkflowPilotController(http.Controller):
             error_message = result.get('error')
             error_node_id = result.get('error_node_id')
             
+            # Deduplicate executed_order: keep last occurrence only.
+            # Loop nodes execute many times but node_outputs already
+            # overwrites so only the final result matters.
+            seen = set()
+            unique_order = []
+            for nid in reversed(executed_order):
+                if nid not in seen:
+                    seen.add(nid)
+                    unique_order.append(nid)
+            unique_order.reverse()
+            executed_order = unique_order
+
             node_results = []
             for node_id in executed_order:
                 output = node_outputs.get(node_id, {})

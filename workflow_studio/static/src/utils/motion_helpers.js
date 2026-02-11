@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 /**
- * Motion.dev Helper Utilities for Workflow Pilot
+ * Motion.dev Helper Utilities for Workflow Studio
  * 
  * Provides animation functions for UX enhancements.
  * Uses window.Motion which is loaded from CDN.

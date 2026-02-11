@@ -37,6 +37,13 @@ class WorkflowType(models.Model):
         index=True,
         help='Technical identifier matching frontend registry (e.g., http, if, loop)'
     )
+    is_custom = fields.Boolean(
+        string='Is Custom',
+        compute='_compute_is_custom',
+        store=True,
+        index=True,
+        help="True when node_type starts with 'x_'."
+    )
     category = fields.Selection(
         selection=[
             ('trigger', 'Trigger'),
@@ -88,6 +95,14 @@ class WorkflowType(models.Model):
         string='Color',
         help='Hex color for node display (e.g., #3498db)'
     )
+    code = fields.Text(
+        string='Runtime Code',
+        help=(
+            "Python runtime code for custom node types (node_type starts with 'x_'). "
+            "Executed with safe_eval at workflow runtime."
+        ),
+        default=""
+    )
 
     # === Security ===
     group_id = fields.Many2one(
@@ -114,6 +129,53 @@ class WorkflowType(models.Model):
                     key=record.node_type
                 ))
 
+    @api.depends('node_type')
+    def _compute_is_custom(self):
+        for record in self:
+            record.is_custom = self._is_custom_node_type((record.node_type or '').strip())
+
+    @staticmethod
+    def _is_custom_node_type(node_type):
+        return isinstance(node_type, str) and node_type.startswith('x_')
+
+    @api.model
+    def _is_module_loading_context(self):
+        """Return True when records are loaded by module install/update."""
+        return bool(self.env.context.get('install_mode') or self.env.context.get('module'))
+
+    @api.constrains('node_type', 'code', 'group_id')
+    def _check_custom_node_contract(self):
+        """Validate custom node runtime contract.
+
+        Contract:
+            - Only custom node types (`x_*`) can define runtime code.
+            - Custom node types must define runtime code.
+            - Custom node types must define required group.
+        """
+        for record in self:
+            node_type = (record.node_type or '').strip()
+            runtime_code = (record.code or '').strip()
+            is_custom = self._is_custom_node_type(node_type)
+
+            if runtime_code and not is_custom:
+                raise ValidationError(_(
+                    "Runtime code is only allowed for custom node types with prefix 'x_'. "
+                    "Received node_type '%(key)s'.",
+                    key=node_type,
+                ))
+
+            if is_custom and not runtime_code:
+                raise ValidationError(_(
+                    "Custom node type '%(key)s' requires runtime code.",
+                    key=node_type,
+                ))
+
+            if is_custom and not record.group_id:
+                raise ValidationError(_(
+                    "Custom node type '%(key)s' requires a Required Group.",
+                    key=node_type,
+                ))
+
     def name_get(self):
         """Display name with category."""
         result = []
@@ -128,11 +190,29 @@ class WorkflowType(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if not self._is_module_loading_context():
+            for vals in vals_list:
+                node_type = (vals.get('node_type') or '').strip()
+                if node_type and not self._is_custom_node_type(node_type):
+                    raise ValidationError(_(
+                        "Custom node type key '%(key)s' must start with 'x_'. "
+                        "Base node types are module-managed.",
+                        key=node_type,
+                    ))
         self.env.registry.clear_cache()
         return super().create(vals_list)
 
     def write(self, vals):
-        if set(vals) & {'node_type', 'output_schema', 'active'}:
+        if 'node_type' in vals and not self._is_module_loading_context():
+            node_type = (vals.get('node_type') or '').strip()
+            if node_type and not self._is_custom_node_type(node_type):
+                raise ValidationError(_(
+                    "Custom node type key '%(key)s' must start with 'x_'. "
+                    "Base node types are module-managed.",
+                    key=node_type,
+                ))
+
+        if set(vals) & {'node_type', 'output_schema', 'active', 'code', 'group_id'}:
             self.env.registry.clear_cache()
         return super().write(vals)
 
@@ -175,6 +255,35 @@ class WorkflowType(models.Model):
         return mapping
 
     @api.model
+    @ormcache()
+    def _get_custom_runtime_mapping(self):
+        """Return custom node runtime contract by node_type.
+
+        Shape:
+            {
+                "x_custom": {
+                    "code": "...",
+                    "group_id": 42,
+                },
+            }
+        """
+        self.flush_model(['node_type', 'code', 'group_id', 'active', 'is_custom'])
+        self.env.cr.execute(
+            "SELECT node_type, code, group_id "
+            "FROM workflow_type "
+            "WHERE active = true AND is_custom = true"
+        )
+        mapping = {}
+        for node_type_key, code, group_id in self.env.cr.fetchall():
+            if not node_type_key:
+                continue
+            mapping[node_type_key] = {
+                'code': code or '',
+                'group_id': group_id,
+            }
+        return mapping
+
+    @api.model
     def get_available_types(self):
         """Return all active node types for frontend.
         
@@ -190,6 +299,7 @@ class WorkflowType(models.Model):
             'description': t.description or '',
             'icon': t.icon or '',
             'color': t.color or '',
+            'is_custom': bool(t.is_custom),
             'config_schema': t.config_schema or {},
             'input_schema': t.input_schema or {},
             'output_schema': t.output_schema or {},

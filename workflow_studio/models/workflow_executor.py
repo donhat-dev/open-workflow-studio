@@ -17,7 +17,8 @@ Expression Evaluation:
 
 import logging
 import re
-from datetime import datetime, date
+import time
+from datetime import datetime, date, timedelta
 import json
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -116,6 +117,15 @@ class WorkflowExecutor:
         self.executed_connections = []  # [{connection_id, source, source_socket, target, target_socket, output_index, sequence}]
         self._last_error_node_id = None
         self._node_record_cache = {}  # node_id -> record (avoids N+1 queries)
+        self._node_run_buffer = []   # in-memory node run data for batch persist
+        self._cached_execution_context = None
+        self._cached_workflow_context = None
+
+        # Bus notification batching (time-based)
+        self._pending_batch = []        # [{node_id, status, node_type, node_label}]
+        self._pending_connections = []  # [routed_connection entries]
+        self._last_flush_time = 0.0    # monotonic timestamp of last bus flush
+        self._bus_flush_interval = 0.15 # 150ms wall-clock threshold
 
         self.exec_context = ExecutionContext(
             node_outputs=self.node_outputs,
@@ -126,6 +136,7 @@ class WorkflowExecutor:
         )
 
         self.node_output_sockets = self._load_node_output_sockets()
+        self.custom_runtime_types = self._load_custom_runtime_types()
         
         # Build lookup structures
         self._build_graph()
@@ -167,79 +178,58 @@ class WorkflowExecutor:
             )
 
 
-    def _notify_node_start(self, node_id):
-        """Send bus notification when a node begins execution.
-
-        The UI uses this to show a spinner/running indicator on the node
-        before the result arrives via ``_notify_node_done``.
-
-        Notification type: ``workflow.execution/node_start``
-        """
+    def _bus_append(self, node_id, status, routed_connections=None):
+        """Append a node result to the pending bus batch."""
         if not self._notify_channel:
             return
         node = self.nodes.get(node_id, {})
-        self._send_bus_notification(
-            'workflow.execution/node_start',
-            {
-                'run_id': self.run.id if self.run else None,
-                'node_id': node_id,
-                'node_type': node.get('type'),
-                'node_label': node.get('label', ''),
-            },
-        )
+        self._pending_batch.append({
+            'node_id': node_id,
+            'status': status,
+            'node_type': node.get('type'),
+            'node_label': node.get('label', ''),
+        })
+        if routed_connections:
+            self._pending_connections.extend(routed_connections)
 
-    def _notify_node_done(self, node_id, result, routed_connections=None):
-        """Send bus notification after a node finishes execution.
+    def _bus_should_flush(self):
+        """Check if enough wall-clock time has passed to warrant a flush."""
+        if not self._notify_channel or not self._pending_batch:
+            return False
+        return (time.monotonic() - self._last_flush_time) >= self._bus_flush_interval
 
-        Only sends when ``_notify_channel`` is set (manual UI runs).
-        Uses a separate DB cursor so the main transaction is untouched.
+    def _bus_flush(self, next_node_id=None, final_status=None, error=None):
+        """Flush pending batch as a single ``workflow.execution/progress`` notification.
 
-        Notification type: ``workflow.execution/node_done``
+        Args:
+            next_node_id: Node about to execute (UI shows as 'running').
+            final_status: 'completed' or 'failed' when execution ends.
+            error: Error message (only with final_status='failed').
         """
         if not self._notify_channel:
             return
-        node = self.nodes.get(node_id, {})
-        has_error = bool(result.get('error'))
-        routed_connections = routed_connections or []
-        self._send_bus_notification(
-            'workflow.execution/node_done',
-            {
-                'run_id': self.run.id if self.run else None,
-                'node_id': node_id,
-                'node_type': node.get('type'),
-                'node_label': node.get('label', ''),
-                'status': 'error' if has_error else 'success',
-                'error': result.get('error') if has_error else None,
-                'executed_order': list(self.executed_order),
-                'routed_connections': routed_connections,
-                'connection_ids': [
-                    entry.get('connection_id')
-                    for entry in routed_connections
-                    if entry.get('connection_id')
-                ],
-                'sequence': len(self.executed_order) - 1,
-            },
-        )
-
-    def _notify_execution_done(self, status='completed', error=None):
-        """Send bus notification when the full execution finishes.
-
-        Notification type: ``workflow.execution/done``
-        """
-        if not self._notify_channel:
+        if not self._pending_batch and not final_status:
             return
-        self._send_bus_notification(
-            'workflow.execution/done',
-            {
-                'run_id': self.run.id if self.run else None,
-                'status': status,
-                'error': error,
-                'executed_order': list(self.executed_order),
-                'executed_connections': list(self.executed_connections),
-                'executed_connection_ids': self._get_executed_connection_ids(),
-                'node_count': len(self.executed_order),
-            },
-        )
+
+        message = {
+            'run_id': self.run.id if self.run else None,
+            'completed_nodes': list(self._pending_batch),
+            'connections': list(self._pending_connections),
+            'next_running_node_id': next_node_id,
+        }
+
+        if final_status:
+            message['status'] = final_status
+            message['error'] = error
+            message['executed_order'] = list(self.executed_order)
+            message['executed_connections'] = list(self.executed_connections)
+            message['executed_connection_ids'] = self._get_executed_connection_ids()
+            message['node_count'] = len(self.executed_order)
+
+        self._send_bus_notification('workflow.execution/progress', message)
+        self._pending_batch.clear()
+        self._pending_connections.clear()
+        self._last_flush_time = time.monotonic()
 
     def _get_executed_connection_ids(self):
         """Return traversed connection IDs in execution order."""
@@ -262,6 +252,13 @@ class WorkflowExecutor:
         """
         try:
             return self.env['workflow.type']._get_output_socket_mapping()
+        except Exception:
+            return {}
+
+    def _load_custom_runtime_types(self):
+        """Load custom runtime contract mapping from workflow.type."""
+        try:
+            return self.env['workflow.type']._get_custom_runtime_mapping()
         except Exception:
             return {}
     
@@ -332,42 +329,72 @@ class WorkflowExecutor:
             )
         return None
 
-    def _persist_node_runs_from_memory(self):
-        """Re-create workflow.run.node records from in-memory execution state.
+    def _persist_all_node_runs(self):
+        """Batch-create all workflow.run.node and workflow.node.output records.
 
-        Called after a savepoint rollback to preserve execution history
-        for debugging while all business-logic side effects (ORM writes
-        performed by code nodes, etc.) have been discarded.
+        Called once after the execution loop completes (success or failure).
+        Uses a single ``create(vals_list)`` call per model instead of N
+        individual creates, reducing SQL round-trips from ~3N to ~2.
 
-        ``executed_order`` and ``node_outputs`` survive the rollback
-        because they are plain Python dicts/lists, not ORM records.
+        Redaction (``_redact_output``) is deferred to this batch step so
+        that the hot execution loop never pays for ``to_plain`` +
+        regex masking + ``json.dumps`` per iteration.
+
+        Also used after a savepoint rollback to re-persist execution
+        history for debugging.
         """
         if not self.run:
             return
-        RunNode = self.env['workflow.run.node']
-        now = fields.Datetime.now()
-        for seq, node_id in enumerate(self.executed_order):
-            node = self.nodes.get(node_id, {})
-            output = self.node_outputs.get(node_id, {})
-            has_error = bool(output.get('error'))
-            output_json = output.get('json')
-            output_display = (
-                self._mask_sensitive_data(to_plain(output_json))
-                if output_json is not None else None
-            )
-            RunNode.create({
+
+        # Build vals list for workflow.run.node
+        run_node_vals = []
+        output_vals = []
+        for entry in self._node_run_buffer:
+            # Derive completed_at from started_at + duration_ms
+            started_at = entry['started_at']
+            duration_ms = entry.get('duration_ms', 0)
+            completed_at = started_at + timedelta(milliseconds=duration_ms)
+
+            # Redact output in batch (Bottleneck C: deferred from hot loop)
+            raw_json = entry.get('_raw_json')
+            redacted = None
+            output_display = None
+            if raw_json is not None:
+                redacted = self._redact_output(raw_json, entry['node_id'])
+                output_display = redacted['display']
+
+            run_node_vals.append({
                 'run_id': self.run.id,
-                'node_id': node_id,
-                'node_type': node.get('type'),
-                'node_label': node.get('label', ''),
-                'status': 'failed' if has_error else 'completed',
-                'started_at': now,
-                'completed_at': now,
+                'node_id': entry['node_id'],
+                'node_type': entry['node_type'],
+                'node_label': entry['node_label'],
+                'status': entry['status'],
+                'started_at': started_at,
+                'completed_at': completed_at,
+                'duration_ms': duration_ms,
                 'output_data': output_display,
-                'output_socket': self._get_primary_output_socket(node, output),
-                'error_message': output.get('error') if has_error else None,
-                'sequence': seq,
+                'output_socket': entry.get('output_socket'),
+                'error_message': entry.get('error_message'),
+                'sequence': entry['sequence'],
             })
+
+            # Collect workflow.node.output in same loop (reuse redacted result)
+            if redacted is not None:
+                node_record = self._get_node_record(entry['node_id'])
+                if node_record:
+                    output_vals.append({
+                        'run_id': self.run.id,
+                        'node_id': node_record.id,
+                        'output_raw': redacted['raw_text'],
+                        'output_display': redacted['display_text'],
+                        'output_json': redacted['display_text'],
+                    })
+
+        if run_node_vals:
+            self.env['workflow.run.node'].create(run_node_vals)
+
+        if output_vals:
+            self.env['workflow.node.output'].create(output_vals)
 
     def execute(self, input_data=None):
         """Execute workflow from start to completion.
@@ -381,7 +408,9 @@ class WorkflowExecutor:
         Raises:
             UserError: On execution failure
         """
+        start = time.monotonic()
         savepoint = None
+
         try:
             # Update run status
             if self.persist:
@@ -413,6 +442,7 @@ class WorkflowExecutor:
             # Execute until stack empty
             iteration = 0
             max_iterations = 1000
+            self._last_flush_time = time.monotonic()
             
             while self.stack and iteration < max_iterations:
                 iteration += 1
@@ -424,9 +454,6 @@ class WorkflowExecutor:
                 if self._is_node_disabled(node_id):
                     _logger.debug("Skipping disabled node %s", node_id)
                     continue
-                
-                # Notify frontend that a node is about to run (spinner)
-                self._notify_node_start(node_id)
 
                 # Execute node
                 try:
@@ -440,8 +467,8 @@ class WorkflowExecutor:
                     }
                     self.node_outputs[node_id] = failed_result
                     self.executed_order.append(node_id)
-                    # Emit a final node status for UI before global done(failed)
-                    self._notify_node_done(node_id, failed_result, [])
+                    self._bus_append(node_id, 'error')
+                    self._bus_flush(final_status='failed', error=str(exc))
                     raise
 
                 # Store output
@@ -451,10 +478,11 @@ class WorkflowExecutor:
                 # Route outputs to connected nodes
                 routed_connections = self._route_outputs(node_id, result)
 
-                # Notify frontend of node completion (real-time progress).
-                # Uses a separate DB cursor so the main transaction stays
-                # intact (no mid-loop commit needed).
-                self._notify_node_done(node_id, result, routed_connections)
+                # Append to bus batch; flush when wall-clock threshold exceeded
+                self._bus_append(node_id, 'success', routed_connections)
+                if self._bus_should_flush():
+                    next_id = self.stack[-1]['nodeId'] if self.stack else None
+                    self._bus_flush(next_node_id=next_id)
             
             if iteration >= max_iterations:
                 raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
@@ -466,6 +494,7 @@ class WorkflowExecutor:
             output_data_raw = self._collect_final_output()
             output_data_display = self._mask_sensitive_data(output_data_raw)
             if self.persist:
+                self._persist_all_node_runs()
                 self.run.write({
                     'status': 'completed',
                     'completed_at': fields.Datetime.now(),
@@ -475,24 +504,33 @@ class WorkflowExecutor:
                     'execution_count': iteration,
                 })
 
-            # Notify frontend that execution is done
-            self._notify_execution_done(status='completed')
+            # Final flush: remaining batch + done status
+            self._bus_flush(final_status='completed')
+
+            end = time.monotonic()
+            duration = end - start
+            if self.persist:
+                self.run.write({'duration_seconds': duration})
+            _logger.info("Workflow execution completed in %.4f seconds", duration)
 
             return output_data_display
             
         except Exception as e:
+            failed_duration = time.monotonic() - start
             # Rollback DB side effects when enabled
             if savepoint:
                 self._release_savepoint(savepoint, rollback=True)
                 savepoint = None
-                # Re-persist execution records for debugging
-                if self.persist:
-                    self._persist_node_runs_from_memory()
+            # Persist node runs for debugging (works after rollback too
+            # since _node_run_buffer is plain Python, not ORM records)
+            if self.persist:
+                self._persist_all_node_runs()
             # Mark run as failed
             if self.persist:
                 values = {
                     'status': 'failed',
                     'completed_at': fields.Datetime.now(),
+                    'duration_seconds': failed_duration,
                     'error_message': str(e),
                     'executed_connections': list(self.executed_connections),
                 }
@@ -500,8 +538,8 @@ class WorkflowExecutor:
                     values['error_node_id'] = self._last_error_node_id
                 self.run.write(values)
                 self.env.cr.commit()
-            # Notify frontend that execution failed
-            self._notify_execution_done(status='failed', error=str(e))
+            # Final flush: remaining batch + failed status
+            self._bus_flush(final_status='failed', error=str(e))
             raise
 
     def execute_until(self, target_node_id, input_data=None, max_iterations=1000):
@@ -703,6 +741,13 @@ class WorkflowExecutor:
 
         node_type = node.get('type')
         config = node.get('config', {})
+        is_custom_node = self._is_custom_node_type(node_type)
+        custom_runtime = self.custom_runtime_types.get(node_type) if is_custom_node else None
+        if is_custom_node and not custom_runtime:
+            raise ValidationError(_(
+                "Custom node type '%(key)s' is not configured or inactive in workflow.type.",
+                key=node_type,
+            ))
 
         # Build execution context (single in-memory context)
         context = self.exec_context.get_runtime_context(
@@ -711,8 +756,19 @@ class WorkflowExecutor:
             workflow=self._get_workflow_context(),
         )
 
-        if node_type == 'code':
+        if node_type == 'code' or is_custom_node:
             context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
+
+        if is_custom_node:
+            result = self._execute_custom_node_runtime(
+                node_type=node_type,
+                node_config=config,
+                input_data=input_data,
+                context=context,
+                runtime_meta=custom_runtime,
+            )
+            self._sanitize_dirty_vars()
+            return result
 
         # Get runner for node type
         runner = self.runners.get(node_type)
@@ -726,10 +782,76 @@ class WorkflowExecutor:
             self._sanitize_dirty_vars()
         return result
 
+    @staticmethod
+    def _is_custom_node_type(node_type):
+        return isinstance(node_type, str) and node_type.startswith('x_')
+
+    def _validate_custom_node_runtime(self, node_type, runtime_meta):
+        """Validate runtime contract for custom node type."""
+        code = (runtime_meta or {}).get('code')
+        required_group_id = (runtime_meta or {}).get('group_id')
+
+        if not isinstance(code, str) or not code.strip():
+            raise ValidationError(_(
+                "Custom node type '%(key)s' has empty runtime code.",
+                key=node_type,
+            ))
+
+        if not required_group_id:
+            raise ValidationError(_(
+                "Custom node type '%(key)s' is missing Required Group.",
+                key=node_type,
+            ))
+
+    def _check_custom_node_permission(self, node_type, runtime_meta):
+        """Enforce group-based runtime permission for custom nodes."""
+        required_group_id = (runtime_meta or {}).get('group_id')
+        if not required_group_id:
+            raise ValidationError(_(
+                "Custom node type '%(key)s' is missing Required Group.",
+                key=node_type,
+            ))
+
+        user = self._get_effective_execution_user()
+        if required_group_id in user.groups_id.ids:
+            return
+
+        group = self.env['res.groups'].browse(required_group_id)
+        group_name = group.display_name if group.exists() else str(required_group_id)
+        raise UserError(_(
+            "User '%(user)s' cannot execute custom node type '%(key)s'. "
+            "Required group: %(group)s.",
+            user=user.display_name,
+            key=node_type,
+            group=group_name,
+        ))
+
+    def _execute_custom_node_runtime(self, node_type, node_config, input_data, context, runtime_meta):
+        """Execute custom node runtime code via CodeNodeRunner + safe_eval."""
+        self._validate_custom_node_runtime(node_type, runtime_meta)
+        self._check_custom_node_permission(node_type, runtime_meta)
+
+        secure_context = context.get('secure_eval_context')
+        if isinstance(secure_context, dict):
+            secure_context['_config'] = node_config or {}
+            secure_context['_node_config'] = node_config or {}
+            secure_context['_node_type'] = node_type
+
+        code_runner = self.runners.get('code')
+        if not code_runner:
+            raise ValidationError(_("Code runner is unavailable for custom node runtime execution."))
+
+        runtime_config = {
+            'code': (runtime_meta.get('code') or '').strip(),
+        }
+        return code_runner.execute(runtime_config, input_data, context)
+
     def _get_execution_context(self):
+        if self._cached_execution_context is not None:
+            return self._cached_execution_context
         if not self.run:
             return None
-        return {
+        ctx = {
             'id': self.run.id,
             'name': self.run.name,
             'status': self.run.status,
@@ -738,21 +860,58 @@ class WorkflowExecutor:
             'duration_seconds': self.run.duration_seconds,
             'execution_count': self.run.execution_count,
         }
+        self._cached_execution_context = ctx
+        return ctx
 
     def _get_workflow_context(self):
-        if self.run and self.run.workflow_id:
-            workflow = self.run.workflow_id
-            return {
+        if self._cached_workflow_context is not None:
+            return self._cached_workflow_context
+        workflow = self._get_execution_workflow()
+        if workflow:
+            ctx = {
                 'id': workflow.id,
                 'name': workflow.name,
                 'active': workflow.active,
             }
+            self._cached_workflow_context = ctx
+            return ctx
 
         metadata = self.snapshot.get('metadata') or {}
         workflow = metadata.get('workflow')
         if isinstance(workflow, dict):
+            self._cached_workflow_context = workflow
             return workflow
         return None
+
+    def _invalidate_context_cache(self):
+        """Clear cached execution/workflow contexts.
+
+        Call after run status changes (e.g. 'running' → 'completed')
+        so that ``_build_context_snapshot`` sees fresh values.
+        """
+        self._cached_execution_context = None
+        self._cached_workflow_context = None
+
+    def _get_execution_workflow(self):
+        """Resolve workflow record for current execution context."""
+        if self.run and self.run.workflow_id:
+            return self.run.workflow_id
+
+        metadata = self.snapshot.get('metadata') or {}
+        workflow_data = metadata.get('workflow')
+        workflow_id = workflow_data.get('id') if isinstance(workflow_data, dict) else None
+        if not workflow_id:
+            return None
+
+        workflow = self.env['ir.workflow'].browse(workflow_id)
+        return workflow if workflow.exists() else None
+
+    def _get_effective_execution_user(self):
+        """Resolve effective execution user (run_as_user fallback)."""
+        workflow = self._get_execution_workflow()
+        if workflow and workflow.run_as_user_id:
+            return workflow.run_as_user_id
+        return self.env.user
 
     def _get_env_with_user(self, user):
         """Return env switched to *user*"""
@@ -792,17 +951,10 @@ class WorkflowExecutor:
             dict: Secure evaluation context
         """
         # Get workflow for security config
-        workflow = None
-        if self.run and self.run.workflow_id:
-            workflow = self.run.workflow_id
-        elif self.snapshot.get('metadata', {}).get('workflow', {}).get('id'):
-            workflow_id = self.snapshot['metadata']['workflow']['id']
-            workflow = self.env['ir.workflow'].browse(workflow_id)
-        
+        workflow = self._get_execution_workflow()
+
         # Determine effective user for execution
-        effective_user = self.env.user
-        if workflow and workflow.run_as_user_id:
-            effective_user = workflow.run_as_user_id
+        effective_user = self._get_effective_execution_user()
         
         # Create environment with effective user
         effective_env = self._get_env_with_user(effective_user)
@@ -929,11 +1081,16 @@ class WorkflowExecutor:
 
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
-        
+
+        When ``persist`` is True, node run data is collected in-memory
+        (``_node_run_buffer``) instead of writing to DB per-node.
+        ``_persist_all_node_runs()`` batch-creates all records after the
+        execution loop finishes.
+
         Args:
             node_id: Node ID to execute
             input_data: Input data for node
-            
+
         Returns:
             NodeOutput dict with outputs, json, etc.
         """
@@ -948,69 +1105,42 @@ class WorkflowExecutor:
             return self._execute_node_core(node_id, input_data, node=node)
 
         node_type = node.get('type')
-
-        # Create node run record
         started_at = datetime.now()
-        node_run = self.env['workflow.run.node'].create({
-            'run_id': self.run.id,
-            'node_id': node_id,
-            'node_type': node_type,
-            'node_label': node.get('label', ''),
-            'status': 'running',
-            'started_at': started_at,
-            'input_data': input_data,
-            # Sequence must track execution events, not unique node ids.
-            # Using executed_order length preserves correct order for loops
-            # where a node can run multiple times.
-            'sequence': len(self.executed_order),
-        })
+        t0 = time.monotonic()
 
         try:
             result = self._execute_node_core(node_id, input_data, node=node)
 
-            redacted = self._redact_output(result.get('json'), node_id)
-
-            # Update node run record
-            completed_at = datetime.now()
-            duration_ms = (completed_at - started_at).total_seconds() * 1000
-
-            # Determine output socket used
+            duration_ms = (time.monotonic() - t0) * 1000
             output_socket = self._get_primary_output_socket(node, result)
 
-            node_run.write({
+            self._node_run_buffer.append({
+                'node_id': node_id,
+                'node_type': node_type,
+                'node_label': node.get('label', ''),
                 'status': 'completed',
-                'completed_at': completed_at,
+                'started_at': started_at,
                 'duration_ms': duration_ms,
-                'output_data': redacted['display'],
                 'output_socket': output_socket,
+                'sequence': len(self.executed_order),
+                '_raw_json': result.get('json'),
             })
-
-            node_record = self._get_node_record(node_id)
-            if node_record:
-                self.env['workflow.node.output'].create({
-                    'run_id': self.run.id,
-                    'node_id': node_record.id,
-                    'output_raw': redacted['raw_text'],
-                    'output_display': redacted['display_text'],
-                    'output_json': redacted['display_text'],
-                })
 
             return result
 
         except Exception as e:
-            # Mark node as failed
-            node_run.write({
+            duration_ms = (time.monotonic() - t0) * 1000
+            self._node_run_buffer.append({
+                'node_id': node_id,
+                'node_type': node_type,
+                'node_label': node.get('label', ''),
                 'status': 'failed',
-                'completed_at': datetime.now(),
+                'started_at': started_at,
+                'duration_ms': duration_ms,
+                'output_socket': None,
                 'error_message': str(e),
+                'sequence': len(self.executed_order),
             })
-
-            # Update run with error node
-            if self.persist:
-                self.run.write({
-                    'error_node_id': node_id,
-                })
-
             raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
     
     def _route_outputs(self, node_id, result):
@@ -1257,6 +1387,7 @@ class WorkflowExecutor:
 
     def _build_context_snapshot(self, target_node_id, target_result):
         """Build context snapshot at target node execution."""
+        self._invalidate_context_cache()
         self.exec_context.update_runtime(
             execution=self._get_execution_context(),
             workflow=self._get_workflow_context(),

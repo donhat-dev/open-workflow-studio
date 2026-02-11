@@ -18,6 +18,13 @@ export class JsonTreeNode extends Component {
         path: { type: Array },  // Array of path segments
         keyName: { type: String, optional: true },  // Key name for display
         onItemClick: { type: Function, optional: true },
+        // Current depth level in the JSON tree (root = 0)
+        level: { type: Number, optional: true },
+        // Initial expansion depth. Nodes deeper than this depth start collapsed.
+        // Example: 1 => root expanded, children collapsed.
+        initialExpandDepth: { type: Number, optional: true },
+        // Auto-collapse large containers when their direct child count is above this threshold.
+        autoCollapseChildrenThreshold: { type: Number, optional: true },
         // Force require: if provided, expression paths will be node-scoped: _node["nodeId"].json...
         // Can be null for _input nodes
         sourceNodeId: { type: [String, { value: null }], optional: true },
@@ -31,8 +38,56 @@ export class JsonTreeNode extends Component {
 
     setup() {
         this.state = useState({
-            isExpanded: true,
+            isExpanded: this.initialExpandState,
         });
+    }
+
+    get initialExpandState() {
+        if (!this.hasChildren) {
+            return false;
+        }
+        if (this.currentLevel >= this.normalizedInitialExpandDepth) {
+            return false;
+        }
+        return this.estimatedChildCount <= this.normalizedAutoCollapseChildrenThreshold;
+    }
+
+    get currentLevel() {
+        const value = this.props.level;
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+            return Math.floor(value);
+        }
+        return 0;
+    }
+
+    get normalizedInitialExpandDepth() {
+        const value = this.props.initialExpandDepth;
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.max(0, Math.floor(value));
+        }
+        return Number.POSITIVE_INFINITY;
+    }
+
+    get normalizedAutoCollapseChildrenThreshold() {
+        const value = this.props.autoCollapseChildrenThreshold;
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.max(0, Math.floor(value));
+        }
+        return Number.POSITIVE_INFINITY;
+    }
+
+    get estimatedChildCount() {
+        if (this.isArray) {
+            return this.props.data.length;
+        }
+        if (this.isObject) {
+            return Object.keys(this.props.data).length;
+        }
+        return 0;
+    }
+
+    get childLevel() {
+        return this.currentLevel + 1;
     }
 
     get isObject() {
@@ -113,9 +168,11 @@ export class JsonTreeNode extends Component {
     }
 
     get expressionPath() {
-        // If isInputNode, use _input prefix (matches CodeNode runtime)
+        // If isInputNode, use _input.json prefix — the canonical data accessor.
+        // _input has metadata keys (json, item, items); raw payload keys are
+        // merged for convenience but _input.json.field is the explicit/safe path.
         if (this.props.isInputNode) {
-            return generateExpressionPath(this.props.path, '_input');
+            return generateExpressionPath(this.props.path, '_input.json');
         }
 
         if (this.props.path && this.props.path[0] === '_vars') {

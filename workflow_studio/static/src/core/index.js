@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 /**
- * Core Module - Workflow Pilot Library
+ * Core Module - Workflow Studio Library
  * 
  * This module exports all core classes for building workflow editors.
  * Inspired by Rete.js architecture with OWL-compatible design.

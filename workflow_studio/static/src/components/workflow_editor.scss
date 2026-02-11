@@ -1,5 +1,5 @@
 /* ============================================================
-   Workflow Pilot - Core Component Styles
+   Workflow Studio - Core Component Styles
    Uses Odoo SCSS variables for automatic light/dark mode
    ============================================================ */
 
@@ -122,10 +122,6 @@
   stroke-dasharray: 6, 4;
   stroke: $o-gray-500;
   color: $o-gray-500;
-}
-
-.workflow-connection--back-edge {
-  stroke: $o-warning;
 }
 
 /* 3. Workflow Node (Odoo Card Style) */
