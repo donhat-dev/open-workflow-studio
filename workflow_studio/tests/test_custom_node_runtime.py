@@ -126,6 +126,30 @@ class TestCustomNodeRuntime(common.TransactionCase):
         self.assertTrue(by_key[custom_type.node_type]['is_custom'])
         self.assertFalse(by_key[builtin_type.node_type]['is_custom'])
 
+    def test_get_available_types_http_contains_suggestion_metadata(self):
+        available = self.WorkflowType.get_available_types()
+        http_type = next((item for item in available if item.get('node_type') == 'http'), None)
+
+        self.assertTrue(http_type, 'HTTP node type must be present in available types')
+
+        config_schema = http_type.get('config_schema') or {}
+        self.assertIn('url', config_schema)
+        self.assertIn('query_params', config_schema)
+        self.assertIn('headers', config_schema)
+
+        self.assertTrue(
+            isinstance(config_schema['url'].get('suggestions'), list),
+            'HTTP url control must expose suggestions list',
+        )
+        self.assertTrue(
+            isinstance(config_schema['query_params'].get('suggestionsByKey'), dict),
+            'HTTP query_params control must expose suggestionsByKey map',
+        )
+        self.assertTrue(
+            isinstance(config_schema['headers'].get('suggestionsByKey'), dict),
+            'HTTP headers control must expose suggestionsByKey map',
+        )
+
     def test_non_module_create_rejects_builtin_key(self):
         with self.assertRaises(ValidationError):
             self.WorkflowType.create({

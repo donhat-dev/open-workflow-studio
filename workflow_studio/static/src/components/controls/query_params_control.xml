@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.query_params_control">
+        <div class="query-params-control">
+            <t t-foreach="state.params" t-as="param" t-key="param.id">
+                <div class="qp-row d-flex gap-1 align-items-end mb-1" t-att-class="{ 'qp-disabled': !param.enabled }">
+                    <!-- Enable/disable checkbox -->
+                    <input type="checkbox" class="qp-toggle" t-att-checked="param.enabled" t-on-change="() => this.onToggleEnabled(param_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                    <input type="text" class="kv-key" placeholder="Key" t-att-value="param.key" t-on-input="(ev) => this.onKeyChange(param_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                    <ExpressionInput value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
+                    <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly">×</button>
+                </div>
+            </t>
+            <button t-if="!props.readonly" class="kv-add" t-on-click="addParam">+ Add</button>
+        </div>
+    </t>
+</templates>

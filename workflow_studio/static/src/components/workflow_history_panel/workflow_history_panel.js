@@ -6,6 +6,7 @@
 
 import { Component, useState, onMounted, useExternalListener } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 import { formatDateTime } from "@web/core/l10n/dates";
 import { _t } from "@web/core/l10n/translation";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
@@ -21,6 +22,8 @@ export class WorkflowHistoryPanel extends Component {
         restoreRequested: Function,
         previewRequested: { type: Function, optional: true },
         currentRequested: { type: Function, optional: true },
+        executionViewRequested: { type: Function, optional: true },
+        exitExecutionView: { type: Function, optional: true },
         historyMetadata: { type: Array, optional: true },
         fieldName: { type: String, optional: true },
     };
@@ -35,6 +38,11 @@ export class WorkflowHistoryPanel extends Component {
         loading: false,
         previewing: false,
         followLatest: true,
+        // Runs tab state
+        activeTab: 'versions',
+        runs: [],
+        selectedRunId: null,
+        loadingRuns: false,
     });
 
     setup() {
@@ -42,6 +50,9 @@ export class WorkflowHistoryPanel extends Component {
         this.dialog = useService("dialog");
         this.notification = useService("notification");
         this.ui = useService("ui");
+
+        /** @type {Map<number, Object>} Cache for preloaded run details */
+        this._runDetailCache = new Map();
 
         onMounted(() => this.init());
         useExternalListener(this.env.bus, "save", () => this.refreshHistory());
@@ -213,6 +224,156 @@ export class WorkflowHistoryPanel extends Component {
 
     onRevisionClick(revisionId) {
         this.selectRevision(revisionId);
+    }
+
+    // ================= Runs Tab =================
+
+    switchTab(tab) {
+        if (this.state.activeTab === tab) {
+            return;
+        }
+        // Exit any active preview/view when switching tabs
+        if (this.state.activeTab === 'versions' && this.state.selectedRevisionId && !this.isCurrentSelected) {
+            this.selectCurrentRevision();
+        }
+        if (this.state.activeTab === 'runs' && this.state.selectedRunId) {
+            this.exitRunView();
+        }
+        this.state.activeTab = tab;
+        if (tab === 'runs' && this.state.runs.length === 0) {
+            this.loadRuns();
+        }
+    }
+
+    async loadRuns() {
+        this.state.loadingRuns = true;
+        try {
+            this.state.runs = await this.orm.call(
+                "ir.workflow",
+                "get_recent_runs",
+                [[this.props.workflowId]]
+            );
+            // Batch preload details for the first 5 runs
+            this._preloadRunDetails(this.state.runs.slice(0, 5));
+        } catch (error) {
+            this.notification.add(
+                _t("Failed to load execution runs: %s", error.message),
+                { type: "danger" }
+            );
+        } finally {
+            this.state.loadingRuns = false;
+        }
+    }
+
+    /**
+     * Preload run details in parallel (up to N runs).
+     * Results are cached in _runDetailCache for instant display on click.
+     * @param {Array<{id: number}>} runs
+     */
+    _preloadRunDetails(runs) {
+        if (!runs || !runs.length) return;
+        const toFetch = runs.filter(r => !this._runDetailCache.has(r.id));
+        if (!toFetch.length) return;
+
+        // Fire-and-forget parallel fetches
+        for (const run of toFetch) {
+            rpc(`/workflow_studio/run/${run.id}`, {}).then(
+                (data) => { this._runDetailCache.set(run.id, data); },
+                () => { /* silently skip preload failures */ }
+            );
+        }
+    }
+
+    async selectRun(runId) {
+        if (this.state.selectedRunId === runId) {
+            return;
+        }
+        try {
+            this.state.loadingRuns = true;
+            this.ui.block();
+            this.state.selectedRunId = runId;
+
+            // Use cached data if available, otherwise fetch
+            let runData = this._runDetailCache.get(runId);
+            if (!runData) {
+                runData = await rpc(`/workflow_studio/run/${runId}`, {});
+                this._runDetailCache.set(runId, runData);
+            }
+
+            if (this.props.executionViewRequested) {
+                const executionData = {
+                    runId: runData.id,
+                    status: runData.status,
+                    executedOrder: runData.executed_order || [],
+                    executedConnectionIds: runData.executed_connection_ids || [],
+                    executedConnections: runData.executed_connections || [],
+                    nodeResults: runData.node_results || [],
+                    contextSnapshot: runData.context_snapshot || null,
+                    error: runData.error || null,
+                    errorNodeId: runData.error_node_id || null,
+                    executionCount: runData.execution_count || null,
+                    inputData: runData.input_data || {},
+                };
+                this.props.executionViewRequested(runId, runData.executed_snapshot, executionData);
+            }
+        } catch (error) {
+            this.notification.add(
+                _t("Failed to load run details: %s", error.message),
+                { type: "danger" }
+            );
+            this.state.selectedRunId = null;
+        } finally {
+            this.ui.unblock();
+            this.state.loadingRuns = false;
+        }
+    }
+
+    exitRunView() {
+        this.state.selectedRunId = null;
+        if (this.props.exitExecutionView) {
+            this.props.exitExecutionView();
+        }
+    }
+
+    getSelectedRun() {
+        return this.state.runs.find(r => r.id === this.state.selectedRunId);
+    }
+
+    get isRunSelected() {
+        return Boolean(this.state.selectedRunId);
+    }
+
+    getRunStatusClass(status) {
+        const map = {
+            completed: 'run-status--success',
+            failed: 'run-status--error',
+            running: 'run-status--running',
+        };
+        return map[status] || 'run-status--default';
+    }
+
+    getRunStatusIcon(status) {
+        const map = {
+            completed: 'fa fa-check-circle',
+            failed: 'fa fa-exclamation-circle',
+            running: 'fa fa-spinner fa-spin',
+        };
+        return map[status] || 'fa fa-circle-o';
+    }
+
+    formatDuration(seconds) {
+        if (seconds === null || seconds === undefined) {
+            return '—';
+        }
+        if (seconds < 1) {
+            return `${(seconds * 1000).toFixed(0)}ms`;
+        }
+        if (seconds < 60) {
+            return `${seconds.toFixed(1)}s`;
+        }
+        const mins = Math.floor(seconds / 60);
+        const secs = (seconds % 60).toFixed(0);
+        return `${mins}m ${secs}s`;
     }
 
     async onRestoreClick() {

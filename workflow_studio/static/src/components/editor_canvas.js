@@ -1586,10 +1586,11 @@ export class EditorCanvas extends Component {
     // ============================================
 
     /**
-     * Handle double-click on node to open config panel (via service action)
+     * Handle double-click on node to open config panel (via service action).
+     * Also allowed in execution view mode to view I/O data.
      */
     onNodeDoubleClick = (nodeId) => {
-        if (!this.canEdit) return;
+        if (!this.canEdit && !this.isInExecutionView) return;
         this.editor.actions.openPanel("config", { nodeId });
     };
 
@@ -1598,6 +1599,21 @@ export class EditorCanvas extends Component {
      */
     get isConfigPanelOpen() {
         return this.uiState.panels.configOpen || false;
+    }
+
+    /**
+     * Whether we are currently viewing a past execution run.
+     */
+    get isInExecutionView() {
+        const executionView = this.editorUiState && this.editorUiState.executionView;
+        return !!(executionView && executionView.active);
+    }
+
+    /**
+     * View mode for NodeConfigPanel: 'execution' when viewing a run, 'edit' otherwise.
+     */
+    get configPanelViewMode() {
+        return this.isInExecutionView ? 'execution' : 'edit';
     }
 
     /**
@@ -1613,7 +1629,7 @@ export class EditorCanvas extends Component {
      * Close config panel (via service action)
      */
     onConfigPanelClose = () => {
-        if (!this.canEdit) return;
+        if (!this.canEdit && !this.isInExecutionView) return;
         this.editor.actions.closePanel("config");
     };
 

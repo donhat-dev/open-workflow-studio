@@ -3,6 +3,10 @@
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "./expression/ExpressionInput";
 import { CodeEditor } from "./code_editor";
+import { AuthControl } from "./controls/auth_control";
+import { BodyTypeControl } from "./controls/body_type_control";
+import { QueryParamsControl } from "./controls/query_params_control";
+import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
 
 /**
  * ControlRenderer Component
@@ -23,13 +27,17 @@ import { CodeEditor } from "./code_editor";
  *   options?: Array<{value, label}>,
  *   keyPlaceholder?: string,
  *   valuePlaceholder?: string,
+ *   suggestions?: Array,
+ *   valueSuggestions?: Array,
+ *   expressionSuggestions?: Array,
+ *   suggestionsByKey?: Object,
  *   height?: number,       // For code control
  *   language?: string,     // For code control
  * }
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor };
+    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -41,6 +49,8 @@ export class ControlRenderer extends Component {
         // For keyvalue controls: modes per pair id
         pairModes: { type: Object, optional: true },
         onPairModeChange: { type: Function, optional: true },
+        // Readonly mode (execution view)
+        readonly: { type: Boolean, optional: true },
     };
 
     setup() {
@@ -129,6 +139,32 @@ export class ControlRenderer extends Component {
         return this.props.control?.options || [];
     }
 
+    get suggestions() {
+        return this.props.control?.suggestions || [];
+    }
+
+    get valueSuggestions() {
+        return this.props.control?.valueSuggestions || [];
+    }
+
+    get expressionSuggestions() {
+        return this.props.control?.expressionSuggestions || [];
+    }
+
+    get suggestionsByKey() {
+        const map = this.props.control?.suggestionsByKey;
+        if (map && typeof map === "object" && !Array.isArray(map)) {
+            return map;
+        }
+        return {};
+    }
+
+    getPairValueSuggestions(pair) {
+        const pairKey = pair && typeof pair.key === "string" ? pair.key : "";
+        const byKey = getSuggestionsByKey(this.suggestionsByKey, pairKey);
+        return byKey;
+    }
+
     get pairs() {
         // Return reactive state for keyvalue controls
         return this.state.pairs;
@@ -185,6 +221,27 @@ export class ControlRenderer extends Component {
     onCodeChange(value) {
         this.props.onChange(this.props.control.key, value);
     }
+
+    /**
+     * Handle auth control change (composite value)
+     */
+    onAuthChange = (value) => {
+        this.props.onChange(this.props.control.key, value);
+    };
+
+    /**
+     * Handle body type control change (composite value)
+     */
+    onBodyTypeChange = (value) => {
+        this.props.onChange(this.props.control.key, value);
+    };
+
+    /**
+     * Handle query params control change (array value)
+     */
+    onQueryParamsChange = (value) => {
+        this.props.onChange(this.props.control.key, value);
+    };
 
     // ============================================
     // KEY-VALUE CONTROL HANDLERS

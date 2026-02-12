@@ -23,7 +23,7 @@
 							</span>
 						</t>
 						<!-- Execute Node Button -->
-						<button class="node-config-execute-btn btn btn-sm btn-success d-flex align-items-center gap-1" t-on-click="onExecute" type="button" title="Execute up to this node">
+						<button t-if="!isExecutionView" class="node-config-execute-btn btn btn-sm btn-success d-flex align-items-center gap-1" t-on-click="onExecute" type="button" title="Execute up to this node">
 							<i class="fa fa-play"/> Execute
 						</button>
 						<!-- Expand/Collapse Toggle Button -->
@@ -36,7 +36,7 @@
 					</div>
 				</div>
 				<!-- Three Column Content -->
-				<div class="node-config-content d-flex">
+				<div class="node-config-content d-flex" t-att-class="{ 'execution-view-mode': isExecutionView }">
 					<!-- LEFT COLUMN: Ancestor Node Outputs (Input) -->
 					<div class="node-config-col-input d-flex flex-column">
 						<div class="col-panel-header d-flex align-items-center gap-2 text-uppercase small fw-semibold">
@@ -92,7 +92,7 @@
 						</div>
 					</div>
 					<!-- CENTER COLUMN: Node Configuration -->
-					<div class="node-config-col-config d-flex flex-column">
+					<div class="node-config-col-config d-flex flex-column" t-att-class="{ 'readonly-config': isExecutionView }">
 						<!-- Tabs (Parameters | Settings only — Output moved to right column) -->
 						<div class="node-config-tabs d-flex">
 							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')" type="button">
@@ -106,11 +106,14 @@
 						<div class="tab-content p-3">
 							<!-- Parameters Tab -->
 							<t t-if="state.activeTab === 'parameters'">
-								<t t-foreach="groupedControls" t-as="group" t-key="group.name">
+								<t t-foreach="groupedControls" t-as="group" t-key="group.key">
 									<div class="node-config-section">
-										<div class="node-config-section-title" t-esc="group.name"/>
+										<div class="node-config-section-title">
+											<i t-att-class="'fa ' + (group.icon || 'fa-cube')"/>
+											<span t-esc="group.name"/>
+										</div>
 										<t t-foreach="group.controls" t-as="control" t-key="control.key">
-											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange"/>
+											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView"/>
 										</t>
 									</div>
 								</t>
@@ -126,7 +129,7 @@
 									<div class="node-config-section-title">Node Settings</div>
 									<div class="control-renderer">
 										<label class="control-label">Node Name</label>
-										<input type="text" class="control-input" t-att-value="props.node.title || ''" placeholder="Enter node name..."/>
+										<input type="text" class="control-input" t-att-value="props.node.title || ''" placeholder="Enter node name..." t-att-disabled="isExecutionView ? 'disabled' : undefined" t-att-readonly="isExecutionView ? 'readonly' : undefined"/>
 									</div>
 								</div>
 							</t>

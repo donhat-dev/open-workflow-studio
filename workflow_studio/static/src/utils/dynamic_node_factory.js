@@ -3,10 +3,13 @@
 import { registry } from "@web/core/registry";
 import { BaseNode } from "../core/node";
 import {
+    AuthControl,
+    BodyTypeControl,
     CheckboxControl,
     CodeControl,
     KeyValueControl,
     NumberControl,
+    QueryParamsControl,
     SelectControl,
     TextInputControl,
 } from "../core/control";
@@ -34,6 +37,83 @@ const CATEGORY_LABELS = {
     integration: "Integrations",
     transform: "Transform",
 };
+
+const HTTP_CONTROL_SUGGESTION_DEFAULTS = {
+    url: {
+        suggestions: [
+            "https://api.example.com",
+            "https://httpbin.org/anything",
+        ],
+    },
+    query_params: {
+        suggestionsByKey: {
+            limit: ["10", "20", "50", "100"],
+            offset: ["0", "10", "20"],
+            page: ["1", "2", "3"],
+            sort: ["asc", "desc"],
+            status: ["active", "inactive"],
+        },
+    },
+    auth: {
+        suggestionsByKey: {
+            header_name: ["Authorization", "X-API-Key"],
+            key_name: ["X-API-Key", "api_key"],
+            scope: ["read", "write", "read write"],
+        },
+    },
+    body_config: {
+        suggestionsByKey: {
+            form_data_value: ["true", "false", "null"],
+        },
+    },
+    headers: {
+        suggestionsByKey: {
+            "Content-Type": [
+                "application/json",
+                "application/x-www-form-urlencoded",
+                "multipart/form-data",
+            ],
+            Accept: ["application/json", "*/*"],
+            Authorization: ["Bearer "],
+        },
+    },
+};
+
+function clonePlain(value) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch {
+        return value;
+    }
+}
+
+function withHttpSuggestionDefaults(nodeType, schema) {
+    if (nodeType !== "http" || !schema || typeof schema !== "object" || Array.isArray(schema)) {
+        return schema;
+    }
+
+    const merged = { ...schema };
+    for (const [controlKey, defaultMeta] of Object.entries(HTTP_CONTROL_SUGGESTION_DEFAULTS)) {
+        const control = merged[controlKey];
+        if (!control || typeof control !== "object" || Array.isArray(control)) {
+            continue;
+        }
+
+        const controlMerged = { ...control };
+        for (const [metaKey, metaValue] of Object.entries(defaultMeta)) {
+            if (Object.prototype.hasOwnProperty.call(controlMerged, metaKey)) {
+                continue;
+            }
+            controlMerged[metaKey] = clonePlain(metaValue);
+        }
+        merged[controlKey] = controlMerged;
+    }
+
+    return merged;
+}
 
 function getNodeTypeKey(entry) {
     if (!entry || typeof entry !== "object") {
@@ -171,11 +251,31 @@ function normalizeSelectOptions(rawOptions) {
     return normalized;
 }
 
+function getSuggestionOptions(schema) {
+    const options = {};
+
+    if (Array.isArray(schema.suggestions)) {
+        options.suggestions = schema.suggestions;
+    }
+    if (Array.isArray(schema.valueSuggestions)) {
+        options.valueSuggestions = schema.valueSuggestions;
+    }
+    if (Array.isArray(schema.expressionSuggestions)) {
+        options.expressionSuggestions = schema.expressionSuggestions;
+    }
+    if (schema.suggestionsByKey && typeof schema.suggestionsByKey === "object" && !Array.isArray(schema.suggestionsByKey)) {
+        options.suggestionsByKey = schema.suggestionsByKey;
+    }
+
+    return options;
+}
+
 function createControl(controlKey, rawSchema) {
     const schema = normalizeControlSchema(rawSchema);
     const controlType = normalizeControlType(schema.type);
     const label = typeof schema.label === "string" && schema.label ? schema.label : humanizeKey(controlKey);
     const placeholder = typeof schema.placeholder === "string" ? schema.placeholder : "";
+    const suggestionOptions = getSuggestionOptions(schema);
 
     let control;
 
@@ -185,6 +285,7 @@ function createControl(controlKey, rawSchema) {
                 label,
                 options: normalizeSelectOptions(schema.options),
                 default: getDefaultValue(schema, undefined),
+                ...suggestionOptions,
             });
             break;
         }
@@ -195,6 +296,7 @@ function createControl(controlKey, rawSchema) {
                 max: schema.max,
                 step: schema.step,
                 default: getDefaultValue(schema, 0),
+                ...suggestionOptions,
             });
             break;
         }
@@ -203,6 +305,7 @@ function createControl(controlKey, rawSchema) {
             control = new CheckboxControl(controlKey, {
                 label,
                 default: Boolean(getDefaultValue(schema, false)),
+                ...suggestionOptions,
             });
             break;
         }
@@ -214,6 +317,7 @@ function createControl(controlKey, rawSchema) {
                 valuePlaceholder:
                     typeof schema.valuePlaceholder === "string" ? schema.valuePlaceholder : "Value",
                 default: getDefaultValue(schema, []),
+                ...suggestionOptions,
             });
             break;
         }
@@ -224,6 +328,31 @@ function createControl(controlKey, rawSchema) {
                 height: typeof schema.height === "number" ? schema.height : 200,
                 placeholder,
                 default: getDefaultValue(schema, ""),
+                ...suggestionOptions,
+            });
+            break;
+        }
+        case "auth": {
+            control = new AuthControl(controlKey, {
+                label,
+                default: getDefaultValue(schema, { type: "none" }),
+                ...suggestionOptions,
+            });
+            break;
+        }
+        case "body_type": {
+            control = new BodyTypeControl(controlKey, {
+                label,
+                default: getDefaultValue(schema, { content_type: "none", body: "", form_data: [] }),
+                ...suggestionOptions,
+            });
+            break;
+        }
+        case "query_params": {
+            control = new QueryParamsControl(controlKey, {
+                label,
+                default: getDefaultValue(schema, []),
+                ...suggestionOptions,
             });
             break;
         }
@@ -238,6 +367,7 @@ function createControl(controlKey, rawSchema) {
                 placeholder,
                 multiline: schema.multiline === true || defaultMultiline,
                 default: getDefaultValue(schema, ""),
+                ...suggestionOptions,
             });
             break;
         }
@@ -245,6 +375,11 @@ function createControl(controlKey, rawSchema) {
 
     if (typeof schema.section === "string" && schema.section) {
         control.section = schema.section;
+    }
+
+    // Conditional visibility: copy visibleWhen conditions
+    if (schema.visibleWhen && typeof schema.visibleWhen === "object") {
+        control.visibleWhen = schema.visibleWhen;
     }
 
     return control;
@@ -282,7 +417,10 @@ function createDynamicNodeClass(typeDef) {
     const nodeDescription =
         typeof typeDef.description === "string" ? typeDef.description : "";
 
-    const configSchema = normalizeSchema(typeDef.config_schema);
+    const configSchema = withHttpSuggestionDefaults(
+        nodeType,
+        normalizeSchema(typeDef.config_schema)
+    );
     const inputSchema = normalizeSchema(typeDef.input_schema);
     const outputSchema = normalizeSchema(typeDef.output_schema);
 

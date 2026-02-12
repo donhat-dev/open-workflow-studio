@@ -108,6 +108,9 @@ export class WorkflowEditorApp extends Component {
                 this.previewHistoryRevision(revisionId, snapshot),
             currentRequested: () => this.exitHistoryPreview(),
             restoreRequested: (revisionId) => this.restoreHistoryRevision(revisionId),
+            executionViewRequested: (runId, snapshot, data) =>
+                this.openExecutionView(runId, snapshot, data),
+            exitExecutionView: () => this.exitExecutionView(),
         };
     }
 
@@ -265,8 +268,21 @@ export class WorkflowEditorApp extends Component {
     }
 
     closeHistory() {
+        // Exit execution view if active
+        if (this.editorService.state.ui.executionView
+            && this.editorService.state.ui.executionView.active) {
+            this.editorService.actions.endExecutionView();
+        }
         this.editorService.actions.endHistoryPreview({ restoreOriginal: true });
         this.editorService.actions.closePanel("history");
+    }
+
+    openExecutionView(runId, snapshot, executionData) {
+        this.editorService.actions.startExecutionView(runId, snapshot, executionData);
+    }
+
+    exitExecutionView() {
+        this.editorService.actions.endExecutionView();
     }
 
     async restoreHistoryRevision(revisionId) {

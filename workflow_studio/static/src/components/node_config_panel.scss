@@ -181,6 +181,42 @@
   background: $o-gray-100;
 }
 
+// Execution view mode: show all three columns with equal weight
+.node-config-content.execution-view-mode {
+  .node-config-col-input {
+    width: 33.33%;
+    min-width: 200px;
+  }
+
+  .node-config-col-config {
+    width: 33.33%;
+    min-width: 200px;
+  }
+
+  .node-config-col-output {
+    width: 33.33%;
+    min-width: 200px;
+  }
+}
+
+// Readonly config column styling (execution view)
+.node-config-col-config.readonly-config {
+  opacity: 0.85;
+  pointer-events: none;
+
+  .control-input,
+  .control-select,
+  .control-number,
+  .control-checkbox,
+  .kv-key,
+  .kv-remove,
+  .kv-add,
+  textarea {
+    opacity: 0.7;
+    cursor: default;
+  }
+}
+
 /* ============================================ */
 /* Left Panel - Input Data */
 /* ============================================ */
@@ -307,7 +343,14 @@
 
 /* Sections */
 .node-config-section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba($o-gray-300, 0.5);
+
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+  }
 }
 
 .node-config-section-title {
@@ -317,6 +360,14 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  i {
+    font-size: 0.7rem;
+    opacity: 0.7;
+  }
 }
 
 .node-config-empty {
@@ -443,18 +494,33 @@
 .kv-row {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-end;
 }
 
 .kv-key,
 .kv-value {
-  flex: 1;
   padding: 6px 10px;
   background: $o-view-background-color;
   border: 1px solid $o-gray-400;
   border-radius: 4px;
   color: $o-main-text-color;
   font-size: 0.813rem;
+}
+
+.kv-key {
+  flex: 0 0 34%;
+  min-width: 120px;
+  max-width: 40%;
+}
+
+.kv-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kv-row > .expression-input {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .kv-key:focus,
@@ -736,4 +802,119 @@
 .output-error i {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* ============================================ */
+/* Auth Control Styles                          */
+/* ============================================ */
+
+.auth-control {
+  .auth-type-selector {
+    margin-bottom: 8px;
+  }
+
+  .auth-info {
+    padding: 8px 12px;
+    background: rgba($o-gray-300, 0.2);
+    border-radius: 6px;
+  }
+
+  .auth-fields {
+    .auth-field {
+      .control-label {
+        font-size: 0.75rem;
+        margin-bottom: 4px;
+      }
+    }
+  }
+}
+
+/* ============================================ */
+/* Body Type Control Styles                     */
+/* ============================================ */
+
+.body-type-control {
+  .body-type-tabs {
+    margin-bottom: 4px;
+  }
+
+  .body-type-tab {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid $o-gray-300;
+    background: $o-view-background-color;
+    color: $o-gray-600;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: rgba($o-action, 0.06);
+      color: $o-action;
+      border-color: $o-action;
+    }
+
+    &.active {
+      background: $o-action;
+      color: white;
+      border-color: $o-action;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+  }
+
+  .body-info {
+    padding: 8px 12px;
+    background: rgba($o-gray-300, 0.2);
+    border-radius: 6px;
+  }
+
+  .body-editor,
+  .body-form-data,
+  .body-raw {
+    .control-select-sm {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      height: auto;
+    }
+  }
+}
+
+/* ============================================ */
+/* Query Params Control Styles                  */
+/* ============================================ */
+
+.query-params-control {
+  .qp-row {
+    .kv-key {
+      flex: 0 0 30%;
+      max-width: 36%;
+    }
+
+    .expression-input {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    &.qp-disabled {
+      opacity: 0.5;
+
+      .kv-key,
+      .expression-input {
+        text-decoration: line-through;
+      }
+    }
+  }
+
+  .qp-toggle {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: $o-action;
+  }
 }

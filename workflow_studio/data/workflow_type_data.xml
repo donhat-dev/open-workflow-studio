@@ -20,10 +20,14 @@
             <field name="icon">fa-globe</field>
             <field name="description">Make HTTP API calls to external services</field>
             <field name="config_schema">{
-    "method": {"type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "GET"},
-    "url": {"type": "string", "required": true},
-    "headers": {"type": "keyvalue"},
-    "body": {"type": "text"}
+    "method": {"type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"], "default": "GET", "section": "request"},
+    "url": {"type": "string", "required": true, "placeholder": "https://api.example.com/endpoint", "section": "request", "suggestions": ["https://api.example.com", "https://httpbin.org/anything"]},
+    "query_params": {"type": "query_params", "label": "Query Params", "section": "request", "suggestionsByKey": {"limit": ["10", "20", "50", "100"], "offset": ["0", "10", "20"], "page": ["1", "2", "3"], "sort": ["asc", "desc"], "status": ["active", "inactive"]}},
+    "auth": {"type": "auth", "label": "Authentication", "section": "authentication", "suggestionsByKey": {"header_name": ["Authorization", "X-API-Key"], "key_name": ["X-API-Key", "api_key"], "scope": ["read", "write", "read write"]}},
+    "body_config": {"type": "body_type", "label": "Body", "section": "body", "visibleWhen": {"method": ["POST", "PUT", "PATCH"]}, "suggestionsByKey": {"form_data_value": ["true", "false", "null"]}},
+    "headers": {"type": "keyvalue", "section": "headers", "suggestionsByKey": {"Content-Type": ["application/json", "application/x-www-form-urlencoded", "multipart/form-data"], "Accept": ["application/json", "*/*"], "Authorization": ["Bearer "]}},
+    "timeout": {"type": "number", "default": 30, "min": 1, "max": 300, "label": "Timeout (seconds)", "section": "settings"},
+    "follow_redirects": {"type": "checkbox", "default": true, "label": "Follow Redirects", "section": "settings"}
 }</field>
             <field name="input_schema">{
     "data": {"type": "DataSocket", "label": "Input Data"}

@@ -273,6 +273,11 @@ export class WorkflowAdapter {
             label: control.label,
             value: control.getValue(),
             section: control.section,  // For grouping in UI
+            visibleWhen: control.visibleWhen,
+            suggestions: control.suggestions,
+            valueSuggestions: control.valueSuggestions,
+            expressionSuggestions: control.expressionSuggestions,
+            suggestionsByKey: control.suggestionsByKey,
             // Type-specific properties
             placeholder: control.placeholder,
             multiline: control.multiline,

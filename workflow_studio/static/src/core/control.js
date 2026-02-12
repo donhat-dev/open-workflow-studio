@@ -24,6 +24,12 @@ export class Control {
         this.type = 'base';
         this.label = options.label || key;
         this.value = options.default !== undefined ? options.default : null;
+        this.suggestions = Array.isArray(options.suggestions) ? options.suggestions : [];
+        this.valueSuggestions = Array.isArray(options.valueSuggestions) ? options.valueSuggestions : [];
+        this.expressionSuggestions = Array.isArray(options.expressionSuggestions) ? options.expressionSuggestions : [];
+        this.suggestionsByKey = options.suggestionsByKey && typeof options.suggestionsByKey === 'object'
+            ? options.suggestionsByKey
+            : null;
     }
 
     setValue(value) {
@@ -197,6 +203,58 @@ export class CodeControl extends Control {
     }
 }
 
+/**
+ * AuthControl - Authentication configuration
+ * Stores auth type + related fields as a structured object
+ */
+export class AuthControl extends Control {
+    constructor(key, options = {}) {
+        super(key, options);
+        this.type = 'auth';
+        if (this.value === null) {
+            this.value = { type: 'none' };
+        }
+    }
+}
+
+/**
+ * BodyTypeControl - HTTP body with content type selection
+ * Stores content type + body value as a structured object
+ */
+export class BodyTypeControl extends Control {
+    constructor(key, options = {}) {
+        super(key, options);
+        this.type = 'body_type';
+        if (this.value === null) {
+            this.value = { content_type: 'none', body: '', form_data: [] };
+        }
+    }
+}
+
+/**
+ * QueryParamsControl - URL query parameters
+ * Stores array of { key, value, enabled } objects
+ */
+export class QueryParamsControl extends Control {
+    constructor(key, options = {}) {
+        super(key, options);
+        this.type = 'query_params';
+        if (!this.value || !Array.isArray(this.value)) {
+            this._nextId = 1;
+            this.value = [{ id: this._nextId++, key: '', value: '', enabled: true }];
+        } else {
+            const maxId = this.value.reduce((max, p) => Math.max(max, p.id || 0), 0);
+            this._nextId = maxId + 1;
+            this.value = this.value.map(p => ({
+                id: p.id || this._nextId++,
+                key: p.key || '',
+                value: p.value || '',
+                enabled: p.enabled !== false,
+            }));
+        }
+    }
+}
+
 // Export control registry
 export const ControlRegistry = {
     text: TextInputControl,
@@ -205,5 +263,8 @@ export const ControlRegistry = {
     number: NumberControl,
     checkbox: CheckboxControl,
     code: CodeControl,
+    auth: AuthControl,
+    body_type: BodyTypeControl,
+    query_params: QueryParamsControl,
 };
 

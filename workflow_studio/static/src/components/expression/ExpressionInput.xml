@@ -4,7 +4,8 @@
 		<div class="expression-input" t-att-class="{
 				 'expression-mode': isExpression,
 				 'focused': state.isFocused,
-				 'drag-over': state.isDragOver
+				 'drag-over': state.isDragOver,
+				 'expression-readonly': props.readonly
 			 }">
 			<!-- Header with label and toggle -->
 			<div class="expression-input__header">
@@ -12,7 +13,7 @@
 					<t t-esc="props.label"/>
 				</label>
 				<!-- Fixed/Expression Toggle (n8n style) -->
-				<div class="expression-input__mode-toggle">
+				<div t-if="!props.readonly" class="expression-input__mode-toggle">
 					<button type="button" class="mode-btn" t-att-class="{ active: !isExpression }" t-on-click="onClickFixed" title="Fixed value">
 						Fixed
 					</button>
@@ -25,12 +26,19 @@
 			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
 				<!-- Expression mode prefix -->
 				<span t-if="isExpression" class="expression-input__fx">ƒx</span>
-			<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" spellcheck="false"/>
+				<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
 					<i class="fa fa-plus-circle"/>
 					Drop to insert
 				
+				</div>
+				<!-- Suggestions -->
+				<div t-if="shouldShowSuggestions" class="expression-input__suggestions">
+					<button type="button" t-foreach="filteredSuggestions" t-as="item" t-key="item.value" class="expression-input__suggestion-item" t-att-class="{ active: item_index === state.activeSuggestionIndex }" t-on-mousedown="(ev) => this.onSuggestionMouseDown(ev, item)">
+						<span class="suggestion-label" t-esc="item.label"/>
+						<span t-if="item.description" class="suggestion-description" t-esc="item.description"/>
+					</button>
 				</div>
 			</div>
 			<!-- Result Preview (expression mode only) -->

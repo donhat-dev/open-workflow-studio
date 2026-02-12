@@ -126,11 +126,11 @@ export class WorkflowNode extends Component {
     }
 
     /**
-     * Handle double-click to open config panel
-     * Only triggers on node zone (header/body), not on toolbar or sockets
+     * Handle double-click to open config panel.
+     * Only triggers on node zone (header/body), not on toolbar or sockets.
+     * Allowed even in readonly mode (execution view) to inspect I/O data.
      */
     onNodeDoubleClick(ev) {
-        if (this.isReadonly) return;
         if (!ev) return;
         const target = ev.target;
         if (target.closest('.canvas-node-toolbar') ||

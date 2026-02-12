@@ -47,6 +47,7 @@ const DEFAULT_UI_STATE = () => ({
     saving: false,
     executing: false,
     historyPreview: { active: false, revisionId: null },
+    executionView: { active: false, runId: null },
     history: { canUndo: false, canRedo: false },
     // NodeMenu state (source of truth)
     nodeMenu: {
@@ -73,6 +74,11 @@ export const workflowEditorService = {
         const historyPreview = {
             active: false,
             revisionId: null,
+            originalSnapshot: null,
+        };
+        const executionView = {
+            active: false,
+            runId: null,
             originalSnapshot: null,
         };
 
@@ -544,6 +550,10 @@ export const workflowEditorService = {
                 if (!snapshot) {
                     return;
                 }
+                // Mutual exclusion: exit execution view if active
+                if (executionView.active) {
+                    actions.endExecutionView();
+                }
                 if (!historyPreview.active) {
                     historyPreview.originalSnapshot = adapter.toJSON();
                 }
@@ -583,6 +593,65 @@ export const workflowEditorService = {
                 historyPreview.originalSnapshot = null;
                 state.ui.historyPreview = { active: false, revisionId: null };
                 state.ui.readonly = false;
+                state.ui.selection = { nodeIds: [], connectionIds: [] };
+                state.ui.hoveredConnection = {
+                    id: null,
+                    midpoint: { x: 0, y: 0 },
+                    canvasMidpoint: null,
+                };
+            },
+
+            startExecutionView(runId, snapshot, executionData) {
+                if (!snapshot) {
+                    return;
+                }
+                // Mutual exclusion: exit history preview if active
+                if (historyPreview.active) {
+                    actions.endHistoryPreview();
+                }
+                if (!executionView.active) {
+                    executionView.originalSnapshot = adapter.toJSON();
+                }
+                executionView.active = true;
+                executionView.runId = runId || null;
+                state.ui.executionView = { active: true, runId: runId || null };
+                state.ui.readonly = true;
+                state.ui.selection = { nodeIds: [], connectionIds: [] };
+                state.ui.hoveredConnection = {
+                    id: null,
+                    midpoint: { x: 0, y: 0 },
+                    canvasMidpoint: null,
+                };
+                state.ui.panels.configOpen = false;
+                state.ui.panels.configNodeId = null;
+                state.ui.nodeMenu = {
+                    visible: false,
+                    x: 0,
+                    y: 0,
+                    canvasX: 0,
+                    canvasY: 0,
+                    variant: 'default',
+                    connectionContext: null,
+                };
+
+                adapter.fromJSON(snapshot);
+
+                // Populate execution highlights from run data
+                if (executionData) {
+                    actions.setExecutionResult(executionData);
+                }
+            },
+
+            endExecutionView() {
+                if (executionView.active && executionView.originalSnapshot) {
+                    adapter.fromJSON(executionView.originalSnapshot);
+                }
+                executionView.active = false;
+                executionView.runId = null;
+                executionView.originalSnapshot = null;
+                state.ui.executionView = { active: false, runId: null };
+                state.ui.readonly = false;
+                state.executionProgress = null;
                 state.ui.selection = { nodeIds: [], connectionIds: [] };
                 state.ui.hoveredConnection = {
                     id: null,
@@ -911,6 +980,9 @@ export const workflowEditorService = {
                     });
                     throw error;
                 }
+            },
+            async getRunDetails(runId) {
+                return await rpc(`/workflow_studio/run/${runId}`, {});
             },
             getWorkflowId() {
                 return workflowId;

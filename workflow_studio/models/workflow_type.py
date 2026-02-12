@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import copy
 import json
 import re
 
@@ -112,6 +113,47 @@ class WorkflowType(models.Model):
     )
 
     _NODE_TYPE_RE = re.compile(r'^[a-z][a-z0-9_]*$')
+
+    _HTTP_CONFIG_SUGGESTION_DEFAULTS = {
+        'url': {
+            'suggestions': [
+                'https://api.example.com',
+                'https://httpbin.org/anything',
+            ],
+        },
+        'query_params': {
+            'suggestionsByKey': {
+                'limit': ['10', '20', '50', '100'],
+                'offset': ['0', '10', '20'],
+                'page': ['1', '2', '3'],
+                'sort': ['asc', 'desc'],
+                'status': ['active', 'inactive'],
+            },
+        },
+        'auth': {
+            'suggestionsByKey': {
+                'header_name': ['Authorization', 'X-API-Key'],
+                'key_name': ['X-API-Key', 'api_key'],
+                'scope': ['read', 'write', 'read write'],
+            },
+        },
+        'body_config': {
+            'suggestionsByKey': {
+                'form_data_value': ['true', 'false', 'null'],
+            },
+        },
+        'headers': {
+            'suggestionsByKey': {
+                'Content-Type': [
+                    'application/json',
+                    'application/x-www-form-urlencoded',
+                    'multipart/form-data',
+                ],
+                'Accept': ['application/json', '*/*'],
+                'Authorization': ['Bearer '],
+            },
+        },
+    }
 
     _sql_constraints = [
         ('node_type_uniq', 'UNIQUE(node_type)', 
@@ -291,6 +333,25 @@ class WorkflowType(models.Model):
         Returns list of dicts with type definitions.
         """
         types = self.search([('active', '=', True)])
+
+        def _merge_http_suggestion_defaults(config_schema):
+            schema = config_schema if isinstance(config_schema, dict) else {}
+            if not schema:
+                return schema
+
+            merged = dict(schema)
+            for control_key, default_meta in self._HTTP_CONFIG_SUGGESTION_DEFAULTS.items():
+                control = merged.get(control_key)
+                if not isinstance(control, dict):
+                    continue
+                control_merged = dict(control)
+                for meta_key, meta_value in default_meta.items():
+                    if meta_key in control_merged:
+                        continue
+                    control_merged[meta_key] = copy.deepcopy(meta_value)
+                merged[control_key] = control_merged
+            return merged
+
         return [{
             'id': t.id,
             'node_type': t.node_type,
@@ -300,7 +361,9 @@ class WorkflowType(models.Model):
             'icon': t.icon or '',
             'color': t.color or '',
             'is_custom': bool(t.is_custom),
-            'config_schema': t.config_schema or {},
+            'config_schema': _merge_http_suggestion_defaults(t.config_schema)
+            if t.node_type == 'http'
+            else (t.config_schema or {}),
             'input_schema': t.input_schema or {},
             'output_schema': t.output_schema or {},
         } for t in types]

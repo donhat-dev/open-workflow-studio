@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.auth_control">
+        <div class="auth-control">
+            <!-- Auth Type Selector -->
+            <div class="auth-type-selector">
+                <select class="control-select" t-on-change="onTypeChange" t-att-disabled="props.readonly ? 'disabled' : undefined">
+                    <t t-foreach="authTypes" t-as="at" t-key="at.value">
+                        <option t-att-value="at.value" t-att-selected="at.value === authType" t-esc="at.label"/>
+                    </t>
+                </select>
+            </div>
+
+            <!-- None: no fields -->
+            <t t-if="authType === 'none'">
+                <div class="auth-info text-muted small mt-2">
+                    <i class="fa fa-info-circle"/> This request does not use any authorization.
+                </div>
+            </t>
+
+            <!-- Bearer Token -->
+            <t t-elif="authType === 'bearer'">
+                <div class="auth-fields mt-2">
+                    <div class="auth-field">
+                        <label class="control-label">Token</label>
+                        <ExpressionInput value="getField('token')" placeholder="placeholders.bearerToken" context="props.inputContext" suggestions="getFieldSuggestions('token')" valueSuggestions="getFieldSuggestions('token')" onChange="(v) => this.onFieldChange('token', v)" readonly="props.readonly"/>
+                    </div>
+                </div>
+            </t>
+
+            <!-- Basic Auth -->
+            <t t-elif="authType === 'basic'">
+                <div class="auth-fields mt-2">
+                    <div class="auth-field">
+                        <label class="control-label">Username</label>
+                        <ExpressionInput value="getField('username')" placeholder="placeholders.username" context="props.inputContext" suggestions="getFieldSuggestions('username')" valueSuggestions="getFieldSuggestions('username')" onChange="(v) => this.onFieldChange('username', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Password</label>
+                        <ExpressionInput value="getField('password')" placeholder="placeholders.password" context="props.inputContext" suggestions="getFieldSuggestions('password')" valueSuggestions="getFieldSuggestions('password')" onChange="(v) => this.onFieldChange('password', v)" readonly="props.readonly"/>
+                    </div>
+                </div>
+            </t>
+
+            <!-- API Key -->
+            <t t-elif="authType === 'api_key'">
+                <div class="auth-fields mt-2">
+                    <div class="auth-field">
+                        <label class="control-label">Key</label>
+                        <ExpressionInput value="getField('key_name')" placeholder="placeholders.apiKeyName" context="props.inputContext" suggestions="getFieldSuggestions('key_name')" valueSuggestions="getFieldSuggestions('key_name')" onChange="(v) => this.onFieldChange('key_name', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Value</label>
+                        <ExpressionInput value="getField('key_value')" placeholder="placeholders.apiKeyValue" context="props.inputContext" suggestions="getFieldSuggestions('key_value')" valueSuggestions="getFieldSuggestions('key_value')" onChange="(v) => this.onFieldChange('key_value', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Add to</label>
+                        <select class="control-select" t-on-change="(ev) => this.onSelectFieldChange('key_location', ev)" t-att-disabled="props.readonly ? 'disabled' : undefined">
+                            <t t-foreach="apiKeyLocations" t-as="loc" t-key="loc.value">
+                                <option t-att-value="loc.value" t-att-selected="loc.value === (getField('key_location') or 'header')" t-esc="loc.label"/>
+                            </t>
+                        </select>
+                    </div>
+                </div>
+            </t>
+
+            <!-- OAuth 2.0 -->
+            <t t-elif="authType === 'oauth2'">
+                <div class="auth-fields mt-2">
+                    <div class="auth-field">
+                        <label class="control-label">Access Token</label>
+                        <ExpressionInput value="getField('access_token')" placeholder="placeholders.accessToken" context="props.inputContext" suggestions="getFieldSuggestions('access_token')" valueSuggestions="getFieldSuggestions('access_token')" onChange="(v) => this.onFieldChange('access_token', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Token URL</label>
+                        <ExpressionInput value="getField('token_url')" context="props.inputContext" suggestions="getFieldSuggestions('token_url')" valueSuggestions="getFieldSuggestions('token_url')" onChange="(v) => this.onFieldChange('token_url', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Client ID</label>
+                        <ExpressionInput value="getField('client_id')" placeholder="placeholders.clientId" context="props.inputContext" suggestions="getFieldSuggestions('client_id')" valueSuggestions="getFieldSuggestions('client_id')" onChange="(v) => this.onFieldChange('client_id', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Client Secret</label>
+                        <ExpressionInput value="getField('client_secret')" placeholder="placeholders.clientSecret" context="props.inputContext" suggestions="getFieldSuggestions('client_secret')" valueSuggestions="getFieldSuggestions('client_secret')" onChange="(v) => this.onFieldChange('client_secret', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Scope</label>
+                        <ExpressionInput value="getField('scope')" placeholder="placeholders.scope" context="props.inputContext" suggestions="getFieldSuggestions('scope')" valueSuggestions="getFieldSuggestions('scope')" onChange="(v) => this.onFieldChange('scope', v)" readonly="props.readonly"/>
+                    </div>
+                </div>
+            </t>
+
+            <!-- Custom Header -->
+            <t t-elif="authType === 'custom_header'">
+                <div class="auth-fields mt-2">
+                    <div class="auth-field">
+                        <label class="control-label">Header Name</label>
+                        <ExpressionInput value="getField('header_name')" placeholder="placeholders.headerName" context="props.inputContext" suggestions="getFieldSuggestions('header_name')" valueSuggestions="getFieldSuggestions('header_name')" onChange="(v) => this.onFieldChange('header_name', v)" readonly="props.readonly"/>
+                    </div>
+                    <div class="auth-field mt-2">
+                        <label class="control-label">Header Value</label>
+                        <ExpressionInput value="getField('header_value')" placeholder="placeholders.headerValue" context="props.inputContext" suggestions="getFieldSuggestions('header_value')" valueSuggestions="getFieldSuggestions('header_value')" onChange="(v) => this.onFieldChange('header_value', v)" readonly="props.readonly"/>
+                    </div>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 	<t t-name="workflow_studio.control_renderer">
-		<div class="control-renderer" t-att-class="'control-type-' + controlType">
+		<div class="control-renderer" t-att-class="'control-type-' + controlType + (props.readonly ? ' control-readonly' : '')">
 			<!-- LABEL -->
 			<label t-if="label" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text'">
-				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" mode="props.mode" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)"/>
+				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" mode="props.mode" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
-				<select class="control-select" t-on-change="onSelectChange">
+				<select class="control-select" t-on-change="onSelectChange" t-att-disabled="props.readonly ? 'disabled' : undefined">
 					<t t-foreach="options" t-as="opt" t-key="opt.value">
 						<option t-att-value="opt.value" t-att-selected="opt.value === value" t-esc="opt.label" />
 					</t>
@@ -18,23 +18,23 @@
 			</t>
 			<!-- NUMBER -->
 			<t t-elif="controlType === 'number'">
-				<input type="number" class="control-input control-number" t-att-value="value" t-att-min="props.control.min" t-att-max="props.control.max" t-att-step="props.control.step" t-on-input="onInput" />
+				<input type="number" class="control-input control-number" t-att-value="value" t-att-min="props.control.min" t-att-max="props.control.max" t-att-step="props.control.step" t-on-input="onInput" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 			</t>
 			<!-- CHECKBOX -->
 			<t t-elif="controlType === 'checkbox'">
-				<input type="checkbox" class="control-checkbox" t-att-checked="value" t-on-change="onCheckboxChange" />
+				<input type="checkbox" class="control-checkbox" t-att-checked="value" t-on-change="onCheckboxChange" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 			</t>
 			<!-- KEY-VALUE PAIRS -->
 			<t t-elif="controlType === 'keyvalue'">
 				<div class="control-keyvalue">
 					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
 						<div class="kv-row">
-							<input type="text" class="kv-key" t-att-placeholder="props.control.keyPlaceholder" t-att-value="pair.key" t-on-input="(ev) => this.onKeyChange(pair_index, ev)" />
-							<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairMode(pair.id)" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)"/>
-							<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1">×</button>
+							<input type="text" class="kv-key" t-att-placeholder="props.control.keyPlaceholder" t-att-value="pair.key" t-on-input="(ev) => this.onKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+							<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
+							<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1 or props.readonly">×</button>
 						</div>
 					</t>
-					<button class="kv-add" t-on-click="addPair">+ Add</button>
+					<button t-if="!props.readonly" class="kv-add" t-on-click="addPair">+ Add</button>
 				</div>
 			</t>
 			<!-- CODE EDITOR (Monaco) -->
@@ -46,6 +46,37 @@
 					placeholder="props.control.placeholder || ''"
 					completionContext="props.inputContext"
 					onChange="(v) => this.onCodeChange(v)"
+					readonly="props.readonly"
+				/>
+			</t>
+			<!-- AUTH CONTROL (composite) -->
+			<t t-elif="controlType === 'auth'">
+				<AuthControl
+					value="value"
+					onChange.bind="onAuthChange"
+					inputContext="props.inputContext"
+					suggestionsByKey="suggestionsByKey"
+					readonly="props.readonly"
+				/>
+			</t>
+			<!-- BODY TYPE CONTROL (composite) -->
+			<t t-elif="controlType === 'body_type'">
+				<BodyTypeControl
+					value="value"
+					onChange.bind="onBodyTypeChange"
+					inputContext="props.inputContext"
+					suggestionsByKey="suggestionsByKey"
+					readonly="props.readonly"
+				/>
+			</t>
+			<!-- QUERY PARAMS CONTROL -->
+			<t t-elif="controlType === 'query_params'">
+				<QueryParamsControl
+					value="value"
+					onChange.bind="onQueryParamsChange"
+					inputContext="props.inputContext"
+					suggestionsByKey="suggestionsByKey"
+					readonly="props.readonly"
 				/>
 			</t>
 		</div>

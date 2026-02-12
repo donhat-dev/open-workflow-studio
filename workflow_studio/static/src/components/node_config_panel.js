@@ -23,6 +23,7 @@ export class NodeConfigPanel extends Component {
         onSave: { type: Function },
         onExecute: { type: Function, optional: true },  // Callback after node execution
         execution: { type: Object, optional: true },
+        viewMode: { type: String, optional: true },  // 'edit' (default) or 'execution'
     };
 
     // Static cache for predecessor computation (cleared on workflow change)
@@ -146,17 +147,23 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
-     * Group controls by section
+     * Group controls by section, filtering by visibleWhen conditions
      */
     get groupedControls() {
         const controls = this.getControls();
         const groups = {};
 
         for (const control of controls) {
+            // Check visibleWhen conditions
+            if (control.visibleWhen && !this._evalVisibleWhen(control.visibleWhen)) {
+                continue;
+            }
             const section = control.section || 'general';
             if (!groups[section]) {
                 groups[section] = {
                     name: this.formatSectionName(section),
+                    key: section,
+                    icon: this._getSectionIcon(section),
                     controls: [],
                 };
             }
@@ -164,6 +171,40 @@ export class NodeConfigPanel extends Component {
         }
 
         return Object.values(groups);
+    }
+
+    /**
+     * Evaluate visibleWhen conditions against current control values.
+     * Format: { "controlKey": ["value1", "value2"] } — control must match one of the values.
+     * @private
+     */
+    _evalVisibleWhen(conditions) {
+        const values = this.state.controlValues;
+        for (const [key, allowed] of Object.entries(conditions)) {
+            const currentVal = values[key];
+            if (Array.isArray(allowed)) {
+                if (!allowed.includes(currentVal)) return false;
+            } else if (typeof allowed === 'string') {
+                if (currentVal !== allowed) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get Font Awesome icon class for a section.
+     * @private
+     */
+    _getSectionIcon(section) {
+        const icons = {
+            general: 'fa-cube',
+            request: 'fa-globe',
+            authentication: 'fa-lock',
+            body: 'fa-file-text-o',
+            headers: 'fa-list-ul',
+            settings: 'fa-cog',
+        };
+        return icons[section] || 'fa-cube';
     }
 
     formatSectionName(section) {
@@ -176,6 +217,10 @@ export class NodeConfigPanel extends Component {
 
     get nodeIcon() {
         return this.props.node.icon || 'fa-cube';
+    }
+
+    get isExecutionView() {
+        return this.props.viewMode === 'execution';
     }
 
     // ============================================

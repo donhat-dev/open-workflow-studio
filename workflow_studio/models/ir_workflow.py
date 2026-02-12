@@ -86,7 +86,7 @@ class Workflow(models.Model):
         string='Active',
         default=True,
         tracking=True,
-        help='Archived workflows are hidden from lists'
+        help='Archived workflows'
     )
 
     # === Multi-company ===
@@ -691,6 +691,37 @@ class Workflow(models.Model):
             })
         
         return revision_id
+
+    def get_recent_runs(self, limit=50):
+        """Get recent execution runs for this workflow (lightweight metadata).
+
+        Args:
+            limit: Maximum number of runs to return (default 50)
+
+        Returns:
+            List of dicts with run metadata (no snapshot/node data)
+        """
+        self.ensure_one()
+        self.check_access('read')
+        runs = self.env['workflow.run'].search(
+            [('workflow_id', '=', self.id)],
+            limit=limit,
+            order='started_at desc',
+        )
+        result = []
+        for run in runs:
+            result.append({
+                'id': run.id,
+                'name': run.name,
+                'status': run.status,
+                'started_at': run.started_at.isoformat() if run.started_at else None,
+                'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+                'duration_seconds': run.duration_seconds,
+                'execution_count': run.execution_count,
+                'node_count_executed': run.node_count_executed,
+                'error_message': run.error_message or None,
+            })
+        return result
 
     def mark_milestone(self, revision_id, name=None, field_name='draft_snapshot'):
         """Mark existing revision as milestone.

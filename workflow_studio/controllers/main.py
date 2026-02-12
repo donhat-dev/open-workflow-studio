@@ -231,6 +231,7 @@ class WorkflowPilotController(http.Controller):
             output_data=run.output_data,
             node_results=node_results,
             context_snapshot=context_snapshot,
+            executed_snapshot=run.executed_snapshot or {},
         ).model_dump()
 
     @http.route('/workflow_studio/execute_until', type='json', auth='user', methods=['POST'])

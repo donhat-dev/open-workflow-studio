@@ -99,6 +99,9 @@ class ExecutionResultSchema:
     # Context snapshot
     context_snapshot: Optional[ContextSnapshotSchema] = None
     
+    # Executed snapshot (workflow graph at execution time)
+    executed_snapshot: Optional[Dict[str, Any]] = None
+    
     # Timestamp
     updated_at: Optional[str] = None
     
@@ -131,6 +134,7 @@ class ExecutionResultSchema:
                 if self.context_snapshot and hasattr(self.context_snapshot, 'model_dump')
                 else self.context_snapshot
             ),
+            'executed_snapshot': self.executed_snapshot,
             'updated_at': self.updated_at or datetime.now().isoformat(),
         }
         return data

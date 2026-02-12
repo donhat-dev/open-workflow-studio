@@ -60,7 +60,7 @@
 				<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 			</div>
 			<!-- Node Config Panel (outside content to avoid transform containment) -->
-			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionProp" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
+			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionProp" viewMode="configPanelViewMode" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
 		</div>
 	</t>
 </templates>

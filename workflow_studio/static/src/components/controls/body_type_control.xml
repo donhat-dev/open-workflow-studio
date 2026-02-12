@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.body_type_control">
+        <div class="body-type-control">
+            <!-- Body Type Tab Bar (Postman-style pill tabs) -->
+            <div class="body-type-tabs d-flex align-items-center gap-1 flex-wrap">
+                <t t-foreach="bodyTypes" t-as="bt" t-key="bt.value">
+                    <button class="body-type-tab" t-att-class="{ active: contentType === bt.value }" t-on-click="() => this.onTypeClick(bt.value)" t-att-disabled="props.readonly ? 'disabled' : undefined" type="button">
+                        <t t-esc="bt.label"/>
+                    </button>
+                </t>
+            </div>
+
+            <!-- none: hint text -->
+            <t t-if="contentType === 'none'">
+                <div class="body-info text-muted small mt-2">
+                    <i class="fa fa-info-circle"/> This request does not have a body.
+                </div>
+            </t>
+
+            <!-- JSON: Code editor -->
+            <t t-elif="contentType === 'json'">
+                <div class="body-editor mt-2">
+                    <CodeEditor
+                        value="body"
+                        height="180"
+                        language="'json'"
+                        placeholder="placeholders.jsonBody"
+                        completionContext="props.inputContext"
+                        onChange="(v) => this.onCodeChange(v)"
+                        readonly="props.readonly"
+                    />
+                </div>
+            </t>
+
+            <!-- form-data: key-value rows -->
+            <t t-elif="contentType === 'form_data'">
+                <div class="body-form-data mt-2">
+                    <t t-foreach="formData" t-as="pair" t-key="pair.id">
+                        <div class="kv-row d-flex gap-1 align-items-end mb-1">
+                            <input type="text" class="kv-key" placeholder="Key" t-att-value="pair.key" t-on-input="(ev) => this.onFormKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                            <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
+                            <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                        </div>
+                    </t>
+                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">+ Add</button>
+                </div>
+            </t>
+
+            <!-- x-www-form-urlencoded: same as form-data -->
+            <t t-elif="contentType === 'urlencoded'">
+                <div class="body-form-data mt-2">
+                    <t t-foreach="formData" t-as="pair" t-key="pair.id">
+                        <div class="kv-row d-flex gap-1 align-items-end mb-1">
+                            <input type="text" class="kv-key" placeholder="Key" t-att-value="pair.key" t-on-input="(ev) => this.onFormKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                            <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
+                            <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                        </div>
+                    </t>
+                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">+ Add</button>
+                </div>
+            </t>
+
+            <!-- raw: text area + content-type selector -->
+            <t t-elif="contentType === 'raw'">
+                <div class="body-raw mt-2">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <select class="control-select control-select-sm" t-on-change="onRawTypeChange" t-att-disabled="props.readonly ? 'disabled' : undefined">
+                            <t t-foreach="rawContentTypes" t-as="rt" t-key="rt.value">
+                                <option t-att-value="rt.value" t-att-selected="rt.value === rawType" t-esc="rt.label"/>
+                            </t>
+                        </select>
+                    </div>
+                    <ExpressionInput value="body" placeholder="placeholders.rawBody" context="props.inputContext" multiline="true" suggestions="getFieldSuggestions('raw_body')" valueSuggestions="getFieldSuggestions('raw_body')" onChange="(v) => this.onBodyChange(v)" readonly="props.readonly"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>
