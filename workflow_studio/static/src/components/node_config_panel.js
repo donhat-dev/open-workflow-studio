@@ -629,11 +629,11 @@ export class NodeConfigPanel extends Component {
     }
 
     getControlMode(controlKey) {
-        return this.state.controlModes?.[controlKey] || 'fixed';
+        return this.state.controlModes[controlKey] || 'fixed';
     }
 
     getPairModes(controlKey) {
-        return this.state.pairModes?.[controlKey] || {};
+        return this.state.pairModes[controlKey] || {};
     }
 
     onControlModeChange = (controlKey, mode) => {
@@ -675,7 +675,7 @@ export class NodeConfigPanel extends Component {
         const safePairs = Array.isArray(pairs) ? pairs : [];
         const existing = (this.state.pairModes && this.state.pairModes[controlKey]) || {};
         const next = { ...existing };
-        const ids = new Set(safePairs.map((p) => p?.id).filter((id) => id !== undefined && id !== null));
+        const ids = new Set(safePairs.map((p) => p && p.id).filter((id) => id !== undefined && id !== null));
 
         let changed = false;
         for (const id of ids) {

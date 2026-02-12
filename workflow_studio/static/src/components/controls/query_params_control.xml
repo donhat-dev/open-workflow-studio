@@ -3,22 +3,24 @@
     <t t-name="workflow_studio.query_params_control">
         <div class="query-params-control">
             <t t-foreach="state.params" t-as="param" t-key="param.id">
-                <div class="qp-row d-flex gap-1 align-items-end mb-1" t-att-class="{ 'qp-disabled': !param.enabled }">
-                    <!-- Enable/disable checkbox -->
-                    <input type="checkbox" class="qp-toggle" t-att-checked="param.enabled" t-on-change="() => this.onToggleEnabled(param_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-                    <InputAutoComplete
-                        value="param.key"
-                        placeholder="'Key'"
-                        getSuggestions="(req) => this.props.suggestionsByKey?.key || []"
-                        onSelect="(v) => this.onKeyChange(param_index, v)"
-                        onInput="(v) => this.onKeyChange(param_index, v)"
-                        class="'kv-key'"
-                    />
-                    <ExpressionInput value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
-                    <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly">×</button>
+                <div class="qp-row kv-row kv-row--stack mb-2" t-att-class="{ 'qp-disabled': !param.enabled }">
+                    <div class="kv-row__meta d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="checkbox" class="qp-toggle" t-att-checked="param.enabled" t-on-change="() => this.onToggleEnabled(param_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                            <span class="kv-field-label">Name</span>
+                        </div>
+                        <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly">×</button>
+                    </div>
+                    <div class="kv-key-cell">
+                        <ExpressionInput value="param.key" placeholder="'Key'" context="props.inputContext" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" onChange="(v) => this.onKeyChange(param_index, v)" readonly="props.readonly"/>
+                    </div>
+                    <span class="kv-field-label">Value</span>
+                    <div class="kv-value-cell">
+                        <ExpressionInput value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
+                    </div>
                 </div>
             </t>
-            <button t-if="!props.readonly" class="kv-add" t-on-click="addParam">+ Add</button>
+            <button t-if="!props.readonly" class="kv-add" t-on-click="addParam">Add Parameter</button>
         </div>
     </t>
 </templates>

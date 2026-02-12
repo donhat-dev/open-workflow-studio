@@ -37,13 +37,21 @@
             <t t-elif="contentType === 'form_data'">
                 <div class="body-form-data mt-2">
                     <t t-foreach="formData" t-as="pair" t-key="pair.id">
-                        <div class="kv-row d-flex gap-1 align-items-end mb-1">
-                            <input type="text" class="kv-key" placeholder="Key" t-att-value="pair.key" t-on-input="(ev) => this.onFormKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-                            <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
-                            <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                        <div class="kv-row kv-row--stack mb-2">
+                            <div class="kv-row__meta d-flex align-items-center justify-content-between">
+                                <span class="kv-field-label">Name</span>
+                                <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                            </div>
+                            <div class="kv-key-cell">
+                                <ExpressionInput value="pair.key" placeholder="'Key'" context="props.inputContext" suggestions="getFieldSuggestions('form_data_key')" valueSuggestions="getFieldSuggestions('form_data_key')" onChange="(v) => this.onFormKeyChange(pair_index, v)" readonly="props.readonly"/>
+                            </div>
+                            <span class="kv-field-label">Value</span>
+                            <div class="kv-value-cell">
+                                <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
+                            </div>
                         </div>
                     </t>
-                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">+ Add</button>
+                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">Add Parameter</button>
                 </div>
             </t>
 
@@ -51,13 +59,21 @@
             <t t-elif="contentType === 'urlencoded'">
                 <div class="body-form-data mt-2">
                     <t t-foreach="formData" t-as="pair" t-key="pair.id">
-                        <div class="kv-row d-flex gap-1 align-items-end mb-1">
-                            <input type="text" class="kv-key" placeholder="Key" t-att-value="pair.key" t-on-input="(ev) => this.onFormKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-                            <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
-                            <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                        <div class="kv-row kv-row--stack mb-2">
+                            <div class="kv-row__meta d-flex align-items-center justify-content-between">
+                                <span class="kv-field-label">Name</span>
+                                <button class="kv-remove" t-on-click="() => this.removeFormPair(pair_index)" t-att-disabled="formData.length &lt;= 1 or props.readonly">×</button>
+                            </div>
+                            <div class="kv-key-cell">
+                                <ExpressionInput value="pair.key" placeholder="'Key'" context="props.inputContext" suggestions="getFieldSuggestions('form_data_key')" valueSuggestions="getFieldSuggestions('form_data_key')" onChange="(v) => this.onFormKeyChange(pair_index, v)" readonly="props.readonly"/>
+                            </div>
+                            <span class="kv-field-label">Value</span>
+                            <div class="kv-value-cell">
+                                <ExpressionInput value="pair.value" placeholder="placeholders.formValue" context="props.inputContext" suggestions="getFieldSuggestions('form_data_value')" valueSuggestions="getFieldSuggestions('form_data_value')" onChange="(v) => this.onFormValueChange(pair_index, v)" readonly="props.readonly"/>
+                            </div>
                         </div>
                     </t>
-                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">+ Add</button>
+                    <button t-if="!props.readonly" class="kv-add" t-on-click="addFormPair">Add Parameter</button>
                 </div>
             </t>
 

@@ -39,6 +39,10 @@
 - Debug handles: `window.app`, `window.app.editor`, `window.WorkflowNodes`.
   - Add node: `window.app.editor.addNode(window.WorkflowNodes.HttpRequestNode, { x: 300, y: 300 })`
   - Export: `window.app.editor.getWorkflow()`
+- **Restart Odoo (On-Demand)**:
+  - Run `python C:\Users\ODOO\Documents\workflow_automation_builder\trigger_restart.py`
+  - Only needed for Python code changes.
+  - No auto-restart/watchdog enabled.
 
 ## Project conventions (must follow)
 - **Language**: Vietnamese in conversation, English for code/docs.

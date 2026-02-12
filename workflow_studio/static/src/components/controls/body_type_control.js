@@ -135,9 +135,9 @@ export class BodyTypeControl extends Component {
     }
 
     // Form data key-value management
-    onFormKeyChange(index, ev) {
+    onFormKeyChange(index, value) {
         if (!this.state.bodyValue.form_data[index]) return;
-        this.state.bodyValue.form_data[index].key = ev.target.value;
+        this.state.bodyValue.form_data[index].key = value;
         this._emit();
     }
 
