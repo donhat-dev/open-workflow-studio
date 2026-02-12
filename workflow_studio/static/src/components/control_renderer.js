@@ -2,6 +2,7 @@
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "./expression/ExpressionInput";
+import { InputAutoComplete } from "./common/input_auto_complete";
 import { CodeEditor } from "./code_editor";
 import { AuthControl } from "./controls/auth_control";
 import { BodyTypeControl } from "./controls/body_type_control";
@@ -37,7 +38,7 @@ import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_uti
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl };
+    static components = { ExpressionInput, InputAutoComplete, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -196,7 +197,25 @@ export class ControlRenderer extends Component {
     }
 
     onPairValueModeChange(pairId, mode) {
-        this.props.onPairModeChange?.(this.props.control.key, pairId, mode);
+        this.props.onPairModeChange?.(this.props.control.key, pairId, 'value', mode);
+    }
+
+    onPairKeyModeChange(pairId, mode) {
+        this.props.onPairModeChange?.(this.props.control.key, pairId, 'key', mode);
+    }
+
+    getPairKeyMode(pairId) {
+        const modes = this.props.pairModes || {};
+        const pairMode = modes[pairId];
+        if (typeof pairMode === "string") return "fixed"; // Legacy normalization
+        return pairMode?.key || 'fixed';
+    }
+
+    getPairValueMode(pairId) {
+        const modes = this.props.pairModes || {};
+        const pairMode = modes[pairId];
+        if (typeof pairMode === "string") return pairMode; // Legacy support
+        return pairMode?.value || 'fixed';
     }
 
     /**
@@ -247,14 +266,18 @@ export class ControlRenderer extends Component {
     // KEY-VALUE CONTROL HANDLERS
     // ============================================
 
-    onKeyChange(index, ev) {
+    onKeyChange(index, value) {
         const control = this.props.control;
         if (!this.state.pairs[index]) {
             throw new Error(`[ControlRenderer] Pair at index ${index} not found for key change`);
         }
-        this.state.pairs[index].key = ev.target.value;
+        this.state.pairs[index].key = value;
         // Notify parent with updated pairs
         this.props.onChange(control.key, [...this.state.pairs]);
+    }
+
+    onKeySelect(index, value) {
+        this.onKeyChange(index, value);
     }
 
     onValueChange(index, ev) {

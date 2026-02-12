@@ -6,7 +6,14 @@
                 <div class="qp-row d-flex gap-1 align-items-end mb-1" t-att-class="{ 'qp-disabled': !param.enabled }">
                     <!-- Enable/disable checkbox -->
                     <input type="checkbox" class="qp-toggle" t-att-checked="param.enabled" t-on-change="() => this.onToggleEnabled(param_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-                    <input type="text" class="kv-key" placeholder="Key" t-att-value="param.key" t-on-input="(ev) => this.onKeyChange(param_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                    <InputAutoComplete
+                        value="param.key"
+                        placeholder="'Key'"
+                        getSuggestions="(req) => this.props.suggestionsByKey?.key || []"
+                        onSelect="(v) => this.onKeyChange(param_index, v)"
+                        onInput="(v) => this.onKeyChange(param_index, v)"
+                        class="'kv-key'"
+                    />
                     <ExpressionInput value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
                     <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly">×</button>
                 </div>

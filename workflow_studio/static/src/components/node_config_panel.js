@@ -47,7 +47,7 @@ export class NodeConfigPanel extends Component {
             controls: [],  // Control metadata from adapter
             // Expression UI modes (persisted in node.meta.ui)
             controlModes: {},  // { [controlKey]: 'fixed' | 'expression' }
-            pairModes: {},  // { [controlKey]: { [pairId]: 'fixed' | 'expression' } }
+            pairModes: {},  // { [controlKey]: { [pairId]: { key, value } } }
             // Collapsed ancestor sections
             collapsedSections: {},  // { nodeId: true/false }
             // Panel resize state
@@ -123,8 +123,13 @@ export class NodeConfigPanel extends Component {
                 for (const p of pairs) {
                     const id = p?.id;
                     if (id === undefined || id === null) continue;
-                    if (!map[id]) {
-                        map[id] = 'fixed';
+                    
+                    const existing = map[id];
+                    if (!existing) {
+                        map[id] = { key: 'fixed', value: 'fixed' };
+                    } else if (typeof existing === 'string') {
+                        // Legacy normalization: assume existing was value-only, key was always fixed
+                        map[id] = { key: 'fixed', value: existing };
                     }
                 }
                 nextPairModes[control.key] = map;
@@ -639,10 +644,16 @@ export class NodeConfigPanel extends Component {
         this._persistUiModes();
     };
 
-    onPairModeChange = (controlKey, pairId, mode) => {
+    onPairModeChange = (controlKey, pairId, cell, mode) => {
         const current = this.state.pairModes || {};
         const map = { ...(current[controlKey] || {}) };
-        map[pairId] = mode;
+        const pairMode = typeof map[pairId] === 'object' ? map[pairId] : { key: 'fixed', value: 'fixed' };
+        
+        map[pairId] = {
+            ...pairMode,
+            [cell]: mode,
+        };
+        
         this.state.pairModes = { ...current, [controlKey]: map };
         this._persistUiModes();
     };
@@ -669,7 +680,7 @@ export class NodeConfigPanel extends Component {
         let changed = false;
         for (const id of ids) {
             if (!next[id]) {
-                next[id] = 'fixed';
+                next[id] = { key: 'fixed', value: 'fixed' };
                 changed = true;
             }
         }

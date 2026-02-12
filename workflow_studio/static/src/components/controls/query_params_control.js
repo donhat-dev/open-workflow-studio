@@ -2,6 +2,7 @@
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "../expression/ExpressionInput";
+import { InputAutoComplete } from "../common/input_auto_complete";
 import { getSuggestionsByKey, mergeUniqueSuggestions } from "@workflow_studio/utils/input_suggestion_utils";
 
 const DEFAULT_QUERY_VALUE_SUGGESTIONS = {
@@ -22,7 +23,7 @@ const DEFAULT_QUERY_VALUE_SUGGESTIONS = {
  */
 export class QueryParamsControl extends Component {
     static template = "workflow_studio.query_params_control";
-    static components = { ExpressionInput };
+    static components = { ExpressionInput, InputAutoComplete };
 
     static props = {
         value: { type: [Array, { value: undefined }], optional: true },
@@ -88,9 +89,10 @@ export class QueryParamsControl extends Component {
         return mergeUniqueSuggestions(defaultSuggestions, schemaSuggestions);
     }
 
-    onKeyChange(index, ev) {
+    onKeyChange(index, value) {
         if (!this.state.params[index]) return;
-        this.state.params[index].key = ev.target.value;
+        const val = typeof value === 'object' ? value.target.value : value;
+        this.state.params[index].key = val;
         this._emit();
     }
 

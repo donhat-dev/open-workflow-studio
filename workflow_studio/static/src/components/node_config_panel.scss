@@ -513,7 +513,67 @@
   max-width: 40%;
 }
 
+.kv-key-cell {
+  flex: 0 0 34%;
+  min-width: 120px;
+  max-width: 40%;
+  display: flex;
+  min-height: 0;
+
+  & > .o_workflow_input_auto_complete {
+    flex: 1;
+    min-width: 0;
+  }
+
+  & > .expression-input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.kv-key-fixed {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid $o-gray-400;
+  border-radius: 4px;
+  background: $o-view-background-color;
+  overflow: hidden;
+
+  & > .o_workflow_input_auto_complete {
+    flex: 1;
+    min-width: 0;
+
+    .o_autocomplete_input {
+       border: none !important;
+       border-radius: 0 !important;
+       box-shadow: none !important;
+       background: transparent !important;
+    }
+  }
+
+  .btn-mode-toggle {
+    flex: 0 0 24px;
+    border: none;
+    border-left: 1px solid $o-gray-200;
+    background: transparent;
+    color: $o-gray-500;
+    font-size: 0.75rem;
+    padding: 0;
+
+    &:hover {
+      background: $o-gray-100;
+      color: $o-action;
+    }
+  }
+}
+
 .kv-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.kv-value-cell {
   flex: 1 1 auto;
   min-width: 0;
 }

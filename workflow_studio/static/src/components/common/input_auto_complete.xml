@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.InputAutoComplete" owl="1">
+        <div class="o_workflow_input_auto_complete" t-att-class="props.class">
+            <AutoComplete
+                value="state.value"
+                sources="sources"
+                placeholder="props.placeholder"
+                onSelect.bind="onSelect"
+                onInput.bind="onInput"
+                autofocus="props.autofocus"
+            />
+        </div>
+    </t>
+</templates>

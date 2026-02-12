@@ -29,8 +29,28 @@
 				<div class="control-keyvalue">
 					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
 						<div class="kv-row">
-							<input type="text" class="kv-key" t-att-placeholder="props.control.keyPlaceholder" t-att-value="pair.key" t-on-input="(ev) => this.onKeyChange(pair_index, ev)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-							<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
+							<div class="kv-key-cell">
+								<t t-if="getPairKeyMode(pair.id) === 'expression'">
+									<ExpressionInput value="pair.key" placeholder="props.control.keyPlaceholder" context="props.inputContext" mode="'expression'" suggestions="suggestions" valueSuggestions="suggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairKeyModeChange(pair.id, m)" onChange="(v) => this.onKeyChange(pair_index, v)" readonly="props.readonly"/>
+								</t>
+								<t t-else="">
+									<div class="kv-key-fixed">
+										<InputAutoComplete
+											value="pair.key"
+											placeholder="props.control.keyPlaceholder"
+											getSuggestions="(req) => this.suggestions"
+											onSelect="(v) => this.onKeySelect(pair_index, v)"
+											onInput="(v) => this.onKeyChange(pair_index, v)"
+										/>
+										<button class="btn-mode-toggle" t-on-click="() => this.onPairKeyModeChange(pair.id, 'expression')" title="Switch to Expression">
+											<i class="fa fa-code"/>
+										</button>
+									</div>
+								</t>
+							</div>
+							<div class="kv-value-cell">
+								<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairValueMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
+							</div>
 							<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1 or props.readonly">×</button>
 						</div>
 					</t>
