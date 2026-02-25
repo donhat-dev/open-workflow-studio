@@ -8,6 +8,7 @@ import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 import { View } from "@web/views/view";
 import { Chatter } from "@mail/chatter/web_portal/chatter";
 import { WorkflowHistoryPanel } from "@workflow_studio/components/workflow_history_panel/workflow_history_panel";
+import { bootstrapWebAwesomeForPoc } from "@workflow_studio/app/webawesome_bootstrap";
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
  * 
@@ -73,6 +74,8 @@ export class WorkflowEditorApp extends Component {
         
         // Load on mount
         onMounted(async () => {
+            await bootstrapWebAwesomeForPoc();
+
             try {
                 await this.editorService.loadNodeTypes();
             } catch (error) {

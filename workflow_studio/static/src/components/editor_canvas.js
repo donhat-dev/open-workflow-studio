@@ -291,6 +291,72 @@ export class EditorCanvas extends Component {
             return [value];
         };
 
+        const buildPredecessorSet = (targetNodeId) => {
+            if (!targetNodeId) {
+                return new Set();
+            }
+
+            const normalizedTarget = String(targetNodeId);
+            const reverseAdj = {};
+            for (const conn of this.connections) {
+                if (!conn || !conn.source || !conn.target) {
+                    continue;
+                }
+
+                const target = String(conn.target);
+                const source = String(conn.source);
+                if (!reverseAdj[target]) {
+                    reverseAdj[target] = [];
+                }
+                reverseAdj[target].push(source);
+            }
+
+            const predecessors = new Set();
+            const visited = new Set();
+            const queue = [normalizedTarget];
+
+            while (queue.length) {
+                const current = queue.shift();
+                const parents = reverseAdj[current] || [];
+                for (const parent of parents) {
+                    if (visited.has(parent)) {
+                        continue;
+                    }
+                    visited.add(parent);
+                    predecessors.add(parent);
+                    queue.push(parent);
+                }
+            }
+
+            return predecessors;
+        };
+
+        const getLastPredecessorJson = (nodeResults, predecessorSet) => {
+            let lastJson = {};
+            let found = false;
+            const safeResults = Array.isArray(nodeResults) ? nodeResults : [];
+
+            for (const result of safeResults) {
+                if (!result || result.node_id === undefined || result.node_id === null) {
+                    continue;
+                }
+                const resultNodeId = String(result.node_id);
+                if (!predecessorSet.has(resultNodeId)) {
+                    continue;
+                }
+                if (result.output_data === undefined) {
+                    continue;
+                }
+                lastJson = result.output_data;
+                found = true;
+            }
+
+            if (!found) {
+                return {};
+            }
+            return lastJson;
+        };
+
         const buildInputContext = (value) => {
             const itemsValue = normalizeItems(value);
             const inputContext = {
@@ -329,24 +395,39 @@ export class EditorCanvas extends Component {
 
             const nodeResults = (options && options.nodeResults) || execution.nodeResults || [];
             const nodeId = (options && options.nodeId) || null;
+            const predecessorSet = nodeId ? buildPredecessorSet(nodeId) : null;
 
             const wrappedNode = {};
             if (Array.isArray(nodeResults) && nodeResults.length) {
                 for (const result of nodeResults) {
-                    wrappedNode[result.node_id] = buildNodeOutputView(result.output_data);
+                    if (!result || result.node_id === undefined || result.node_id === null) {
+                        continue;
+                    }
+
+                    const resultNodeId = String(result.node_id);
+                    if (predecessorSet && !predecessorSet.has(resultNodeId)) {
+                        continue;
+                    }
+
+                    wrappedNode[resultNodeId] = buildNodeOutputView(result.output_data);
                 }
             } else {
                 const nodeEntries = snapshot.node || {};
                 for (const [entryId, output] of Object.entries(nodeEntries)) {
-                    wrappedNode[entryId] = buildNodeOutputView(output);
+                    const normalizedEntryId = String(entryId);
+                    if (predecessorSet && !predecessorSet.has(normalizedEntryId)) {
+                        continue;
+                    }
+                    wrappedNode[normalizedEntryId] = buildNodeOutputView(output);
                 }
             }
 
             let json = snapshot.json || {};
-            if (nodeId && Array.isArray(nodeResults) && nodeResults.length) {
-                const match = nodeResults.find((r) => r.node_id === nodeId);
-                if (match && match.output_data !== undefined) {
-                    json = match.output_data;
+            if (predecessorSet) {
+                if (Array.isArray(nodeResults) && nodeResults.length) {
+                    json = getLastPredecessorJson(nodeResults, predecessorSet);
+                } else {
+                    json = {};
                 }
             }
 
