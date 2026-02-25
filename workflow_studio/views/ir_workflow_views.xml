@@ -164,5 +164,12 @@
 		</record>
 		<menuitem id="menu_workflow_pilot_root" name="Workflow Studio"/>
 		<menuitem id="menu_ir_workflow" name="Workflows" parent="menu_workflow_pilot_root" action="action_ir_workflow" sequence="10"/>
+
+		<!-- Connector Landing Demo -->
+		<record id="action_connector_landing" model="ir.actions.client">
+			<field name="name">Connector Demo</field>
+			<field name="tag">workflow_studio.connector_landing</field>
+		</record>
+		<menuitem id="menu_connector_landing" name="Connector Demo" parent="menu_workflow_pilot_root" action="action_connector_landing" sequence="90"/>
 	</data>
 </odoo>
