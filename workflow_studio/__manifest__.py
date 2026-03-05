@@ -21,9 +21,8 @@
     'assets': {
         # Core libs bundle - can be lazy-loaded or included separately
         'workflow_studio.assets_libs': [
-            'workflow_studio/static/lib/dagre.js/dagre.min.js',
-            'workflow_studio/static/lib/lucide/lucide.min.js',
-            'workflow_studio/static/lib/motion/**/*',
+            'workflow_studio/static/lib/dagre/dagre.min.js',
+            'workflow_studio/static/lib/lucide/lucide.min.js'
         ],
         'web.assets_backend': [
             # Include libs bundle first

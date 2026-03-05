@@ -301,6 +301,8 @@ export class WorkflowGraph {
     layoutWithSplitting(options = {}) {
         const SUBGRAPH_SPACING = 160;  // n8n: GRID_SIZE * 8
         const components = this.findComponents();
+        const rankdir = options.rankdir === "TB" ? "TB" : "LR";
+        const isVerticalFlow = rankdir === "TB";
 
         // Single component → normal layout
         if (components.length <= 1) {
@@ -313,6 +315,9 @@ export class WorkflowGraph {
         for (const nodeIds of components) {
             // Create and layout subgraph
             const subgraph = this.createSubgraph(nodeIds);
+            const subgraphConfig = subgraph.graph();
+            Object.assign(subgraphConfig, options);
+            subgraph.setGraph(subgraphConfig);
 
             // Detect and remove back-edges for this subgraph
             const backEdges = this._detectCyclesInGraph(subgraph);
@@ -336,25 +341,40 @@ export class WorkflowGraph {
         }
 
         // Sort components by their original top-left position (preserve general order)
-        layoutedComponents.sort((a, b) => a.bbox.minY - b.bbox.minY);
+        if (isVerticalFlow) {
+            layoutedComponents.sort((a, b) => a.bbox.minX - b.bbox.minX);
+        } else {
+            layoutedComponents.sort((a, b) => a.bbox.minY - b.bbox.minY);
+        }
 
-        // Stack vertically
-        const MARGIN_TOP = 50;
-        let currentY = MARGIN_TOP;
+        // Stack subgraphs in the opposite axis of flow for readability:
+        // - LR flow: stack components vertically
+        // - TB flow: stack components horizontally
+        const MARGIN_START = 50;
+        let currentOffset = MARGIN_START;
         const positions = {};
 
         for (const comp of layoutedComponents) {
-            const offsetY = currentY - comp.bbox.minY + (comp.bbox.height / 2);
+            const offset = currentOffset;
 
             for (const nodeId of comp.nodeIds) {
                 const node = comp.graph.node(nodeId);
+                const sourceX = node.x;
+                const sourceY = node.y;
+                const targetX = isVerticalFlow
+                    ? sourceX + (offset - comp.bbox.minX)
+                    : sourceX;
+                const targetY = isVerticalFlow
+                    ? sourceY
+                    : sourceY + (offset - comp.bbox.minY);
+
                 positions[nodeId] = {
-                    x: node.x,
-                    y: node.y + offsetY - comp.bbox.minY,
+                    x: targetX,
+                    y: targetY,
                 };
             }
 
-            currentY += comp.bbox.height + SUBGRAPH_SPACING;
+            currentOffset += (isVerticalFlow ? comp.bbox.width : comp.bbox.height) + SUBGRAPH_SPACING;
         }
 
         return positions;

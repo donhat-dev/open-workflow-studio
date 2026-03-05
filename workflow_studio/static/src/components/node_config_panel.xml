@@ -61,7 +61,7 @@
 											</t>
 										</div>
 										<div class="ancestor-node-data" t-if="!isSectionCollapsed(item.nodeId) and item.data.json !== undefined">
-											<JsonTreeNode data="item.data.json" path="[]" level="0" initialExpandDepth="inputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" isInputNode="item.isInputNode" sourceNodeId="item.isInputNode ? null : item.nodeId"/>
+											<JsonTreeNode data="item.data.json" path="[]" level="0" initialExpandDepth="inputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" isInputNode="item.isInputNode" sourceNodeId="item.isInputNode ? null : item.nodeId" resolveRecordRefs="actions.resolveRecordRefs" recordRefCache="state.recordRefCache" onRecordRefCachePatch.bind="onRecordRefCachePatch"/>
 										</div>
 										<div class="ancestor-node-data" t-elif="!isSectionCollapsed(item.nodeId)">
 											<div class="input-data-empty">
@@ -78,7 +78,7 @@
 										<span>Variables and context</span>
 									</div>
 									<div class="ancestor-node-data" t-if="!isSectionCollapsed('_context')">
-										<JsonTreeNode data="contextVariables" path="[]" level="0" initialExpandDepth="contextTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="true" isContextRoot="true"/>
+										<JsonTreeNode data="contextVariables" path="[]" level="0" initialExpandDepth="contextTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="true" isContextRoot="true" resolveRecordRefs="actions.resolveRecordRefs" recordRefCache="state.recordRefCache" onRecordRefCachePatch.bind="onRecordRefCachePatch"/>
 									</div>
 								</div>
 							</t>
@@ -156,12 +156,12 @@
 										<span>Execution failed</span>
 									</div>
 									<div class="output-tree-container">
-										<JsonTreeNode data="executionDisplayResult.error" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false"/>
+										<JsonTreeNode data="executionDisplayResult.error" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false" resolveRecordRefs="actions.resolveRecordRefs" recordRefCache="state.recordRefCache" onRecordRefCachePatch.bind="onRecordRefCachePatch"/>
 									</div>
 								</t>
 								<t t-else="">
 									<div class="output-tree-container">
-										<JsonTreeNode data="executionDisplayResult.output" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false"/>
+										<JsonTreeNode data="executionDisplayResult.output" path="[]" level="0" initialExpandDepth="outputTreeExpandDepth" autoCollapseChildrenThreshold="treeAutoCollapseChildrenThreshold" draggable="false" resolveRecordRefs="actions.resolveRecordRefs" recordRefCache="state.recordRefCache" onRecordRefCachePatch.bind="onRecordRefCachePatch"/>
 									</div>
 								</t>
 							</t>

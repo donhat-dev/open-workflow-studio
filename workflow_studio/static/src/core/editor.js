@@ -10,7 +10,6 @@ import { Connection } from './connection';
 
 /**
  * WorkflowEditor - Central state manager for workflow graph
- * Inspired by Rete.js NodeEditor and n8n's workflow store
  * 
  * Manages nodes and connections, handles validation,
  * and provides serialization/deserialization.

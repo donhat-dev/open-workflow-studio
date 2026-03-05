@@ -215,6 +215,89 @@
   color: $o-warning;
 }
 
+.json-value--recordrefs {
+  color: $o-info;
+}
+
+.json-tree-node__record-refs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.json-tree-node__record-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba($o-info, 0.35);
+  background: rgba($o-info, 0.08);
+  color: $o-info;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.json-tree-node__record-expand {
+  border: 0;
+  background: transparent;
+  color: $o-action;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 0;
+}
+
+.json-tree-node__record-details {
+  margin-left: 22px;
+  margin-top: 4px;
+  border-left: 1px solid $o-gray-300;
+  padding-left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.json-tree-node__record-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: $o-gray-600;
+  font-size: 11px;
+}
+
+.json-tree-node__record-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.json-tree-node__record-item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.json-tree-node__record-status {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.json-tree-node__record-status.status-ok {
+  color: $o-success;
+}
+
+.json-tree-node__record-status.status-error {
+  color: $o-danger;
+}
+
+.json-tree-node__record-error {
+  color: $o-danger;
+  font-size: 11px;
+}
+
 .json-tree-node__drag-handle {
   opacity: 0;
   color: $o-gray-600;
@@ -231,4 +314,84 @@
   padding-left: 16px;
   border-left: 1px solid $o-gray-300;
   margin-left: 7px;
+}
+
+// ============================================
+// RECORD BADGE LIST
+// ============================================
+
+.record-badge-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.record-badge-list__spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.record-badge-list__toggle {
+  // Inherits .json-tree-node__toggle cursor/size — just pin alignment
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 3px;
+}
+
+.record-badge-list__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+// Individual badge — same visual language as .json-tree-node__key-badge
+// but smaller and non-draggable (solid, not dashed border)
+.record-badge-list__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid $o-gray-400;
+  border-radius: 4px;
+  color: $o-gray-700;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: rgba($o-action, 0.08);
+    border-color: $o-action;
+    color: $o-action;
+  }
+}
+
+// Overflow expand button — styled like the badge but with action colour
+.record-badge-list__overflow {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px dashed rgba($o-action, 0.6);
+  border-radius: 4px;
+  color: $o-action;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+
+  &:hover {
+    border-style: solid;
+    background: rgba($o-action, 0.08);
+    color: darken($o-action, 8%);
+  }
+
+  i.fa {
+    font-size: 9px;
+  }
 }

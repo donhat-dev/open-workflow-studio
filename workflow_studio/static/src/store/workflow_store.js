@@ -984,6 +984,12 @@ export const workflowEditorService = {
             async getRunDetails(runId) {
                 return await rpc(`/workflow_studio/run/${runId}`, {});
             },
+            async resolveRecordRefs(refs = []) {
+                const safeRefs = Array.isArray(refs) ? refs : [];
+                return await rpc('/workflow_studio/resolve_record_refs', {
+                    refs: safeRefs,
+                });
+            },
             getWorkflowId() {
                 return workflowId;
             },

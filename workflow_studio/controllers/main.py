@@ -26,6 +26,158 @@ _logger = logging.getLogger(__name__)
 
 class WorkflowPilotController(http.Controller):
     """Controller for workflow execution endpoints."""
+
+    _RECORD_REFS_KEY = '__wf_record_refs__'
+    _MAX_RECORD_REF_RESOLVE = 200
+    _MINIMAL_FIELD_CANDIDATES = [
+        'display_name',
+        'name',
+        'state',
+        'status',
+        'code',
+        'email',
+        'phone',
+        'mobile',
+        'active',
+        'create_date',
+        'write_date',
+    ]
+
+    def _get_minimal_read_fields(self, model):
+        """Pick a bounded, lightweight field set for live expansion."""
+        field_names = ['display_name']
+        fields_map = model.fields_get()
+        for candidate in self._MINIMAL_FIELD_CANDIDATES:
+            if candidate == 'display_name':
+                continue
+            if candidate not in fields_map:
+                continue
+            field_type = fields_map[candidate].get('type')
+            if field_type in ('binary', 'one2many', 'many2many'):
+                continue
+            field_names.append(candidate)
+        # Keep payload minimal and deterministic.
+        return field_names[:12]
+
+    def _normalize_record_refs(self, refs):
+        normalized = []
+        if not isinstance(refs, list):
+            return normalized
+
+        for ref in refs[:self._MAX_RECORD_REF_RESOLVE]:
+            if not isinstance(ref, dict):
+                continue
+            model_name = ref.get('model')
+            record_id = ref.get('id')
+            if not isinstance(model_name, str) or not model_name:
+                continue
+            try:
+                record_id = int(record_id)
+            except Exception:
+                continue
+            if record_id <= 0:
+                continue
+            normalized.append({
+                'model': model_name,
+                'id': record_id,
+            })
+        return normalized
+
+    @http.route('/workflow_studio/resolve_record_refs', type='json', auth='user', methods=['POST'])
+    def resolve_record_refs(self, refs=None, **kwargs):
+        """Resolve record references to minimal live data (ACL-aware)."""
+        payload = request.httprequest.json or {}
+        if refs is None:
+            refs = payload.get('refs')
+
+        normalized_refs = self._normalize_record_refs(refs)
+        if not normalized_refs:
+            return {'items': []}
+
+        grouped_ids = {}
+        for ref in normalized_refs:
+            model_name = ref['model']
+            if model_name not in grouped_ids:
+                grouped_ids[model_name] = set()
+            grouped_ids[model_name].add(ref['id'])
+
+        resolved_map = {}
+
+        for model_name, id_set in grouped_ids.items():
+            try:
+                model = request.env[model_name]
+            except Exception:
+                for rid in id_set:
+                    resolved_map[(model_name, rid)] = {
+                        'status': 'model_not_found',
+                        'error': 'Model not found',
+                        'data': None,
+                    }
+                continue
+
+            if not model.check_access_rights('read', raise_exception=False):
+                for rid in id_set:
+                    resolved_map[(model_name, rid)] = {
+                        'status': 'access_denied',
+                        'error': 'Read access denied',
+                        'data': None,
+                    }
+                continue
+
+            ids_list = list(id_set)
+            accessible_ids = model.search([('id', 'in', ids_list)]).ids
+            accessible_set = set(accessible_ids)
+            missing_or_denied = set(ids_list) - accessible_set
+
+            fields_to_read = self._get_minimal_read_fields(model)
+            rows_by_id = {}
+            if accessible_ids:
+                rows = model.browse(accessible_ids).read(fields_to_read)
+                for row in rows:
+                    row_id = row.get('id')
+                    if row_id:
+                        rows_by_id[row_id] = row
+
+            for rid in ids_list:
+                key = (model_name, rid)
+                if rid in rows_by_id:
+                    resolved_map[key] = {
+                        'status': 'ok',
+                        'error': None,
+                        'data': rows_by_id[rid],
+                    }
+                    continue
+                if rid in missing_or_denied:
+                    resolved_map[key] = {
+                        'status': 'missing_or_denied',
+                        'error': 'Record not found or no access',
+                        'data': None,
+                    }
+                    continue
+                resolved_map[key] = {
+                    'status': 'unresolved',
+                    'error': 'Unable to resolve record',
+                    'data': None,
+                }
+
+        items = []
+        for ref in normalized_refs:
+            model_name = ref['model']
+            rid = ref['id']
+            resolved = resolved_map.get((model_name, rid), {
+                'status': 'unresolved',
+                'error': 'Unable to resolve record',
+                'data': None,
+            })
+            items.append({
+                'model': model_name,
+                'id': rid,
+                'status': resolved['status'],
+                'error': resolved['error'],
+                'data': resolved['data'],
+            })
+
+        return {'items': items}
     
     @http.route('/workflow_studio/execute', type='json', auth='user', methods=['POST'])
     def execute_workflow(self, workflow_id=None, input_data=None, **kwargs):

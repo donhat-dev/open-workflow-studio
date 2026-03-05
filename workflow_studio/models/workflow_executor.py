@@ -37,6 +37,7 @@ from .runners import (
 )
 from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
+from .security.safe_model_proxy import SafeModelProxy
 from .security.secret_broker import SecretBrokerFactory
 
 _logger = logging.getLogger(__name__)
@@ -65,6 +66,14 @@ class WorkflowExecutor:
         (re.compile(r'(secret["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
         (re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', re.IGNORECASE), '***@***.***'),
     ]
+
+    # Marker keys for Odoo record references in execution output.
+    _RECORD_REFS_KEY = '__wf_record_refs__'
+    _RECORD_REFS_COUNT_KEY = '__wf_record_refs_count__'
+    _RECORD_REFS_TRUNCATED_KEY = '__wf_record_refs_truncated__'
+    _RECORD_REFS_MODEL_KEY = '__wf_record_refs_model__'
+    _MAX_RECORD_REFS = 100
+    _MAX_NORMALIZE_DEPTH = 20
 
     # Node runner registry
     NODE_RUNNERS = {
@@ -492,7 +501,9 @@ class WorkflowExecutor:
             
             # Complete run
             output_data_raw = self._collect_final_output()
+            output_data_raw = self._normalize_output_value(output_data_raw)
             output_data_display = self._mask_sensitive_data(output_data_raw)
+            output_data_display = self._normalize_output_value(output_data_display)
             if self.persist:
                 self._persist_all_node_runs()
                 self.run.write({
@@ -1027,11 +1038,13 @@ class WorkflowExecutor:
         Returns:
             dict with raw/display objects and serialized strings
         """
-        output_raw = to_plain(output)
+        output_raw = self._normalize_output_value(to_plain(output))
         output_display = output_raw
 
         if not self._can_unmask_output(node_id):
             output_display = self._mask_sensitive_data(output_raw)
+
+        output_display = self._normalize_output_value(output_display)
 
         return {
             'raw': output_raw,
@@ -1049,12 +1062,96 @@ class WorkflowExecutor:
         return node_record._should_unmask_for_user(self.env.user, run=self.run)
 
     def _serialize_output(self, output):
+        output = self._normalize_output_value(output)
         if isinstance(output, str):
             return output
         try:
             return json.dumps(output, ensure_ascii=True)
         except Exception:
             return str(output)
+
+    def _is_record_refs_marker(self, value):
+        return isinstance(value, dict) and self._RECORD_REFS_KEY in value
+
+    def _build_record_refs_marker(self, recordset):
+        ids = list(recordset.ids or [])
+        limited_ids = ids[:self._MAX_RECORD_REFS]
+        refs = [
+            {
+                'model': recordset._name,
+                'id': rid,
+            }
+            for rid in limited_ids
+        ]
+        return {
+            self._RECORD_REFS_KEY: refs,
+            self._RECORD_REFS_MODEL_KEY: recordset._name,
+            self._RECORD_REFS_COUNT_KEY: len(ids),
+            self._RECORD_REFS_TRUNCATED_KEY: len(ids) > len(limited_ids),
+        }
+
+    def _normalize_output_value(self, value, depth=0):
+        """Convert output value to JSON-safe structure.
+
+        Key responsibility in Phase 1:
+        - convert Odoo record/recordset values to record-ref markers.
+        """
+        if depth > self._MAX_NORMALIZE_DEPTH:
+            return str(value)
+
+        if isinstance(value, SafeModelProxy):
+            value = value._model
+
+        if isinstance(value, models.BaseModel):
+            return self._build_record_refs_marker(value)
+
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+
+        if isinstance(value, bytes):
+            return value.decode('utf-8', errors='replace')
+
+        if isinstance(value, dict):
+            if self._is_record_refs_marker(value):
+                refs = value.get(self._RECORD_REFS_KEY) or []
+                normalized_refs = []
+                for ref in refs:
+                    if not isinstance(ref, dict):
+                        continue
+                    model_name = ref.get('model')
+                    record_id = ref.get('id')
+                    if not model_name:
+                        continue
+                    try:
+                        record_id = int(record_id)
+                    except Exception:
+                        continue
+                    normalized_refs.append({
+                        'model': model_name,
+                        'id': record_id,
+                    })
+                count = value.get(self._RECORD_REFS_COUNT_KEY)
+                if not isinstance(count, int):
+                    count = len(normalized_refs)
+                return {
+                    self._RECORD_REFS_KEY: normalized_refs,
+                    self._RECORD_REFS_MODEL_KEY: value.get(self._RECORD_REFS_MODEL_KEY),
+                    self._RECORD_REFS_COUNT_KEY: count,
+                    self._RECORD_REFS_TRUNCATED_KEY: bool(value.get(self._RECORD_REFS_TRUNCATED_KEY)),
+                }
+
+            normalized = {}
+            for key, item in value.items():
+                normalized[key] = self._normalize_output_value(item, depth + 1)
+            return normalized
+
+        if isinstance(value, (list, tuple, set)):
+            return [self._normalize_output_value(item, depth + 1) for item in value]
+
+        return str(value)
 
     def _mask_sensitive_data(self, value):
         """Mask sensitive patterns (API keys, passwords, tokens, emails).

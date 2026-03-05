@@ -136,7 +136,11 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
             return;
         }
         // Skip if over overlays
-        if (ev.target.closest('.node-menu') || ev.target.closest('.connection-toolbar')) {
+        if (
+            ev.target.closest('.node-menu')
+            || ev.target.closest('.connection-toolbar')
+            || ev.target.closest('.workflow-editor-canvas__controls')
+        ) {
             return;
         }
 
@@ -217,8 +221,9 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
     /**
      * Fit all nodes into viewport
      * @param {Array} nodes - Array of node objects with x, y
+     * @param {Object} [options] - Fit options (padding/mode)
      */
-    function fitToView(nodes) {
+    function fitToView(nodes, options = {}) {
         if (!nodes || nodes.length === 0) return;
         if (!rootRef.el) return;
 
@@ -226,7 +231,7 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
         if (!dims) return;
 
         const rect = rootRef.el.getBoundingClientRect();
-        const viewState = calculateFitView(nodes, dims, rect);
+        const viewState = calculateFitView(nodes, dims, rect, options);
 
         if (!viewState) return;
 

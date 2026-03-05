@@ -12,7 +12,6 @@ import {
     getVerticalStackPath,
     getConnectionPath as calculateConnectionPath
 } from "./editor_canvas/utils/connection_path";
-import { calculateFitView } from "./editor_canvas/utils/view_utils";
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
@@ -105,6 +104,10 @@ export class EditorCanvas extends Component {
             execution: this.props.executionData || null,
             // Dimension config (both modes)
             dimensionConfig: this.props.dimensionConfig || {},
+        });
+
+        this.localUi = useState({
+            fitMenuOpen: false,
         });
 
         // Bind to editor service state (editor mode) for reactivity
@@ -235,6 +238,8 @@ export class EditorCanvas extends Component {
             if (this.rootRef.el) {
                 this._resizeObserver.observe(this.rootRef.el);
             }
+            // Debug handle for QA – accessible as window.canvas in browser console
+            window.canvas = this;
         });
         onWillUnmount(() => {
             this._resizeObserver.disconnect();
@@ -263,6 +268,7 @@ export class EditorCanvas extends Component {
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
+        useExternalListener(document, "mousedown", this.onDocumentMouseDown.bind(this));
 
         this.isDebug = typeof odoo !== "undefined" && odoo.debug;
         window.canvas = this.isDebug ? this : null;
@@ -869,13 +875,111 @@ export class EditorCanvas extends Component {
      * Fit all nodes into viewport with padding
      * Inspired by n8n/VueFlow fitView implementation
      */
+    getFitTopOffsetPx() {
+        const rootEl = this.rootRef.el;
+        if (!rootEl) {
+            return 0;
+        }
+        const controlsEl = rootEl.querySelector(".workflow-editor-canvas__controls");
+        if (!controlsEl) {
+            return 0;
+        }
+        const rootRect = rootEl.getBoundingClientRect();
+        const controlsRect = controlsEl.getBoundingClientRect();
+        // Leave a small visual gap below controls to avoid overlap.
+        return Math.max(0, (controlsRect.bottom - rootRect.top) + 12);
+    }
+
+    /**
+     * Adaptive rank separation for fit-height layout.
+     * Keeps current 1/2-gap behavior on small graphs, and compresses
+     * vertical spacing progressively for larger workflows.
+     * @returns {number}
+     */
+    getAdaptiveFitHeightRanksep() {
+        const nodeCount = this.nodes.length;
+        if (nodeCount <= 6) {
+            return 40;
+        }
+        if (nodeCount <= 12) {
+            return 32;
+        }
+        if (nodeCount <= 20) {
+            return 24;
+        }
+        return 20;
+    }
+
     /**
      * Fit all nodes into viewport with padding
      * Logic extracted to utils/view_utils.js
      * Works in both editor and viewer modes via viewportHook
      */
-    fitToView() {
-        this.viewportHook.fitToView(this.nodes);
+    fitToView(options = {}) {
+        this.closeFitMenu();
+        const fitOptions = {
+            ...options,
+            topOffsetPx: options.topOffsetPx !== undefined
+                ? options.topOffsetPx
+                : this.getFitTopOffsetPx(),
+        };
+        this.viewportHook.fitToView(this.nodes, fitOptions);
+    }
+
+    get isFitMenuOpen() {
+        return !!this.localUi.fitMenuOpen;
+    }
+
+    toggleFitMenu(ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+        if (this.isReadonly || this.nodes.length === 0) {
+            return;
+        }
+        this.localUi.fitMenuOpen = !this.localUi.fitMenuOpen;
+    }
+
+    closeFitMenu() {
+        if (this.localUi.fitMenuOpen) {
+            this.localUi.fitMenuOpen = false;
+        }
+    }
+
+    onFitMenuAction(mode, ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+
+        if (mode === "full-height") {
+            this.fitFullHeight();
+            return;
+        }
+        this.fitFullWidth();
+    }
+
+    fitFullWidth() {
+        if (!this.canEdit) return;
+        this.closeFitMenu();
+        this.tidyUp({
+            orientation: "horizontal",
+            label: "Auto layout (horizontal) + fit full width",
+        });
+        this.fitToView({ mode: "cover-width" });
+    }
+
+    fitFullHeight() {
+        if (!this.canEdit) return;
+        this.closeFitMenu();
+        const adaptiveRanksep = this.getAdaptiveFitHeightRanksep();
+        this.tidyUp({
+            orientation: "vertical",
+            ranksep: adaptiveRanksep,
+            label: "Auto layout (vertical) + fit full height",
+        });
+        this.fitToView({ mode: "cover-height" });
     }
 
     // =========================================
@@ -887,12 +991,20 @@ export class EditorCanvas extends Component {
      * Uses pure util for position calculation, service actions for mutations.
      * Wrapped in batch for single undo/redo step.
      */
-    tidyUp() {
+    tidyUp(options = {}) {
         if (!this.canEdit) return;
         if (this.nodes.length === 0) return;
 
+        const orientation = options.orientation === "vertical" ? "vertical" : "horizontal";
+        const ranksep = typeof options.ranksep === "number" ? options.ranksep : undefined;
+        const label = options.label
+            || (orientation === "vertical" ? "Tidy up layout (vertical)" : "Tidy up layout");
+
         // Calculate new positions using pure utility (no side effects)
-        const positions = calculateTidyPositions(this.nodes, this.connections);
+        const positions = calculateTidyPositions(this.nodes, this.connections, {
+            orientation,
+            ranksep,
+        });
 
         // Apply positions via service actions (wrapped in batch for single undo)
         this.editor.actions.beginBatch();
@@ -902,7 +1014,7 @@ export class EditorCanvas extends Component {
                 this.editor.actions.moveNode(node.id, { x: pos.x, y: pos.y });
             }
         }
-        this.editor.actions.endBatch("Tidy up layout");
+        this.editor.actions.endBatch(label);
     }
 
     /**
@@ -992,6 +1104,21 @@ export class EditorCanvas extends Component {
     // Connection drawing methods now handled by useConnectionDrawing hook
     // Keeping findNearestSocket for backward compatibility with hook dependency
     // (hook receives getSocketPositionForNode which uses this internally)
+
+    /**
+     * Close fit dropdown when clicking outside.
+     * @param {MouseEvent} ev
+     */
+    onDocumentMouseDown(ev) {
+        if (!this.isFitMenuOpen) {
+            return;
+        }
+        const target = ev.target;
+        if (target && target.closest && target.closest(".fit-view-dropdown")) {
+            return;
+        }
+        this.closeFitMenu();
+    }
 
     /**
      * @param {MouseEvent} ev
@@ -1678,6 +1805,23 @@ export class EditorCanvas extends Component {
         return this.isEditorMode ? this.editorState.ui.executing : false;
     }
 
+    get fitMenuItems() {
+        return [
+            {
+                key: "fit-full-width",
+                icon: "ArrowLeftRight",
+                label: "Fit Full Width",
+                callback: (ev) => this.onFitMenuAction("full-width", ev),
+            },
+            {
+                key: "fit-full-height",
+                icon: "ArrowUpDown",
+                label: "Fit Full Height",
+                callback: (ev) => this.onFitMenuAction("full-height", ev),
+            },
+        ];
+    }
+
     /**
      * Handle undo button click
      */
@@ -1790,9 +1934,15 @@ export class EditorCanvas extends Component {
                 icon: 'Maximize',
                 callback: () => this.fitToView(),
                 visible: true,
-                disabled: false,
+                disabled: this.nodes.length === 0,
                 title: 'Fit to View',
                 classes: 'btn btn-light btn-sm',
+                menu: {
+                    open: this.isFitMenuOpen,
+                    disabled: this.isReadonly || this.nodes.length === 0,
+                    toggle: (ev) => this.toggleFitMenu(ev),
+                    items: this.fitMenuItems,
+                },
             },
             {
                 name: 'zoom-out',
@@ -1918,9 +2068,15 @@ export class EditorCanvas extends Component {
                 icon: 'Maximize',
                 callback: () => this.fitToView(),
                 visible: true,
-                disabled: false,
+                disabled: this.nodes.length === 0,
                 title: 'Fit to View',
                 classes: 'btn btn-light btn-sm',
+                menu: {
+                    open: this.isFitMenuOpen,
+                    disabled: this.isReadonly || this.nodes.length === 0,
+                    toggle: (ev) => this.toggleFitMenu(ev),
+                    items: this.fitMenuItems,
+                },
             },
             {
                 name: 'zoom-out',

@@ -26,10 +26,6 @@ export class NodeConfigPanel extends Component {
         viewMode: { type: String, optional: true },  // 'edit' (default) or 'execution'
     };
 
-    // Static cache for predecessor computation (cleared on workflow change)
-    static _predecessorCache = new Map();  // "workflowId:nodeId" -> Set<predecessorId>
-    static _reverseAdjCache = new Map();   // workflowId -> reverseAdj map
-
     static INPUT_TREE_EXPAND_DEPTH = 1;
     static OUTPUT_TREE_EXPAND_DEPTH = 1;
     static CONTEXT_TREE_EXPAND_DEPTH = 1;
@@ -54,6 +50,9 @@ export class NodeConfigPanel extends Component {
             isExpanded: false,  // Full width mode
             customWidth: null,  // Custom width from drag (in pixels)
             isResizing: false,  // Currently dragging to resize
+            // Lazy-loaded record ref details cache.
+            // Key format: `${model}:${id}`
+            recordRefCache: {},
         });
 
         this.panelRef = useRef("panel");
@@ -71,10 +70,21 @@ export class NodeConfigPanel extends Component {
                 this.state.controls = [];
                 this.state.controlModes = {};
                 this.state.pairModes = {};
+                this.state.recordRefCache = {};
                 this.initControlValues(nextProps.node);
             }
         });
     }
+
+    onRecordRefCachePatch = (patch) => {
+        if (!patch || typeof patch !== 'object') {
+            return;
+        }
+        this.state.recordRefCache = {
+            ...(this.state.recordRefCache || {}),
+            ...patch,
+        };
+    };
 
     /**
      * Initialize control values from Core layer via adapterService
@@ -360,13 +370,32 @@ export class NodeConfigPanel extends Component {
             // Fallback: show all results except current node
             return nodeResults.filter(r => r.node_id !== currentNodeId);
         }
-        
-        // Build set of predecessor node IDs (cached BFS backwards from current node)
-        const workflowId = workflow.id || 'draft';
-        const predecessorIds = this._getPredecessorIds(currentNodeId, workflowId, workflow.connections);
-        
-        // Filter results to only include predecessors, maintaining execution order
-        return nodeResults.filter(r => predecessorIds.has(r.node_id));
+
+        // Build reverse adjacency map from current connections (no cache — avoids
+        // stale data when connections change or across different workflows).
+        const reverseAdj = {};
+        for (const conn of workflow.connections) {
+            const { source, target } = conn;
+            if (!source || !target) continue;
+            if (!reverseAdj[target]) reverseAdj[target] = [];
+            reverseAdj[target].push(source);
+        }
+
+        // BFS backwards from currentNodeId to collect all predecessors.
+        const predecessors = new Set();
+        const visited = new Set();
+        const queue = [currentNodeId];
+        while (queue.length > 0) {
+            const current = queue.shift();
+            for (const parent of (reverseAdj[current] || [])) {
+                if (visited.has(parent)) continue;
+                visited.add(parent);
+                predecessors.add(parent);
+                queue.push(parent);
+            }
+        }
+
+        return nodeResults.filter(r => predecessors.has(r.node_id));
     }
 
     /**
@@ -395,74 +424,6 @@ export class NodeConfigPanel extends Component {
         return Array.from(uniqueByNode.values());
     }
     
-    /**
-     * Get all predecessor node IDs using cached BFS backwards traversal.
-     * Uses static cache keyed by workflowId:nodeId for O(1) repeated lookups.
-     * @private
-     */
-    _getPredecessorIds(targetNodeId, workflowId, connections) {
-        const cacheKey = `${workflowId}:${targetNodeId}`;
-        
-        // Check cache first
-        if (NodeConfigPanel._predecessorCache.has(cacheKey)) {
-            return NodeConfigPanel._predecessorCache.get(cacheKey);
-        }
-        
-        // Get or build reverse adjacency map (cached per workflow)
-        let reverseAdj = NodeConfigPanel._reverseAdjCache.get(workflowId);
-        if (!reverseAdj) {
-            reverseAdj = {};
-            for (const conn of connections) {
-                const target = conn.target;
-                const source = conn.source;
-                if (!target || !source) continue;
-                if (!reverseAdj[target]) reverseAdj[target] = [];
-                reverseAdj[target].push(source);
-            }
-            NodeConfigPanel._reverseAdjCache.set(workflowId, reverseAdj);
-        }
-        
-        // BFS backwards traversal
-        const predecessors = new Set();
-        const visited = new Set();
-        const queue = [targetNodeId];
-        
-        while (queue.length > 0) {
-            const current = queue.shift();
-            const parents = reverseAdj[current] || [];
-            for (const parent of parents) {
-                if (visited.has(parent)) continue;
-                visited.add(parent);
-                predecessors.add(parent);
-                queue.push(parent);
-            }
-        }
-        
-        // Cache result
-        NodeConfigPanel._predecessorCache.set(cacheKey, predecessors);
-        return predecessors;
-    }
-    
-    /**
-     * Clear predecessor cache (call when workflow connections change).
-     * @param {string} [workflowId] - Clear specific workflow or all if omitted
-     */
-    static clearPredecessorCache(workflowId) {
-        if (workflowId) {
-            // Clear specific workflow entries
-            NodeConfigPanel._reverseAdjCache.delete(workflowId);
-            for (const key of NodeConfigPanel._predecessorCache.keys()) {
-                if (key.startsWith(`${workflowId}:`)) {
-                    NodeConfigPanel._predecessorCache.delete(key);
-                }
-            }
-        } else {
-            // Clear all
-            NodeConfigPanel._predecessorCache.clear();
-            NodeConfigPanel._reverseAdjCache.clear();
-        }
-    }
-
     get executionDisplayResult() {
         const runResult = this.executionNodeResult;
         if (!runResult) return null;

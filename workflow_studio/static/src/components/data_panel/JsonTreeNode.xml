@@ -17,14 +17,50 @@
 					</span>
 				</t>
 				<!-- Value display (not draggable) -->
-				<span t-att-class="'json-tree-node__value ' + valueClass">
-					<t t-esc="displayValue"/>
-				</span>
+				<t t-if="isRecordRefMarker">
+					<div class="json-tree-node__record-refs">
+						<RecordBadge data="recordRefLabels" max="5" getLabel.bind="identity"/>
+						<button t-if="canExpandRecordRefs" class="json-tree-node__record-expand" type="button" t-on-click="onToggleRecordRefs">
+							<i t-att-class="state.recordRefsExpanded ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"/>
+							<span t-if="!state.recordRefsLoading" t-esc="state.recordRefsExpanded ? 'Collapse' : 'Expand'"/>
+							<span t-else="">Loading...</span>
+						</button>
+					</div>
+				</t>
+				<t t-else="">
+					<span t-att-class="'json-tree-node__value ' + valueClass">
+						<t t-esc="displayValue"/>
+					</span>
+				</t>
 			</div>
 			<!-- Children (recursive) -->
 			<div t-if="hasChildren and state.isExpanded" class="json-tree-node__children">
 				<t t-foreach="children" t-as="child" t-key="child.key">
-					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" level="childLevel" initialExpandDepth="props.initialExpandDepth" autoCollapseChildrenThreshold="props.autoCollapseChildrenThreshold" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="props.draggable" isContextRoot="props.isContextRoot"/>
+					<JsonTreeNode data="child.value" path="child.path" keyName="child.key" onItemClick="props.onItemClick" level="childLevel" initialExpandDepth="props.initialExpandDepth" autoCollapseChildrenThreshold="props.autoCollapseChildrenThreshold" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="props.draggable" isContextRoot="props.isContextRoot" resolveRecordRefs="props.resolveRecordRefs" recordRefCache="props.recordRefCache" onRecordRefCachePatch="props.onRecordRefCachePatch"/>
+				</t>
+			</div>
+			<div t-if="isRecordRefMarker and state.recordRefsExpanded" class="json-tree-node__record-details">
+				<div t-if="state.recordRefsLoading" class="json-tree-node__record-loading">
+					<i class="fa fa-spinner fa-spin"/>
+					<span>Loading record data...</span>
+				</div>
+				<t t-else="">
+					<t t-foreach="resolvedRecordItems" t-as="recordItem" t-key="recordItem.key">
+						<div class="json-tree-node__record-item">
+							<div class="json-tree-node__record-item-header">
+								<span class="json-tree-node__record-badge" t-esc="recordItem.label"/>
+								<span class="json-tree-node__record-status" t-att-class="recordItem.status === 'ok' ? 'status-ok' : 'status-error'" t-esc="recordItem.status"/>
+							</div>
+							<t t-if="recordItem.status === 'ok' and recordItem.data">
+								<div class="json-tree-node__record-item-body">
+									<JsonTreeNode data="recordItem.data" path="recordItem.path" level="childLevel" initialExpandDepth="props.initialExpandDepth" autoCollapseChildrenThreshold="props.autoCollapseChildrenThreshold" sourceNodeId="props.sourceNodeId" isInputNode="props.isInputNode" draggable="false" isContextRoot="props.isContextRoot" resolveRecordRefs="props.resolveRecordRefs" recordRefCache="props.recordRefCache" onRecordRefCachePatch="props.onRecordRefCachePatch"/>
+								</div>
+							</t>
+							<t t-else="">
+								<div class="json-tree-node__record-error" t-esc="recordItem.error || 'Unable to load record'"/>
+							</t>
+						</div>
+					</t>
 				</t>
 			</div>
 		</div>
