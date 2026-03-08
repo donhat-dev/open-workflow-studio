@@ -21,7 +21,9 @@
 			<!-- Card Content Layout -->
 			<div class="workflow-node__icon-col d-flex flex-column align-items-center justify-content-center ps-2 flex-shrink-0">
 				<div class="workflow-node__icon-box d-flex align-items-center justify-content-center rounded-2">
-					<LucideIcon t-props="{ name: nodeIcon, size: 34 }"/>
+					<img t-if="isImageIcon" t-att-src="nodeIcon" class="workflow-node__icon-image" alt=""/>
+					<i t-elif="isFontAwesomeIcon" t-att-class="fontAwesomeClass"/>
+					<LucideIcon t-else="" t-props="{ name: nodeIcon, size: 34 }"/>
 				</div>
 			</div>
 

@@ -188,6 +188,23 @@ export class WorkflowNode extends Component {
         return icons[this.props.node.type] || "fa-cube";
     }
 
+    get isImageIcon() {
+        const icon = this.nodeIcon;
+        if (typeof icon !== "string") {
+            return false;
+        }
+        return icon.startsWith("/") || icon.startsWith("http://") || icon.startsWith("https://") || icon.startsWith("data:image/");
+    }
+
+    get isFontAwesomeIcon() {
+        const icon = this.nodeIcon;
+        return typeof icon === "string" && icon.startsWith("fa-");
+    }
+
+    get fontAwesomeClass() {
+        return `fa ${this.nodeIcon}`;
+    }
+
     get nodeTypeClass() {
         return `workflow-node--${this.props.node.type || "default"}`;
     }

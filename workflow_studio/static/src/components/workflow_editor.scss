@@ -174,6 +174,20 @@
   background: $o-gray-200;
 }
 
+.workflow-node__icon-image {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.node-palette__icon-image {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
 .workflow-node__icon-box .lucide {
   color: inherit;
   stroke-width: 1.5;
@@ -503,7 +517,7 @@
 .fit-view-dropdown__toggle {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  border-left: 0;
+  margin-left: -1px;
   padding-left: 6px;
   padding-right: 6px;
 }

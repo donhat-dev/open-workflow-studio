@@ -161,10 +161,7 @@ export class JsonTreeNode extends Component {
         if (this.isObject) return `Object`;
 
         if (typeof this.props.data === 'string') {
-            const truncated = this.props.data.length > 50
-                ? this.props.data.substring(0, 47) + '...'
-                : this.props.data;
-            return `"${truncated}"`;
+            return `"${this.props.data}"`;
         }
 
         return String(this.props.data);

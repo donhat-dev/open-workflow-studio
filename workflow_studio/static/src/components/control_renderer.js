@@ -7,6 +7,8 @@ import { AuthControl } from "./controls/auth_control";
 import { BodyTypeControl } from "./controls/body_type_control";
 import { QueryParamsControl } from "./controls/query_params_control";
 import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
+import { DomainControl } from "./domain_control/domain_control";
+import { FieldValuesControl } from "./field_values_control/field_values_control";
 
 /**
  * ControlRenderer Component
@@ -37,7 +39,7 @@ import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_uti
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl };
+    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl, DomainControl, FieldValuesControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -51,6 +53,8 @@ export class ControlRenderer extends Component {
         onPairModeChange: { type: Function, optional: true },
         // Readonly mode (execution view)
         readonly: { type: Boolean, optional: true },
+        // Sibling control values — needed by domain/field_values controls to read model
+        controlValues: { type: Object, optional: true },
     };
 
     setup() {
@@ -157,6 +161,28 @@ export class ControlRenderer extends Component {
             return map;
         }
         return {};
+    }
+
+    /**
+     * Current selected model name — read from sibling controlValues.
+     * Used by domain and field_values controls to pass resModel prop.
+     */
+    get resModel() {
+        const vals = this.props.controlValues;
+        if (!vals || typeof vals !== "object") return "";
+        const model = vals.model;
+        return typeof model === "string" ? model.trim() : "";
+    }
+
+    /**
+     * Current selected operation — read from sibling controlValues.
+     * Used by field_values control to filter field suggestions (create vs write).
+     */
+    get operation() {
+        const vals = this.props.controlValues;
+        if (!vals || typeof vals !== "object") return "";
+        const op = vals.operation;
+        return typeof op === "string" ? op : "";
     }
 
     getPairValueSuggestions(pair) {

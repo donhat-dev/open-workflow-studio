@@ -1,0 +1,84 @@
+.o_workflow_field_values {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .fv-row {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.02);
+        border-radius: 4px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .fv-row-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2px;
+    }
+
+    .fv-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: rgba(0, 0, 0, 0.45);
+        letter-spacing: 0.03em;
+    }
+
+    .fv-remove {
+        background: none;
+        border: none;
+        color: rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        border-radius: 3px;
+        font-size: 14px;
+
+        &:hover {
+            color: #dc3545;
+        }
+
+        &:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+    }
+
+    .fv-add {
+        margin-top: 2px;
+        padding: 5px 10px;
+        font-size: 12px;
+        background: none;
+        border: 1px dashed var(--o-action-color, #017e84);
+        color: var(--o-action-color, #017e84);
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        text-align: center;
+        transition: background 0.15s, color 0.15s;
+
+        &:hover {
+            background: var(--o-action-color, #017e84);
+            color: white;
+        }
+    }
+}
+
+// Ensure DomainSelector fits within the config panel width
+.o_workflow_domain_control {
+    .o_domain_selector {
+        width: 100%;
+    }
+
+    .o_workflow_domain_placeholder {
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.02);
+        border-radius: 4px;
+        border: 1px dashed rgba(0, 0, 0, 0.15);
+        color: rgba(0, 0, 0, 0.45);
+    }
+}

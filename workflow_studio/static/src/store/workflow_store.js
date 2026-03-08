@@ -874,6 +874,7 @@ export const workflowEditorService = {
                 });
                 versionHash = result.version_hash;
                 history.clear();
+                editorBus.trigger('refresh');
                 return result;
             },
 
@@ -923,6 +924,7 @@ export const workflowEditorService = {
                         contextSnapshot: result.context_snapshot || null,
                         nodeResults: run.node_results || [],
                     });
+                    editorBus.trigger('refresh');
                 } else if (result && result.error) {
                     actions.setExecutionResult({
                         status: result.status || 'failed',

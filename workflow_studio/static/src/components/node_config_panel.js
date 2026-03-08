@@ -3,6 +3,7 @@
 import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
+import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 
 /**
  * NodeConfigPanel Component
@@ -36,6 +37,10 @@ export class NodeConfigPanel extends Component {
         if (!this.actions) {
             throw new Error("[NodeConfigPanel] Missing actions prop");
         }
+
+        // Kick off background fetch of Odoo model list for model_select controls.
+        // getOdooModels() returns cached list immediately (fallback during fetch).
+        this._odooModels = useOdooModels();
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -154,11 +159,32 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
-     * Get controls for rendering
-     * Returns control metadata objects (not Control instances)
+     * Get controls for rendering.
+     * Returns control metadata objects (not Control instances).
+     * Post-processes model_select controls to inject live model suggestions.
      */
     getControls() {
-        return this.state.controls || [];
+        const raw = this.state.controls || [];
+        return raw.map((ctrl) => {
+            if (ctrl.type === "model_select") {
+                return { ...ctrl, suggestions: this._getModelSuggestions() };
+            }
+            return ctrl;
+        });
+    }
+
+    /**
+     * Build model suggestions array from the background-fetched Odoo model list.
+     * Returns immediately (no await) using cached/fallback data.
+     * @private
+     */
+    _getModelSuggestions() {
+        const models = this._odooModels.getOdooModels();
+        return models.map((m) => ({
+            value: m.model,
+            label: m.model,
+            description: m.description,
+        }));
     }
 
     /**

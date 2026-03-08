@@ -87,6 +87,38 @@
 					readonly="props.readonly"
 				/>
 			</t>
+			<!-- MODEL SELECT — ExpressionInput fixed mode with Odoo model autocomplete -->
+			<t t-elif="controlType === 'model_select'">
+				<ExpressionInput
+					value="value"
+					placeholder="placeholder"
+					mode="'fixed'"
+					suggestions="suggestions"
+					valueSuggestions="valueSuggestions"
+					onChange="(v) => this.onExpressionChange(v)"
+					readonly="props.readonly"
+				/>
+			</t>
+			<!-- DOMAIN — Odoo DomainSelector (field-aware, type-safe operators) -->
+			<t t-elif="controlType === 'domain'">
+				<DomainControl
+					resModel="resModel"
+					value="value"
+					onChange="(v) => this.onExpressionChange(v)"
+					readonly="props.readonly"
+				/>
+			</t>
+			<!-- FIELD VALUES — visual field→value rows for create/write ops -->
+			<t t-elif="controlType === 'field_values'">
+				<FieldValuesControl
+					resModel="resModel"
+					operation="operation"
+					value="value"
+					onChange="(v) => this.onExpressionChange(v)"
+					readonly="props.readonly"
+					inputContext="props.inputContext"
+				/>
+			</t>
 		</div>
 	</t>
 </templates>

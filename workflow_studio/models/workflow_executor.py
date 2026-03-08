@@ -34,6 +34,7 @@ from .runners import (
     ValidationNodeRunner,
     CodeNodeRunner,
     SwitchNodeRunner,
+    RecordOperationNodeRunner,
 )
 from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
@@ -85,6 +86,7 @@ class WorkflowExecutor:
         'validation': ValidationNodeRunner,
         'code': CodeNodeRunner,
         'switch': SwitchNodeRunner,
+        'record_operation': RecordOperationNodeRunner,
     }
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
@@ -767,7 +769,7 @@ class WorkflowExecutor:
             workflow=self._get_workflow_context(),
         )
 
-        if node_type == 'code' or is_custom_node:
+        if node_type in ('code', 'record_operation') or is_custom_node:
             context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
 
         if is_custom_node:

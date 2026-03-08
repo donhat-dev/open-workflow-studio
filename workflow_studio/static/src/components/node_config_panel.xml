@@ -113,7 +113,7 @@
 											<span t-esc="group.name"/>
 										</div>
 										<t t-foreach="group.controls" t-as="control" t-key="control.key">
-											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView"/>
+											<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
 										</t>
 									</div>
 								</t>

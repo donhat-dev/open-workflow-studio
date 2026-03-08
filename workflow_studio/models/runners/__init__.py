@@ -24,6 +24,7 @@ from .variable_runner import VariableNodeRunner
 from .validation_runner import ValidationNodeRunner
 from .code_runner import CodeNodeRunner
 from .switch_runner import SwitchNodeRunner
+from .record_operation_runner import RecordOperationNodeRunner
 
 __all__ = [
     'BaseNodeRunner',
@@ -36,4 +37,5 @@ __all__ = [
     'ValidationNodeRunner',
     'CodeNodeRunner',
     'SwitchNodeRunner',
+    'RecordOperationNodeRunner',
 ]
