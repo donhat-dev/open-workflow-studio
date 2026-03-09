@@ -15,7 +15,7 @@ Provides runner implementations for different node types:
     - SwitchNodeRunner: Multi-branch routing
 """
 
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner, ExpressionEvaluator, SmartExpressionResolver
 from .http_runner import HttpNodeRunner
 from .if_runner import IfNodeRunner
 from .loop_runner import LoopNodeRunner
@@ -29,6 +29,7 @@ from .record_operation_runner import RecordOperationNodeRunner
 __all__ = [
     'BaseNodeRunner',
     'ExpressionEvaluator',
+    'SmartExpressionResolver',
     'HttpNodeRunner',
     'IfNodeRunner',
     'LoopNodeRunner',

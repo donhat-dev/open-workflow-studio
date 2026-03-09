@@ -1,9 +1,9 @@
 /** @odoo-module **/
 
 import { Component, onMounted, onWillUpdateProps, useState } from "@odoo/owl";
-import { DomainSelector } from "@web/core/domain_selector/domain_selector";
 import { useService } from "@web/core/utils/hooks";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
+import { WorkflowDomainBuilder } from "@workflow_studio/components/domain_builder/workflow_domain_builder";
 
 /**
  * DomainControl — wraps Odoo's DomainSelector as a workflow config control.
@@ -16,13 +16,14 @@ import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
  */
 export class DomainControl extends Component {
     static template = "workflow_studio.domain_control";
-    static components = { DomainSelector };
+    static components = { WorkflowDomainBuilder };
 
     static props = {
         resModel: { type: String, optional: true },
         value: { type: String, optional: true },
         onChange: Function,
         readonly: { type: Boolean, optional: true },
+        inputContext: { type: Object, optional: true },
     };
 
     setup() {

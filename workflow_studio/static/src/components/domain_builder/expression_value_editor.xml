@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="workflow_studio.ExpressionValueEditor">
+        <div class="o_expression_value_editor d-flex align-items-center w-100 gap-1">
+            <!-- Native or expression editor -->
+            <div class="flex-grow-1 overflow-hidden">
+                <t t-if="isExpression">
+                    <ExpressionInput
+                        value="expressionValue"
+                        onChange.bind="onExpressionChange"
+                        placeholder="'{{ _input.field }}'"
+                        context="expressionContext"
+                        expressionSuggestions="expressionSuggestions"
+                        mode="'expression'"
+                        toggleMode="'side'"
+                        onModeChange.bind="onExpressionModeChange"
+                    />
+                    <t t-if="isExpression and !state.expressionValid and expressionValue">
+                        <small class="text-warning d-block mt-1 ps-1">
+                            <i class="fa fa-exclamation-triangle me-1"/>Invalid syntax
+                        </small>
+                    </t>
+                </t>
+                <t t-else="">
+                    <t t-component="nativeComponent" t-props="nativeProps" />
+                </t>
+            </div>
+            <!-- Expression toggle button -->
+            <button
+                class="btn btn-sm o_expression_toggle px-1"
+                t-att-class="{ 'btn-primary': isExpression, 'btn-outline-secondary': !isExpression }"
+                t-att-title="isExpression ? 'Switch to literal value' : 'Switch to expression'"
+                t-on-click="toggleMode"
+                type="button"
+            >
+                <span class="fw-bold small">ƒx</span>
+            </button>
+        </div>
+    </t>
+
+</templates>

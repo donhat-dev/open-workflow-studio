@@ -67,6 +67,32 @@
   align-items: stretch;
 }
 
+.expression-input__side-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 8px;
+  background: $o-view-background-color;
+  border: 1px solid $o-gray-400;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  font-size: 11px;
+  color: $o-gray-600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.expression-input__side-toggle:hover {
+  background: rgba($o-black, 0.05);
+}
+
+.expression-input__side-toggle.active {
+  background: rgba($o-warning, 0.15);
+  color: $o-warning;
+  border-color: $o-warning;
+}
+
 .expression-input__fx {
   display: flex;
   align-items: center;
@@ -102,6 +128,13 @@
   border-radius: 0 6px 6px 0;
 }
 
+.expression-input__field:has(.expression-input__side-toggle)
+  .expression-input__text,
+.expression-input__field:has(.expression-input__side-toggle)
+  .expression-input__textarea {
+  border-radius: 0 6px 6px 0;
+}
+
 .expression-input__text:focus,
 .expression-input__textarea:focus {
   outline: none;
@@ -125,6 +158,10 @@
 }
 
 .expression-input.expression-mode .expression-input__fx {
+  border-color: $o-warning;
+}
+
+.expression-input.expression-mode .expression-input__side-toggle {
   border-color: $o-warning;
 }
 

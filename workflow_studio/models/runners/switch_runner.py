@@ -6,12 +6,8 @@ Switch Node Runner
 Routes data to one of multiple branches based on equality checks.
 """
 
-import re
-
-from odoo.tools.safe_eval import safe_eval
-
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 
 class SwitchNodeRunner(BaseNodeRunner):
@@ -23,10 +19,10 @@ class SwitchNodeRunner(BaseNodeRunner):
         payload = input_data or {}
         eval_context = build_eval_context(payload, context, include_input_item=True)
 
-        switch_value = self._resolve_value(node_config.get('switchValue', ''), eval_context)
-        case1 = self._resolve_value(node_config.get('case1', ''), eval_context)
-        case2 = self._resolve_value(node_config.get('case2', ''), eval_context)
-        case3 = self._resolve_value(node_config.get('case3', ''), eval_context)
+        switch_value = self.resolver.resolve(node_config.get('switchValue', ''), eval_context)
+        case1 = self.resolver.resolve(node_config.get('case1', ''), eval_context)
+        case2 = self.resolver.resolve(node_config.get('case2', ''), eval_context)
+        case3 = self.resolver.resolve(node_config.get('case3', ''), eval_context)
 
         switch_value, case1 = self._coerce_numbers(switch_value, case1)
         switch_value, case2 = self._coerce_numbers(switch_value, case2)
@@ -51,30 +47,6 @@ class SwitchNodeRunner(BaseNodeRunner):
             'json': input_data,
             'branch': output_index,
         }
-
-    def _resolve_value(self, raw_value, eval_context):
-        if not isinstance(raw_value, str):
-            return raw_value
-
-        stripped = raw_value.strip()
-        if not stripped:
-            return ''
-
-        template_match = re.fullmatch(r'\{\{(.+)\}\}', stripped)
-        if template_match:
-            inner_expr = template_match.group(1).strip()
-            try:
-                return safe_eval(inner_expr, eval_context, mode='eval')
-            except Exception:
-                return raw_value
-
-        if '{{' in raw_value and '}}' in raw_value:
-            try:
-                return ExpressionEvaluator.evaluate(raw_value, eval_context)
-            except Exception:
-                return raw_value
-
-        return raw_value
 
     def _coerce_numbers(self, left, right):
         left_num = self._maybe_number(left)

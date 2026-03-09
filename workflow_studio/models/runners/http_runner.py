@@ -15,7 +15,7 @@ from urllib.parse import urlencode
 import requests
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 _logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class HttpNodeRunner(BaseNodeRunner):
 
         # Evaluate URL
         url = node_config.get('url', '')
-        url = ExpressionEvaluator.evaluate(url, eval_context)
+        url = self.resolver.resolve_str(url, eval_context)
 
         if not url:
             raise ValueError("HTTP node requires a URL")
@@ -142,24 +142,24 @@ class HttpNodeRunner(BaseNodeRunner):
         auth_type = auth_config.get('type', 'none')
 
         if auth_type == 'bearer':
-            token = ExpressionEvaluator.evaluate(auth_config.get('token', ''), eval_context)
+            token = self.resolver.resolve_str(auth_config.get('token', ''), eval_context)
             return {'Authorization': f'Bearer {token}'}, {}, None
 
         if auth_type == 'basic':
-            username = ExpressionEvaluator.evaluate(auth_config.get('username', ''), eval_context)
-            password = ExpressionEvaluator.evaluate(auth_config.get('password', ''), eval_context)
+            username = self.resolver.resolve_str(auth_config.get('username', ''), eval_context)
+            password = self.resolver.resolve_str(auth_config.get('password', ''), eval_context)
             return {}, {}, (username, password)
 
         if auth_type == 'api_key':
-            key_name = ExpressionEvaluator.evaluate(auth_config.get('key_name', ''), eval_context)
-            key_value = ExpressionEvaluator.evaluate(auth_config.get('key_value', ''), eval_context)
+            key_name = self.resolver.resolve_str(auth_config.get('key_name', ''), eval_context)
+            key_value = self.resolver.resolve_str(auth_config.get('key_value', ''), eval_context)
             location = auth_config.get('key_location', 'header')
             if location == 'query':
                 return {}, {key_name: key_value} if key_name else {}, None
             return {key_name: key_value} if key_name else {}, {}, None
 
         if auth_type == 'oauth2':
-            access_token = ExpressionEvaluator.evaluate(
+            access_token = self.resolver.resolve_str(
                 auth_config.get('access_token', ''), eval_context
             )
             if access_token:
@@ -167,10 +167,10 @@ class HttpNodeRunner(BaseNodeRunner):
             return {}, {}, None
 
         if auth_type == 'custom_header':
-            header_name = ExpressionEvaluator.evaluate(
+            header_name = self.resolver.resolve_str(
                 auth_config.get('header_name', ''), eval_context
             )
-            header_value = ExpressionEvaluator.evaluate(
+            header_value = self.resolver.resolve_str(
                 auth_config.get('header_value', ''), eval_context
             )
             if header_name:
@@ -197,7 +197,7 @@ class HttpNodeRunner(BaseNodeRunner):
             key = p.get('key', '')
             if not key:
                 continue
-            value = ExpressionEvaluator.evaluate(p.get('value', ''), eval_context)
+            value = self.resolver.resolve_str(p.get('value', ''), eval_context)
             params[key] = value
         return params
 
@@ -218,7 +218,7 @@ class HttpNodeRunner(BaseNodeRunner):
             if not key:
                 continue
             value = h.get('value', '')
-            evaluated[key] = ExpressionEvaluator.evaluate(value, eval_context)
+            evaluated[key] = self.resolver.resolve_str(value, eval_context)
         return evaluated
 
     # ------------------------------------------------------------------
@@ -239,7 +239,7 @@ class HttpNodeRunner(BaseNodeRunner):
             old_body = node_config.get('body', '')
             if old_body:
                 if isinstance(old_body, str):
-                    body_str = ExpressionEvaluator.evaluate(old_body, eval_context)
+                    body_str = self.resolver.resolve_str(old_body, eval_context)
                     # Try to parse as JSON
                     try:
                         return json_lib.loads(body_str), None, 'application/json'
@@ -248,7 +248,7 @@ class HttpNodeRunner(BaseNodeRunner):
                 if isinstance(old_body, dict):
                     evaluated = {}
                     for k, v in old_body.items():
-                        evaluated[k] = ExpressionEvaluator.evaluate(v, eval_context)
+                        evaluated[k] = self.resolver.resolve(v, eval_context)
                     return evaluated, None, 'application/json'
             return None, None, None
 
@@ -259,12 +259,16 @@ class HttpNodeRunner(BaseNodeRunner):
 
         if content_type == 'json':
             raw_body = body_config.get('body', '')
-            body_str = ExpressionEvaluator.evaluate(raw_body, eval_context)
-            if body_str:
+            body_str = self.resolver.resolve(raw_body, eval_context)
+            if body_str is not None and body_str != '':
+                # If resolver returned a dict/list, use directly as JSON
+                if isinstance(body_str, (dict, list)):
+                    return body_str, None, 'application/json'
+                # String result — try to parse as JSON
                 try:
-                    return json_lib.loads(body_str), None, 'application/json'
+                    return json_lib.loads(str(body_str)), None, 'application/json'
                 except (json_lib.JSONDecodeError, TypeError):
-                    return None, body_str, 'application/json'
+                    return None, str(body_str), 'application/json'
             return None, None, 'application/json'
 
         if content_type == 'form_data':
@@ -277,7 +281,7 @@ class HttpNodeRunner(BaseNodeRunner):
                     key = item.get('key', '')
                     if not key:
                         continue
-                    value = ExpressionEvaluator.evaluate(item.get('value', ''), eval_context)
+                    value = self.resolver.resolve_str(item.get('value', ''), eval_context)
                     data[key] = value
                 return None, data, 'multipart/form-data'
             return None, None, None
@@ -292,14 +296,14 @@ class HttpNodeRunner(BaseNodeRunner):
                     key = item.get('key', '')
                     if not key:
                         continue
-                    value = ExpressionEvaluator.evaluate(item.get('value', ''), eval_context)
+                    value = self.resolver.resolve_str(item.get('value', ''), eval_context)
                     data[key] = value
                 return None, urlencode(data), 'application/x-www-form-urlencoded'
             return None, None, None
 
         if content_type == 'raw':
             raw_body = body_config.get('body', '')
-            body_str = ExpressionEvaluator.evaluate(raw_body, eval_context)
+            body_str = self.resolver.resolve_str(raw_body, eval_context)
             raw_type = body_config.get('raw_type', 'text/plain')
             return None, body_str, raw_type
 

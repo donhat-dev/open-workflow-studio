@@ -26,7 +26,7 @@
                     <div class="fv-value-cell">
                         <ExpressionInput
                             value="row.value"
-                            placeholder="value or {{ expression }}"
+                            placeholder="'value or {{ expression }}'"
                             context="props.inputContext"
                             mode="getValueMode(row.id)"
                             onModeChange="(m) => this.onValueModeChange(row.id, m)"

@@ -106,6 +106,7 @@
 					value="value"
 					onChange="(v) => this.onExpressionChange(v)"
 					readonly="props.readonly"
+					inputContext="props.inputContext"
 				/>
 			</t>
 			<!-- FIELD VALUES — visual field→value rows for create/write ops -->

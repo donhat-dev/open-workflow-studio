@@ -38,6 +38,13 @@ export const EXPRESSION_PATTERNS = {
  */
 export const NAMESPACES = ['_json', '_vars', '_loop', '_node', '_input', '_execution', '_workflow', '_now', '_today'];
 
+function containsSupportedNamespaceReference(expression) {
+    if (typeof expression !== 'string' || !expression) {
+        return false;
+    }
+    return NAMESPACES.some((namespace) => expression.includes(namespace));
+}
+
 /**
  * Check if a value contains expression templates
  * @param {string} value - Value to check
@@ -297,13 +304,29 @@ export function evaluateExpression(expression, context = {}) {
 
         if (templates.length === 0) {
             // No templates, return as-is
-            return { value: expression, error: null };
+            return { value: expression, error: null, type: _typeLabel(expression) };
         }
 
         // For single template, evaluate and return value
         if (templates.length === 1 && templates[0].full === expression) {
-            const value = resolveExpression(templates[0].expression, context);
-            return { value, error: null };
+            const singleExpression = templates[0].expression;
+            try {
+                const value = resolveExpression(singleExpression, context);
+                return { value, error: null, type: _typeLabel(value) };
+            } catch (err) {
+                // Preview fallback: complex expressions (e.g. list/boolean expressions)
+                // may reference valid namespaces but are not simple selector paths.
+                // Do not show a hard error in this case; backend safe_eval is source of truth.
+                if (
+                    err
+                    && typeof err.message === 'string'
+                    && err.message.startsWith('Invalid expression namespace')
+                    && containsSupportedNamespaceReference(singleExpression)
+                ) {
+                    return { value: undefined, error: null, type: null };
+                }
+                throw err;
+            }
         }
 
         // Multiple templates or mixed content: replace each
@@ -314,8 +337,23 @@ export function evaluateExpression(expression, context = {}) {
             result = result.replace(tmpl.full, stringValue);
         }
 
-        return { value: result, error: null };
+        return { value: result, error: null, type: 'str' };
     } catch (err) {
-        return { value: null, error: err.message };
+        return { value: null, error: err.message, type: null };
     }
+}
+
+/**
+ * Derive a short type label for a resolved value.
+ * @param {*} value
+ * @returns {string|null}
+ */
+function _typeLabel(value) {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'boolean') return 'bool';
+    if (typeof value === 'number') return Number.isInteger(value) ? 'int' : 'float';
+    if (typeof value === 'string') return 'str';
+    if (Array.isArray(value)) return 'list';
+    if (typeof value === 'object') return 'object';
+    return null;
 }

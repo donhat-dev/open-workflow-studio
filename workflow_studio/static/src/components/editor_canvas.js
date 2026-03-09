@@ -350,13 +350,28 @@ export class EditorCanvas extends Component {
 
             let json = snapshot.json || {};
             if (nodeId && Array.isArray(nodeResults) && nodeResults.length) {
-                const match = nodeResults.find((r) => r.node_id === nodeId);
-                if (match && match.output_data !== undefined) {
-                    json = match.output_data;
+                // _input/_json for a node's config panel = the UPSTREAM node's output
+                // (i.e. what this node receives as input, not what it produces)
+                const executedOrder = execution.executedOrder || [];
+                const currentIndex = executedOrder.indexOf(nodeId);
+                if (currentIndex > 0) {
+                    // Previous node exists — use its output as this node's input
+                    const prevNodeId = executedOrder[currentIndex - 1];
+                    const prevResult = nodeResults.find((r) => r.node_id === prevNodeId);
+                    if (prevResult && prevResult.output_data !== undefined) {
+                        json = prevResult.output_data;
+                    }
+                } else if (currentIndex === -1) {
+                    // nodeId not in executedOrder yet (viewing config before running)
+                    // Fall back to the last executed node's output
+                    const lastResult = nodeResults[nodeResults.length - 1];
+                    if (lastResult && lastResult.output_data !== undefined) {
+                        json = lastResult.output_data;
+                    }
                 }
+                // currentIndex === 0 → first node, no upstream → keep snapshot.json
             }
 
-            const inputItems = normalizeItems(json);
             return {
                 _vars: snapshot.vars || {},
                 _node: wrappedNode,

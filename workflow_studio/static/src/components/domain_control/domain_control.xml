@@ -3,13 +3,14 @@
     <t t-name="workflow_studio.domain_control">
         <div class="o_workflow_domain_control">
             <t t-if="isValidModel">
-                <DomainSelector
+                <WorkflowDomainBuilder
                     resModel="props.resModel"
                     domain="domain"
                     readonly="!!props.readonly"
                     update.bind="onDomainUpdate"
                     isDebugMode="!!env.debug"
                     allowExpressions="true"
+                    inputContext="props.inputContext"
                 />
             </t>
             <t t-else="">

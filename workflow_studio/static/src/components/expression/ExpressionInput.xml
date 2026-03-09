@@ -8,12 +8,12 @@
 				 'expression-readonly': props.readonly
 			 }">
 			<!-- Header with label and toggle -->
-			<div class="expression-input__header">
+			<div t-if="showHeader" class="expression-input__header">
 				<label t-if="props.label" class="expression-input__label">
 					<t t-esc="props.label"/>
 				</label>
 				<!-- Fixed/Expression Toggle (n8n style) -->
-				<div t-if="!props.readonly" class="expression-input__mode-toggle">
+				<div t-if="showTopToggle" class="expression-input__mode-toggle">
 					<button type="button" class="mode-btn" t-att-class="{ active: !isExpression }" t-on-click="onClickFixed" title="Fixed value">
 						Fixed
 					</button>
@@ -24,8 +24,18 @@
 			</div>
 			<!-- Input field -->
 			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
+				<button
+					t-if="showSideToggle"
+					type="button"
+					class="expression-input__side-toggle"
+					t-att-class="{ active: isExpression }"
+					t-att-title="isExpression ? 'Switch to fixed value' : 'Switch to dynamic expression'"
+					t-on-click="onClickSideToggle"
+				>
+					<span class="fw-bold">fx</span>
+				</button>
 				<!-- Expression mode prefix -->
-				<span t-if="isExpression" class="expression-input__fx">ƒx</span>
+				<span t-if="isExpression and !showSideToggle" class="expression-input__fx">ƒx</span>
 				<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
@@ -45,6 +55,7 @@
 			<div t-if="isExpression" class="expression-input__result">
 				<div class="result-header">
 					<span class="result-label">Result</span>
+					<span t-if="previewType" class="result-type-badge badge text-bg-info ms-1" t-esc="previewType"/>
 					<span class="result-tip">Tip: Drag fields from INPUT panel</span>
 				</div>
 				<div class="result-value">

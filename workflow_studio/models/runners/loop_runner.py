@@ -10,7 +10,7 @@ Maintains state across iterations via nodeContext.
 import logging
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 _logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class LoopNodeRunner(BaseNodeRunner):
         items_expr = node_config.get('inputItems', '{{ _json }}')
         if items_expr:
             try:
-                items = ExpressionEvaluator.evaluate(items_expr, eval_context)
+                items = self.resolver.resolve(items_expr, eval_context)
             except Exception as e:
                 raise ValueError(f"Loop items expression failed when evaluating '{items_expr}': {e}")
         else:

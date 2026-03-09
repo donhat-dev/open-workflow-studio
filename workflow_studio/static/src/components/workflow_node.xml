@@ -29,12 +29,12 @@
 
 			<div class="workflow-node__content-col d-flex flex-column justify-content-center py-2 pe-2 min-w-0">
 				<div class="workflow-node__header-row d-flex justify-content-between align-items-start mb-1">
-					<span class="workflow-node__title o_text_overflow text-body fw-semibold pe-1" t-att-title="props.node.title || props.node.type">
-						<t t-esc="props.node.title || props.node.type"/>
+					<span class="workflow-node__title o_text_overflow text-body fw-semibold pe-1 text-truncate d-block" t-att-title="displayTitle">
+						<t t-esc="displayTitle"/>
 					</span>
 				</div>
 				
-				<div class="workflow-node__subtitle small text-muted font-monospace o_text_overflow mb-1">
+				<div class="workflow-node__subtitle small font-monospace o_text_overflow mb-1 text-bg-danger text-truncate d-block" t-att-title="props.node.type">
 					<t t-esc="props.node.type"/>
 				</div>
 

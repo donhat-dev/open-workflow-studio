@@ -894,20 +894,22 @@ export const workflowEditorService = {
                 });
                 if (result && result.run_id) {
                     const run = await rpc(`/workflow_studio/run/${result.run_id}`, {});
-                    if (run && run.error) {
-                        const message = run.error || result.error || 'Failed to load run details';
+                    if (!run || typeof run !== 'object' || run.jsonrpc) {
+                        // Run API call itself failed (RPC error / network error)
                         actions.setExecutionResult({
                             runId: result.run_id,
                             status: result.status || 'failed',
-                            error: message,
+                            error: result.error || 'Failed to load run details',
                             inputData: safeInput,
                         });
                         return result;
                     }
+                    // run.error is the execution error message (not an API failure);
+                    // always populate full nodeResults so config panels show context.
                     actions.setExecutionResult({
-                        runId: run.id || result.run_id,
+                        runId: run.run_id || run.id || result.run_id,
                         status: run.status || result.status || 'completed',
-                        error: run.error_message || result.error || null,
+                        error: run.error || run.error_message || result.error || null,
                         errorNodeId: run.error_node_id || null,
                         outputData: run.output_data || null,
                         executedOrder: run.executed_order || result.executed_order || [],
@@ -921,7 +923,7 @@ export const workflowEditorService = {
                             || [],
                         executionCount: run.execution_count || null,
                         inputData: run.input_data || safeInput,
-                        contextSnapshot: result.context_snapshot || null,
+                        contextSnapshot: result.context_snapshot || run.context_snapshot || null,
                         nodeResults: run.node_results || [],
                     });
                     editorBus.trigger('refresh');

@@ -4,6 +4,7 @@ import { Component, useRef } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
 import { CanvasNodeToolbar } from "./canvas_node_toolbar";
 import { LucideIcon } from "./common/lucide_icon";
+import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 
 /**
  * WorkflowNode Component
@@ -36,6 +37,7 @@ export class WorkflowNode extends Component {
     setup() {
         this.rootRef = useRef("root");
         this.editor = this.env.workflowEditor || null;
+        this._odooModels = useOdooModels();
         this._toolbarPropsCache = null;
         this._toolbarPropsNodeId = null; 
         this._toolbarPropsDisabled = null;
@@ -79,6 +81,67 @@ export class WorkflowNode extends Component {
                 this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
             }
         };
+    }
+
+    _getRecordOperationModelName() {
+        if (!this.editor || !this.editor.getNodeConfig) {
+            return "";
+        }
+        const config = this.editor.getNodeConfig(this.props.node.id) || {};
+        const modelName = config.model;
+        if (typeof modelName !== "string") {
+            return "";
+        }
+        return modelName.trim();
+    }
+
+    _getRecordOperationOperation() {
+        if (!this.editor || !this.editor.getNodeConfig) {
+            return "";
+        }
+        const config = this.editor.getNodeConfig(this.props.node.id) || {};
+        const operation = config.operation;
+        if (typeof operation !== "string") {
+            return "";
+        }
+        return operation.trim().toLowerCase();
+    }
+
+    _getRecordOperationOperationLabel(operation) {
+        const operationMap = {
+            search: "Search",
+            create: "Create",
+            write: "Update",
+            delete: "Delete",
+        };
+        return operationMap[operation] || "Record Operation";
+    }
+
+    _getRecordOperationModelLabel() {
+        const modelName = this._getRecordOperationModelName();
+        if (!modelName) {
+            return "";
+        }
+        const meta = this._odooModels.getModelMetaByName(modelName);
+        if (meta && typeof meta.description === "string" && meta.description.trim()) {
+            return meta.description.trim();
+        }
+        return modelName;
+    }
+
+    _getRecordOperationIcon() {
+        if (this.props.node.type !== "record_operation") {
+            return "";
+        }
+        const modelName = this._getRecordOperationModelName();
+        if (!modelName) {
+            return "";
+        }
+        const meta = this._odooModels.getModelMetaByName(modelName);
+        if (meta && typeof meta.iconUrl === "string" && meta.iconUrl) {
+            return meta.iconUrl;
+        }
+        return "";
     }
 
     /**
@@ -171,6 +234,10 @@ export class WorkflowNode extends Component {
     }
 
     get nodeIcon() {
+        const recordOperationIcon = this._getRecordOperationIcon();
+        if (recordOperationIcon) {
+            return recordOperationIcon;
+        }
         if (this.props.node.icon) {
             return this.props.node.icon;
         }
@@ -207,6 +274,20 @@ export class WorkflowNode extends Component {
 
     get nodeTypeClass() {
         return `workflow-node--${this.props.node.type || "default"}`;
+    }
+
+    get displayTitle() {
+        if (this.props.node.type !== "record_operation") {
+            return this.props.node.title || this.props.node.type;
+        }
+
+        const operationLabel = this._getRecordOperationOperationLabel(this._getRecordOperationOperation());
+        const modelLabel = this._getRecordOperationModelLabel();
+
+        if (modelLabel) {
+            return `${operationLabel} ${modelLabel}`;
+        }
+        return operationLabel;
     }
 
     /**

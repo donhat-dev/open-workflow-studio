@@ -26,6 +26,8 @@ export class ExpressionInput extends Component {
         multiline: { type: Boolean, optional: true },  // Use textarea
         // Controlled mode: 'fixed' | 'expression'
         mode: { type: String, optional: true },
+        // Toggle UI placement: 'top' | 'side' | 'none'
+        toggleMode: { type: String, optional: true },
         onModeChange: { type: Function, optional: true },
         onChange: { type: Function },
         onDrop: { type: Function, optional: true },
@@ -88,6 +90,13 @@ export class ExpressionInput extends Component {
         return "";
     }
 
+    _normalizeToggleMode(mode) {
+        if (mode === "top" || mode === "side" || mode === "none") {
+            return mode;
+        }
+        return "top";
+    }
+
     _inferModeFromValue(value) {
         const text = String(value || "").trim();
         if (text.startsWith("{{") && text.endsWith("}}")) {
@@ -98,6 +107,22 @@ export class ExpressionInput extends Component {
 
     get hasControlledMode() {
         return this._normalizeMode(this.props.mode) !== "";
+    }
+
+    get toggleMode() {
+        return this._normalizeToggleMode(this.props.toggleMode);
+    }
+
+    get showTopToggle() {
+        return !this.props.readonly && this.toggleMode === "top";
+    }
+
+    get showSideToggle() {
+        return !this.props.readonly && this.toggleMode === "side";
+    }
+
+    get showHeader() {
+        return Boolean(this.props.label) || this.showTopToggle;
     }
 
     get currentValue() {
@@ -187,6 +212,12 @@ export class ExpressionInput extends Component {
         return String(result.value);
     }
 
+    get previewType() {
+        const result = this.previewResult;
+        if (!result || result.error || result.type === null) return '';
+        return result.type || '';
+    }
+
     _safeStringify(value) {
         try {
             return JSON.stringify(value, null, 2);
@@ -244,6 +275,11 @@ export class ExpressionInput extends Component {
 
     onClickExpression() {
         this.setMode('expression');
+    }
+
+    onClickSideToggle() {
+        const nextMode = this.isExpression ? "fixed" : "expression";
+        this.setMode(nextMode);
     }
 
     // ============================================

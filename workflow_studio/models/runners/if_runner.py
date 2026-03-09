@@ -7,12 +7,9 @@ Conditional branching node that routes data based on expression evaluation.
 """
 
 import logging
-import re
-
-from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 _logger = logging.getLogger(__name__)
 
@@ -39,15 +36,15 @@ class IfNodeRunner(BaseNodeRunner):
             right_raw = node_config.get('rightOperand', '')
             operator = node_config.get('operator', 'eq')
 
-            left = self._resolve_value(left_raw, eval_context)
-            right = self._resolve_value(right_raw, eval_context)
+            left = self.resolver.resolve(left_raw, eval_context)
+            right = self.resolver.resolve(right_raw, eval_context)
 
             left, right = self._coerce_numbers(left, right)
             condition_result = self._compare(operator, left, right)
         else:
             condition_expr = node_config.get('condition', 'false')
             try:
-                raw_result = self._resolve_value(condition_expr, eval_context)
+                raw_result = self.resolver.resolve(condition_expr, eval_context)
                 condition_result = self._to_bool(raw_result)
             except Exception as e:
                 _logger.warning("IF condition evaluation failed: %s, treating as false", e)
@@ -65,32 +62,6 @@ class IfNodeRunner(BaseNodeRunner):
             'json': input_data,
             'branch': 'false',
         }
-
-    def _resolve_value(self, raw_value, eval_context):
-        if not isinstance(raw_value, str):
-            return raw_value
-
-        stripped = raw_value.strip()
-        if not stripped:
-            return raw_value
-
-        template_match = re.fullmatch(r'\{\{(.+)\}\}', stripped)
-        if template_match:
-            inner_expr = template_match.group(1).strip()
-            try:
-                return safe_eval(inner_expr, eval_context, mode='eval')
-            except Exception as e:
-                _logger.warning("IF template evaluation failed: %s", e)
-                return raw_value
-
-        if '{{' in raw_value and '}}' in raw_value:
-            try:
-                return ExpressionEvaluator.evaluate(raw_value, eval_context)
-            except Exception as e:
-                _logger.warning("IF expression evaluation failed: %s", e)
-                return raw_value
-
-        return raw_value
 
     def _coerce_numbers(self, left, right):
         left_num = self._maybe_number(left)

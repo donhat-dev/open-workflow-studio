@@ -250,6 +250,10 @@ export class WorkflowAdapter {
             return false;
         }
         coreNode.setConfig(config);
+        // Node config mutations are not emitted by Core automatically.
+        // Refresh reactive UI state so config-driven rendering (e.g. dynamic icons)
+        // stays in sync immediately.
+        this._syncState();
         console.log(`[Adapter] Config set for ${nodeId}:`, coreNode.getConfig());
         return true;
     }

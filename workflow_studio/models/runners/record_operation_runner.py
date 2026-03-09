@@ -10,12 +10,13 @@ Phase-1 operations:
     - delete (unlink)
 """
 
+import ast
 import re
 
 from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 
 class RecordOperationNodeRunner(BaseNodeRunner):
@@ -62,91 +63,192 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         return fallback
 
     def _resolve_model_name(self, raw_model, eval_context):
-        value = self._resolve_value(raw_model, eval_context)
+        value = self.resolver.resolve(raw_model, eval_context)
         if value is None:
             return ''
         return str(value).strip()
 
-    def _resolve_value(self, raw_value, eval_context):
-        if not isinstance(raw_value, str):
-            return raw_value
-
-        stripped = raw_value.strip()
-        if not stripped:
-            return raw_value
-
-        template_match = self._TEMPLATE_RE.match(stripped)
-        if template_match:
-            expr = template_match.group(1).strip()
-            return safe_eval(expr, eval_context, mode='eval')
-
-        if '{{' in raw_value and '}}' in raw_value:
-            return ExpressionEvaluator.evaluate(raw_value, eval_context)
-
-        return raw_value
-
     def _resolve_int(self, raw_value, eval_context, default=None):
-        value = self._resolve_value(raw_value, eval_context)
-        if value is None or value == '':
-            return default
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
+        return self.resolver.resolve_int(raw_value, eval_context, default=default)
+
+    def _coerce_field_value(self, model, field_name, value):
+        """Coerce *value* to the Python type expected by *model*.*field_name*.
+
+        Fixes the common case where UI/JSON serialisation delivers every value
+        as a ``str`` even when the field is Integer, Float, Boolean, etc.
+        Non-string values are returned as-is after minimal normalisation.
+        Unknown fields are returned unchanged so Odoo surfaces the real error.
+        """
+        if value is None:
+            return value
+
+        field = model._fields.get(field_name)
+        if field is None:
+            return value  # unknown field – let Odoo raise
+
+        ftype = field.type
+
+        if not isinstance(value, str):
+            if ftype == 'boolean' and isinstance(value, int):
+                return bool(value)
+            return value
+
+        stripped = value.strip()
+
+        if ftype in ('integer', 'many2one'):
+            if stripped == '' or stripped.lower() in ('false', 'none'):
+                return False
+            try:
+                return int(stripped)
+            except (ValueError, TypeError):
+                return value
+
+        if ftype == 'float':
+            if stripped == '':
+                return 0.0
+            try:
+                return float(stripped)
+            except (ValueError, TypeError):
+                return value
+
+        if ftype == 'boolean':
+            if stripped.lower() in ('true', '1', 'yes'):
+                return True
+            if stripped.lower() in ('false', '0', 'no', ''):
+                return False
+            return bool(stripped)
+
+        # char, text, html, date, datetime, selection, many2many, one2many – keep as-is
+        return value
 
     def _resolve_domain(self, node_config, eval_context):
         """Resolve domain_expr to a Python list.
 
         Accepts three formats:
-          1. ``{{ [('field', '=', val)] }}`` — expression template (legacy)
+          1. ``{{ [('field', '=', val)] }}`` — full expression template
           2. ``[('field', '=', val)]``       — plain Odoo domain string from DomainSelector
           3. Already a list (from expression evaluation)
+
+        After resolving the domain to a list, per-value ``{{ }}`` expressions
+        inside individual tuples are resolved (backward compat with old saved
+        workflows where the frontend serialized expressions as quoted strings).
         """
         raw = node_config.get('domain_expr') or '[]'
-        domain = self._resolve_value(raw, eval_context)
+        domain = self.resolver.resolve(raw, eval_context)
         if domain is None:
             return []
         if isinstance(domain, list):
-            return domain
+            return self._resolve_domain_values(domain, eval_context)
         # Plain Odoo domain string from DomainSelector: "[('name', 'ilike', 'test')]"
         if isinstance(domain, str):
             stripped = domain.strip()
             if not stripped or stripped == '[]':
                 return []
-            parsed = safe_eval(stripped, eval_context, mode='eval')
+            # Try literal_eval first (rejects bare identifiers like _input.x),
+            # fall back to safe_eval with full context for expression-containing domains.
+            try:
+                parsed = ast.literal_eval(stripped)
+            except (ValueError, SyntaxError):
+                parsed = safe_eval(stripped, eval_context, mode='eval')
             if isinstance(parsed, list):
-                return parsed
+                return self._resolve_domain_values(parsed, eval_context)
         raise ValueError("domain_expr must evaluate to a list, got: %r" % type(domain).__name__)
 
+    def _resolve_domain_values(self, domain_list, eval_context):
+        """Walk a domain list and resolve ``{{ }}`` expressions in tuple values.
+
+        Handles domain connectors (``&``, ``|``, ``!``) which appear as plain
+        strings amid the tuple elements.  Tuples are ``(field, op, value)``
+        where *value* may be a ``{{ expr }}`` string that needs resolution.
+
+        **Important**: uses ``resolver._resolve_leaf_value`` to enforce the
+        strict type contract: only *full* ``{{ expr }}`` templates are
+        evaluated; partial templates like ``[{{ expr }}]`` are rejected
+        because string-interpolation produces strings that cause SQL type
+        mismatches.
+        """
+        result = []
+        for item in domain_list:
+            if isinstance(item, str):
+                # Domain connector: '&', '|', '!'
+                result.append(item)
+            elif isinstance(item, (list, tuple)):
+                if len(item) == 3:
+                    field, op, value = item
+                    value = self.resolver._resolve_leaf_value(value, eval_context)
+                    result.append((field, op, value))
+                else:
+                    result.append(item)
+            else:
+                result.append(item)
+        return result
+
     def _resolve_fields(self, node_config, eval_context):
-        fields_value = self._resolve_value(node_config.get('fields_expr', "{{ ['id', 'display_name'] }}"), eval_context)
+        fields_value = self.resolver.resolve(node_config.get('fields_expr', "{{ ['id', 'display_name'] }}"), eval_context)
         if fields_value in (None, ''):
             return ['id', 'display_name']
         if not isinstance(fields_value, list):
             raise ValueError("Fields must evaluate to a list")
         return [str(field) for field in fields_value if field]
 
-    def _resolve_vals(self, node_config, eval_context):
+    def _is_full_template_string(self, value):
+        if not isinstance(value, str):
+            return False
+        return bool(self._TEMPLATE_RE.match(value.strip()))
+
+    def _should_defer_vals_string_resolution(self, raw_value):
+        """Defer interpolation for JSON-like vals strings containing templates.
+
+        This keeps strings like ``{"name": "{{ _input.json.name }}"}``
+        intact so they can be parsed first (JSON -> dict) and then evaluated
+        field-by-field in :meth:`_eval_val_expressions`.
+        """
+        if not isinstance(raw_value, str):
+            return False
+
+        stripped = raw_value.strip()
+        if not stripped or self._is_full_template_string(stripped):
+            return False
+
+        has_template = '{{' in stripped and '}}' in stripped
+        if not has_template:
+            return False
+
+        is_json_object = stripped.startswith('{') and stripped.endswith('}')
+        is_json_array = stripped.startswith('[') and stripped.endswith(']') and '{' in stripped
+        return is_json_object or is_json_array
+
+    def _resolve_vals(self, node_config, eval_context, model=None):
         """Resolve vals_expr to a dict (or list of dicts for batch create).
 
         Accepts three formats:
           1. ``{{ {...} }}``               — expression template (legacy)
-          2. ``'{"name": "{{ expr }}"}'``  — JSON object string from FieldValuesControl
+          2. ``'{"name": "{{ expr }}"}'’’  — JSON object string from FieldValuesControl
           3. Already a dict/list (from expression evaluation)
 
         For JSON-format dicts, each value that contains ``{{ }}`` is evaluated
         individually so field values can still use expression syntax.
+
+        When *model* is provided, string values are coerced to the field’s
+        expected Python type via :meth:`_coerce_field_value`.
         """
         import json
         raw = node_config.get('vals_expr') or '{}'
-        vals = self._resolve_value(raw, eval_context)
+
+        if self._should_defer_vals_string_resolution(raw):
+            vals = raw
+        else:
+            vals = self.resolver.resolve(raw, eval_context)
+
         if vals is None:
             return {}
         if isinstance(vals, dict):
-            return self._eval_val_expressions(vals, eval_context)
+            return self._eval_val_expressions(vals, eval_context, model=model)
         if isinstance(vals, list):
             return [
-                self._eval_val_expressions(item, eval_context) if isinstance(item, dict) else item
+                self._eval_val_expressions(item, eval_context, model=model)
+                if isinstance(item, dict)
+                else self._resolve_val_item(item, eval_context)
                 for item in vals
             ]
         if isinstance(vals, str):
@@ -157,10 +259,12 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             try:
                 parsed = json.loads(stripped)
                 if isinstance(parsed, dict):
-                    return self._eval_val_expressions(parsed, eval_context)
+                    return self._eval_val_expressions(parsed, eval_context, model=model)
                 if isinstance(parsed, list):
                     return [
-                        self._eval_val_expressions(item, eval_context) if isinstance(item, dict) else item
+                        self._eval_val_expressions(item, eval_context, model=model)
+                        if isinstance(item, dict)
+                        else self._resolve_val_item(item, eval_context)
                         for item in parsed
                     ]
             except (ValueError, TypeError):
@@ -168,26 +272,41 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             # Fallback: Python literal via safe_eval (backward compat)
             parsed = safe_eval(stripped, eval_context, mode='eval')
             if isinstance(parsed, dict):
-                return self._eval_val_expressions(parsed, eval_context)
+                return self._eval_val_expressions(parsed, eval_context, model=model)
             if isinstance(parsed, list):
                 return [
-                    self._eval_val_expressions(item, eval_context) if isinstance(item, dict) else item
+                    self._eval_val_expressions(item, eval_context, model=model)
+                    if isinstance(item, dict)
+                    else self._resolve_val_item(item, eval_context)
                     for item in parsed
                 ]
         raise ValueError("vals_expr must evaluate to an object or list of objects")
 
-    def _eval_val_expressions(self, d, eval_context):
-        """Evaluate any ``{{ }}`` expression values inside a dict."""
+    def _resolve_val_item(self, value, eval_context):
+        """Resolve template expressions recursively in nested vals payloads."""
+        if isinstance(value, dict):
+            return {key: self._resolve_val_item(item, eval_context) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._resolve_val_item(item, eval_context) for item in value]
+        if isinstance(value, str) and '{{' in value and '}}' in value:
+            return self.resolver.resolve(value, eval_context)
+        return value
+
+    def _eval_val_expressions(self, d, eval_context, model=None):
+        """Evaluate any ``{{ }}`` expression values inside a dict.
+
+        When *model* is provided, resolved values – and plain non-expression
+        string values – are coerced to the correct Python type for each field
+        via :meth:`_coerce_field_value` instead of always staying ``str``.
+        """
         result = {}
         for k, v in d.items():
-            if isinstance(v, str) and '{{' in v and '}}' in v:
-                result[k] = self._resolve_value(v, eval_context)
-            else:
-                result[k] = v
+            resolved = self._resolve_val_item(v, eval_context)
+            result[k] = self._coerce_field_value(model, k, resolved) if model is not None else resolved
         return result
 
     def _resolve_ids(self, node_config, eval_context):
-        ids_value = self._resolve_value(node_config.get('ids_expr', '{{ [] }}'), eval_context)
+        ids_value = self.resolver.resolve(node_config.get('ids_expr', '{{ [] }}'), eval_context)
         if ids_value in (None, ''):
             return []
         if isinstance(ids_value, int):
@@ -215,7 +334,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         domain = self._resolve_domain(node_config, eval_context)
         fields_list = self._resolve_fields(node_config, eval_context)
         limit = self._resolve_int(node_config.get('limit'), eval_context, default=20)
-        order_value = self._resolve_value(node_config.get('order'), eval_context)
+        order_value = self.resolver.resolve(node_config.get('order'), eval_context)
         order = str(order_value).strip() if order_value else None
 
         records = model.search(domain, limit=limit or None, order=order or None)
@@ -232,7 +351,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         }
 
     def _run_create(self, model, node_config, eval_context):
-        vals = self._resolve_vals(node_config, eval_context)
+        vals = self._resolve_vals(node_config, eval_context, model=model)
         created = model.create(vals)
         return {
             'success': True,
@@ -244,7 +363,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         }
 
     def _run_write(self, model, node_config, eval_context):
-        vals = self._resolve_vals(node_config, eval_context)
+        vals = self._resolve_vals(node_config, eval_context, model=model)
         if not isinstance(vals, dict):
             raise ValueError("Write operation requires values object")
 

@@ -272,6 +272,10 @@ export class JsonTreeNode extends Component {
         return this.recordRefs.length > 0 && typeof this.props.resolveRecordRefs === 'function';
     }
 
+    get title() {
+        return (this.isDraggable ? ('Drag to map this field: ' + this.expressionPath) : 'Preview (read-only)') + '.\nClick to collapse/expand.';
+    }
+
     _recordRefKey(ref) {
         return `${ref.model}:${ref.id}`;
     }
