@@ -149,13 +149,14 @@
     </t>
 
     <t t-name="workflow_studio.WorkflowTreeEditor.condition">
-        <div class="o_tree_editor_row d-flex align-items-start gap-2 border rounded p-2" style="border-color: #dee2e6;">
+        <div class="o_tree_editor_row border rounded p-2" style="border-color: #dee2e6;">
             <t t-if="props.readonly">
                 <t t-call="workflow_studio.WorkflowTreeEditor.condition:readonly" />
             </t>
             <t t-else="">
-                <t t-call="workflow_studio.WorkflowTreeEditor.condition:editable" />
-                <t t-call="workflow_studio.WorkflowTreeEditor.controls" />
+                <t t-call="workflow_studio.WorkflowTreeEditor.condition:editable">
+                    <t t-call="workflow_studio.WorkflowTreeEditor.controls" />
+                </t>
             </t>
         </div>
         <t t-if="isTree(node.value)">
@@ -206,28 +207,31 @@
     </t>
 
     <t t-name="workflow_studio.WorkflowTreeEditor.condition:editable">
-        <div class="o_tree_editor_condition d-flex flex-column flex-grow-1 gap-2">
-            <!-- Row 1: key + operator (75:25) -->
-            <div class="row g-2 align-items-end m-0">
-                <div class="col-9 px-0">
-                    <t t-call="workflow_studio.WorkflowTreeEditor.Editor">
-                        <t t-set="_classes" t-value="'w-100 overflow-hidden'" />
-                        <t t-set="info" t-value="getPathEditorInfo()" />
-                        <t t-set="value" t-value="node.path" />
-                        <t t-set="update" t-value="(path) => this.updatePath(node, path)" />
-                    </t>
+        <div class="o_tree_editor_condition d-flex flex-column w-100 gap-2">
+            <!-- Row 1: key + operator (75:25) + controls -->
+            <div class="d-flex align-items-end gap-2">
+                <div class="row g-2 align-items-end m-0 flex-grow-1">
+                    <div class="col-9 px-0">
+                        <t t-call="workflow_studio.WorkflowTreeEditor.Editor">
+                            <t t-set="_classes" t-value="'w-100 overflow-hidden'" />
+                            <t t-set="info" t-value="getPathEditorInfo()" />
+                            <t t-set="value" t-value="node.path" />
+                            <t t-set="update" t-value="(path) => this.updatePath(node, path)" />
+                        </t>
+                    </div>
+                    <div class="col-3 pe-0">
+                        <t t-call="workflow_studio.WorkflowTreeEditor.Editor">
+                            <t t-set="_classes" t-value="'w-100 overflow-hidden'" />
+                            <t t-set="info" t-value="getOperatorEditorInfo(node)" />
+                            <t t-set="value" t-value="[node.operator, node.negate]" />
+                            <t t-set="update" t-value="(operator, negate) => this.updateLeafOperator(node, operator, negate)" />
+                        </t>
+                    </div>
                 </div>
-                <div class="col-3 pe-0">
-                    <t t-call="workflow_studio.WorkflowTreeEditor.Editor">
-                        <t t-set="_classes" t-value="'w-100 overflow-hidden'" />
-                        <t t-set="info" t-value="getOperatorEditorInfo(node)" />
-                        <t t-set="value" t-value="[node.operator, node.negate]" />
-                        <t t-set="update" t-value="(operator, negate) => this.updateLeafOperator(node, operator, negate)" />
-                    </t>
-                </div>
+                <t t-out="0" />
             </div>
 
-            <!-- Row 2: domain value editor -->
+            <!-- Row 2: domain value editor (full width) -->
             <div class="w-100 overflow-hidden">
                 <t t-call="workflow_studio.WorkflowTreeEditor.Editor">
                     <t t-set="_classes" t-value="'w-100 overflow-hidden'" />

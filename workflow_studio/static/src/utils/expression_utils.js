@@ -38,11 +38,74 @@ export const EXPRESSION_PATTERNS = {
  */
 export const NAMESPACES = ['_json', '_vars', '_loop', '_node', '_input', '_execution', '_workflow', '_now', '_today'];
 
+const SIMPLE_SELECTOR_PATTERN = /^_(json|vars|loop|node|input|execution|workflow|now|today)(?:(?:\.[a-zA-Z_][a-zA-Z0-9_]*)|(?:\[(?:\d+|'[^']+'|"[^"]+")\]))*$/;
+
 function containsSupportedNamespaceReference(expression) {
     if (typeof expression !== 'string' || !expression) {
         return false;
     }
     return NAMESPACES.some((namespace) => expression.includes(namespace));
+}
+
+function isSimpleSelectorExpression(expression) {
+    if (typeof expression !== 'string') {
+        return false;
+    }
+    return SIMPLE_SELECTOR_PATTERN.test(expression.trim());
+}
+
+function normalizePreviewExpression(expression) {
+    if (typeof expression !== 'string') {
+        return '';
+    }
+
+    return expression
+        .trim()
+        .replace(/\s+and\s+/g, ' && ')
+        .replace(/\s+or\s+/g, ' || ')
+        .replace(/(^|[\s(])not\s+/g, '$1!');
+}
+
+function buildPreviewScope(context = {}) {
+    return {
+        _json: context._json || {},
+        _vars: context._vars || {},
+        _loop: context._loop || {},
+        _node: context._node || {},
+        _input: context._input || {},
+        _execution: context._execution || {},
+        _workflow: context._workflow || {},
+        _now: context._now || null,
+        _today: context._today || null,
+        True: true,
+        False: false,
+        None: null,
+        globalThis: undefined,
+        window: undefined,
+        document: undefined,
+        Function: undefined,
+    };
+}
+
+function evaluatePreviewExpression(expression, context = {}) {
+    const scope = buildPreviewScope(context);
+    const normalizedExpression = normalizePreviewExpression(expression);
+    const argNames = Object.keys(scope);
+    const argValues = Object.values(scope);
+
+    const evaluator = new Function(
+        ...argNames,
+        '"use strict"; return (' + normalizedExpression + ');'
+    );
+
+    return evaluator(...argValues);
+}
+
+function resolvePreviewTemplate(expression, context = {}) {
+    if (isSimpleSelectorExpression(expression)) {
+        return resolveExpression(expression, context);
+    }
+    return evaluatePreviewExpression(expression, context);
 }
 
 /**
@@ -311,7 +374,7 @@ export function evaluateExpression(expression, context = {}) {
         if (templates.length === 1 && templates[0].full === expression) {
             const singleExpression = templates[0].expression;
             try {
-                const value = resolveExpression(singleExpression, context);
+                const value = resolvePreviewTemplate(singleExpression, context);
                 return { value, error: null, type: _typeLabel(value) };
             } catch (err) {
                 // Preview fallback: complex expressions (e.g. list/boolean expressions)
@@ -319,8 +382,6 @@ export function evaluateExpression(expression, context = {}) {
                 // Do not show a hard error in this case; backend safe_eval is source of truth.
                 if (
                     err
-                    && typeof err.message === 'string'
-                    && err.message.startsWith('Invalid expression namespace')
                     && containsSupportedNamespaceReference(singleExpression)
                 ) {
                     return { value: undefined, error: null, type: null };
@@ -332,7 +393,7 @@ export function evaluateExpression(expression, context = {}) {
         // Multiple templates or mixed content: replace each
         let result = expression;
         for (const tmpl of templates) {
-            const value = resolveExpression(tmpl.expression, context);
+            const value = resolvePreviewTemplate(tmpl.expression, context);
             const stringValue = value === undefined ? '' : String(value);
             result = result.replace(tmpl.full, stringValue);
         }

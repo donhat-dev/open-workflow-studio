@@ -3,6 +3,7 @@
 import { Component, useState, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ExpressionInput } from "../expression/ExpressionInput";
+import { hasExpressions } from "@workflow_studio/utils/expression_utils";
 
 /**
  * FieldValuesControl — visual field→value editor for record create/write operations.
@@ -39,6 +40,8 @@ export class FieldValuesControl extends Component {
             valueModes: {}, // { [rowId]: 'fixed' | 'expression' }
         });
 
+        this.state.valueModes = this._buildValueModes(this.state.rows);
+
         onMounted(() => {
             this._loadFields(this.props.resModel);
         });
@@ -52,7 +55,7 @@ export class FieldValuesControl extends Component {
                 const incoming = this._parseToRows(nextProps.value);
                 if (this._sig(incoming) !== this._sig(this.state.rows)) {
                     this.state.rows = incoming;
-                    this.state.valueModes = {};
+                    this.state.valueModes = this._buildValueModes(incoming);
                 }
             }
         });
@@ -77,6 +80,18 @@ export class FieldValuesControl extends Component {
 
     _sig(rows) {
         return (rows || []).map((r) => `${r.id}:${r.field}=${r.value}`).join("|");
+    }
+
+    _inferValueMode(value) {
+        return typeof value === "string" && hasExpressions(value) ? "expression" : "fixed";
+    }
+
+    _buildValueModes(rows) {
+        const modes = {};
+        for (const row of rows || []) {
+            modes[row.id] = this._inferValueMode(row.value);
+        }
+        return modes;
     }
 
     _serialize() {
@@ -117,7 +132,11 @@ export class FieldValuesControl extends Component {
     }
 
     getValueMode(rowId) {
-        return this.state.valueModes[rowId] || "fixed";
+        const row = this.state.rows.find((item) => item.id === rowId);
+        if (!row) {
+            return "fixed";
+        }
+        return this.state.valueModes[rowId] || this._inferValueMode(row.value);
     }
 
     onFieldChange(index, fieldName) {
@@ -139,12 +158,20 @@ export class FieldValuesControl extends Component {
     }
 
     addRow() {
-        this.state.rows = [...this.state.rows, { id: this._nextId++, field: "", value: "" }];
+        const id = this._nextId++;
+        this.state.rows = [...this.state.rows, { id, field: "", value: "" }];
+        this.state.valueModes = { ...this.state.valueModes, [id]: "fixed" };
     }
 
     removeRow(index) {
+        const removedRow = this.state.rows[index];
         const next = this.state.rows.filter((_, i) => i !== index);
+        const nextModes = { ...this.state.valueModes };
+        if (removedRow) {
+            delete nextModes[removedRow.id];
+        }
         this.state.rows = next.length > 0 ? next : [{ id: this._nextId++, field: "", value: "" }];
+        this.state.valueModes = next.length > 0 ? nextModes : this._buildValueModes(this.state.rows);
         this.props.onChange(this._serialize());
     }
 }

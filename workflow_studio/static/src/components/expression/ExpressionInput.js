@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
-import { wrapExpression, evaluateExpression } from "@workflow_studio/utils/expression_utils";
+import { wrapExpression, evaluateExpression, hasExpressions } from "@workflow_studio/utils/expression_utils";
 import {
     buildContextExpressionSuggestions,
     filterSuggestions,
@@ -99,7 +99,8 @@ export class ExpressionInput extends Component {
 
     _inferModeFromValue(value) {
         const text = String(value || "").trim();
-        if (text.startsWith("{{") && text.endsWith("}}")) {
+        // Detect both pure {{ expr }} and partial templates like "Name is {{ _input.field }}"
+        if (hasExpressions(text)) {
             return "expression";
         }
         return "fixed";

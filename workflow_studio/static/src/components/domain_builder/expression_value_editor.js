@@ -1,9 +1,10 @@
 /** @odoo-module **/
 
-import { Component, useState } from "@odoo/owl";
+import { Component, onWillUpdateProps, useState } from "@odoo/owl";
 import { ExpressionInput } from "@workflow_studio/components/expression/ExpressionInput";
 import { Expression } from "@web/core/tree_editor/condition_tree";
 import { isExpressionValue } from "./domain_builder_utils";
+import { hasExpressions } from "@workflow_studio/utils/expression_utils";
 
 function normalizeLiteralCandidate(value) {
     if (value && typeof value === "object") {
@@ -93,6 +94,10 @@ function isExpressionLike(value) {
     return value instanceof Expression || isExpressionValue(value);
 }
 
+function shouldUseExpressionMode(value) {
+    return isExpressionLike(value) || (typeof value === "string" && hasExpressions(value));
+}
+
 function toLiteralSeed(expressionValue, fallbackValue) {
     const inner = unwrapExpressionBody(expressionValue);
     if (inner === null) {
@@ -159,9 +164,16 @@ export class ExpressionValueEditor extends Component {
     };
 
     setup() {
+        const initialValue = this.props.value;
         this.state = useState({
-            mode: isExpressionLike(this.props.value) ? "expression" : "literal",
-            expressionValid: isExpressionLike(this.props.value),
+            mode: shouldUseExpressionMode(initialValue) ? "expression" : "literal",
+            expressionValid: shouldUseExpressionMode(initialValue),
+        });
+
+        onWillUpdateProps((nextProps) => {
+            const nextValue = nextProps ? nextProps.value : undefined;
+            this.state.mode = shouldUseExpressionMode(nextValue) ? "expression" : "literal";
+            this.state.expressionValid = shouldUseExpressionMode(nextValue);
         });
     }
 
@@ -226,7 +238,9 @@ export class ExpressionValueEditor extends Component {
         // toExpressionInstance is safe: if the Python body can't be parsed
         // (e.g. user is mid-keystroke), it returns the raw string.
         const converted = toExpressionInstance(newVal);
-        this.state.expressionValid = converted instanceof Expression;
+        // Partial templates like "Name is {{ _input.field }}" are valid even though
+        // they don't wrap to an Expression instance — backend renders them as template strings.
+        this.state.expressionValid = shouldUseExpressionMode(converted) || (typeof newVal === "string" && hasExpressions(newVal));
         this.props.update(converted);
     }
 }

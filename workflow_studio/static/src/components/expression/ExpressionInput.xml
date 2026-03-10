@@ -55,10 +55,11 @@
 			<div t-if="isExpression" class="expression-input__result">
 				<div class="result-header">
 					<span class="result-label">Result</span>
-					<span t-if="previewType" class="result-type-badge badge text-bg-info ms-1" t-esc="previewType"/>
+					
 					<span class="result-tip">Tip: Drag fields from INPUT panel</span>
 				</div>
 				<div class="result-value">
+					<span t-if="previewType" class="result-type-badge badge text-bg-info me-1" t-esc="previewType"/>
 					<t t-if="previewResult and !previewResult.error">
 						<t t-esc="previewDisplay"/></t>
 					<t t-elif="previewResult and previewResult.error">
