@@ -1,0 +1,25 @@
+$wf-panel-backdrop-bg: rgba($o-black, 0.2) !default;
+
+$wf-canvas-grid-dot-color: rgba($o-gray-500, 0.3) !default;
+
+$wf-node-bg: $wf-surface-base !default;
+$wf-node-border-color: $wf-border-strong !default;
+$wf-node-shadow: $wf-shadow-sm !default;
+$wf-node-hover-shadow: 0 2px 8px rgba($o-black, 0.12) !default;
+$wf-node-drag-shadow: 0 6px 16px rgba($o-black, 0.2) !default;
+
+$wf-action-soft-bg: rgba($wf-action-color, 0.08) !default;
+$wf-action-soft-bg-strong: rgba($wf-action-color, 0.12) !default;
+$wf-success-soft-bg: rgba($wf-success-color, 0.12) !default;
+$wf-danger-soft-bg: rgba($wf-danger-color, 0.12) !default;
+$wf-info-soft-bg: rgba($wf-info-color, 0.12) !default;
+$wf-warning-soft-bg: rgba($wf-warning-color, 0.15) !default;
+
+$wf-expression-mode-bg: mix($wf-warning-color, $wf-surface-base, 5%) !default;
+$wf-expression-highlight-bg: rgba($wf-success-color, 0.18) !default;
+$wf-expression-highlight-ring: inset 0 0 0 1px rgba($wf-success-color, 0.2) !default;
+
+$wf-field-row-bg: mix($wf-surface-subtle, $wf-surface-base, 35%) !default;
+$wf-field-row-border: mix($wf-border-base, $wf-surface-base, 85%) !default;
+$wf-field-placeholder-bg: mix($wf-surface-subtle, $wf-surface-base, 35%) !default;
+$wf-field-placeholder-border: mix($wf-border-strong, $wf-surface-base, 80%) !default;

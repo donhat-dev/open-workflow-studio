@@ -1,0 +1,15 @@
+// Phase 1 note:
+// This bundle is loaded in `web.assets_backend`, so these variables act as
+// module-local Bootstrap/Odoo-aligned tokens for Workflow Studio controls.
+// If we later move style variables into a primary variables bundle, the same
+// names can drive earlier Bootstrap-level overrides.
+
+$wf-control-border-radius: $wf-radius-md !default;
+$wf-control-focus-border-color: $wf-action-color !default;
+$wf-control-focus-ring: 0 0 0 2px rgba($wf-action-color, 0.15) !default;
+$wf-control-focus-ring-strong: 0 0 0 2px rgba($wf-action-color, 0.2) !default;
+
+$wf-expression-border-color: $wf-warning-color !default;
+$wf-expression-focus-ring: 0 0 0 2px rgba($wf-warning-color, 0.15) !default;
+
+$wf-popover-shadow: 0 6px 20px rgba($o-black, 0.12) !default;

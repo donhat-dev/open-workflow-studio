@@ -39,6 +39,10 @@
             'workflow_studio/static/src/core/**/*',
             # Utilities
             'workflow_studio/static/src/utils/**/*',
+            # Shared SCSS layer (must load before component styles)
+            'workflow_studio/static/src/scss/primary_variables.scss',
+            'workflow_studio/static/src/scss/secondary_variables.scss',
+            'workflow_studio/static/src/scss/bootstrap_overridden.scss',
             # Components (use services)
             'workflow_studio/static/src/components/**/*',
             # Entry points and styles

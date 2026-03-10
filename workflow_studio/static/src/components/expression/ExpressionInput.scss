@@ -71,9 +71,9 @@
   position: relative;
   flex: 1;
   display: flex;
-  background: $o-view-background-color;
-  border: 1px solid $o-gray-400;
-  border-radius: 6px;
+  background: $wf-surface-base;
+  border: 1px solid $wf-border-strong;
+  border-radius: $wf-control-border-radius;
   overflow: hidden;
   transition:
     border-color 0.15s ease,
@@ -87,10 +87,10 @@
   justify-content: center;
   min-width: 30px;
   padding: 0 8px;
-  background: $o-view-background-color;
-  border: 1px solid $o-gray-400;
+  background: $wf-surface-base;
+  border: 1px solid $wf-border-strong;
   border-right: none;
-  border-radius: 6px 0 0 6px;
+  border-radius: $wf-control-border-radius 0 0 $wf-control-border-radius;
   font-size: 11px;
   color: $o-gray-600;
   cursor: pointer;
@@ -102,9 +102,9 @@
 }
 
 .expression-input__side-toggle.active {
-  background: rgba($o-warning, 0.15);
-  color: $o-warning;
-  border-color: $o-warning;
+  background: $wf-warning-soft-bg;
+  color: $wf-warning-color;
+  border-color: $wf-expression-border-color;
 }
 
 .expression-input__fx {
@@ -112,13 +112,13 @@
   align-items: center;
   justify-content: center;
   width: 28px;
-  background: $o-gray-300;
-  border: 1px solid $o-gray-400;
+  background: $wf-surface-emphasis;
+  border: 1px solid $wf-border-strong;
   border-right: none;
-  border-radius: 6px 0 0 6px;
+  border-radius: $wf-control-border-radius 0 0 $wf-control-border-radius;
   font-size: 12px;
   font-weight: 600;
-  color: $o-warning;
+  color: $wf-warning-color;
   flex-shrink: 0;
 }
 
@@ -144,8 +144,8 @@
 }
 
 .expression-input__input-layer:focus-within {
-  border-color: $o-action;
-  box-shadow: 0 0 0 2px rgba($o-action, 0.15);
+  border-color: $wf-control-focus-border-color;
+  box-shadow: $wf-control-focus-ring;
 }
 
 .expression-input__text,
@@ -194,33 +194,33 @@
 }
 
 .expression-input__highlight {
-  background: rgba($o-success, 0.18);
-  box-shadow: inset 0 0 0 1px rgba($o-success, 0.2);
+  background: $wf-expression-highlight-bg;
+  box-shadow: $wf-expression-highlight-ring;
   border-radius: 4px;
 }
 
 // Expression mode styling - Warning/Orange border
 .expression-input.expression-mode .expression-input__input-layer {
-  border-color: $o-warning;
-  background: mix($o-warning, $o-view-background-color, 5%);
+  border-color: $wf-expression-border-color;
+  background: $wf-expression-mode-bg;
 }
 
 .expression-input.expression-mode .expression-input__fx {
-  border-color: $o-warning;
+  border-color: $wf-expression-border-color;
 }
 
 .expression-input.expression-mode .expression-input__side-toggle {
-  border-color: $o-warning;
+  border-color: $wf-expression-border-color;
 }
 
 .expression-input.expression-mode .expression-input__input-layer:focus-within {
-  box-shadow: 0 0 0 2px rgba($o-warning, 0.15);
+  box-shadow: $wf-expression-focus-ring;
 }
 
 // Drag-over state
 .expression-input.drag-over .expression-input__input-layer {
   border: 2px dashed $o-action;
-  background: rgba($o-action, 0.08);
+  background: $wf-action-soft-bg;
 }
 
 .expression-input__drop-indicator {
@@ -255,10 +255,10 @@
   flex-direction: column;
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid $o-gray-400;
-  border-radius: 6px;
-  background: $o-view-background-color;
-  box-shadow: 0 6px 20px rgba($o-black, 0.12);
+  border: 1px solid $wf-border-strong;
+  border-radius: $wf-control-border-radius;
+  background: $wf-surface-base;
+  box-shadow: $wf-popover-shadow;
 }
 
 .expression-input__suggestion-item {
@@ -280,7 +280,7 @@
 
 .expression-input__suggestion-item:hover,
 .expression-input__suggestion-item.active {
-  background: rgba($o-action, 0.1);
+  background: $wf-action-soft-bg-strong;
 }
 
 .suggestion-label {

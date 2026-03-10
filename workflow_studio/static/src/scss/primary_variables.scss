@@ -1,0 +1,28 @@
+$wf-white: $o-white !default;
+
+$wf-surface-base: $o-view-background-color !default;
+$wf-surface-subtle: $o-gray-100 !default;
+$wf-surface-emphasis: $o-gray-200 !default;
+$wf-surface-app: $o-webclient-background-color !default;
+
+$wf-border-base: $o-gray-300 !default;
+$wf-border-strong: $o-gray-400 !default;
+
+$wf-text-base: $o-main-text-color !default;
+$wf-text-muted: $o-gray-600 !default;
+$wf-text-muted-strong: $o-gray-700 !default;
+$wf-text-faint: $o-gray-500 !default;
+
+$wf-action-color: $o-action !default;
+$wf-success-color: $o-success !default;
+$wf-danger-color: $o-danger !default;
+$wf-warning-color: $o-warning !default;
+$wf-info-color: $o-info !default;
+
+$wf-radius-sm: 4px !default;
+$wf-radius-md: 6px !default;
+$wf-radius-lg: 8px !default;
+
+$wf-shadow-sm: 0 2px 8px rgba($o-black, 0.08) !default;
+$wf-shadow-md: 0 4px 16px rgba($o-black, 0.12) !default;
+$wf-shadow-panel: -6px 0 18px rgba($o-black, 0.12) !default;
