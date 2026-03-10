@@ -30,6 +30,10 @@ import { ModelFieldSelector } from "@web/core/model_field_selector/model_field_s
 import { useService } from "@web/core/utils/hooks";
 import { useMakeGetFieldDef } from "@web/core/tree_editor/utils";
 import { getDefaultCondition } from "@web/core/domain_selector/utils";
+import {
+    ensureExpressionPrefix,
+    stripExpressionPrefix,
+} from "@workflow_studio/utils/expression_utils";
 
 import { WorkflowTreeEditor } from "./workflow_tree_editor";
 import { ExpressionInput } from "@workflow_studio/components/expression/ExpressionInput";
@@ -37,6 +41,14 @@ import { isExpressionValue } from "./domain_builder_utils";
 
 const ARCHIVED_CONDITION = condition("active", "in", [true, false]);
 const ARCHIVED_DOMAIN = `[("active", "in", [True, False])]`;
+
+function unwrapLegacyExpressionBody(value) {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const match = value.trim().match(/^\{\{([\s\S]*)\}\}$/);
+    return match ? match[1].trim() : null;
+}
 
 export class WorkflowDomainBuilder extends Component {
     static template = "workflow_studio.WorkflowDomainBuilder";
@@ -95,8 +107,9 @@ export class WorkflowDomainBuilder extends Component {
     get codeEditorDisplayValue() {
         const d = this.props.domain || "";
         if (this.isExpression) {
-            const m = d.match(/^\{\{([\s\S]*)\}\}$/);
-            return m ? m[1].trim() : d;
+            const withoutPrefix = stripExpressionPrefix(d);
+            const legacyBody = unwrapLegacyExpressionBody(withoutPrefix);
+            return legacyBody !== null ? legacyBody : withoutPrefix;
         }
         return d;
     }
@@ -106,9 +119,9 @@ export class WorkflowDomainBuilder extends Component {
             // Back to domain builder: try to recover a valid domain string
             this.exprState.isExpression = false;
             const current = this.props.domain || "";
-            // Extract inner content if wrapped in {{ ... }}
-            const m = current.match(/^\{\{([\s\S]*)\}\}$/);
-            const inner = m ? m[1].trim() : current;
+            const withoutPrefix = stripExpressionPrefix(current);
+            const legacyBody = unwrapLegacyExpressionBody(withoutPrefix);
+            const inner = legacyBody !== null ? legacyBody : withoutPrefix.trim();
             // Try to parse inner as a valid domain; if it fails, reset to []
             let recovered = "[]";
             if (inner) {
@@ -128,9 +141,7 @@ export class WorkflowDomainBuilder extends Component {
             const current = this.props.domain;
             if (!isExpressionValue(current)) {
                 const seed = (typeof current === "string" && current.trim()) ? current : "[]";
-                // Keep raw domain text in expression mode (no quote-wrapping / no escaping),
-                // so users don't get noisy backslashes when switching from tree editor.
-                this.props.update(`{{ ${seed} }}`);
+                this.props.update(ensureExpressionPrefix(seed));
             }
         }
     }
@@ -258,16 +269,14 @@ export class WorkflowDomainBuilder extends Component {
 
     onDomainInput(rawDomain) {
         if (this.props.debugUpdate) {
-            // In expression mode the textarea shows raw content; re-wrap for debugUpdate
-            const val = this.isExpression ? `{{ ${rawDomain} }}` : rawDomain;
+            const val = this.isExpression ? ensureExpressionPrefix(rawDomain) : rawDomain;
             this.props.debugUpdate(val);
         }
     }
 
     onDomainChange(rawDomain) {
         if (this.isExpression) {
-            // Textarea shows stripped expression content; re-wrap before storing
-            this.props.update(`{{ ${rawDomain} }}`);
+            this.props.update(ensureExpressionPrefix(rawDomain));
         } else {
             this.props.update(rawDomain, true);
         }

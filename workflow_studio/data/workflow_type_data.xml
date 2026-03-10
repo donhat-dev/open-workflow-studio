@@ -217,8 +217,8 @@
     "operation": {"type": "select", "label": "Operation", "options": ["search", "create", "write", "delete"], "default": "search", "section": "operation"},
     "model": {"type": "model_select", "label": "Model", "required": true, "placeholder": "res.partner", "section": "operation"},
     "domain_expr": {"type": "domain", "label": "Domain", "default": "[]", "section": "target", "visibleWhen": {"operation": ["search", "write", "delete"]}},
-    "ids_expr": {"type": "expression", "label": "Record IDs", "default": "{{ [] }}", "section": "target", "visibleWhen": {"operation": ["write", "delete"]}},
-    "fields_expr": {"type": "expression", "label": "Fields", "default": "{{ ['id', 'display_name'] }}", "section": "search", "visibleWhen": {"operation": ["search"]}},
+    "ids_expr": {"type": "expression", "label": "Record IDs", "default": "={{ [] }}", "section": "target", "visibleWhen": {"operation": ["write", "delete"]}},
+    "fields_expr": {"type": "expression", "label": "Fields", "default": "={{ ['id', 'display_name'] }}", "section": "search", "visibleWhen": {"operation": ["search"]}},
     "order": {"type": "string", "label": "Order", "placeholder": "id desc", "section": "search", "visibleWhen": {"operation": ["search"]}},
     "limit": {"type": "number", "label": "Limit", "default": 20, "min": 1, "max": 2000, "section": "search", "visibleWhen": {"operation": ["search", "write", "delete"]}},
     "vals_expr": {"type": "field_values", "label": "Values", "default": "{}", "section": "values", "visibleWhen": {"operation": ["create", "write"]}}

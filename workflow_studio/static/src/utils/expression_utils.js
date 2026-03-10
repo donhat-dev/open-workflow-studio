@@ -3,7 +3,7 @@
 /**
  * Expression Utilities
  * 
- * Expression handling: {{ _json.field }}, {{ _vars.name }}, {{ _loop.item }}
+ * Expression handling: ={{ _json.field }}, =Name is {{ _json.field }}, ={{ _vars.name }}, ={{ _loop.item }}
  * 
  * Supports all ExecutionContext namespaces:
  * - _json: Previous node output (shortcut)
@@ -129,6 +129,45 @@ export function hasExpressions(value) {
 export function isExpressionMode(value) {
     if (typeof value !== 'string') return false;
     return value.startsWith('=');
+}
+
+/**
+ * Strip a leading expression-mode prefix from a stored value.
+ * @param {string} value
+ * @returns {string}
+ */
+export function stripExpressionPrefix(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return isExpressionMode(value) ? value.slice(1) : value;
+}
+
+/**
+ * Ensure a stored value is marked as expression mode.
+ * @param {string} value
+ * @returns {string}
+ */
+export function ensureExpressionPrefix(value) {
+    if (value === null || value === undefined) {
+        return '=';
+    }
+    const text = String(value);
+    return isExpressionMode(text) ? text : `=${text}`;
+}
+
+/**
+ * Infer expression mode from stored value.
+ * Only the leading '=' prefix marks expression mode.
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function inferExpressionModeFromValue(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+    return isExpressionMode(value);
 }
 
 /**
@@ -362,16 +401,31 @@ export function resolveExpression(expression, context = {}) {
  */
 export function evaluateExpression(expression, context = {}) {
     try {
+        const rawExpression = typeof expression === 'string' ? expression : '';
+        const prefixedExpression = isExpressionMode(rawExpression);
+
+        if (!prefixedExpression) {
+            return { value: rawExpression, error: null, type: _typeLabel(rawExpression) };
+        }
+
+        const expressionSource = stripExpressionPrefix(rawExpression);
+
         // Extract template content
-        const templates = extractExpressions(expression);
+        const templates = extractExpressions(expressionSource);
 
         if (templates.length === 0) {
-            // No templates, return as-is
-            return { value: expression, error: null, type: _typeLabel(expression) };
+            if (!expressionSource.trim()) {
+                return { value: '', error: null, type: 'str' };
+            }
+            return {
+                value: expressionSource,
+                error: null,
+                type: _typeLabel(expressionSource),
+            };
         }
 
         // For single template, evaluate and return value
-        if (templates.length === 1 && templates[0].full === expression) {
+        if (templates.length === 1 && templates[0].full === expressionSource) {
             const singleExpression = templates[0].expression;
             try {
                 const value = resolvePreviewTemplate(singleExpression, context);
@@ -391,7 +445,7 @@ export function evaluateExpression(expression, context = {}) {
         }
 
         // Multiple templates or mixed content: replace each
-        let result = expression;
+        let result = expressionSource;
         for (const tmpl of templates) {
             const value = resolvePreviewTemplate(tmpl.expression, context);
             const stringValue = value === undefined ? '' : String(value);

@@ -4,13 +4,17 @@ import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
-import { hasExpressions } from "@workflow_studio/utils/expression_utils";
+import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 function inferControlMode(control, value) {
-    if (control && control.type === "text" && typeof value === "string" && hasExpressions(value)) {
+    if (inferExpressionModeFromValue(value)) {
         return "expression";
     }
     return "fixed";
+}
+
+function normalizeControlValue(control, value) {
+    return value;
 }
 
 /**
@@ -118,10 +122,20 @@ export class NodeConfigPanel extends Component {
 
         // Extract values for local state
         const values = {};
+        let valuesNormalized = false;
         for (const control of controls) {
-            values[control.key] = control.value;
+            const normalizedValue = normalizeControlValue(control, control.value);
+            values[control.key] = normalizedValue;
+            if (normalizedValue !== control.value) {
+                valuesNormalized = true;
+            }
+            control.value = normalizedValue;
         }
         this.state.controlValues = values;
+
+        if (valuesNormalized && this.actions.setNodeConfig) {
+            this.actions.setNodeConfig(nodeId, values);
+        }
 
         // Restore UI modes from node meta (persisted)
         if (!this.actions.getNodeMeta) {
@@ -627,7 +641,21 @@ export class NodeConfigPanel extends Component {
     getControlMode(controlKey) {
         const control = (this.state.controls || []).find((item) => item.key === controlKey);
         const value = this.state.controlValues ? this.state.controlValues[controlKey] : undefined;
-        return this.state.controlModes[controlKey] || inferControlMode(control, value);
+        const inferredMode = inferControlMode(control, value);
+        const persistedMode = this.state.controlModes[controlKey];
+        const hasValueSignal = typeof value === "string"
+            ? value !== ""
+            : value !== undefined && value !== null;
+
+        if (hasValueSignal) {
+            return inferredMode;
+        }
+
+        if (persistedMode === "fixed" || persistedMode === "expression") {
+            return persistedMode;
+        }
+
+        return inferredMode;
     }
 
     getPairModes(controlKey) {
@@ -800,13 +828,14 @@ export class NodeConfigPanel extends Component {
     // ============================================
 
     onControlChange = (controlKey, value) => {
-        this.state.controlValues[controlKey] = value;
-
         const control = this.state.controls.find(c => c.key === controlKey);
+        const normalizedValue = normalizeControlValue(control, value);
+        this.state.controlValues[controlKey] = normalizedValue;
+
         if (control) {
-            control.value = value;
+            control.value = normalizedValue;
             if (control.type === 'keyvalue') {
-                this._reconcilePairModes(controlKey, value);
+                this._reconcilePairModes(controlKey, normalizedValue);
             }
         }
 

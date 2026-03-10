@@ -3,7 +3,7 @@
 import { Component, useState, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ExpressionInput } from "../expression/ExpressionInput";
-import { hasExpressions } from "@workflow_studio/utils/expression_utils";
+import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
  * FieldValuesControl — visual field→value editor for record create/write operations.
@@ -83,7 +83,7 @@ export class FieldValuesControl extends Component {
     }
 
     _inferValueMode(value) {
-        return typeof value === "string" && hasExpressions(value) ? "expression" : "fixed";
+        return inferExpressionModeFromValue(value) ? "expression" : "fixed";
     }
 
     _buildValueModes(rows) {

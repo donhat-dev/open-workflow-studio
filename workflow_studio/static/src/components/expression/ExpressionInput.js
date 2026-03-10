@@ -6,6 +6,9 @@ import {
     evaluateExpression,
     hasExpressions,
     extractExpressions,
+    ensureExpressionPrefix,
+    inferExpressionModeFromValue,
+    stripExpressionPrefix,
 } from "@workflow_studio/utils/expression_utils";
 import {
     buildContextExpressionSuggestions,
@@ -46,10 +49,19 @@ export class ExpressionInput extends Component {
         expressionSuggestions: { type: Array, optional: true },
     };
 
+    static defaultProps = {
+        mode: "fixed",
+        toggleMode: "top",
+        readonly: false,
+        context: {},
+        multiline: true,
+    };
+
     setup() {
-        const initialValue = typeof this.props.value === "string" ? this.props.value : "";
+        const initialStoredValue = typeof this.props.value === "string" ? this.props.value : "";
         const initialMode = this._normalizeMode(this.props.mode)
-            || this._inferModeFromValue(initialValue);
+            || this._inferModeFromValue(initialStoredValue);
+        const initialValue = this._toDisplayValue(initialStoredValue, initialMode);
 
         this.state = useState({
             isFocused: false,
@@ -68,13 +80,17 @@ export class ExpressionInput extends Component {
         onWillUpdateProps((nextProps) => {
             const nextValue = nextProps && typeof nextProps.value === "string" ? nextProps.value : "";
             const nextMode = this._normalizeMode(nextProps && nextProps.mode);
-            const valueChanged = nextValue !== this.state.localValue;
+            const inferredNextMode = nextMode || this._inferModeFromValue(nextValue);
+            const nextDisplayValue = this._toDisplayValue(nextValue, inferredNextMode);
+            const valueChanged = nextDisplayValue !== this.state.localValue;
+            const modeChanged = inferredNextMode !== this.mode;
 
-            // Don't override while user is actively editing.
-            if (this.state.isFocused) return;
+            // While focused, keep typing responsive, but still sync when mode flips
+            // (e.g. user adds leading '=' in fixed mode and parent promotes to expression).
+            if (this.state.isFocused && !modeChanged) return;
 
-            if (valueChanged) {
-                this.state.localValue = nextValue;
+            if (valueChanged || modeChanged) {
+                this.state.localValue = nextDisplayValue;
             }
 
             // If mode is controlled by parent, keep local mode synchronized.
@@ -84,8 +100,8 @@ export class ExpressionInput extends Component {
             }
 
             // For uncontrolled mode, infer initial mode from incoming value.
-            if (valueChanged) {
-                this.state.localMode = this._inferModeFromValue(nextValue);
+            if (valueChanged || modeChanged) {
+                this.state.localMode = inferredNextMode;
             }
         });
     }
@@ -105,12 +121,23 @@ export class ExpressionInput extends Component {
     }
 
     _inferModeFromValue(value) {
-        const text = String(value || "").trim();
-        // Detect both pure {{ expr }} and partial templates like "Name is {{ _input.field }}"
-        if (hasExpressions(text)) {
+        if (inferExpressionModeFromValue(value)) {
             return "expression";
         }
         return "fixed";
+    }
+
+    _toDisplayValue(value, mode = this.mode) {
+        const text = typeof value === "string" ? value : "";
+        return mode === "expression" ? stripExpressionPrefix(text) : text;
+    }
+
+    _serializeValue(value, mode = this.mode) {
+        const text = typeof value === "string" ? value : value == null ? "" : String(value);
+        if (mode === "expression") {
+            return ensureExpressionPrefix(text);
+        }
+        return text;
     }
 
     get hasControlledMode() {
@@ -227,7 +254,6 @@ export class ExpressionInput extends Component {
         return rawValue
             .replace(/\{\{/g, "")
             .replace(/\}\}/g, "")
-            .replace(/^=/, "")
             .trim();
     }
 
@@ -253,7 +279,7 @@ export class ExpressionInput extends Component {
             return null;
         }
 
-        const result = evaluateExpression(this.currentValue, this.props.context);
+        const result = evaluateExpression(this._serializeValue(this.currentValue, "expression"), this.props.context);
         return result;
     }
 
@@ -302,7 +328,7 @@ export class ExpressionInput extends Component {
         this.state.showSuggestions = true;
         this.state.activeSuggestionIndex = -1;
 
-        this.props.onChange(value);
+        this.props.onChange(this._serializeValue(value));
     }
 
     onFocus() {
@@ -327,8 +353,19 @@ export class ExpressionInput extends Component {
             return;
         }
 
+        const currentMode = this.mode;
+        const currentDisplayValue = this.currentValue;
+        const previousSerialized = this._serializeValue(currentDisplayValue, currentMode);
+        const nextSerialized = this._serializeValue(currentDisplayValue, normalized);
+
         if (!this.hasControlledMode) {
             this.state.localMode = normalized;
+        }
+
+        this.state.localValue = this._toDisplayValue(nextSerialized, normalized);
+
+        if (nextSerialized !== previousSerialized) {
+            this.props.onChange(nextSerialized);
         }
 
         if (this.props.onModeChange) {
@@ -401,7 +438,7 @@ export class ExpressionInput extends Component {
         this.state.localValue = newValue;
 
         // Notify parent of change (no mode switching)
-        this.props.onChange(newValue);
+        this.props.onChange(this._serializeValue(newValue));
         if (this.props.onDrop) {
             this.props.onDrop(expression || path);
         }
@@ -481,6 +518,6 @@ export class ExpressionInput extends Component {
         this.state.localValue = nextValue;
         this.state.showSuggestions = false;
         this.state.activeSuggestionIndex = -1;
-        this.props.onChange(nextValue);
+        this.props.onChange(this._serializeValue(nextValue));
     }
 }

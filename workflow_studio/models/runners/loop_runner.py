@@ -54,7 +54,7 @@ class LoopNodeRunner(BaseNodeRunner):
         eval_context = build_eval_context(payload, context, include_input_item=True)
         
         # Get items to iterate
-        items_expr = node_config.get('inputItems', '{{ _json }}')
+        items_expr = node_config.get('inputItems', '={{ _json }}')
         if items_expr:
             try:
                 items = self.resolver.resolve(items_expr, eval_context)

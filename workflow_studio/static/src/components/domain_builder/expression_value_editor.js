@@ -4,7 +4,12 @@ import { Component, onWillUpdateProps, useState } from "@odoo/owl";
 import { ExpressionInput } from "@workflow_studio/components/expression/ExpressionInput";
 import { Expression } from "@web/core/tree_editor/condition_tree";
 import { isExpressionValue } from "./domain_builder_utils";
-import { hasExpressions } from "@workflow_studio/utils/expression_utils";
+import {
+    ensureExpressionPrefix,
+    inferExpressionModeFromValue,
+    isExpressionMode,
+    stripExpressionPrefix,
+} from "@workflow_studio/utils/expression_utils";
 
 function normalizeLiteralCandidate(value) {
     if (value && typeof value === "object") {
@@ -32,15 +37,18 @@ function shouldWrapAsRawExpression(value) {
 function toExpressionSeed(value) {
     const normalized = normalizeLiteralCandidate(value);
     if (typeof normalized === "string") {
-        if (isExpressionValue(normalized)) {
+        if (isExpressionMode(normalized)) {
             return normalized;
         }
-        if (shouldWrapAsRawExpression(normalized)) {
-            return `{{ ${normalized.trim()} }}`;
+        if (isExpressionValue(normalized)) {
+            return ensureExpressionPrefix(normalized);
         }
-        return `{{ ${JSON.stringify(normalized)} }}`;
+        if (shouldWrapAsRawExpression(normalized)) {
+            return ensureExpressionPrefix(`{{ ${normalized.trim()} }}`);
+        }
+        return ensureExpressionPrefix(`{{ ${JSON.stringify(normalized)} }}`);
     }
-    return `{{ ${JSON.stringify(normalized)} }}`;
+    return ensureExpressionPrefix(`{{ ${JSON.stringify(normalized)} }}`);
 }
 
 function unwrapExpressionBody(value) {
@@ -50,7 +58,7 @@ function unwrapExpressionBody(value) {
     if (typeof value !== "string") {
         return null;
     }
-    const match = value.trim().match(/^\{\{([\s\S]*)\}\}$/);
+    const match = stripExpressionPrefix(value).trim().match(/^\{\{([\s\S]*)\}\}$/);
     if (!match) {
         return null;
     }
@@ -58,49 +66,36 @@ function unwrapExpressionBody(value) {
 }
 
 /**
- * Try to convert a {{ expr }} string to an Expression instance.
- * Returns the Expression on success, or the original raw string on
- * parse failure (graceful degradation — avoids crash-while-typing).
- *
- * If the value is already an Expression or is not a {{ }}-wrapped
- * string, return it unchanged.
- */
-function toExpressionInstance(value) {
-    if (value instanceof Expression) {
-        return value;
-    }
-    if (typeof value !== "string") {
-        return value;
-    }
-    const body = unwrapExpressionBody(value);
-    if (body === null) {
-        return value;
-    }
-    try {
-        return new Expression(body);
-    } catch {
-        // Parsing failed (incomplete/invalid Python syntax during typing).
-        // Return the raw {{ expr }} string — it will be serialized as a
-        // quoted string temporarily, but that's safe and non-crashing.
-        return value;
-    }
-}
-
-/**
- * Check whether a value represents an expression — either an Expression
- * instance or a {{ }}-wrapped string.
+ * Check whether a value represents an expression.
  */
 function isExpressionLike(value) {
-    return value instanceof Expression || isExpressionValue(value);
+    return value instanceof Expression || isExpressionValue(value) || isExpressionMode(value);
 }
 
 function shouldUseExpressionMode(value) {
-    return isExpressionLike(value) || (typeof value === "string" && hasExpressions(value));
+    if (value instanceof Expression) {
+        return true;
+    }
+    return inferExpressionModeFromValue(value);
+}
+
+function isExpressionContentValid(value) {
+    if (value instanceof Expression) {
+        return true;
+    }
+    if (typeof value !== "string") {
+        return false;
+    }
+
+    return isExpressionMode(value) || isExpressionValue(value);
 }
 
 function toLiteralSeed(expressionValue, fallbackValue) {
     const inner = unwrapExpressionBody(expressionValue);
     if (inner === null) {
+        if (typeof expressionValue === "string") {
+            return stripExpressionPrefix(expressionValue);
+        }
         return normalizeLiteralCandidate(fallbackValue);
     }
 
@@ -167,13 +162,16 @@ export class ExpressionValueEditor extends Component {
         const initialValue = this.props.value;
         this.state = useState({
             mode: shouldUseExpressionMode(initialValue) ? "expression" : "literal",
-            expressionValid: shouldUseExpressionMode(initialValue),
+            expressionValid: isExpressionContentValid(initialValue),
+            hasExplicitModeSelection: false,
         });
 
         onWillUpdateProps((nextProps) => {
             const nextValue = nextProps ? nextProps.value : undefined;
-            this.state.mode = shouldUseExpressionMode(nextValue) ? "expression" : "literal";
-            this.state.expressionValid = shouldUseExpressionMode(nextValue);
+            if (!this.state.hasExplicitModeSelection) {
+                this.state.mode = shouldUseExpressionMode(nextValue) ? "expression" : "literal";
+            }
+            this.state.expressionValid = isExpressionContentValid(nextValue);
         });
     }
 
@@ -201,19 +199,25 @@ export class ExpressionValueEditor extends Component {
     get expressionValue() {
         const v = this.props.value;
         if (v instanceof Expression) {
-            return `{{ ${v.toString()} }}`;
+            return ensureExpressionPrefix(`{{ ${v.toString()} }}`);
         }
-        return typeof v === "string" ? v : "";
+        if (typeof v === "string") {
+            return shouldUseExpressionMode(v) && !isExpressionMode(v)
+                ? ensureExpressionPrefix(v)
+                : v;
+        }
+        return "";
     }
 
     toggleMode() {
+        this.state.hasExplicitModeSelection = true;
         if (this.state.mode === "literal") {
             // Switch to expression: wrap current value as Expression instance
             this.state.mode = "expression";
             const current = normalizeLiteralCandidate(this.props.value);
             if (current !== undefined && current !== false && current !== "" && !isExpressionLike(current)) {
                 const seed = toExpressionSeed(current);
-                this.props.update(toExpressionInstance(seed));
+                this.props.update(seed);
             }
         } else {
             // Switch to literal: try to preserve the expression payload as literal.
@@ -231,16 +235,7 @@ export class ExpressionValueEditor extends Component {
     }
 
     onExpressionChange(newVal) {
-        // Convert {{ expr }} strings to Expression instances so that
-        // domainFromTree's toAST() serializes them as unquoted code,
-        // not as string literals.
-        //
-        // toExpressionInstance is safe: if the Python body can't be parsed
-        // (e.g. user is mid-keystroke), it returns the raw string.
-        const converted = toExpressionInstance(newVal);
-        // Partial templates like "Name is {{ _input.field }}" are valid even though
-        // they don't wrap to an Expression instance — backend renders them as template strings.
-        this.state.expressionValid = shouldUseExpressionMode(converted) || (typeof newVal === "string" && hasExpressions(newVal));
-        this.props.update(converted);
+        this.state.expressionValid = isExpressionContentValid(newVal);
+        this.props.update(newVal);
     }
 }

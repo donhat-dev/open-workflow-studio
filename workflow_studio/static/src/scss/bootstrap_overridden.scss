@@ -9,7 +9,8 @@ $wf-control-focus-border-color: $wf-action-color !default;
 $wf-control-focus-ring: 0 0 0 2px rgba($wf-action-color, 0.15) !default;
 $wf-control-focus-ring-strong: 0 0 0 2px rgba($wf-action-color, 0.2) !default;
 
-$wf-expression-border-color: $wf-warning-color !default;
-$wf-expression-focus-ring: 0 0 0 2px rgba($wf-warning-color, 0.15) !default;
+$wf-expression-border-color: var(--expression-editor--color--border) !default;
+$wf-expression-focus-ring: 0 0 0 2px
+	var(--expression-editor--color--focus-ring) !default;
 
 $wf-popover-shadow: 0 6px 20px rgba($o-black, 0.12) !default;

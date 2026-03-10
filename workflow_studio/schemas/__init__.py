@@ -10,6 +10,7 @@ from .execution import (
     NodeResultSchema,
     ContextSnapshotSchema,
     ExecutionResultSchema,
+    ExecutionEventSchema,
     ExecutionErrorSchema,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     'NodeResultSchema',
     'ContextSnapshotSchema',
     'ExecutionResultSchema',
+    'ExecutionEventSchema',
     'ExecutionErrorSchema',
 ]

@@ -53,8 +53,8 @@
 }
 
 .mode-btn--expression.active {
-  background: rgba($o-warning, 0.15);
-  color: $o-warning;
+  background: $wf-expression-mode-bg;
+  color: $wf-expression-mode-fg;
 }
 
 // ============================================
@@ -102,8 +102,8 @@
 }
 
 .expression-input__side-toggle.active {
-  background: $wf-warning-soft-bg;
-  color: $wf-warning-color;
+  background: $wf-expression-mode-bg;
+  color: $wf-expression-mode-fg;
   border-color: $wf-expression-border-color;
 }
 
@@ -118,7 +118,7 @@
   border-radius: $wf-control-border-radius 0 0 $wf-control-border-radius;
   font-size: 12px;
   font-weight: 600;
-  color: $wf-warning-color;
+  color: $wf-expression-mode-fg;
   flex-shrink: 0;
 }
 
@@ -176,6 +176,7 @@
   overflow: hidden;
   pointer-events: none;
   border-radius: inherit;
+  z-index: 1;
 }
 
 .expression-input__highlights-content {
@@ -187,16 +188,27 @@
   white-space: pre-wrap;
   word-break: break-word;
   will-change: transform;
+  color: $o-main-text-color;
 }
 
 .expression-input__highlight-fragment {
-  color: transparent;
+  color: inherit;
 }
 
 .expression-input__highlight {
   background: $wf-expression-highlight-bg;
   box-shadow: $wf-expression-highlight-ring;
   border-radius: 4px;
+  color: $wf-expression-highlight-fg;
+}
+
+.expression-input__input-layer.has-highlight {
+  .expression-input__text,
+  .expression-input__textarea {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: $o-main-text-color;
+  }
 }
 
 // Expression mode styling - Warning/Orange border

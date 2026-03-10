@@ -5,7 +5,7 @@
 			<!-- LABEL -->
 			<label t-if="label" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
-			<t t-if="controlType === 'text'">
+			<t t-if="controlType === 'text' or controlType === 'expression'">
 				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" mode="props.mode" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
 			</t>
 			<!-- SELECT -->
@@ -93,11 +93,13 @@
 					value="value"
 					placeholder="placeholder"
 					mode="'fixed'"
+					toggleMode="'none'"
 					suggestions="suggestions"
 					valueSuggestions="valueSuggestions"
 					onChange="(v) => this.onExpressionChange(v)"
 					readonly="props.readonly"
 				/>
+				<div class="control-description">Literal model name only. Expressions are not supported here.</div>
 			</t>
 			<!-- DOMAIN — Odoo DomainSelector (field-aware, type-safe operators) -->
 			<t t-elif="controlType === 'domain'">

@@ -400,7 +400,6 @@ function createControl(controlKey, rawSchema) {
         }
         case "json":
         case "text":
-        case "expression":
         case "string":
         default: {
             const defaultMultiline = controlType === "text" || controlType === "json";
@@ -411,6 +410,9 @@ function createControl(controlKey, rawSchema) {
                 default: getDefaultValue(schema, ""),
                 ...suggestionOptions,
             });
+            if (controlType === "expression") {
+                control.type = "expression";
+            }
             break;
         }
     }

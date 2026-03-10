@@ -3,21 +3,15 @@
 import { getValueEditorInfo } from "@web/core/tree_editor/tree_editor_value_editors";
 import { formatValue, Expression } from "@web/core/tree_editor/condition_tree";
 import { _t } from "@web/core/l10n/translation";
+import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
- * Detect whether a value is a *full* expression template: the string
- * starts with ``{{`` and ends with ``}}``, possibly with whitespace.
+ * Detect whether a value represents an expression-oriented domain payload.
  *
- * Partial templates like ``[{{ expr }}]`` return **false** — they are
- * not valid expression values in domain-leaf context (they would cause
- * type confusion during backend evaluation).
+ * Canonical format is strict n8n-style prefix mode (`=...`).
  */
 export function isExpressionValue(value) {
-    if (typeof value !== "string") {
-        return false;
-    }
-    const trimmed = value.trim();
-    return trimmed.startsWith("{{") && trimmed.endsWith("}}");
+    return inferExpressionModeFromValue(value);
 }
 
 /**

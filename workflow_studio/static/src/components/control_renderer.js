@@ -9,6 +9,7 @@ import { QueryParamsControl } from "./controls/query_params_control";
 import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
 import { DomainControl } from "./domain_control/domain_control";
 import { FieldValuesControl } from "./field_values_control/field_values_control";
+import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
  * ControlRenderer Component
@@ -112,7 +113,7 @@ export class ControlRenderer extends Component {
     }
 
     _pairsSignature(pairs) {
-        const safe = Array.isArray(pairs) ? pairs : [];
+    const safe = Array.isArray(pairs) ? pairs : [];
         return safe
             .map((p) => `${p?.id || ''}:${p?.key || ''}=${p?.value || ''}`)
             .join('|');
@@ -124,7 +125,8 @@ export class ControlRenderer extends Component {
 
     // Phase 3: Read value directly from plain object
     get value() {
-        return this.props.control?.value ?? '';
+        const rawValue = this.props.control?.value ?? '';
+        return rawValue;
     }
 
     get label() {
@@ -236,16 +238,32 @@ export class ControlRenderer extends Component {
     }
 
     getPairKeyMode(pairId) {
+        const pair = this.state.pairs.find((item) => item.id === pairId);
+        const currentValue = pair && typeof pair.key === "string" ? pair.key : "";
+        if (inferExpressionModeFromValue(currentValue)) {
+            return "expression";
+        }
+
         const modes = this.props.pairModes || {};
         const pairMode = modes[pairId];
+        if (!currentValue && typeof pairMode === "string") return "fixed"; // Legacy normalization
+        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.key || 'fixed';
         if (typeof pairMode === "string") return "fixed"; // Legacy normalization
         if (!pairMode || typeof pairMode !== 'object') return 'fixed';
         return pairMode.key || 'fixed';
     }
 
     getPairValueMode(pairId) {
+        const pair = this.state.pairs.find((item) => item.id === pairId);
+        const currentValue = pair && typeof pair.value === "string" ? pair.value : "";
+        if (inferExpressionModeFromValue(currentValue)) {
+            return "expression";
+        }
+
         const modes = this.props.pairModes || {};
         const pairMode = modes[pairId];
+        if (!currentValue && typeof pairMode === "string") return pairMode;
+        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.value || 'fixed';
         if (typeof pairMode === "string") return pairMode; // Legacy support
         if (!pairMode || typeof pairMode !== 'object') return 'fixed';
         return pairMode.value || 'fixed';

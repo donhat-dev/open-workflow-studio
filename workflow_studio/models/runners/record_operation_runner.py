@@ -11,8 +11,6 @@ Phase-1 operations:
 """
 
 import ast
-import re
-
 from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
@@ -23,7 +21,6 @@ class RecordOperationNodeRunner(BaseNodeRunner):
     """Runner for record_operation node."""
 
     node_type = 'record_operation'
-    _TEMPLATE_RE = re.compile(r'^\s*\{\{(.+)\}\}\s*$')
 
     def execute(self, node_config, input_data, context):
         payload = input_data or {}
@@ -125,47 +122,25 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         """Resolve domain_expr to a Python list.
 
         Accepts three formats:
-          1. ``{{ [('field', '=', val)] }}`` — full expression template
-          2. ``[('field', '=', val)]``       — plain Odoo domain string from DomainSelector
-          3. Already a list (from expression evaluation)
+                    1. ``={{ [('field', '=', val)] }}`` — explicit expression mode
+                    2. ``[('field', '=', val)]``       — plain Odoo domain string from DomainSelector
+                    3. Already a list
 
-        After resolving the domain to a list, per-value ``{{ }}`` expressions
-        inside individual tuples are resolved (backward compat with old saved
-        workflows where the frontend serialized expressions as quoted strings).
+                After resolving the domain to a list, per-value explicit ``=...``
+                expressions inside individual tuples are resolved.
         """
         raw = node_config.get('domain_expr') or '[]'
-        domain = self.resolver.resolve(raw, eval_context)
-        if domain is None:
-            return []
-        if isinstance(domain, list):
-            return self._resolve_domain_values(domain, eval_context)
-        # Plain Odoo domain string from DomainSelector: "[('name', 'ilike', 'test')]"
-        if isinstance(domain, str):
-            stripped = domain.strip()
-            if not stripped or stripped == '[]':
-                return []
-            # Try literal_eval first (rejects bare identifiers like _input.x),
-            # fall back to safe_eval with full context for expression-containing domains.
-            try:
-                parsed = ast.literal_eval(stripped)
-            except (ValueError, SyntaxError):
-                parsed = safe_eval(stripped, eval_context, mode='eval')
-            if isinstance(parsed, list):
-                return self._resolve_domain_values(parsed, eval_context)
-        raise ValueError("domain_expr must evaluate to a list, got: %r" % type(domain).__name__)
+        return self.resolver.resolve_domain(raw, eval_context)
 
     def _resolve_domain_values(self, domain_list, eval_context):
-        """Walk a domain list and resolve ``{{ }}`` expressions in tuple values.
+        """Walk a domain list and resolve explicit ``=...`` tuple values.
 
         Handles domain connectors (``&``, ``|``, ``!``) which appear as plain
         strings amid the tuple elements.  Tuples are ``(field, op, value)``
-        where *value* may be a ``{{ expr }}`` string that needs resolution.
+        where *value* may be an explicit ``=...`` string that needs resolution.
 
-        **Important**: uses ``resolver._resolve_leaf_value`` to enforce the
-        strict type contract: only *full* ``{{ expr }}`` templates are
-        evaluated; partial templates like ``[{{ expr }}]`` are rejected
-        because string-interpolation produces strings that cause SQL type
-        mismatches.
+        Non-prefixed strings stay literal, matching the strict global
+        expression contract.
         """
         result = []
         for item in domain_list:
@@ -184,7 +159,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         return result
 
     def _resolve_fields(self, node_config, eval_context):
-        fields_value = self.resolver.resolve(node_config.get('fields_expr', "{{ ['id', 'display_name'] }}"), eval_context)
+        fields_value = self.resolver.resolve(node_config.get('fields_expr', "={{ ['id', 'display_name'] }}"), eval_context)
         if fields_value in (None, ''):
             return ['id', 'display_name']
         if not isinstance(fields_value, list):
@@ -194,7 +169,8 @@ class RecordOperationNodeRunner(BaseNodeRunner):
     def _is_full_template_string(self, value):
         if not isinstance(value, str):
             return False
-        return bool(self._TEMPLATE_RE.match(value.strip()))
+        stripped = value.strip()
+        return stripped.startswith('{{') and stripped.endswith('}}')
 
     def _should_defer_vals_string_resolution(self, raw_value):
         """Defer interpolation for JSON-like vals strings containing templates.
@@ -210,10 +186,6 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         if not stripped or self._is_full_template_string(stripped):
             return False
 
-        has_template = '{{' in stripped and '}}' in stripped
-        if not has_template:
-            return False
-
         is_json_object = stripped.startswith('{') and stripped.endswith('}')
         is_json_array = stripped.startswith('[') and stripped.endswith(']') and '{' in stripped
         return is_json_object or is_json_array
@@ -221,19 +193,20 @@ class RecordOperationNodeRunner(BaseNodeRunner):
     def _resolve_vals(self, node_config, eval_context, model=None):
         """Resolve vals_expr to a dict (or list of dicts for batch create).
 
-        Accepts three formats:
-          1. ``{{ {...} }}``               — expression template (legacy)
-          2. ``'{"name": "{{ expr }}"}'’’  — JSON object string from FieldValuesControl
-          3. Already a dict/list (from expression evaluation)
+                Accepts three formats:
+                    1. ``={...}`` or ``={{ {...} }}`` — explicit expression mode
+                    2. ``'{"name": "=..."}'``        — JSON object string from FieldValuesControl
+                    3. Already a dict/list
 
-        For JSON-format dicts, each value that contains ``{{ }}`` is evaluated
-        individually so field values can still use expression syntax.
+                For JSON-format dicts, each value that starts with ``=`` is evaluated
+                individually so field values can still use explicit expression syntax.
 
         When *model* is provided, string values are coerced to the field’s
         expected Python type via :meth:`_coerce_field_value`.
         """
         import json
         raw = node_config.get('vals_expr') or '{}'
+        literal_prefixed_raw = self.resolver.is_literal_prefixed_string(raw)
 
         if self._should_defer_vals_string_resolution(raw):
             vals = raw
@@ -255,6 +228,10 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             stripped = vals.strip()
             if not stripped or stripped in ('{}', '[]'):
                 return {}
+            if literal_prefixed_raw:
+                raise ValueError(
+                    "Values expressions must wrap dynamic content in {{ ... }} when using '=' prefix"
+                )
             # Try JSON (from FieldValuesControl serialization)
             try:
                 parsed = json.loads(stripped)
@@ -283,17 +260,17 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         raise ValueError("vals_expr must evaluate to an object or list of objects")
 
     def _resolve_val_item(self, value, eval_context):
-        """Resolve template expressions recursively in nested vals payloads."""
+        """Resolve explicit ``=...`` expressions recursively in nested vals payloads."""
         if isinstance(value, dict):
             return {key: self._resolve_val_item(item, eval_context) for key, item in value.items()}
         if isinstance(value, list):
             return [self._resolve_val_item(item, eval_context) for item in value]
-        if isinstance(value, str) and '{{' in value and '}}' in value:
+        if self.resolver.should_resolve_string(value):
             return self.resolver.resolve(value, eval_context)
         return value
 
     def _eval_val_expressions(self, d, eval_context, model=None):
-        """Evaluate any ``{{ }}`` expression values inside a dict.
+        """Evaluate any explicit ``=...`` expression values inside a dict.
 
         When *model* is provided, resolved values – and plain non-expression
         string values – are coerced to the correct Python type for each field
@@ -306,7 +283,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         return result
 
     def _resolve_ids(self, node_config, eval_context):
-        ids_value = self.resolver.resolve(node_config.get('ids_expr', '{{ [] }}'), eval_context)
+        ids_value = self.resolver.resolve(node_config.get('ids_expr', '={{ [] }}'), eval_context)
         if ids_value in (None, ''):
             return []
         if isinstance(ids_value, int):

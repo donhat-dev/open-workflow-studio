@@ -25,7 +25,6 @@ from odoo.exceptions import UserError, ValidationError
 
 from .runners import (
     BaseNodeRunner,
-    ExpressionEvaluator,
     HttpNodeRunner,
     IfNodeRunner,
     LoopNodeRunner,
