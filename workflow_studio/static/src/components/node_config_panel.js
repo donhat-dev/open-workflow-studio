@@ -4,6 +4,14 @@ import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
+import { hasExpressions } from "@workflow_studio/utils/expression_utils";
+
+function inferControlMode(control, value) {
+    if (control && control.type === "text" && typeof value === "string" && hasExpressions(value)) {
+        return "expression";
+    }
+    return "fixed";
+}
 
 /**
  * NodeConfigPanel Component
@@ -129,8 +137,9 @@ export class NodeConfigPanel extends Component {
         const nextPairModes = { ...restoredPairModes };
 
         for (const control of controls) {
-            if (!nextControlModes[control.key]) {
-                nextControlModes[control.key] = 'fixed';
+            const inferredMode = inferControlMode(control, values[control.key]);
+            if (!nextControlModes[control.key] || inferredMode === "expression") {
+                nextControlModes[control.key] = inferredMode;
             }
             if (control.type === 'keyvalue') {
                 const pairs = Array.isArray(values[control.key]) ? values[control.key] : [];
@@ -616,7 +625,9 @@ export class NodeConfigPanel extends Component {
     }
 
     getControlMode(controlKey) {
-        return this.state.controlModes[controlKey] || 'fixed';
+        const control = (this.state.controls || []).find((item) => item.key === controlKey);
+        const value = this.state.controlValues ? this.state.controlValues[controlKey] : undefined;
+        return this.state.controlModes[controlKey] || inferControlMode(control, value);
     }
 
     getPairModes(controlKey) {

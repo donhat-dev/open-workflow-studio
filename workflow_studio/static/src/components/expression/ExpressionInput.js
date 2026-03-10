@@ -1,7 +1,12 @@
 /** @odoo-module **/
 
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
-import { wrapExpression, evaluateExpression, hasExpressions } from "@workflow_studio/utils/expression_utils";
+import {
+    wrapExpression,
+    evaluateExpression,
+    hasExpressions,
+    extractExpressions,
+} from "@workflow_studio/utils/expression_utils";
 import {
     buildContextExpressionSuggestions,
     filterSuggestions,
@@ -51,6 +56,8 @@ export class ExpressionInput extends Component {
             isDragOver: false,
             showSuggestions: false,
             activeSuggestionIndex: -1,
+            scrollTop: 0,
+            scrollLeft: 0,
             // Local value for reactivity - syncs with props
             localValue: initialValue,
             // Fallback mode when parent does not control mode explicitly
@@ -129,6 +136,62 @@ export class ExpressionInput extends Component {
     get currentValue() {
         // Use local state value for reactivity
         return this.state.localValue;
+    }
+
+    get hasExpressionHighlights() {
+        return this.isExpression && extractExpressions(this.currentValue).length > 0;
+    }
+
+    get highlightSegments() {
+        const value = this.currentValue || "";
+        const expressions = extractExpressions(value);
+
+        if (!expressions.length) {
+            return [{ id: 0, text: value, isExpression: false }];
+        }
+
+        const segments = [];
+        let cursor = 0;
+
+        for (let index = 0; index < expressions.length; index++) {
+            const match = expressions[index];
+            if (match.start > cursor) {
+                segments.push({
+                    id: `${index}-plain-${cursor}`,
+                    text: value.slice(cursor, match.start),
+                    isExpression: false,
+                });
+            }
+
+            segments.push({
+                id: `${index}-expr-${match.start}`,
+                text: match.full,
+                isExpression: true,
+            });
+            cursor = match.end;
+        }
+
+        if (cursor < value.length) {
+            segments.push({
+                id: `tail-${cursor}`,
+                text: value.slice(cursor),
+                isExpression: false,
+            });
+        }
+
+        if (!segments.length) {
+            segments.push({ id: 0, text: value, isExpression: false });
+        }
+
+        return segments;
+    }
+
+    get highlightContentStyle() {
+        const { scrollLeft, scrollTop } = this.state;
+        if (!scrollLeft && !scrollTop) {
+            return "";
+        }
+        return `transform: translate(${-scrollLeft}px, ${-scrollTop}px);`;
     }
 
     get mode() {
@@ -251,6 +314,11 @@ export class ExpressionInput extends Component {
         this.state.isFocused = false;
         this.state.showSuggestions = false;
         this.state.activeSuggestionIndex = -1;
+    }
+
+    onScroll(ev) {
+        this.state.scrollTop = ev.target.scrollTop || 0;
+        this.state.scrollLeft = ev.target.scrollLeft || 0;
     }
 
     setMode(mode) {

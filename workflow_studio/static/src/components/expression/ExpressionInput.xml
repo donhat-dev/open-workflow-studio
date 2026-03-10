@@ -36,7 +36,20 @@
 				</button>
 				<!-- Expression mode prefix -->
 				<span t-if="isExpression and !showSideToggle" class="expression-input__fx">ƒx</span>
-				<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+				<div class="expression-input__input-layer" t-att-class="{ 'has-highlight': hasExpressionHighlights }">
+					<div t-if="hasExpressionHighlights" class="expression-input__highlights">
+						<div class="expression-input__highlights-content" t-att-style="highlightContentStyle">
+							<t t-foreach="highlightSegments" t-as="segment" t-key="segment.id">
+								<span
+									class="expression-input__highlight-fragment"
+									t-att-class="{ 'expression-input__highlight': segment.isExpression }"
+									t-esc="segment.text"
+								/>
+							</t>
+						</div>
+					</div>
+					<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" t-on-scroll="onScroll" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+				</div>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
 					<i class="fa fa-plus-circle"/>

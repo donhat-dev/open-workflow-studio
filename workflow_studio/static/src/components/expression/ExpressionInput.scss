@@ -67,6 +67,20 @@
   align-items: stretch;
 }
 
+.expression-input__input-layer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  background: $o-view-background-color;
+  border: 1px solid $o-gray-400;
+  border-radius: 6px;
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
 .expression-input__side-toggle {
   display: inline-flex;
   align-items: center;
@@ -111,35 +125,41 @@
 .expression-input__text,
 .expression-input__textarea {
   flex: 1;
-  background: $o-view-background-color;
-  border: 1px solid $o-gray-400;
-  border-radius: 6px;
   padding: 8px 10px;
   font-size: 13px;
   color: $o-main-text-color;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: color 0.15s ease;
 }
 
+.expression-input__field:has(.expression-input__fx) .expression-input__input-layer,
 .expression-input__field:has(.expression-input__fx) .expression-input__text,
-.expression-input__field:has(.expression-input__fx)
-  .expression-input__textarea {
+.expression-input__field:has(.expression-input__fx) .expression-input__textarea {
   border-radius: 0 6px 6px 0;
 }
 
-.expression-input__field:has(.expression-input__side-toggle)
-  .expression-input__text,
-.expression-input__field:has(.expression-input__side-toggle)
-  .expression-input__textarea {
+.expression-input__field:has(.expression-input__side-toggle) .expression-input__input-layer,
+.expression-input__field:has(.expression-input__side-toggle) .expression-input__text,
+.expression-input__field:has(.expression-input__side-toggle) .expression-input__textarea {
   border-radius: 0 6px 6px 0;
+}
+
+.expression-input__input-layer:focus-within {
+  border-color: $o-action;
+  box-shadow: 0 0 0 2px rgba($o-action, 0.15);
+}
+
+.expression-input__text,
+.expression-input__textarea {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  border-radius: inherit;
 }
 
 .expression-input__text:focus,
 .expression-input__textarea:focus {
   outline: none;
-  border-color: $o-action;
-  box-shadow: 0 0 0 2px rgba($o-action, 0.15);
 }
 
 .expression-input__textarea {
@@ -150,9 +170,37 @@
   line-height: 1.5;
 }
 
+.expression-input__highlights {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.expression-input__highlights-content {
+  min-height: 100%;
+  padding: 8px 10px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  will-change: transform;
+}
+
+.expression-input__highlight-fragment {
+  color: transparent;
+}
+
+.expression-input__highlight {
+  background: rgba($o-success, 0.18);
+  box-shadow: inset 0 0 0 1px rgba($o-success, 0.2);
+  border-radius: 4px;
+}
+
 // Expression mode styling - Warning/Orange border
-.expression-input.expression-mode .expression-input__text,
-.expression-input.expression-mode .expression-input__textarea {
+.expression-input.expression-mode .expression-input__input-layer {
   border-color: $o-warning;
   background: mix($o-warning, $o-view-background-color, 5%);
 }
@@ -165,14 +213,12 @@
   border-color: $o-warning;
 }
 
-.expression-input.expression-mode .expression-input__text:focus,
-.expression-input.expression-mode .expression-input__textarea:focus {
+.expression-input.expression-mode .expression-input__input-layer:focus-within {
   box-shadow: 0 0 0 2px rgba($o-warning, 0.15);
 }
 
 // Drag-over state
-.expression-input.drag-over .expression-input__text,
-.expression-input.drag-over .expression-input__textarea {
+.expression-input.drag-over .expression-input__input-layer {
   border: 2px dashed $o-action;
   background: rgba($o-action, 0.08);
 }
