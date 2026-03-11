@@ -74,6 +74,7 @@ export class WorkflowAdapter {
             id: node.id,
             type: node.type,
             title: node.label,
+            titleIsCustom: !!(node.meta && node.meta.ui && node.meta.ui.titleIsCustom),
             x: node.position.x,
             y: node.position.y,
             icon: node.icon,
@@ -233,6 +234,20 @@ export class WorkflowAdapter {
      */
     setNodeMeta(nodeId, metaPatch) {
         return this.editor.setNodeMeta(nodeId, metaPatch);
+    }
+
+    /**
+     * Rename a node (update its display label).
+     * @param {string} nodeId
+     * @param {string} label
+     * @returns {boolean}
+     */
+    setNodeLabel(nodeId, label) {
+        const result = this.editor.setNodeLabel(nodeId, label);
+        if (result) {
+            this._syncState();
+        }
+        return result;
     }
 
     /**

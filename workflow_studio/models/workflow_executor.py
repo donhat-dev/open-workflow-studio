@@ -373,6 +373,20 @@ class WorkflowExecutor:
                 redacted = self._redact_output(raw_json, entry['node_id'])
                 output_display = redacted['display']
 
+            # Normalize input_data for storage (plain Python, truncated)
+            raw_input = entry.get('_input_data')
+            input_display = None
+            if raw_input is not None:
+                try:
+                    plain_input = to_plain(raw_input)
+                    input_json_str = json.dumps(plain_input, ensure_ascii=False)
+                    # Truncate large payloads to stay within DB field limits
+                    if len(input_json_str) > 65536:
+                        plain_input = {'__truncated__': True, 'preview': input_json_str[:512]}
+                    input_display = plain_input
+                except Exception:
+                    input_display = None
+
             run_node_vals.append({
                 'run_id': self.run.id,
                 'node_id': entry['node_id'],
@@ -382,6 +396,7 @@ class WorkflowExecutor:
                 'started_at': started_at,
                 'completed_at': completed_at,
                 'duration_ms': duration_ms,
+                'input_data': input_display,
                 'output_data': output_display,
                 'output_socket': entry.get('output_socket'),
                 'error_message': entry.get('error_message'),
@@ -1222,6 +1237,7 @@ class WorkflowExecutor:
                 'output_socket': output_socket,
                 'sequence': len(self.executed_order),
                 '_raw_json': result.get('json'),
+                '_input_data': input_data,
             })
 
             return result
@@ -1238,6 +1254,7 @@ class WorkflowExecutor:
                 'output_socket': None,
                 'error_message': str(e),
                 'sequence': len(self.executed_order),
+                '_input_data': input_data,
             })
             raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
     

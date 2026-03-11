@@ -189,6 +189,20 @@ export class WorkflowEditor {
     }
 
     /**
+     * Update a node's display label (user-visible title).
+     * @param {string} nodeId
+     * @param {string} label
+     * @returns {boolean}
+     */
+    setNodeLabel(nodeId, label) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return false;
+        node.label = label;
+        this._emit('onChange', { event: 'label', data: { nodeId, label } });
+        return true;
+    }
+
+    /**
      * Get node by ID
      */
     getNode(nodeId) {

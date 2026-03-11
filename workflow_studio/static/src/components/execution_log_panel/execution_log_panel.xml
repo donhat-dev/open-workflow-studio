@@ -6,15 +6,25 @@
                 <div class="execution-log-panel__resize-bar"/>
             </div>
             <div class="execution-log-panel__toolbar">
-                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'list' }" t-on-click="() => this.switchTab('list')" type="button">
+                <button class="execution-log-panel__tab wf-tab-nav__item" t-att-class="{ active: state.activeTab === 'list', 'is-active': state.activeTab === 'list' }" t-on-click="() => this.switchTab('list')" type="button">
                     <i class="fa fa-list-ul me-1"/>List
                 </button>
-                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'gantt' }" t-on-click="() => this.switchTab('gantt')" type="button">
+                <button class="execution-log-panel__tab wf-tab-nav__item" t-att-class="{ active: state.activeTab === 'gantt', 'is-active': state.activeTab === 'gantt' }" t-on-click="() => this.switchTab('gantt')" type="button">
                     <i class="fa fa-tasks me-1"/>Gantt
                 </button>
-                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'raw' }" t-on-click="() => this.switchTab('raw')" type="button">
+                <button class="execution-log-panel__tab wf-tab-nav__item" t-att-class="{ active: state.activeTab === 'raw', 'is-active': state.activeTab === 'raw' }" t-on-click="() => this.switchTab('raw')" type="button">
                     <i class="fa fa-code me-1"/>Raw JSON
                 </button>
+                <t t-if="state.activeTab === 'list'">
+                    <div class="execution-log-panel__list-mode-toggle wf-segmented-toggle">
+                        <button class="execution-log-panel__mode-btn wf-segmented-toggle__item" t-att-class="{ active: state.listMode === 'overview', 'is-active': state.listMode === 'overview' }" t-on-click="() => this.switchListMode('overview')" type="button" title="Overview — compact step list">
+                            <i class="fa fa-bars"/>
+                        </button>
+                        <button class="execution-log-panel__mode-btn wf-segmented-toggle__item" t-att-class="{ active: state.listMode === 'detail', 'is-active': state.listMode === 'detail' }" t-on-click="() => this.switchListMode('detail')" type="button" title="Detail — show input and output per step">
+                            <i class="fa fa-columns"/>
+                        </button>
+                    </div>
+                </t>
                 <div class="execution-log-panel__toolbar-spacer"/>
                 <span class="execution-log-panel__meta">
                     <t t-esc="completedStepCount"/> steps · <t t-esc="formatDuration(totalDurationMs)"/>
@@ -28,25 +38,67 @@
             </div>
             <div class="execution-log-panel__body">
                 <t t-if="!hasExecution">
-                    <div class="execution-log-panel__empty">
+                    <div class="execution-log-panel__empty wf-empty-state">
                         <i class="fa fa-terminal"/>
                         <p>No execution logs yet</p>
                         <span>Run a workflow to inspect step results, timing, and raw execution JSON.</span>
                     </div>
                 </t>
                 <t t-elif="isRunningExecution">
-                    <div class="execution-log-panel__empty">
+                    <div class="execution-log-panel__empty wf-empty-state">
                         <i class="fa fa-spinner fa-spin"/>
                         <p>Execution in progress</p>
                         <span>Step logs and timing bars will appear as soon as results arrive.</span>
                     </div>
                 </t>
                 <t t-elif="state.activeTab === 'list'">
-                    <div class="execution-log-panel__list">
-                        <t t-foreach="executionSteps" t-as="step" t-key="step.rowKey">
-                            <div t-att-class="getStepRowClass(step)">
-                                <div class="execution-log-panel__step-header">
-                                    <button class="execution-log-panel__step-main" t-on-click="() => this.onStepClick(step)" type="button">
+                    <!-- ── OVERVIEW MODE ─────────────────────────────────── -->
+                    <t t-if="state.listMode === 'overview'">
+                        <div class="execution-log-panel__list">
+                            <t t-foreach="executionSteps" t-as="step" t-key="step.rowKey">
+                                <div t-att-class="getStepRowClass(step)">
+                                    <div class="execution-log-panel__step-header">
+                                        <button class="execution-log-panel__step-main" t-on-click="() => this.onStepClick(step)" type="button">
+                                            <span class="execution-log-panel__step-status">
+                                                <i t-att-class="getStatusIconClass(step)"/>
+                                            </span>
+                                            <span class="execution-log-panel__step-index">#<t t-esc="step.index + 1"/></span>
+                                            <span class="execution-log-panel__step-label" t-esc="step.label"/>
+                                            <span class="execution-log-panel__step-duration" t-esc="formatDuration(step.durationMs)"/>
+                                        </button>
+                                        <button t-if="hasStepDetails(step)" class="execution-log-panel__step-toggle" t-on-click.stop="() => this.toggleStep(step.rowKey)" type="button" title="Toggle details">
+                                            <i t-att-class="isStepExpanded(step.rowKey) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'"/>
+                                        </button>
+                                    </div>
+                                    <div class="execution-log-panel__step-details" t-if="isStepExpanded(step.rowKey)">
+                                        <div class="execution-log-panel__step-info-row">
+                                            <span><strong>Node:</strong> <t t-esc="step.nodeId"/></span>
+                                            <span><strong>Start:</strong> <t t-esc="formatTimestamp(step.startedAt)"/></span>
+                                            <span><strong>End:</strong> <t t-esc="formatTimestamp(step.completedAt)"/></span>
+                                        </div>
+                                        <t t-if="step.errorMessage">
+                                            <div class="execution-log-panel__step-error wf-inline-banner wf-inline-banner--danger">
+                                                <i class="fa fa-exclamation-triangle me-1"/>
+                                                <t t-esc="step.errorMessage"/>
+                                            </div>
+                                        </t>
+                                        <t t-if="step.outputData !== undefined">
+                                            <div class="execution-log-panel__tree-wrap">
+                                                <JsonTreeNode data="step.outputData" path="[]" level="0" initialExpandDepth="1" autoCollapseChildrenThreshold="40" draggable="false"/>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </t>
+                    <!-- ── DETAIL MODE (n8n-style split: list | data pane) ── -->
+                    <t t-else="">
+                        <div class="execution-log-panel__detail-layout">
+                            <!-- Left: scrollable step list -->
+                            <div class="execution-log-panel__detail-list">
+                                <t t-foreach="executionSteps" t-as="step" t-key="step.rowKey">
+                                    <button t-att-class="getDetailStepClass(step)" t-on-click="() => this.selectDetailStep(step)" type="button">
                                         <span class="execution-log-panel__step-status">
                                             <i t-att-class="getStatusIconClass(step)"/>
                                         </span>
@@ -54,31 +106,83 @@
                                         <span class="execution-log-panel__step-label" t-esc="step.label"/>
                                         <span class="execution-log-panel__step-duration" t-esc="formatDuration(step.durationMs)"/>
                                     </button>
-                                    <button t-if="hasStepDetails(step)" class="execution-log-panel__step-toggle" t-on-click.stop="() => this.toggleStep(step.rowKey)" type="button" title="Toggle details">
-                                        <i t-att-class="isStepExpanded(step.rowKey) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'"/>
-                                    </button>
-                                </div>
-                                <div class="execution-log-panel__step-details" t-if="isStepExpanded(step.rowKey)">
-                                    <div class="execution-log-panel__step-info-row">
-                                        <span><strong>Node:</strong> <t t-esc="step.nodeId"/></span>
-                                        <span><strong>Start:</strong> <t t-esc="formatTimestamp(step.startedAt)"/></span>
-                                        <span><strong>End:</strong> <t t-esc="formatTimestamp(step.completedAt)"/></span>
-                                    </div>
-                                    <t t-if="step.errorMessage">
-                                        <div class="execution-log-panel__step-error">
-                                            <i class="fa fa-exclamation-triangle me-1"/>
-                                            <t t-esc="step.errorMessage"/>
-                                        </div>
-                                    </t>
-                                    <t t-if="step.outputData !== undefined">
-                                        <div class="execution-log-panel__tree-wrap">
-                                            <JsonTreeNode data="step.outputData" path="[]" level="0" initialExpandDepth="1" autoCollapseChildrenThreshold="40" draggable="false"/>
-                                        </div>
-                                    </t>
-                                </div>
+                                </t>
                             </div>
-                        </t>
-                    </div>
+                            <!-- Right: data pane for selected step -->
+                            <div class="execution-log-panel__detail-pane">
+                                <t t-if="detailSelectedStep">
+                                    <!-- Pane header: step title + independent I/O toggles -->
+                                    <div class="execution-log-panel__detail-pane-header">
+                                        <span class="execution-log-panel__detail-pane-title" t-esc="detailSelectedStep.label"/>
+                                        <div class="execution-log-panel__io-toggle wf-segmented-toggle">
+                                            <button class="execution-log-panel__io-btn wf-segmented-toggle__item" t-att-class="{ active: state.detailShowInput, 'is-active': state.detailShowInput }" t-on-click="() => { this.state.detailShowInput = !this.state.detailShowInput; }" type="button" title="Toggle input data">
+                                                <i class="fa fa-sign-in me-1"/>Input
+                                            </button>
+                                            <button class="execution-log-panel__io-btn wf-segmented-toggle__item" t-att-class="{ active: state.detailShowOutput, 'is-active': state.detailShowOutput }" t-on-click="() => { this.state.detailShowOutput = !this.state.detailShowOutput; }" type="button" title="Toggle output data">
+                                                <i class="fa fa-sign-out me-1"/>Output
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <!-- Error banner (always visible if present) -->
+                                    <t t-if="detailSelectedStep.errorMessage">
+                                        <div class="execution-log-panel__step-error execution-log-panel__detail-error wf-inline-banner wf-inline-banner--danger">
+                                            <i class="fa fa-exclamation-triangle me-1"/>
+                                            <t t-esc="detailSelectedStep.errorMessage"/>
+                                        </div>
+                                    </t>
+                                    <!-- Data body: INPUT and OUTPUT as grid columns -->
+                                    <div class="execution-log-panel__detail-pane-body">
+                                        <t t-if="areBothSectionsHidden">
+                                            <div class="execution-log-panel__data-empty">
+                                                <i class="fa fa-eye-slash me-1"/>Toggle Input or Output above to view data
+                                            </div>
+                                        </t>
+                                        <t t-else="">
+                                            <div t-att-class="getIoGridClass()">
+                                                <!-- ── INPUT ──────────────────────────── -->
+                                                <t t-if="state.detailShowInput">
+                                                    <div class="execution-log-panel__data-section">
+                                                        <div class="execution-log-panel__data-section-header">
+                                                            <i class="fa fa-sign-in me-1"/>INPUT
+                                                        </div>
+                                                        <t t-if="hasInputData(detailSelectedStep)">
+                                                            <JsonTreeNode data="detailSelectedStep.inputData" path="[]" level="0" initialExpandDepth="10" autoCollapseChildrenThreshold="40" draggable="false"/>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <div class="execution-log-panel__data-empty">
+                                                                <i class="fa fa-inbox me-1"/>No input data
+                                                            </div>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                                <!-- ── OUTPUT ─────────────────────────── -->
+                                                <t t-if="state.detailShowOutput">
+                                                    <div class="execution-log-panel__data-section">
+                                                        <div class="execution-log-panel__data-section-header">
+                                                            <i class="fa fa-sign-out me-1"/>OUTPUT
+                                                        </div>
+                                                        <t t-if="hasOutputData(detailSelectedStep)">
+                                                            <JsonTreeNode data="detailSelectedStep.outputData" path="[]" level="0" initialExpandDepth="10" autoCollapseChildrenThreshold="40" draggable="false"/>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <div class="execution-log-panel__data-empty">
+                                                                <i class="fa fa-inbox me-1"/>No output data
+                                                            </div>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="execution-log-panel__data-empty execution-log-panel__data-empty--center wf-empty-state">
+                                        <i class="fa fa-mouse-pointer me-1"/>Select a step to inspect its data
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
                 </t>
                 <t t-elif="state.activeTab === 'gantt'">
                     <div class="execution-log-panel__gantt">

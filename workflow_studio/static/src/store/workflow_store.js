@@ -847,6 +847,9 @@ export const workflowEditorService = {
             setNodeMeta(nodeId, metaPatch) {
                 return adapter.setNodeMeta(nodeId, metaPatch);
             },
+            renameNode(nodeId, label) {
+                return adapter.setNodeLabel(nodeId, label);
+            },
             setControlValue(nodeId, controlKey, value) {
                 return adapter.setControlValue(nodeId, controlKey, value);
             },

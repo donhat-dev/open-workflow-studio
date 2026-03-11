@@ -124,6 +124,8 @@ export class EditorCanvas extends Component {
             getControls: (nodeId) => this.editor.getNodeControls(nodeId),
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
+            renameNode: (nodeId, label) => this.editor.renameNode(nodeId, label),
+            getNodeConfig: (nodeId) => this.editor.getNodeConfig(nodeId),
             getExpressionContext: (options) => buildExecutionContext ? buildExecutionContext(options) : null,
             buildContextForNode: () => ({
                 _node: {}, _json: {}, _input: { item: null, json: null },

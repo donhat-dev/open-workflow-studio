@@ -276,7 +276,58 @@ export class NodeConfigPanel extends Component {
     }
 
     get nodeTitle() {
+        if (this.props.node.type === 'record_operation' && !this.props.node.titleIsCustom) {
+            return this._computeRecordOperationAutoTitle() || this.props.node.title || this.props.node.type || 'Node Configuration';
+        }
         return this.props.node.title || this.props.node.type || 'Node Configuration';
+    }
+
+    /**
+     * Value shown in the Settings > Node Name input.
+     * For auto-titled nodes shows the computed label; for custom-titled shows the stored title.
+     */
+    get nodeNameInputValue() {
+        return this.props.node.title || '';
+    }
+
+    /**
+     * True when this node type supports title auto-derivation from config.
+     */
+    get isAutoTitleNode() {
+        return this.props.node.type === 'record_operation';
+    }
+
+    // ============================================
+    // RECORD OPERATION AUTO-TITLE HELPERS
+    // ============================================
+
+    _computeRecordOperationAutoTitle() {
+        if (this.props.node.type !== 'record_operation') return null;
+        const values = this.state.controlValues || {};
+        const operation = typeof values.operation === 'string' ? values.operation.trim().toLowerCase() : '';
+        const operationLabel = this._recordOperationLabel(operation);
+        const modelLabel = this._recordOperationModelLabel(values.model);
+        return modelLabel ? `${operationLabel} ${modelLabel}` : operationLabel;
+    }
+
+    _recordOperationLabel(operation) {
+        const operationMap = {
+            search: 'Search',
+            create: 'Create',
+            write: 'Update',
+            delete: 'Delete',
+        };
+        return operationMap[operation] || 'Record Operation';
+    }
+
+    _recordOperationModelLabel(modelName) {
+        if (typeof modelName !== 'string' || !modelName.trim()) return '';
+        const name = modelName.trim();
+        const meta = this._odooModels.getModelMetaByName(name);
+        if (meta && typeof meta.description === 'string' && meta.description.trim()) {
+            return meta.description.trim();
+        }
+        return name;
     }
 
     get nodeIcon() {
@@ -840,6 +891,14 @@ export class NodeConfigPanel extends Component {
         }
 
         this._debouncedLocalSave();
+
+        // Auto-update title for nodes that derive their name from config
+        if (this.isAutoTitleNode && !this.props.node.titleIsCustom && this.actions.renameNode) {
+            const autoTitle = this._computeRecordOperationAutoTitle();
+            if (autoTitle) {
+                this.actions.renameNode(this.props.node.id, autoTitle);
+            }
+        }
     };
 
     _debouncedLocalSave() {
@@ -862,6 +921,45 @@ export class NodeConfigPanel extends Component {
 
     onTabClick(tabName) {
         this.state.activeTab = tabName;
+    }
+
+    /**
+     * User edits the node name in the Settings tab.
+     * Persists the label and marks the title as user-customized so it
+     * won't be overridden by auto-title logic.
+     */
+    onNodeNameChange(ev) {
+        if (!this.actions.renameNode || !this.actions.setNodeMeta) return;
+        const newLabel = ev.target.value.trim();
+        const nodeId = this.props.node.id;
+        if (!newLabel) {
+            // Clearing the user title → revert to auto-title (remove custom flag)
+            this.actions.setNodeMeta(nodeId, { ui: { titleIsCustom: false } });
+            if (this.isAutoTitleNode) {
+                const autoTitle = this._computeRecordOperationAutoTitle();
+                if (autoTitle) {
+                    this.actions.renameNode(nodeId, autoTitle);
+                }
+            }
+        } else {
+            this.actions.setNodeMeta(nodeId, { ui: { titleIsCustom: true } });
+            this.actions.renameNode(nodeId, newLabel);
+        }
+    }
+
+    /**
+     * Reset the node title back to the auto-derived label (removes custom flag).
+     */
+    onResetNodeName() {
+        if (!this.actions.renameNode || !this.actions.setNodeMeta) return;
+        const nodeId = this.props.node.id;
+        this.actions.setNodeMeta(nodeId, { ui: { titleIsCustom: false } });
+        if (this.isAutoTitleNode) {
+            const autoTitle = this._computeRecordOperationAutoTitle();
+            if (autoTitle) {
+                this.actions.renameNode(nodeId, autoTitle);
+            }
+        }
     }
 
     toggleAncestorSection(nodeId) {

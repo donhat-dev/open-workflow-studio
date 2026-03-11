@@ -52,6 +52,7 @@ class WorkflowPilotController(http.Controller):
             duration_ms=node_run.duration_ms,
             started_at=node_run.started_at.isoformat() if node_run.started_at else None,
             completed_at=node_run.completed_at.isoformat() if node_run.completed_at else None,
+            input_data=node_run.input_data,
             output_data=node_run.output_data,
             output_socket=node_run.output_socket,
             error_message=node_run.error_message,

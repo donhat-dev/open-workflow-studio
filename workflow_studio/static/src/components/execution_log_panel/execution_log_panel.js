@@ -35,6 +35,10 @@ export class ExecutionLogPanel extends Component {
         this.panelRef = useRef("panel");
         this.state = useState({
             activeTab: "list",
+            listMode: "overview",       // "overview" | "detail"
+            detailSelectedKey: null,    // rowKey of step selected in detail pane
+            detailShowInput: false,     // independent toggle: show INPUT section
+            detailShowOutput: true,     // independent toggle: show OUTPUT section
             customHeight: DEFAULT_PANEL_HEIGHT,
             isResizing: false,
             expandedSteps: {},
@@ -134,6 +138,7 @@ export class ExecutionLogPanel extends Component {
             durationMs: typeof result.duration_ms === "number" ? result.duration_ms : null,
             startedAt: result.started_at || null,
             completedAt: result.completed_at || null,
+            inputData: result.input_data !== undefined ? result.input_data : null,
             outputData: result.output_data,
             errorMessage: result.error_message || null,
             nodeType: result.node_type || null,
@@ -177,6 +182,61 @@ export class ExecutionLogPanel extends Component {
 
     switchTab(tab) {
         this.state.activeTab = tab;
+    }
+
+    switchListMode(mode) {
+        this.state.listMode = mode;
+        // Auto-select first step when entering detail mode
+        if (mode === "detail" && !this.state.detailSelectedKey) {
+            const steps = this.executionSteps;
+            if (steps.length) {
+                this.state.detailSelectedKey = steps[0].rowKey;
+            }
+        }
+    }
+
+    // ── Detail pane ──────────────────────────────────────────────────────────
+
+    get detailSelectedStep() {
+        const steps = this.executionSteps;
+        if (!steps.length) {
+            return null;
+        }
+        const key = this.state.detailSelectedKey;
+        if (!key) {
+            return steps[0];
+        }
+        return steps.find((s) => s.rowKey === key) || steps[0];
+    }
+
+    isDetailSelected(step) {
+        const selected = this.detailSelectedStep;
+        return !!(selected && selected.rowKey === step.rowKey);
+    }
+
+    selectDetailStep(step) {
+        this.state.detailSelectedKey = step.rowKey;
+        if (step.nodeId) {
+            this.workflowEditor.actions.focusNode(step.nodeId);
+            this.env.bus.trigger("execution-log:focus-node", { nodeId: step.nodeId });
+        }
+    }
+
+    get areBothSectionsHidden() {
+        return !this.state.detailShowInput && !this.state.detailShowOutput;
+    }
+
+    getIoGridClass() {
+        const both = this.state.detailShowInput && this.state.detailShowOutput;
+        return "execution-log-panel__io-grid" + (both ? " is-split" : "");
+    }
+
+    hasInputData(step) {
+        return step && step.inputData !== null && step.inputData !== undefined;
+    }
+
+    hasOutputData(step) {
+        return step && step.outputData !== null && step.outputData !== undefined;
     }
 
     get totalDurationMs() {
@@ -367,6 +427,19 @@ export class ExecutionLogPanel extends Component {
             className += " is-success";
         }
         if (this.isSelectedStep(step)) {
+            className += " is-selected";
+        }
+        return className;
+    }
+
+    getDetailStepClass(step) {
+        let className = "execution-log-panel__detail-step-btn";
+        if (step.status === "failed" || step.status === "error" || step.errorMessage) {
+            className += " is-error";
+        } else if (step.status === "running") {
+            className += " is-running";
+        }
+        if (this.isDetailSelected(step)) {
             className += " is-selected";
         }
         return className;
