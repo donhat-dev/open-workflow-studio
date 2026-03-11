@@ -43,6 +43,20 @@ class WorkflowPilotController(http.Controller):
         'write_date',
     ]
 
+    def _build_node_result_schema(self, node_run):
+        return NodeResultSchema(
+            node_id=node_run.node_id,
+            node_type=node_run.node_type,
+            node_label=node_run.node_label,
+            status=node_run.status,
+            duration_ms=node_run.duration_ms,
+            started_at=node_run.started_at.isoformat() if node_run.started_at else None,
+            completed_at=node_run.completed_at.isoformat() if node_run.completed_at else None,
+            output_data=node_run.output_data,
+            output_socket=node_run.output_socket,
+            error_message=node_run.error_message,
+        )
+
     def _get_minimal_read_fields(self, model):
         """Pick a bounded, lightweight field set for live expansion."""
         field_names = ['display_name']
@@ -228,29 +242,11 @@ class WorkflowPilotController(http.Controller):
                             # Loop iteration: overwrite last entry
                             for i in range(len(node_results) - 1, -1, -1):
                                 if node_results[i].node_id == nid:
-                                    node_results[i] = NodeResultSchema(
-                                        node_id=nid,
-                                        node_type=node_run.node_type,
-                                        node_label=node_run.node_label,
-                                        status=node_run.status,
-                                        duration_ms=node_run.duration_ms,
-                                        output_data=node_run.output_data,
-                                        output_socket=node_run.output_socket,
-                                        error_message=node_run.error_message,
-                                    )
+                                    node_results[i] = self._build_node_result_schema(node_run)
                                     break
                         else:
                             seen_nodes.add(nid)
-                            node_results.append(NodeResultSchema(
-                                node_id=nid,
-                                node_type=node_run.node_type,
-                                node_label=node_run.node_label,
-                                status=node_run.status,
-                                duration_ms=node_run.duration_ms,
-                                output_data=node_run.output_data,
-                                output_socket=node_run.output_socket,
-                                error_message=node_run.error_message,
-                            ))
+                            node_results.append(self._build_node_result_schema(node_run))
                             executed_order.append(nid)
                     
                     if not context_snapshot:
@@ -320,29 +316,11 @@ class WorkflowPilotController(http.Controller):
             if nid in seen_nodes:
                 for i in range(len(node_results) - 1, -1, -1):
                     if node_results[i].node_id == nid:
-                        node_results[i] = NodeResultSchema(
-                            node_id=nid,
-                            node_type=node_run.node_type,
-                            node_label=node_run.node_label,
-                            status=node_run.status,
-                            duration_ms=node_run.duration_ms,
-                            output_data=node_run.output_data,
-                            output_socket=node_run.output_socket,
-                            error_message=node_run.error_message,
-                        )
+                        node_results[i] = self._build_node_result_schema(node_run)
                         break
             else:
                 seen_nodes.add(nid)
-                node_results.append(NodeResultSchema(
-                    node_id=nid,
-                    node_type=node_run.node_type,
-                    node_label=node_run.node_label,
-                    status=node_run.status,
-                    duration_ms=node_run.duration_ms,
-                    output_data=node_run.output_data,
-                    output_socket=node_run.output_socket,
-                    error_message=node_run.error_message,
-                ))
+                node_results.append(self._build_node_result_schema(node_run))
                 executed_order.append(nid)
         
         workflow = run.workflow_id

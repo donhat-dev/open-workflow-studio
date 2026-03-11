@@ -54,6 +54,8 @@
 - **File naming**: `snake_case.js` for files, `PascalCase` for classes.
 - **Template naming**: `module.template_name` (e.g., `workflow_pilot.workflow_editor_app`).
 - **Manifest assets**: use glob patterns; asset order: libs → registries → services → core → nodes → utils → components.
+- **SCSS architecture**: shared module styling tokens live in `workflow_studio/static/src/scss/`; load them in order `primary_variables.scss` → `secondary_variables.scss` → `bootstrap_overridden.scss` before component SCSS.
+- **SCSS usage**: shared colors/shadows/radii should be declared as `$wf-*` tokens in the shared SCSS layer; component SCSS should consume those tokens instead of repeating hardcoded/fallback values.
 - **Feature gating**: gate disabled features with a const flag + early return; keep services registered.
 - **Bus usage**: use bus for global events (save/execute) and scoped model/service events; prefer direct actions/callbacks for local UI.
 - **Clipboard**: use `workflowEditor` service (not adapter).

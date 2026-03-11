@@ -1,0 +1,171 @@
+// SvgTimeline component styles
+// Uses $wf-* tokens from shared SCSS layer + Odoo variables
+
+.svg-timeline {
+    // CSS custom properties for bar colors (overridable by container)
+    --svg-timeline-bar-success: #{$o-success};
+    --svg-timeline-bar-success-hover: #{darken($o-success, 10%)};
+    --svg-timeline-bar-error: #{$o-danger};
+    --svg-timeline-bar-error-hover: #{darken($o-danger, 10%)};
+    --svg-timeline-bar-running: #{$o-info};
+    --svg-timeline-bar-running-hover: #{darken($o-info, 10%)};
+    --svg-timeline-bar-pending: #{$o-gray-400};
+    --svg-timeline-bar-pending-hover: #{darken($o-gray-400, 10%)};
+
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+// ── Left labels column ────────────────────────────────────────────────────────
+
+.svg-timeline__labels {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid $o-gray-300;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: $o-view-background-color;
+}
+
+.svg-timeline__label-axis {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    border-bottom: 1px solid $o-gray-300;
+    background: $o-gray-100;
+}
+
+.svg-timeline__mode-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba($o-action, 0.08);
+    color: $o-action;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.svg-timeline__label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    cursor: pointer;
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba($o-gray-300, 0.65);
+    transition: background-color 0.1s ease;
+
+    &:hover {
+        background: rgba($o-action, 0.05);
+    }
+
+    &.is-selected {
+        background: rgba($o-action, 0.08);
+    }
+}
+
+.svg-timeline__label-index {
+    flex-shrink: 0;
+    color: $o-gray-500;
+    font-size: 0.72rem;
+    font-weight: 600;
+    min-width: 24px;
+}
+
+.svg-timeline__label-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: $o-main-text-color;
+}
+
+// ── SVG track area ────────────────────────────────────────────────────────────
+
+.svg-timeline__track {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+.svg-timeline__svg {
+    display: block;
+    overflow: visible;
+}
+
+// ── Tick lines & labels ───────────────────────────────────────────────────────
+
+.svg-timeline__tick-line {
+    stroke: $o-gray-300;
+    stroke-width: 1;
+}
+
+.svg-timeline__tick-text {
+    fill: $o-gray-600;
+    font-size: 11px;
+    font-family: inherit;
+}
+
+.svg-timeline__row-sep {
+    stroke: rgba($o-gray-300, 0.7);
+    stroke-width: 1;
+}
+
+// ── Bar elements ──────────────────────────────────────────────────────────────
+
+.svg-timeline__bar-hitarea {
+    cursor: pointer;
+    fill: transparent;
+}
+
+.svg-timeline__bar {
+    cursor: pointer;
+    transition: opacity 0.12s ease;
+    opacity: 0.88;
+
+    &:hover,
+    .svg-timeline__bar-group:hover & {
+        opacity: 1;
+    }
+}
+
+.svg-timeline__bar.is-selected {
+    opacity: 1;
+}
+
+.svg-timeline__bar-selected-ring {
+    stroke: $o-action;
+    stroke-width: 2;
+}
+
+.svg-timeline__bar-label {
+    fill: white;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    font-family: inherit;
+
+    // Drop shadow for readability on light bars
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
+}
+
+// ── When no labels ────────────────────────────────────────────────────────────
+
+.svg-timeline--no-labels .svg-timeline__track {
+    width: 100%;
+}

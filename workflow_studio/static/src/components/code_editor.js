@@ -426,6 +426,22 @@ export class CodeEditor extends Component {
 
         onWillUpdateProps((nextProps) => {
             completionContext = nextProps.completionContext || {};
+            if (this.editor) {
+                const nextValue = nextProps.value || nextProps.placeholder || "";
+                if (nextValue !== this.editor.getValue()) {
+                    this.editor.setValue(nextValue);
+                }
+                this.editor.updateOptions({ readOnly: !!nextProps.readonly });
+                const model = this.editor.getModel();
+                if (model && window.monaco && nextProps.language !== this.props.language) {
+                    window.monaco.editor.setModelLanguage(model, nextProps.language);
+                }
+                requestAnimationFrame(() => {
+                    if (this.editor) {
+                        this.editor.layout();
+                    }
+                });
+            }
         });
 
         onWillUnmount(() => {

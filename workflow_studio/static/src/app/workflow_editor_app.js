@@ -8,6 +8,7 @@ import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 import { View } from "@web/views/view";
 import { Chatter } from "@mail/chatter/web_portal/chatter";
 import { WorkflowHistoryPanel } from "@workflow_studio/components/workflow_history_panel/workflow_history_panel";
+import { ExecutionLogPanel } from "@workflow_studio/components/execution_log_panel/execution_log_panel";
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
  * 
@@ -16,7 +17,7 @@ import { WorkflowHistoryPanel } from "@workflow_studio/components/workflow_histo
  */
 export class WorkflowEditorApp extends Component {
     static template = "workflow_studio.workflow_editor_app";
-    static components = { EditorCanvas, LucideIcon, View, Chatter, WorkflowHistoryPanel };
+    static components = { EditorCanvas, LucideIcon, View, Chatter, WorkflowHistoryPanel, ExecutionLogPanel };
     
     setup() {
         this.editorService = useEditor();
@@ -98,6 +99,10 @@ export class WorkflowEditorApp extends Component {
 
     get isHistoryOpen() {
         return this.editorService.state.ui.panels.historyOpen;
+    }
+
+    get isExecutionLogOpen() {
+        return this.editorService.state.ui.panels.executionLogOpen;
     }
 
     get isReadonly() {
@@ -270,6 +275,14 @@ export class WorkflowEditorApp extends Component {
             return;
         }
         this.editorService.actions.openPanel("history");
+    }
+
+    toggleExecutionLog() {
+        if (this.isExecutionLogOpen) {
+            this.editorService.actions.closePanel("executionLog");
+            return;
+        }
+        this.editorService.actions.openPanel("executionLog");
     }
 
     closeHistory() {

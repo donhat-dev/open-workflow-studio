@@ -35,6 +35,8 @@ class NodeResultSchema:
     node_label: Optional[str] = None
     status: str = "completed"
     duration_ms: Optional[float] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
     output_data: Any = None
     output_socket: Optional[str] = None
     error_message: Optional[str] = None
@@ -44,6 +46,8 @@ class NodeResultSchema:
     def __post_init__(self):
         self.error_message = _normalize_false(self.error_message)
         self.output_data = _normalize_false(self.output_data)
+        self.started_at = _normalize_false(self.started_at)
+        self.completed_at = _normalize_false(self.completed_at)
     
     def model_dump(self) -> Dict[str, Any]:
         return asdict(self)

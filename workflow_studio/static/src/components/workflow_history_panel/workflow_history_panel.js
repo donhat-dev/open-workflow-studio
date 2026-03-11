@@ -362,6 +362,8 @@ export class WorkflowHistoryPanel extends Component {
                     error: runData.error || null,
                     errorNodeId: runData.error_node_id || null,
                     executionCount: runData.execution_count || null,
+                    durationSeconds: runData.duration_seconds || null,
+                    nodeCountExecuted: runData.node_count_executed || null,
                     inputData: runData.input_data || {},
                 };
                 this.props.executionViewRequested(runId, runData.executed_snapshot, executionData);

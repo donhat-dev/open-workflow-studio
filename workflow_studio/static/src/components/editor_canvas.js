@@ -1,6 +1,7 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, onMounted, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
+import { Component, useRef, useState, useExternalListener, onMounted, onPatched, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
+import { useBus } from "@web/core/utils/hooks";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
@@ -65,6 +66,7 @@ export class EditorCanvas extends Component {
         this._executedConnectionIdsCache = null;
         this._executedConnectionIdsLength = 0;
         this._lastExecutedOrderLength = 0;
+        this._lastFocusNodeRequest = null;
 
         // Determine operating mode FIRST (before any state/hooks)
         // Mode 1: Editor Mode - service exists, no graphData prop
@@ -97,6 +99,7 @@ export class EditorCanvas extends Component {
                 selection: { nodeIds: [], connectionIds: [] },
                 hoveredConnection: { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null },
                 panels: { configOpen: false, configNodeId: null },
+                focusNodeRequest: null,
                 nodeMenu: { visible: false, x: 0, y: 0, canvasX: 0, canvasY: 0, variant: 'default', connectionContext: null },
                 history: { canUndo: false, canRedo: false },
             },
@@ -263,6 +266,22 @@ export class EditorCanvas extends Component {
                 clearTimeout(this._deferredConnectTimeout);
                 this._deferredConnectTimeout = null;
             }
+        });
+
+        onPatched(() => {
+            const request = this.uiState.focusNodeRequest;
+            if (!request || request === this._lastFocusNodeRequest) {
+                return;
+            }
+            this._lastFocusNodeRequest = request;
+            this.viewportHook.panToNode(request.nodeId, this.nodes);
+        });
+
+        useBus(this.env.bus, "execution-log:focus-node", (payload) => {
+            if (!payload || !payload.nodeId) {
+                return;
+            }
+            this.viewportHook.panToNode(payload.nodeId, this.nodes);
         });
 
         // Global mouse listeners

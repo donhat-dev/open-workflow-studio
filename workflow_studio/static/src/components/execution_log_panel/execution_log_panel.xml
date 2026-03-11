@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.ExecutionLogPanel">
+        <div class="execution-log-panel" t-ref="panel" t-att-style="panelStyle" t-att-class="{ 'is-resizing': state.isResizing }">
+            <div class="execution-log-panel__resize-handle" t-on-mousedown="onResizeStart" title="Drag to resize">
+                <div class="execution-log-panel__resize-bar"/>
+            </div>
+            <div class="execution-log-panel__toolbar">
+                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'list' }" t-on-click="() => this.switchTab('list')" type="button">
+                    <i class="fa fa-list-ul me-1"/>List
+                </button>
+                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'gantt' }" t-on-click="() => this.switchTab('gantt')" type="button">
+                    <i class="fa fa-tasks me-1"/>Gantt
+                </button>
+                <button class="execution-log-panel__tab" t-att-class="{ active: state.activeTab === 'raw' }" t-on-click="() => this.switchTab('raw')" type="button">
+                    <i class="fa fa-code me-1"/>Raw JSON
+                </button>
+                <div class="execution-log-panel__toolbar-spacer"/>
+                <span class="execution-log-panel__meta">
+                    <t t-esc="completedStepCount"/> steps · <t t-esc="formatDuration(totalDurationMs)"/>
+                    <t t-if="failedStepCount">
+                        · <span class="text-danger"><t t-esc="failedStepCount"/> failed</span>
+                    </t>
+                </span>
+                <button class="execution-log-panel__close" t-on-click="closePanel" type="button" title="Close">
+                    <i class="fa fa-times"/>
+                </button>
+            </div>
+            <div class="execution-log-panel__body">
+                <t t-if="!hasExecution">
+                    <div class="execution-log-panel__empty">
+                        <i class="fa fa-terminal"/>
+                        <p>No execution logs yet</p>
+                        <span>Run a workflow to inspect step results, timing, and raw execution JSON.</span>
+                    </div>
+                </t>
+                <t t-elif="isRunningExecution">
+                    <div class="execution-log-panel__empty">
+                        <i class="fa fa-spinner fa-spin"/>
+                        <p>Execution in progress</p>
+                        <span>Step logs and timing bars will appear as soon as results arrive.</span>
+                    </div>
+                </t>
+                <t t-elif="state.activeTab === 'list'">
+                    <div class="execution-log-panel__list">
+                        <t t-foreach="executionSteps" t-as="step" t-key="step.rowKey">
+                            <div t-att-class="getStepRowClass(step)">
+                                <div class="execution-log-panel__step-header">
+                                    <button class="execution-log-panel__step-main" t-on-click="() => this.onStepClick(step)" type="button">
+                                        <span class="execution-log-panel__step-status">
+                                            <i t-att-class="getStatusIconClass(step)"/>
+                                        </span>
+                                        <span class="execution-log-panel__step-index">#<t t-esc="step.index + 1"/></span>
+                                        <span class="execution-log-panel__step-label" t-esc="step.label"/>
+                                        <span class="execution-log-panel__step-duration" t-esc="formatDuration(step.durationMs)"/>
+                                    </button>
+                                    <button t-if="hasStepDetails(step)" class="execution-log-panel__step-toggle" t-on-click.stop="() => this.toggleStep(step.rowKey)" type="button" title="Toggle details">
+                                        <i t-att-class="isStepExpanded(step.rowKey) ? 'fa fa-chevron-down' : 'fa fa-chevron-right'"/>
+                                    </button>
+                                </div>
+                                <div class="execution-log-panel__step-details" t-if="isStepExpanded(step.rowKey)">
+                                    <div class="execution-log-panel__step-info-row">
+                                        <span><strong>Node:</strong> <t t-esc="step.nodeId"/></span>
+                                        <span><strong>Start:</strong> <t t-esc="formatTimestamp(step.startedAt)"/></span>
+                                        <span><strong>End:</strong> <t t-esc="formatTimestamp(step.completedAt)"/></span>
+                                    </div>
+                                    <t t-if="step.errorMessage">
+                                        <div class="execution-log-panel__step-error">
+                                            <i class="fa fa-exclamation-triangle me-1"/>
+                                            <t t-esc="step.errorMessage"/>
+                                        </div>
+                                    </t>
+                                    <t t-if="step.outputData !== undefined">
+                                        <div class="execution-log-panel__tree-wrap">
+                                            <JsonTreeNode data="step.outputData" path="[]" level="0" initialExpandDepth="1" autoCollapseChildrenThreshold="40" draggable="false"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+                <t t-elif="state.activeTab === 'gantt'">
+                    <div class="execution-log-panel__gantt">
+                        <SvgTimeline t-props="svgTimelineProps"/>
+                    </div>
+                </t>
+                <t t-else="">
+                    <div class="execution-log-panel__raw">
+                        <CodeEditor value="rawExecutionJson" height="rawEditorHeight" language="'json'" readonly="true"/>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -243,6 +243,48 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
         updateViewRect();
     }
 
+    /**
+     * Pan viewport to center a specific node.
+     * @param {string} nodeId
+     * @param {Array} nodes
+     */
+    function panToNode(nodeId, nodes) {
+        if (!rootRef.el || !nodeId || !Array.isArray(nodes)) {
+            return;
+        }
+        const node = nodes.find((entry) => entry && entry.id === nodeId);
+        if (!node) {
+            return;
+        }
+
+        const viewport = getViewport();
+        const dimensions = getDimensions ? getDimensions() : null;
+        const nodeWidth = dimensions && typeof dimensions.nodeWidth === "number"
+            ? dimensions.nodeWidth
+            : 240;
+        const bodyPadding = dimensions && typeof dimensions.nodeBodyPadding === "number"
+            ? dimensions.nodeBodyPadding
+            : 10;
+        const socketSpacing = dimensions && typeof dimensions.socketSpacing === "number"
+            ? dimensions.socketSpacing
+            : 24;
+        const socketCount = Math.max(
+            Object.keys(node.inputs || {}).length,
+            Object.keys(node.outputs || {}).length,
+            1,
+        );
+        const nodeHeight = Math.max(72, (bodyPadding * 2) + (socketCount * socketSpacing));
+        const rect = rootRef.el.getBoundingClientRect();
+        const panX = -((node.x + (nodeWidth / 2)) * viewport.zoom) + (rect.width / 2);
+        const panY = -((node.y + (nodeHeight / 2)) * viewport.zoom) + (rect.height / 2);
+
+        setViewport({
+            pan: { x: panX, y: panY },
+            zoom: viewport.zoom,
+        });
+        updateViewRect();
+    }
+
     // Initialize view rect on mount
     onMounted(() => {
         updateViewRect();
@@ -276,5 +318,6 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
         zoomOut,
         resetZoom,
         fitToView,
+        panToNode,
     };
 }

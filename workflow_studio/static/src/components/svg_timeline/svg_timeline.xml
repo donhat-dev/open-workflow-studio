@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.SvgTimeline">
+        <div class="svg-timeline" t-att-class="{ 'svg-timeline--no-labels': !props.showLabels }">
+
+            <!-- ── Left label column ─────────────────────────────────────── -->
+            <t t-if="props.showLabels">
+                <div class="svg-timeline__labels" t-att-style="'width:' + props.labelColumnWidth + 'px'">
+                    <!-- Axis row placeholder (aligns with tick row in SVG) -->
+                    <div class="svg-timeline__label-axis" t-att-style="'height:' + props.tickHeight + 'px'">
+                        <t t-if="props.modeLabel">
+                            <span class="svg-timeline__mode-pill" t-esc="props.modeLabel"/>
+                        </t>
+                    </div>
+                    <!-- One label row per item -->
+                    <t t-foreach="props.items" t-as="item" t-key="item.id">
+                        <div class="svg-timeline__label-row"
+                             t-att-class="{ 'is-selected': selectedSet.has(item.id) }"
+                             t-att-style="'height:' + props.rowHeight + 'px'"
+                             t-on-click="(ev) => this.onBarClick(ev, item.id)"
+                             t-att-title="item.label">
+                            <span class="svg-timeline__label-index">#<t t-esc="item_index + 1"/></span>
+                            <span class="svg-timeline__label-text" t-esc="item.label"/>
+                        </div>
+                    </t>
+                </div>
+            </t>
+
+            <!-- ── SVG track ──────────────────────────────────────────────── -->
+            <div class="svg-timeline__track" t-ref="track">
+                <t t-if="state.trackWidth > 0">
+                    <svg
+                        class="svg-timeline__svg"
+                        t-att-width="trackWidth"
+                        t-att-height="totalHeight"
+                        xmlns="http://www.w3.org/2000/svg"
+                        shape-rendering="crispEdges">
+
+                        <!-- ── Tick vertical grid lines ────────────────── -->
+                        <g class="svg-timeline__tick-lines">
+                            <t t-foreach="svgTicks" t-as="tick" t-key="tick.key">
+                                <line
+                                    t-att-x1="tick.x1"
+                                    t-att-y1="tick.y1"
+                                    t-att-x2="tick.x2"
+                                    t-att-y2="tick.y2"
+                                    class="svg-timeline__tick-line"/>
+                            </t>
+                        </g>
+
+                        <!-- ── Tick labels (axis row) ──────────────────── -->
+                        <g class="svg-timeline__tick-labels">
+                            <t t-foreach="svgTicks" t-as="tick" t-key="tick.key">
+                                <text
+                                    t-att-x="tick.labelX"
+                                    t-att-y="props.tickHeight - 6"
+                                    t-att-text-anchor="tick.labelAnchor"
+                                    class="svg-timeline__tick-text"
+                                    t-esc="tick.label"/>
+                            </t>
+                        </g>
+
+                        <!-- ── Row separator lines ─────────────────────── -->
+                        <g class="svg-timeline__row-separators">
+                            <t t-foreach="props.items" t-as="item" t-key="item.id">
+                                <line
+                                    x1="0"
+                                    t-att-x2="trackWidth"
+                                    t-att-y1="props.tickHeight + (item_index + 1) * props.rowHeight"
+                                    t-att-y2="props.tickHeight + (item_index + 1) * props.rowHeight"
+                                    class="svg-timeline__row-sep"/>
+                            </t>
+                        </g>
+
+                        <!-- ── Bars ────────────────────────────────────── -->
+                        <g class="svg-timeline__bars">
+                            <t t-foreach="svgBars" t-as="bar" t-key="bar.id">
+                                <g class="svg-timeline__bar-group"
+                                   t-att-class="{ 'is-selected': bar.isSelected, 'is-error': bar.status === 'error' or bar.status === 'failed', 'is-running': bar.status === 'running' }">
+
+                                    <!-- Hit area (wider than visual bar for easier clicking) -->
+                                    <rect
+                                        t-att-x="bar.x"
+                                        t-att-y="props.tickHeight + (bar_index * props.rowHeight)"
+                                        t-att-width="bar.width"
+                                        t-att-height="props.rowHeight"
+                                        fill="transparent"
+                                        class="svg-timeline__bar-hitarea"
+                                        t-on-click="(ev) => this.onBarClick(ev, bar.id)"/>
+
+                                    <!-- Visual bar -->
+                                    <rect
+                                        t-att-x="bar.x"
+                                        t-att-y="bar.y"
+                                        t-att-width="bar.width"
+                                        t-att-height="bar.height"
+                                        t-att-rx="bar.rx"
+                                        t-att-fill="bar.fill"
+                                        class="svg-timeline__bar"
+                                        t-att-class="{ 'is-selected': bar.isSelected }"
+                                        t-on-click="(ev) => this.onBarClick(ev, bar.id)">
+                                        <title t-esc="bar.tooltip"/>
+                                    </rect>
+
+                                    <!-- Duration label inside bar -->
+                                    <t t-if="bar.showDurationLabel">
+                                        <text
+                                            t-att-x="bar.x + bar.width / 2"
+                                            t-att-y="bar.y + bar.height / 2 + 1"
+                                            text-anchor="middle"
+                                            dominant-baseline="middle"
+                                            class="svg-timeline__bar-label">
+                                            <title t-esc="bar.tooltip"/>
+                                            <t t-esc="bar.durationLabel"/>
+                                        </text>
+                                    </t>
+
+                                    <!-- Selected indicator: outline ring -->
+                                    <t t-if="bar.isSelected">
+                                        <rect
+                                            t-att-x="bar.x - 1"
+                                            t-att-y="bar.y - 1"
+                                            t-att-width="bar.width + 2"
+                                            t-att-height="bar.height + 2"
+                                            t-att-rx="bar.rx + 1"
+                                            fill="none"
+                                            class="svg-timeline__bar-selected-ring"/>
+                                    </t>
+                                </g>
+                            </t>
+                        </g>
+                    </svg>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

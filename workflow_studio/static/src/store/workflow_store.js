@@ -37,7 +37,14 @@ import { registerBackendNodeTypes } from "../utils/dynamic_node_factory";
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
     viewport: { pan: { x: 0, y: 0 }, zoom: 1 },
-    panels: { configOpen: false, configNodeId: null, menuOpen: false, historyOpen: false },
+    focusNodeRequest: null,
+    panels: {
+        configOpen: false,
+        configNodeId: null,
+        menuOpen: false,
+        historyOpen: false,
+        executionLogOpen: false,
+    },
     hoveredConnection: {
         id: null,
         midpoint: { x: 0, y: 0 },
@@ -71,6 +78,7 @@ export const workflowEditorService = {
         let versionHash = null;
         let workflowId = null;
         let autoSave = true;
+        let focusNodeRequestSeq = 0;
         const historyPreview = {
             active: false,
             revisionId: null,
@@ -150,6 +158,8 @@ export const workflowEditorService = {
                 inputData: {},
                 contextSnapshot: null,
                 executionCount: null,
+                durationSeconds: null,
+                nodeCountExecuted: null,
             };
         }
 
@@ -237,6 +247,14 @@ export const workflowEditorService = {
                         }
                     }
                     state.executionProgress.executedConnectionIds = executedConnectionIds;
+                }
+
+                if (
+                    state.executionProgress
+                    && (state.executionProgress.status === 'completed'
+                        || state.executionProgress.status === 'failed')
+                ) {
+                    state.ui.panels.executionLogOpen = true;
                 }
             },
             clearExecution() {
@@ -501,6 +519,21 @@ export const workflowEditorService = {
                 };
             },
 
+            focusNode(nodeId) {
+                if (!nodeId) {
+                    return;
+                }
+                state.ui.selection = {
+                    nodeIds: [nodeId],
+                    connectionIds: [],
+                };
+                focusNodeRequestSeq += 1;
+                state.ui.focusNodeRequest = {
+                    nodeId,
+                    seq: focusNodeRequestSeq,
+                };
+            },
+
             setViewport({ pan, zoom }) {
                 const nextPan = pan || state.ui.viewport.pan;
                 const nextZoom = typeof zoom === "number" ? zoom : state.ui.viewport.zoom;
@@ -615,6 +648,7 @@ export const workflowEditorService = {
                 executionView.active = true;
                 executionView.runId = runId || null;
                 state.ui.executionView = { active: true, runId: runId || null };
+                state.ui.panels.executionLogOpen = true;
                 state.ui.readonly = true;
                 state.ui.selection = { nodeIds: [], connectionIds: [] };
                 state.ui.hoveredConnection = {
@@ -672,6 +706,9 @@ export const workflowEditorService = {
                 if (panelType === "history") {
                     state.ui.panels.historyOpen = true;
                 }
+                if (panelType === "executionLog") {
+                    state.ui.panels.executionLogOpen = true;
+                }
             },
 
             closePanel(panelType) {
@@ -685,6 +722,9 @@ export const workflowEditorService = {
                 }
                 if (panelType === "history") {
                     state.ui.panels.historyOpen = false;
+                }
+                if (panelType === "executionLog") {
+                    state.ui.panels.executionLogOpen = false;
                 }
             },
 
@@ -922,6 +962,8 @@ export const workflowEditorService = {
                             || result.executed_connections
                             || [],
                         executionCount: run.execution_count || null,
+                        durationSeconds: run.duration_seconds || result.duration_seconds || null,
+                        nodeCountExecuted: run.node_count_executed || null,
                         inputData: run.input_data || safeInput,
                         contextSnapshot: result.context_snapshot || run.context_snapshot || null,
                         nodeResults: run.node_results || [],
@@ -968,6 +1010,8 @@ export const workflowEditorService = {
                             executedConnectionIds: result.executed_connection_ids || [],
                             executedConnections: result.executed_connections || [],
                             executionCount: result.execution_count || null,
+                            durationSeconds: result.duration_seconds || null,
+                            nodeCountExecuted: result.node_count_executed || null,
                             inputData: safeInput,
                             nodeResults,
                             nodeOutputs: result.node_outputs || null,
