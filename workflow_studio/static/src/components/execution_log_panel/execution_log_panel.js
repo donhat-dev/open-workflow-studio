@@ -84,6 +84,11 @@ export class ExecutionLogPanel extends Component {
             return [];
         }
 
+        const executionEvents = Array.isArray(execution.executionEvents) ? execution.executionEvents : [];
+        if (executionEvents.length) {
+            return executionEvents.map((event, index) => this._buildStep(event, index));
+        }
+
         const order = Array.isArray(execution.executedOrder) ? execution.executedOrder : [];
         const results = Array.isArray(execution.nodeResults) ? execution.nodeResults : [];
         const resultsByNodeId = new Map();
@@ -128,10 +133,13 @@ export class ExecutionLogPanel extends Component {
     }
 
     _buildStep(result, index) {
-        const rowKey = result.node_id || `step_${index}`;
+        const eventSequence = typeof result.sequence === "number" ? result.sequence : index;
+        const rowKey = result.row_key || `${result.node_id || 'step'}_${eventSequence}`;
         return {
             rowKey,
             index,
+            sequence: eventSequence,
+            iteration: typeof result.iteration === "number" ? result.iteration : null,
             nodeId: result.node_id,
             label: result.node_label || result.title || result.node_type || result.node_id || `Step ${index + 1}`,
             status: result.error_message ? "error" : (result.status || "completed"),
@@ -283,6 +291,7 @@ export class ExecutionLogPanel extends Component {
             executedOrder: execution.executedOrder || [],
             executedConnectionIds: execution.executedConnectionIds || [],
             executedConnections: execution.executedConnections || [],
+            executionEvents: execution.executionEvents || [],
             nodeStatuses: execution.nodeStatuses || {},
             nodeResults: execution.nodeResults || [],
             nodeOutputs: execution.nodeOutputs || null,

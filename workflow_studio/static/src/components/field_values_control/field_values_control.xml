@@ -16,9 +16,11 @@
                         <ExpressionInput
                             value="row.field"
                             placeholder="field_name"
-                            mode="'fixed'"
+                            mode="getFieldMode(row.id)"
                             suggestions="state.fieldSuggestions"
+                            onModeChange="(m) => this.onFieldModeChange(row.id, m)"
                             onChange="(v) => this.onFieldChange(row_index, v)"
+                            onDrop="(payload) => this.onFieldDrop(row.id, payload)"
                             readonly="props.readonly"
                         />
                     </div>

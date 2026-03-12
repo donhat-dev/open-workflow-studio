@@ -1,5 +1,222 @@
 /** @odoo-module **/
 
+function normalizeConnections(connections) {
+    if (!Array.isArray(connections)) {
+        return [];
+    }
+    return connections.filter((connection) => connection && connection.source && connection.target);
+}
+
+function getConnectionKey(connection) {
+    if (connection.id) {
+        return String(connection.id);
+    }
+    return [
+        String(connection.source),
+        String(connection.sourceHandle || connection.sourceSocket || ""),
+        String(connection.target),
+        String(connection.targetHandle || connection.targetSocket || ""),
+    ].join("→");
+}
+
+function buildForwardAdjacency(connections) {
+    const adjacency = new Map();
+    for (const connection of normalizeConnections(connections)) {
+        const sourceId = String(connection.source);
+        if (!adjacency.has(sourceId)) {
+            adjacency.set(sourceId, []);
+        }
+        adjacency.get(sourceId).push(connection);
+    }
+    return adjacency;
+}
+
+function buildReverseAdjacency(connections) {
+    const adjacency = new Map();
+    for (const connection of normalizeConnections(connections)) {
+        const targetId = String(connection.target);
+        if (!adjacency.has(targetId)) {
+            adjacency.set(targetId, []);
+        }
+        adjacency.get(targetId).push(String(connection.source));
+    }
+    return adjacency;
+}
+
+function getBackEdgeKeySet(connections) {
+    const normalized = normalizeConnections(connections);
+    if (!normalized.length) {
+        return new Set();
+    }
+
+    const forwardAdjacency = buildForwardAdjacency(normalized);
+    const nodeIds = new Set();
+    const inDegree = new Map();
+
+    for (const connection of normalized) {
+        const sourceId = String(connection.source);
+        const targetId = String(connection.target);
+        nodeIds.add(sourceId);
+        nodeIds.add(targetId);
+        inDegree.set(sourceId, inDegree.get(sourceId) || 0);
+        inDegree.set(targetId, (inDegree.get(targetId) || 0) + 1);
+    }
+
+    const visited = new Set();
+    const inStack = new Set();
+    const backEdgeKeys = new Set();
+
+    const visit = (nodeId) => {
+        visited.add(nodeId);
+        inStack.add(nodeId);
+
+        for (const connection of forwardAdjacency.get(nodeId) || []) {
+            const targetId = String(connection.target);
+            if (sourceIdEqualsTarget(nodeId, targetId)) {
+                backEdgeKeys.add(getConnectionKey(connection));
+                continue;
+            }
+
+            if (inStack.has(targetId)) {
+                backEdgeKeys.add(getConnectionKey(connection));
+                continue;
+            }
+
+            if (!visited.has(targetId)) {
+                visit(targetId);
+            }
+        }
+
+        inStack.delete(nodeId);
+    };
+
+    const rootNodeIds = [...nodeIds].filter((nodeId) => (inDegree.get(nodeId) || 0) === 0);
+    for (const nodeId of rootNodeIds) {
+        if (!visited.has(nodeId)) {
+            visit(nodeId);
+        }
+    }
+
+    for (const nodeId of nodeIds) {
+        if (!visited.has(nodeId)) {
+            visit(nodeId);
+        }
+    }
+
+    return backEdgeKeys;
+}
+
+function sourceIdEqualsTarget(sourceId, targetId) {
+    return sourceId === targetId;
+}
+
+export function getStructuralConnections(connections) {
+    const normalized = normalizeConnections(connections);
+    if (!normalized.length) {
+        return [];
+    }
+
+    const backEdgeKeys = getBackEdgeKeySet(normalized);
+    return normalized.filter((connection) => {
+        const sourceId = String(connection.source);
+        const targetId = String(connection.target);
+        if (sourceIdEqualsTarget(sourceId, targetId)) {
+            return false;
+        }
+
+        return !backEdgeKeys.has(getConnectionKey(connection));
+    });
+}
+
+export function getStructuralParentIds(workflow, nodeId) {
+    if (!workflow || !nodeId) {
+        return [];
+    }
+
+    const reverseAdjacency = buildReverseAdjacency(getStructuralConnections(workflow.connections));
+    return [...(reverseAdjacency.get(String(nodeId)) || [])];
+}
+
+export function getStructuralPredecessorIds(workflow, nodeId) {
+    if (!workflow || !nodeId) {
+        return [];
+    }
+
+    const reverseAdjacency = buildReverseAdjacency(getStructuralConnections(workflow.connections));
+    const visited = new Set([String(nodeId)]);
+    const predecessors = [];
+    const queue = [String(nodeId)];
+
+    while (queue.length) {
+        const currentId = queue.shift();
+        for (const parentId of reverseAdjacency.get(currentId) || []) {
+            if (visited.has(parentId)) {
+                continue;
+            }
+
+            visited.add(parentId);
+            predecessors.push(parentId);
+            queue.push(parentId);
+        }
+    }
+
+    return predecessors;
+}
+
+export function getLatestNodeResultsByNodeIds(nodeResults, nodeIds) {
+    if (!Array.isArray(nodeResults) || !nodeResults.length) {
+        return [];
+    }
+
+    const allowedIds = new Set((nodeIds || []).map((nodeId) => String(nodeId)));
+    if (!allowedIds.size) {
+        return [];
+    }
+
+    const uniqueByNode = new Map();
+    for (const result of nodeResults) {
+        if (!result || result.node_id === undefined || result.node_id === null) {
+            continue;
+        }
+
+        const nodeId = String(result.node_id);
+        if (!allowedIds.has(nodeId)) {
+            continue;
+        }
+
+        if (uniqueByNode.has(nodeId)) {
+            uniqueByNode.delete(nodeId);
+        }
+        uniqueByNode.set(nodeId, result);
+    }
+
+    return Array.from(uniqueByNode.values());
+}
+
+export function getLatestNodeResultForNodeIds(nodeResults, nodeIds) {
+    if (!Array.isArray(nodeResults) || !nodeResults.length) {
+        return null;
+    }
+
+    const allowedIds = new Set((nodeIds || []).map((nodeId) => String(nodeId)));
+    if (!allowedIds.size) {
+        return null;
+    }
+
+    for (let index = nodeResults.length - 1; index >= 0; index--) {
+        const result = nodeResults[index];
+        if (!result || result.node_id === undefined || result.node_id === null) {
+            continue;
+        }
+
+        if (allowedIds.has(String(result.node_id))) {
+            return result;
+        }
+    }
+
+    return null;
+}
+
 /**
  * WorkflowGraph - Core Graph Utilities using Dagre.js
  * 

@@ -440,6 +440,14 @@ export class JsonTreeNode extends Component {
         // Set data transfer
         ev.dataTransfer.setData('text/plain', this.expressionPath);
         ev.dataTransfer.setData('application/x-expression', this.expressionTemplate);
+        ev.dataTransfer.setData('application/x-expression-key', this.props.keyName || '');
+        ev.dataTransfer.setData('application/x-expression-meta', JSON.stringify({
+            keyName: this.props.keyName || null,
+            path: this.props.path || null,
+            sourceNodeId: this.props.sourceNodeId || null,
+            expressionPath: this.expressionPath,
+            expressionTemplate: this.expressionTemplate,
+        }));
         ev.dataTransfer.effectAllowed = 'copy';
 
         // Visual feedback

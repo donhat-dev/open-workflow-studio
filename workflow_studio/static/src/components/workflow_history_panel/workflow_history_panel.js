@@ -352,11 +352,12 @@ export class WorkflowHistoryPanel extends Component {
 
             if (this.props.executionViewRequested) {
                 const executionData = {
-                    runId: runData.id,
+                    runId: runData.run_id || runData.id,
                     status: runData.status,
                     executedOrder: runData.executed_order || [],
                     executedConnectionIds: runData.executed_connection_ids || [],
                     executedConnections: runData.executed_connections || [],
+                    executionEvents: runData.execution_events || [],
                     nodeResults: runData.node_results || [],
                     contextSnapshot: runData.context_snapshot || null,
                     error: runData.error || null,

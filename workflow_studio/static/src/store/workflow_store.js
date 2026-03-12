@@ -149,6 +149,7 @@ export const workflowEditorService = {
                 executedOrder: [],
                 executedConnectionIds: [],
                 executedConnections: [],
+                executionEvents: [],
                 // Rich data — populated when execution finishes
                 nodeResults: [],
                 nodeOutputs: null,
@@ -969,6 +970,7 @@ export const workflowEditorService = {
                         nodeCountExecuted: run.node_count_executed || null,
                         inputData: run.input_data || safeInput,
                         contextSnapshot: result.context_snapshot || run.context_snapshot || null,
+                        executionEvents: run.execution_events || result.execution_events || [],
                         nodeResults: run.node_results || [],
                     });
                     editorBus.trigger('refresh');
@@ -1016,6 +1018,7 @@ export const workflowEditorService = {
                             durationSeconds: result.duration_seconds || null,
                             nodeCountExecuted: result.node_count_executed || null,
                             inputData: safeInput,
+                            executionEvents: result.execution_events || [],
                             nodeResults,
                             nodeOutputs: result.node_outputs || null,
                             contextSnapshot: result.context_snapshot || null,

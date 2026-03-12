@@ -78,6 +78,7 @@ export class WorkflowEditorApp extends Component {
          
         // Load on mount
         onMounted(async () => {
+            window._app = this; // DEV ONLY
             try {
                 await this.editorService.loadNodeTypes();
             } catch (error) {
@@ -631,6 +632,9 @@ export class WorkflowEditorApp extends Component {
             },
             get execution() {
                 return self._getExecutionResult();
+            },
+            get selectedNode() {
+                return node.all().find((n) => editor.state.ui.selection.nodeIds.includes(n.id)) || null;
             },
             get nodes() {
                 return node.all();

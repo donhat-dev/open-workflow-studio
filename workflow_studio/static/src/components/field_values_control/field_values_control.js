@@ -37,9 +37,11 @@ export class FieldValuesControl extends Component {
         this.state = useState({
             rows: this._parseToRows(this.props.value),
             fieldSuggestions: [],
+            fieldModes: {}, // { [rowId]: 'fixed' | 'expression' }
             valueModes: {}, // { [rowId]: 'fixed' | 'expression' }
         });
 
+        this.state.fieldModes = this._buildFieldModes(this.state.rows);
         this.state.valueModes = this._buildValueModes(this.state.rows);
 
         onMounted(() => {
@@ -55,6 +57,7 @@ export class FieldValuesControl extends Component {
                 const incoming = this._parseToRows(nextProps.value);
                 if (this._sig(incoming) !== this._sig(this.state.rows)) {
                     this.state.rows = incoming;
+                    this.state.fieldModes = this._buildFieldModes(incoming);
                     this.state.valueModes = this._buildValueModes(incoming);
                 }
             }
@@ -90,6 +93,14 @@ export class FieldValuesControl extends Component {
         const modes = {};
         for (const row of rows || []) {
             modes[row.id] = this._inferValueMode(row.value);
+        }
+        return modes;
+    }
+
+    _buildFieldModes(rows) {
+        const modes = {};
+        for (const row of rows || []) {
+            modes[row.id] = this._inferValueMode(row.field);
         }
         return modes;
     }
@@ -131,6 +142,45 @@ export class FieldValuesControl extends Component {
         }
     }
 
+    _extractDroppedFieldName(payload) {
+        if (payload && typeof payload.keyName === "string" && payload.keyName.trim()) {
+            return payload.keyName.trim();
+        }
+        if (payload && payload.meta && Array.isArray(payload.meta.path) && payload.meta.path.length) {
+            const lastSegment = payload.meta.path[payload.meta.path.length - 1];
+            if (typeof lastSegment === "string" && lastSegment.trim()) {
+                return lastSegment.trim();
+            }
+        }
+        if (payload && typeof payload.path === "string") {
+            const path = payload.path.trim();
+            const dotMatch = path.match(/\.([A-Za-z_][A-Za-z0-9_]*)$/);
+            if (dotMatch && dotMatch[1]) {
+                return dotMatch[1];
+            }
+            const bracketMatch = path.match(/\["([^"\]]+)"\]$/);
+            if (bracketMatch && bracketMatch[1]) {
+                return bracketMatch[1];
+            }
+        }
+        return "";
+    }
+
+    _hasFieldSuggestion(fieldName) {
+        if (!fieldName) {
+            return false;
+        }
+        return this.state.fieldSuggestions.some((item) => item && item.value === fieldName);
+    }
+
+    getFieldMode(rowId) {
+        const row = this.state.rows.find((item) => item.id === rowId);
+        if (!row) {
+            return "fixed";
+        }
+        return this.state.fieldModes[rowId] || this._inferValueMode(row.field);
+    }
+
     getValueMode(rowId) {
         const row = this.state.rows.find((item) => item.id === rowId);
         if (!row) {
@@ -144,6 +194,31 @@ export class FieldValuesControl extends Component {
             i === index ? { ...r, field: fieldName } : r
         );
         this.props.onChange(this._serialize());
+    }
+
+    onFieldModeChange(rowId, mode) {
+        this.state.fieldModes = { ...this.state.fieldModes, [rowId]: mode };
+    }
+
+    onFieldDrop(rowId, payload) {
+        const droppedFieldName = this._extractDroppedFieldName(payload);
+        if (this._hasFieldSuggestion(droppedFieldName)) {
+            return {
+                handled: true,
+                mode: "fixed",
+                value: droppedFieldName,
+            };
+        }
+
+        if (payload && typeof payload.expression === "string" && payload.expression) {
+            return {
+                handled: true,
+                mode: "expression",
+                value: payload.expression,
+            };
+        }
+
+        return null;
     }
 
     onValueChange(index, val) {
@@ -160,17 +235,21 @@ export class FieldValuesControl extends Component {
     addRow() {
         const id = this._nextId++;
         this.state.rows = [...this.state.rows, { id, field: "", value: "" }];
+        this.state.fieldModes = { ...this.state.fieldModes, [id]: "fixed" };
         this.state.valueModes = { ...this.state.valueModes, [id]: "fixed" };
     }
 
     removeRow(index) {
         const removedRow = this.state.rows[index];
         const next = this.state.rows.filter((_, i) => i !== index);
+        const nextFieldModes = { ...this.state.fieldModes };
         const nextModes = { ...this.state.valueModes };
         if (removedRow) {
+            delete nextFieldModes[removedRow.id];
             delete nextModes[removedRow.id];
         }
         this.state.rows = next.length > 0 ? next : [{ id: this._nextId++, field: "", value: "" }];
+        this.state.fieldModes = next.length > 0 ? nextFieldModes : this._buildFieldModes(this.state.rows);
         this.state.valueModes = next.length > 0 ? nextModes : this._buildValueModes(this.state.rows);
         this.props.onChange(this._serialize());
     }

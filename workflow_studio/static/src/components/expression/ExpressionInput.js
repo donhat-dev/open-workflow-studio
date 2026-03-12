@@ -408,13 +408,66 @@ export class ExpressionInput extends Component {
         ev.dataTransfer.dropEffect = 'copy';
     }
 
+    _getDropPayload(ev) {
+        const expression = ev.dataTransfer.getData('application/x-expression');
+        const path = ev.dataTransfer.getData('text/plain');
+        const keyName = ev.dataTransfer.getData('application/x-expression-key');
+        const rawMeta = ev.dataTransfer.getData('application/x-expression-meta');
+        let meta = null;
+
+        if (rawMeta) {
+            try {
+                meta = JSON.parse(rawMeta);
+            } catch {
+                meta = null;
+            }
+        }
+
+        return {
+            expression,
+            path,
+            keyName: keyName || (meta && typeof meta.keyName === 'string' ? meta.keyName : ''),
+            meta,
+        };
+    }
+
     onDrop(ev) {
         ev.preventDefault();
         this.state.isDragOver = false;
 
-        // Get expression from dataTransfer
-        const expression = ev.dataTransfer.getData('application/x-expression');
-        const path = ev.dataTransfer.getData('text/plain');
+        const dropPayload = this._getDropPayload(ev);
+        const expression = dropPayload.expression;
+        const path = dropPayload.path;
+
+        const currentMode = this.mode;
+        const currentDisplayValue = this.currentValue;
+        const previousSerialized = this._serializeValue(currentDisplayValue, currentMode);
+
+        if (this.props.onDrop) {
+            const override = this.props.onDrop(dropPayload);
+            if (override && override.handled) {
+                const nextMode = this._normalizeMode(override.mode) || currentMode;
+                const nextSerialized = override.serializedValue !== undefined
+                    ? String(override.serializedValue ?? '')
+                    : this._serializeValue(override.value ?? '', nextMode);
+
+                if (!this.hasControlledMode) {
+                    this.state.localMode = nextMode;
+                }
+                this.state.localValue = this._toDisplayValue(nextSerialized, nextMode);
+
+                if (nextSerialized !== previousSerialized) {
+                    this.props.onChange(nextSerialized);
+                }
+                if (this.props.onModeChange && nextMode !== currentMode) {
+                    this.props.onModeChange(nextMode);
+                }
+
+                this.state.showSuggestions = false;
+                this.state.activeSuggestionIndex = -1;
+                return;
+            }
+        }
 
         const insertText = expression || (path ? wrapExpression(path) : '');
         if (!insertText) {
@@ -437,11 +490,7 @@ export class ExpressionInput extends Component {
         // Update local state for immediate UI update
         this.state.localValue = newValue;
 
-        // Notify parent of change (no mode switching)
         this.props.onChange(this._serializeValue(newValue));
-        if (this.props.onDrop) {
-            this.props.onDrop(expression || path);
-        }
         this.state.showSuggestions = false;
 
         // Restore cursor after DOM updates

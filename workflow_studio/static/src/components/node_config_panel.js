@@ -5,6 +5,10 @@ import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
+import {
+    getLatestNodeResultsByNodeIds,
+    getStructuralPredecessorIds,
+} from "@workflow_studio/utils/graph_utils";
 
 function inferControlMode(control, value) {
     if (inferExpressionModeFromValue(value)) {
@@ -399,24 +403,24 @@ export class NodeConfigPanel extends Component {
         const execution = this.props.execution;
         
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
-            // Filter to show only predecessors (nodes executed before current node)
+            // Filter to show only structural predecessors (ignore loop back-edges).
             const predecessorResults = this._filterPredecessorResults(
                 execution.nodeResults,
                 currentNodeId
             );
 
-            const unique = this._getLastExecutionByNode(predecessorResults);
-            if (unique.length === 0) return null;
+            if (predecessorResults.length === 0) return null;
 
-            return unique.map((result, index) => ({
+            return predecessorResults.map((result, index) => ({
                 nodeId: String(result.node_id),
                 rowKey: String(result.node_id),
                 data: {
                     json: result.output_data,
                     title: result.title || result.node_label || result.node_type || result.node_id,
                 },
-                isInputNode: index === unique.length - 1,
+                isInputNode: index === predecessorResults.length - 1,
             }));
+
         }
 
         const workflow = this._getWorkflowFromContext();
@@ -471,57 +475,8 @@ export class NodeConfigPanel extends Component {
             return nodeResults.filter(r => r.node_id !== currentNodeId);
         }
 
-        // Build reverse adjacency map from current connections (no cache — avoids
-        // stale data when connections change or across different workflows).
-        const reverseAdj = {};
-        for (const conn of workflow.connections) {
-            const { source, target } = conn;
-            if (!source || !target) continue;
-            if (!reverseAdj[target]) reverseAdj[target] = [];
-            reverseAdj[target].push(source);
-        }
-
-        // BFS backwards from currentNodeId to collect all predecessors.
-        const predecessors = new Set();
-        const visited = new Set();
-        const queue = [currentNodeId];
-        while (queue.length > 0) {
-            const current = queue.shift();
-            for (const parent of (reverseAdj[current] || [])) {
-                if (visited.has(parent)) continue;
-                visited.add(parent);
-                predecessors.add(parent);
-                queue.push(parent);
-            }
-        }
-
-        return nodeResults.filter(r => predecessors.has(r.node_id));
-    }
-
-    /**
-     * Keep only the latest execution result for each node.
-     * Preserves insertion order by last occurrence (important for loop nodes).
-     * @param {Array} nodeResults
-     * @returns {Array}
-     * @private
-     */
-    _getLastExecutionByNode(nodeResults) {
-        if (!Array.isArray(nodeResults) || nodeResults.length === 0) {
-            return [];
-        }
-
-        const uniqueByNode = new Map();
-        for (const result of nodeResults) {
-            if (!result || result.node_id === undefined || result.node_id === null) {
-                continue;
-            }
-            const nodeId = String(result.node_id);
-            if (uniqueByNode.has(nodeId)) {
-                uniqueByNode.delete(nodeId);
-            }
-            uniqueByNode.set(nodeId, result);
-        }
-        return Array.from(uniqueByNode.values());
+        const predecessorIds = getStructuralPredecessorIds(workflow, currentNodeId);
+        return getLatestNodeResultsByNodeIds(nodeResults, predecessorIds);
     }
     
     get executionDisplayResult() {
@@ -572,10 +527,14 @@ export class NodeConfigPanel extends Component {
      */
     get inputData() {
         const execution = this.props.execution;
-        if (execution) {
-            const runResult = this.executionNodeResult;
-            if (runResult && runResult.output_data !== undefined) {
-                return runResult.output_data;
+        if (execution && this.actions.getExpressionContext) {
+            const context = this.actions.getExpressionContext({
+                execution,
+                nodeId: this.props.node.id,
+                nodeResults: execution.nodeResults || [],
+            });
+            if (context && context._json !== undefined) {
+                return context._json;
             }
         }
         const workflow = this._getWorkflowFromContext();
@@ -586,7 +545,7 @@ export class NodeConfigPanel extends Component {
         if (!this.actions.buildContextForNode) {
             throw new Error("[NodeConfigPanel] Missing actions.buildContextForNode");
         }
-        const context = this.actions.buildContextForNode(workflow, this.props.node.id);
+        const context = this.actions.buildContextForNode();
         return context._json;
     }
 

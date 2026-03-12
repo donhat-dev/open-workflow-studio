@@ -262,12 +262,21 @@ class RecordOperationNodeRunner(BaseNodeRunner):
     def _resolve_val_item(self, value, eval_context):
         """Resolve explicit ``=...`` expressions recursively in nested vals payloads."""
         if isinstance(value, dict):
-            return {key: self._resolve_val_item(item, eval_context) for key, item in value.items()}
+            return {
+                self._resolve_val_key(key, eval_context): self._resolve_val_item(item, eval_context)
+                for key, item in value.items()
+            }
         if isinstance(value, list):
             return [self._resolve_val_item(item, eval_context) for item in value]
         if self.resolver.should_resolve_string(value):
             return self.resolver.resolve(value, eval_context)
         return value
+
+    def _resolve_val_key(self, key, eval_context):
+        if isinstance(key, str):
+            resolved = self.resolver.resolve(key, eval_context)
+            return '' if resolved is None else str(resolved)
+        return '' if key is None else str(key)
 
     def _eval_val_expressions(self, d, eval_context, model=None):
         """Evaluate any explicit ``=...`` expression values inside a dict.
@@ -278,8 +287,13 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         """
         result = {}
         for k, v in d.items():
+            resolved_key = self._resolve_val_key(k, eval_context)
             resolved = self._resolve_val_item(v, eval_context)
-            result[k] = self._coerce_field_value(model, k, resolved) if model is not None else resolved
+            result[resolved_key] = (
+                self._coerce_field_value(model, resolved_key, resolved)
+                if model is not None
+                else resolved
+            )
         return result
 
     def _resolve_ids(self, node_config, eval_context):

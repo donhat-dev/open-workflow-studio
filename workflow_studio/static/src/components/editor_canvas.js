@@ -16,6 +16,12 @@ import {
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
+import {
+    getLatestNodeResultForNodeIds,
+    getLatestNodeResultsByNodeIds,
+    getStructuralParentIds,
+    getStructuralPredecessorIds,
+} from "@workflow_studio/utils/graph_utils";
 
 /**
  * EditorCanvas Component
@@ -356,41 +362,48 @@ export class EditorCanvas extends Component {
 
             const nodeResults = (options && options.nodeResults) || execution.nodeResults || [];
             const nodeId = (options && options.nodeId) || null;
+            const workflow = this.workflowData;
+            const structuralPredecessorIds = nodeId
+                ? getStructuralPredecessorIds(workflow, nodeId)
+                : [];
+            const structuralPredecessorIdSet = new Set(structuralPredecessorIds);
+            const structuralParentIds = nodeId
+                ? getStructuralParentIds(workflow, nodeId)
+                : [];
 
             const wrappedNode = {};
             if (Array.isArray(nodeResults) && nodeResults.length) {
-                for (const result of nodeResults) {
+                const sourceResults = nodeId
+                    ? getLatestNodeResultsByNodeIds(nodeResults, structuralPredecessorIds)
+                    : nodeResults;
+                for (const result of sourceResults) {
                     wrappedNode[result.node_id] = buildNodeOutputView(result.output_data);
                 }
             } else {
                 const nodeEntries = snapshot.node || {};
                 for (const [entryId, output] of Object.entries(nodeEntries)) {
+                    if (nodeId && !structuralPredecessorIdSet.has(String(entryId))) {
+                        continue;
+                    }
                     wrappedNode[entryId] = buildNodeOutputView(output);
                 }
             }
 
             let json = snapshot.json || {};
             if (nodeId && Array.isArray(nodeResults) && nodeResults.length) {
-                // _input/_json for a node's config panel = the UPSTREAM node's output
-                // (i.e. what this node receives as input, not what it produces)
-                const executedOrder = execution.executedOrder || [];
-                const currentIndex = executedOrder.indexOf(nodeId);
-                if (currentIndex > 0) {
-                    // Previous node exists — use its output as this node's input
-                    const prevNodeId = executedOrder[currentIndex - 1];
-                    const prevResult = nodeResults.find((r) => r.node_id === prevNodeId);
-                    if (prevResult && prevResult.output_data !== undefined) {
-                        json = prevResult.output_data;
-                    }
-                } else if (currentIndex === -1) {
-                    // nodeId not in executedOrder yet (viewing config before running)
-                    // Fall back to the last executed node's output
-                    const lastResult = nodeResults[nodeResults.length - 1];
-                    if (lastResult && lastResult.output_data !== undefined) {
-                        json = lastResult.output_data;
+                const latestParentResult = getLatestNodeResultForNodeIds(nodeResults, structuralParentIds);
+                if (latestParentResult && latestParentResult.output_data !== undefined) {
+                    json = latestParentResult.output_data;
+                }
+            } else if (nodeId && structuralParentIds.length) {
+                const snapshotNodes = snapshot.node || {};
+                for (let index = structuralParentIds.length - 1; index >= 0; index--) {
+                    const parentId = structuralParentIds[index];
+                    if (Object.prototype.hasOwnProperty.call(snapshotNodes, parentId)) {
+                        json = snapshotNodes[parentId];
+                        break;
                     }
                 }
-                // currentIndex === 0 → first node, no upstream → keep snapshot.json
             }
 
             return {

@@ -48,6 +48,8 @@ class WorkflowPilotController(http.Controller):
             node_id=node_run.node_id,
             node_type=node_run.node_type,
             node_label=node_run.node_label,
+            sequence=node_run.sequence,
+            iteration=node_run.iteration,
             status=node_run.status,
             duration_ms=node_run.duration_ms,
             started_at=node_run.started_at.isoformat() if node_run.started_at else None,
@@ -57,6 +59,34 @@ class WorkflowPilotController(http.Controller):
             output_socket=node_run.output_socket,
             error_message=node_run.error_message,
         )
+
+    def _collect_run_node_results(self, run):
+        node_results = []
+        execution_events = []
+        executed_order = []
+        node_outputs_map = {}
+        node_index_by_id = {}
+
+        for node_run in run.node_run_ids.sorted('sequence'):
+            node_result = self._build_node_result_schema(node_run)
+            execution_events.append(node_result)
+
+            nid = node_run.node_id
+            node_outputs_map[nid] = node_run.output_data
+            if nid in node_index_by_id:
+                node_results[node_index_by_id[nid]] = node_result
+                continue
+
+            node_index_by_id[nid] = len(node_results)
+            node_results.append(node_result)
+            executed_order.append(nid)
+
+        return {
+            'node_results': node_results,
+            'execution_events': execution_events,
+            'executed_order': executed_order,
+            'node_outputs_map': node_outputs_map,
+        }
 
     def _get_minimal_read_fields(self, model):
         """Pick a bounded, lightweight field set for live expansion."""
@@ -225,6 +255,7 @@ class WorkflowPilotController(http.Controller):
             
             # Fetch node results from run record (single iteration for performance)
             node_results = []
+            execution_events = []
             node_outputs_map = {}
             executed_order = []
             executed_connections = []
@@ -233,22 +264,11 @@ class WorkflowPilotController(http.Controller):
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
                     executed_connections = run.executed_connections or []
-                    # Single pass: build node_results, node_outputs_map, and executed_order
-                    # Sort by sequence to maintain execution order
-                    seen_nodes = set()
-                    for node_run in run.node_run_ids.sorted('sequence'):
-                        nid = node_run.node_id
-                        node_outputs_map[nid] = node_run.output_data
-                        if nid in seen_nodes:
-                            # Loop iteration: overwrite last entry
-                            for i in range(len(node_results) - 1, -1, -1):
-                                if node_results[i].node_id == nid:
-                                    node_results[i] = self._build_node_result_schema(node_run)
-                                    break
-                        else:
-                            seen_nodes.add(nid)
-                            node_results.append(self._build_node_result_schema(node_run))
-                            executed_order.append(nid)
+                    run_result_data = self._collect_run_node_results(run)
+                    node_results = run_result_data['node_results']
+                    execution_events = run_result_data['execution_events']
+                    node_outputs_map = run_result_data['node_outputs_map']
+                    executed_order = run_result_data['executed_order']
                     
                     if not context_snapshot:
                         # Build context snapshot using pre-built map (fallback)
@@ -287,6 +307,7 @@ class WorkflowPilotController(http.Controller):
                 input_data=input_data or {},
                 output_data=result.get('output_data'),
                 node_results=node_results,
+                execution_events=execution_events,
                 context_snapshot=context_snapshot,
             ).model_dump()
             
@@ -308,26 +329,17 @@ class WorkflowPilotController(http.Controller):
         if not run.exists():
             return ExecutionErrorSchema(error='Run not found').model_dump()
         
-        node_results = []
-        executed_order = []
+        run_result_data = self._collect_run_node_results(run)
+        node_results = run_result_data['node_results']
+        execution_events = run_result_data['execution_events']
+        executed_order = run_result_data['executed_order']
+        node_outputs_map = run_result_data['node_outputs_map']
         executed_connections = run.executed_connections or []
-        seen_nodes = set()
-        for node_run in run.node_run_ids.sorted('sequence'):
-            nid = node_run.node_id
-            if nid in seen_nodes:
-                for i in range(len(node_results) - 1, -1, -1):
-                    if node_results[i].node_id == nid:
-                        node_results[i] = self._build_node_result_schema(node_run)
-                        break
-            else:
-                seen_nodes.add(nid)
-                node_results.append(self._build_node_result_schema(node_run))
-                executed_order.append(nid)
         
         workflow = run.workflow_id
         context_snapshot = ContextSnapshotSchema(
             json=run.output_data,
-            node={nr.node_id: nr.output_data for nr in run.node_run_ids},
+            node=node_outputs_map,
             execution={
                 'id': run.id,
                 'name': run.name,
@@ -361,6 +373,7 @@ class WorkflowPilotController(http.Controller):
             input_data=run.input_data or {},
             output_data=run.output_data,
             node_results=node_results,
+            execution_events=execution_events,
             context_snapshot=context_snapshot,
             executed_snapshot=run.executed_snapshot or {},
         ).model_dump()

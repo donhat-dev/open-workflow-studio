@@ -1224,6 +1224,11 @@ class WorkflowExecutor:
         try:
             result = self._execute_node_core(node_id, input_data, node=node)
 
+            # Some runners (e.g. loop back-edge) signal a preferred log input
+            # so the persisted input_data reflects the *original* data rather
+            # than whatever the back-edge child returned.
+            log_input = result.pop('_log_input', None)
+
             duration_ms = (time.monotonic() - t0) * 1000
             output_socket = self._get_primary_output_socket(node, result)
 
@@ -1237,7 +1242,7 @@ class WorkflowExecutor:
                 'output_socket': output_socket,
                 'sequence': len(self.executed_order),
                 '_raw_json': result.get('json'),
-                '_input_data': input_data,
+                '_input_data': log_input if log_input is not None else input_data,
             })
 
             return result

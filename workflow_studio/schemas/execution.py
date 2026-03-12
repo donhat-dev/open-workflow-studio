@@ -33,6 +33,8 @@ class NodeResultSchema:
     node_id: str
     node_type: Optional[str] = None
     node_label: Optional[str] = None
+    sequence: Optional[int] = None
+    iteration: Optional[int] = None
     status: str = "completed"
     duration_ms: Optional[float] = None
     started_at: Optional[str] = None
@@ -100,6 +102,7 @@ class ExecutionResultSchema:
     
     # Node results
     node_results: List[NodeResultSchema] = field(default_factory=list)
+    execution_events: List[NodeResultSchema] = field(default_factory=list)
     node_outputs: Optional[Dict[str, Any]] = None
     
     # Context snapshot
@@ -133,6 +136,10 @@ class ExecutionResultSchema:
             'node_results': [
                 nr.model_dump() if hasattr(nr, 'model_dump') else nr
                 for nr in self.node_results
+            ],
+            'execution_events': [
+                nr.model_dump() if hasattr(nr, 'model_dump') else nr
+                for nr in self.execution_events
             ],
             'node_outputs': self.node_outputs,
             'context_snapshot': (

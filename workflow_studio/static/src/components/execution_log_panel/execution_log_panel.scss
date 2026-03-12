@@ -49,8 +49,35 @@
 }
 
 .execution-log-panel__tab {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: $o-gray-600;
+  font-weight: 500;
+  font-size: 0.85rem;
   line-height: 1;
   white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: $o-main-text-color;
+    background: rgba($o-black, 0.04);
+  }
+
+  &.active, &.is-active {
+    color: $o-action;
+    border-bottom-color: $o-action;
+    background: transparent;
+  }
+
+  i {
+    font-size: 0.9em;
+  }
 }
 
 .execution-log-panel__toolbar-spacer {
@@ -218,13 +245,37 @@
 // ── List mode toggle (Overview / Detail icons in toolbar) ─────────────────────
 
 .execution-log-panel__list-mode-toggle {
+  display: inline-flex;
+  align-items: center;
   margin-left: 8px;
+  background: $o-gray-300;
+  border-radius: 6px;
+  padding: 2px;
 }
 
 .execution-log-panel__mode-btn {
-  width: 26px;
-  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
   font-size: 0.78rem;
+  border: none;
+  background: transparent;
+  color: $o-gray-600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: $o-main-text-color;
+  }
+
+  &.active, &.is-active {
+    background: $o-view-background-color;
+    color: $o-action;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
 }
 
 // ── Detail 3-pane layout (list | data pane) ──────────────────────────────────
@@ -387,14 +438,38 @@
 // I/O toggle pill (reused in detail pane header)
 
 .execution-log-panel__io-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: $o-gray-300;
+  border-radius: 6px;
+  padding: 2px;
   flex-shrink: 0;
 }
 
 .execution-log-panel__io-btn {
-  padding: 2px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
   font-size: 0.74rem;
   line-height: 1.5;
   white-space: nowrap;
+  border: none;
+  background: transparent;
+  color: $o-gray-600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: $o-main-text-color;
+  }
+
+  &.active, &.is-active {
+    background: $o-view-background-color;
+    color: $o-action;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
 }
 
 .execution-log-panel__data-empty {
