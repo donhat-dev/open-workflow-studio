@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_x2many_search_widget" model="ir.ui.view">
+        <field name="name">sale.order.form.x2many.search.widget</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='order_lines']/field[@name='order_line']" position="before">
+                <widget
+                    name="x2many_search_widget"
+                    target_field="order_line"
+                    search_fields="name,product_id"
+                    placeholder="Search order lines..."
+                    debounce_ms="250"
+                    min_chars="1"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>
