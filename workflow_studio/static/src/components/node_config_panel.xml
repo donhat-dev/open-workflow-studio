@@ -39,9 +39,16 @@
 				<div class="node-config-content d-flex" t-att-class="{ 'execution-view-mode': isExecutionView }">
 					<!-- LEFT COLUMN: Ancestor Node Outputs (Input) -->
 					<div class="node-config-col-input d-flex flex-column">
-						<div class="col-panel-header d-flex align-items-center gap-2 text-uppercase small fw-semibold">
-							<i class="fa fa-database"/>
-							<span>INPUT</span>
+						<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
+							<div class="d-flex align-items-center gap-2">
+								<i class="fa fa-database"/>
+								<span>INPUT</span>
+							</div>
+							<t t-if="versionOptions.length > 0">
+								<span class="output-item-count">
+									Run <t t-esc="activeVersionIndex + 1"/> of <t t-esc="activeSocketEvents.length"/>
+								</span>
+							</t>
 						</div>
 						<div class="col-panel-content">
 							<!-- Show predecessor nodes with their outputs -->
@@ -93,15 +100,7 @@
 					</div>
 					<!-- CENTER COLUMN: Node Configuration -->
 					<div class="node-config-col-config d-flex flex-column" t-att-class="{ 'readonly-config': isExecutionView }">
-						<!-- Tabs (Parameters | Settings only — Output moved to right column) -->
-						<div class="node-config-tabs d-flex">
-							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'parameters' }" t-on-click="() => this.onTabClick('parameters')" type="button">
-								<i class="fa fa-sliders"/> Parameters
-							</button>
-							<button class="node-config-tab d-flex align-items-center justify-content-center gap-1" t-att-class="{ active: state.activeTab === 'settings' }" t-on-click="() => this.onTabClick('settings')" type="button">
-								<i class="fa fa-cog"/> Settings
-							</button>
-						</div>
+						<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
 						<!-- Tab Content -->
 						<div class="tab-content p-3">
 							<!-- Parameters Tab -->
@@ -134,6 +133,7 @@
 								</div>
 							</t>
 						</div>
+						</TabNav>
 					</div>
 					<!-- RIGHT COLUMN: Output (always visible) -->
 					<div class="node-config-col-output d-flex flex-column">
@@ -142,10 +142,32 @@
 								<i class="fa fa-terminal"/>
 								<span>OUTPUT</span>
 							</div>
-							<t t-if="executionDisplayResult">
-								<span class="output-item-count" t-if="outputItemCount !== null">
-									<t t-esc="outputItemCount"/> item<t t-if="outputItemCount !== 1">s</t>
-								</span>
+							<div class="d-flex align-items-center gap-2">
+								<!-- Version selector dropdown (when multiple executions for active socket) -->
+								<t t-if="versionOptions.length > 0">
+									<select class="output-version-select form-select form-select-sm" t-on-change="onVersionChange">
+										<t t-foreach="versionOptions" t-as="opt" t-key="opt.index">
+											<option t-att-value="opt.index" t-att-selected="opt.index === activeVersionIndex">
+												Run <t t-esc="opt.label"/>
+											</option>
+										</t>
+									</select>
+								</t>
+								<t t-if="executionDisplayResult">
+									<span class="output-item-count" t-if="outputItemCount !== null">
+										<t t-esc="outputItemCount"/> item<t t-if="outputItemCount !== 1">s</t>
+									</span>
+								</t>
+							</div>
+						</div>
+						<!-- Socket tabs (when node has multiple output sockets) -->
+						<div t-if="outputSocketTabs.length > 0" class="output-socket-tabs d-flex border-bottom">
+							<t t-foreach="outputSocketTabs" t-as="tab" t-key="tab.id">
+								<button type="button" class="output-socket-tab btn btn-sm btn-link text-decoration-none px-3 py-1 rounded-0 border-0"
+									t-att-class="{ 'active fw-semibold border-bottom border-primary': tab.id === activeOutputSocket }"
+									t-on-click="() => this.onOutputSocketClick(tab.id)">
+									<t t-esc="tab.label"/>
+								</button>
 							</t>
 						</div>
 						<div class="col-panel-content">

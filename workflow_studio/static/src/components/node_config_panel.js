@@ -3,6 +3,7 @@
 import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo/owl";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
+import { TabNav } from "./primitives/tab_nav/tab_nav";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 import {
@@ -30,7 +31,7 @@ function normalizeControlValue(control, value) {
  */
 export class NodeConfigPanel extends Component {
     static template = "workflow_studio.node_config_panel";
-    static components = { ControlRenderer, JsonTreeNode };
+    static components = { ControlRenderer, JsonTreeNode, TabNav };
 
     static props = {
         node: { type: Object },  // Required: node data object (plain, no _node)
@@ -74,6 +75,9 @@ export class NodeConfigPanel extends Component {
             // Lazy-loaded record ref details cache.
             // Key format: `${model}:${id}`
             recordRefCache: {},
+            // Version/socket selection for output display
+            selectedOutputSocket: null,  // null = first available socket
+            selectedExecutionVersion: null,  // null = latest version
         });
 
         this.panelRef = useRef("panel");
@@ -92,6 +96,8 @@ export class NodeConfigPanel extends Component {
                 this.state.controlModes = {};
                 this.state.pairModes = {};
                 this.state.recordRefCache = {};
+                this.state.selectedOutputSocket = null;
+                this.state.selectedExecutionVersion = null;
                 this.initControlValues(nextProps.node);
             }
         });
@@ -378,24 +384,147 @@ export class NodeConfigPanel extends Component {
         return JSON.stringify(runResult.output_data, null, 2);
     }
 
-    get executionNodeResult() {
+    /**
+     * All execution events for the current node (preserves iterations).
+     * Uses executionEvents (non-deduplicated) when available, falls back to nodeResults.
+     */
+    get nodeExecutionEvents() {
         const execution = this.props.execution;
-        if (!execution || !Array.isArray(execution.nodeResults)) {
-            return null;
-        }
-        for (let i = execution.nodeResults.length - 1; i >= 0; i--) {
-            const result = execution.nodeResults[i];
-            if (result && result.node_id === this.props.node.id) {
-                return result;
+        if (!execution) return [];
+        const nodeId = this.props.node.id;
+        const events = Array.isArray(execution.executionEvents) && execution.executionEvents.length
+            ? execution.executionEvents
+            : execution.nodeResults;
+        if (!Array.isArray(events)) return [];
+        return events.filter(e => e && e.node_id === nodeId);
+    }
+
+    /**
+     * Group execution events by output_socket.
+     * Returns Map<socketKey, Array<event>>.
+     * Events without output_socket are grouped under '_default'.
+     */
+    get outputSocketGroups() {
+        const events = this.nodeExecutionEvents;
+        const groups = new Map();
+        for (const event of events) {
+            const key = event.output_socket || '_default';
+            if (!groups.has(key)) {
+                groups.set(key, []);
             }
+            groups.get(key).push(event);
         }
-        return null;
+        return groups;
+    }
+
+    /**
+     * Tab definitions for output socket selection.
+     * Only shown when node has multiple output sockets in execution results.
+     */
+    get outputSocketTabs() {
+        const groups = this.outputSocketGroups;
+        if (groups.size <= 1 && groups.has('_default')) return [];
+        const nodeOutputs = this.props.node.outputs || {};
+        const tabs = [];
+        for (const [socketKey, events] of groups) {
+            const socketDef = socketKey !== '_default' ? nodeOutputs[socketKey] : null;
+            const label = socketDef
+                ? (socketDef.label || socketKey)
+                : (socketKey === '_default' ? 'Output' : socketKey);
+            tabs.push({
+                id: socketKey,
+                label: `${label} (${events.length})`,
+                rawLabel: label,
+                count: events.length,
+            });
+        }
+        return tabs;
+    }
+
+    /**
+     * Currently active output socket key.
+     * Defaults to first available socket from execution events.
+     */
+    get activeOutputSocket() {
+        const tabs = this.outputSocketTabs;
+        if (!tabs.length) return '_default';
+        if (this.state.selectedOutputSocket) {
+            const exists = tabs.some(t => t.id === this.state.selectedOutputSocket);
+            if (exists) return this.state.selectedOutputSocket;
+        }
+        return tabs[0].id;
+    }
+
+    /**
+     * Events filtered by the active output socket.
+     */
+    get activeSocketEvents() {
+        const groups = this.outputSocketGroups;
+        const key = this.activeOutputSocket;
+        return groups.get(key) || [];
+    }
+
+    /**
+     * Version dropdown options for the active socket.
+     * Each entry: { index, label, event }.
+     */
+    get versionOptions() {
+        const events = this.activeSocketEvents;
+        if (events.length <= 1) return [];
+        return events.map((event, idx) => ({
+            index: idx,
+            label: `${idx + 1} of ${events.length}`,
+            event,
+        }));
+    }
+
+    /**
+     * Currently selected version index within the active socket.
+     * Defaults to last (latest) version.
+     */
+    get activeVersionIndex() {
+        const events = this.activeSocketEvents;
+        if (!events.length) return -1;
+        const selected = this.state.selectedExecutionVersion;
+        if (selected !== null && selected >= 0 && selected < events.length) {
+            return selected;
+        }
+        return events.length - 1;
+    }
+
+    /**
+     * The selected execution event based on socket + version selection.
+     */
+    get selectedExecutionEvent() {
+        const events = this.activeSocketEvents;
+        const idx = this.activeVersionIndex;
+        if (idx < 0 || idx >= events.length) return null;
+        return events[idx];
+    }
+
+    get executionNodeResult() {
+        return this.selectedExecutionEvent;
+    }
+
+    onOutputSocketClick(socketKey) {
+        this.state.selectedOutputSocket = socketKey;
+        this.state.selectedExecutionVersion = null;
+    }
+
+    onVersionChange(ev) {
+        const value = parseInt(ev.target.value, 10);
+        this.state.selectedExecutionVersion = isNaN(value) ? null : value;
     }
 
     /**
      * Get aggregated context from predecessor nodes only.
      * Shows data from nodes that executed BEFORE the current node (not the current node or successors).
-     * Matches backend behavior: when opening n_2, show n_1's output; when opening n_1, show n_2's output (not n_3).
+     *
+     * For the immediate input node: uses the CURRENT node's own input_data from
+     * the selected execution event. This ensures loop-cycle children see the
+     * data they actually received (e.g., loop-socket batch) instead of the
+     * loop node's final done-branch output.
+     *
      * Returns array with isInputNode marker for expression prefix handling.
      */
     get leftPanelData() {
@@ -411,15 +540,29 @@ export class NodeConfigPanel extends Component {
 
             if (predecessorResults.length === 0) return null;
 
-            return predecessorResults.map((result, index) => ({
-                nodeId: String(result.node_id),
-                rowKey: String(result.node_id),
-                data: {
-                    json: result.output_data,
-                    title: result.title || result.node_label || result.node_type || result.node_id,
-                },
-                isInputNode: index === predecessorResults.length - 1,
-            }));
+            // Try to get THIS node's input_data from the selected execution event.
+            // This reflects what the node actually received, resolving loop-cycle
+            // ambiguity where predecessor's last output_data may be "done" branch
+            // data while the child only received "loop" branch data.
+            const selectedEvent = this.selectedExecutionEvent;
+            const nodeInputData = selectedEvent && selectedEvent.input_data !== undefined
+                ? selectedEvent.input_data
+                : null;
+
+            return predecessorResults.map((result, index) => {
+                const isInput = index === predecessorResults.length - 1;
+                return {
+                    nodeId: String(result.node_id),
+                    rowKey: String(result.node_id),
+                    data: {
+                        json: isInput && nodeInputData !== null
+                            ? nodeInputData
+                            : result.output_data,
+                        title: result.title || result.node_label || result.node_type || result.node_id,
+                    },
+                    isInputNode: isInput,
+                };
+            });
 
         }
 
@@ -523,9 +666,15 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
-     * Get input data for expression preview (immediate previous node)
+     * Get input data for expression preview (immediate previous node).
+     * Prefers the selected execution event's input_data for accuracy
+     * (resolves loop-cycle "future data" issue).
      */
     get inputData() {
+        const selectedEvent = this.selectedExecutionEvent;
+        if (selectedEvent && selectedEvent.input_data !== undefined) {
+            return selectedEvent.input_data;
+        }
         const execution = this.props.execution;
         if (execution && this.actions.getExpressionContext) {
             const context = this.actions.getExpressionContext({
@@ -564,11 +713,19 @@ export class NodeConfigPanel extends Component {
             if (!this.actions.getExpressionContext) {
                 throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
             }
-            return this.actions.getExpressionContext({
+            const baseCtx = this.actions.getExpressionContext({
                 execution,
                 nodeId: this.props.node.id,
                 nodeResults: execution.nodeResults,
             });
+            // Override _json with the selected event's input_data for accuracy
+            // (critical for loop-cycle children that should see loop-branch data)
+            const selectedEvent = this.selectedExecutionEvent;
+            if (selectedEvent && selectedEvent.input_data !== undefined && baseCtx) {
+                baseCtx._json = selectedEvent.input_data;
+                baseCtx._input = this._buildInputContextFromValue(selectedEvent.input_data);
+            }
+            return baseCtx;
         }
 
         if (!this.actions.getExpressionContext) {
@@ -800,6 +957,25 @@ export class NodeConfigPanel extends Component {
     }
 
     /**
+     * Build _input context from a value (used for expression preview override).
+     * @private
+     */
+    _buildInputContextFromValue(value) {
+        const items = Array.isArray(value) ? value
+            : (value === null || value === undefined) ? []
+            : [value];
+        const inputContext = {
+            item: items.length ? items[0] : value,
+            json: value,
+            items,
+        };
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            return { ...value, ...inputContext };
+        }
+        return inputContext;
+    }
+
+    /**
      * Execute workflow up to this node
      *
      * Phase 3 Flow (Refactored via workflowRunService):
@@ -880,6 +1056,13 @@ export class NodeConfigPanel extends Component {
 
     onTabClick(tabName) {
         this.state.activeTab = tabName;
+    }
+
+    get tabDefs() {
+        return [
+            { id: 'parameters', label: 'Parameters', icon: 'fa-sliders' },
+            { id: 'settings',   label: 'Settings',   icon: 'fa-cog'     },
+        ];
     }
 
     /**

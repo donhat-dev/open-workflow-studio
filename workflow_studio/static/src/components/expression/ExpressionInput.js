@@ -9,6 +9,7 @@ import {
     ensureExpressionPrefix,
     inferExpressionModeFromValue,
     stripExpressionPrefix,
+    isExpressionValue,
 } from "@workflow_studio/utils/expression_utils";
 import {
     buildContextExpressionSuggestions,
@@ -49,14 +50,6 @@ export class ExpressionInput extends Component {
         expressionSuggestions: { type: Array, optional: true },
     };
 
-    static defaultProps = {
-        mode: "fixed",
-        toggleMode: "top",
-        readonly: false,
-        context: {},
-        multiline: true,
-    };
-
     setup() {
         const initialStoredValue = typeof this.props.value === "string" ? this.props.value : "";
         const initialMode = this._normalizeMode(this.props.mode)
@@ -74,6 +67,7 @@ export class ExpressionInput extends Component {
             localValue: initialValue,
             // Fallback mode when parent does not control mode explicitly
             localMode: initialMode,
+            mode: initialMode, // "fixed" | "expression"
         });
 
         // Option 2: sync localValue when parent updates props (avoid stale state if component is reused)

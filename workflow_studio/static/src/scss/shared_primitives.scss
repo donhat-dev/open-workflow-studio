@@ -1,0 +1,57 @@
+// =============================================================================
+// shared_primitives.scss — Reusable visual contracts for workflow_studio
+// Load order: after bootstrap_overridden.scss, before component SCSS.
+//
+// Rules:
+//   - Class prefix: .wf-<component>-<element>
+//   - Token prefix: $wf-<component>-<property>
+//   - No workflow-specific props (node ids, execution data) in these rules.
+//   - Scoped overrides live in the consuming component's own SCSS file.
+// =============================================================================
+
+
+// =============================================================================
+// Tab Nav  (.wf-tab-nav / .wf-tab-btn)
+// -----------------------------------------------------------------------------
+// Tokens — override in component SCSS via scoped selector if needed.
+$wf-tab-border:          $wf-border-base   !default;
+$wf-tab-bg:              $wf-surface-base  !default;
+$wf-tab-text:            $wf-text-muted    !default;
+$wf-tab-text-hover:      $wf-text-base     !default;
+$wf-tab-text-active:     $wf-action-color  !default;
+$wf-tab-indicator-color: $wf-action-color  !default;
+
+// Tab strip wrapper — flex container of tab buttons.
+// Use as direct parent of .wf-tab-btn elements.
+.wf-tab-nav {
+    border-bottom: 1px solid $wf-tab-border;
+    background: $wf-tab-bg;
+    flex-shrink: 0; // keep strip fixed height inside flex column layouts
+}
+
+// Individual tab button.
+// Add Bootstrap helpers (.d-flex .align-items-center .gap-1) for icon+label.
+.wf-tab-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: $wf-tab-text;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease;
+
+    &:hover { color: $wf-tab-text-hover; }
+
+    &.active {
+        color: $wf-tab-text-active;
+        border-bottom-color: $wf-tab-indicator-color;
+    }
+
+    i {
+        font-size: 12px;
+        opacity: 0.75;
+    }
+}

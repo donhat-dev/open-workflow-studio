@@ -251,7 +251,7 @@ export function generateNodeSelectorExpressionPath(nodeId, pathParts) {
  * @returns {string} - e.g., {{ _json.email }}
  */
 export function wrapExpression(expression) {
-    return `{{ ${expression} }}`;
+    return `={{ ${expression} }}`;
 }
 
 /**
