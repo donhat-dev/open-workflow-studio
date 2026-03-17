@@ -405,46 +405,4 @@ export class WorkflowAdapter {
     fromJSON(data) {
         this.editor.fromJSON(data);
     }
-
-    /**
-     * Load from legacy format (current localStorage format)
-     */
-    fromLegacyFormat(data) {
-        this.clear();
-
-        // Convert legacy nodes to new format
-        (data.nodes || []).forEach(legacyNode => {
-            const nodeId = this.addNode(legacyNode.type, {
-                x: legacyNode.x,
-                y: legacyNode.y,
-            });
-            if (nodeId) {
-                // Override auto-generated ID with legacy ID
-                const coreNode = this._getCoreNode(nodeId);
-                if (coreNode) {
-                    this.editor.nodes.delete(nodeId);
-                    coreNode.id = legacyNode.id;
-                    this.editor.nodes.set(legacyNode.id, coreNode);
-                }
-            }
-        });
-
-        // Restore connections
-        (data.connections || []).forEach(conn => {
-            this.editor.addConnection(
-                conn.source,
-                conn.sourceHandle,
-                conn.target,
-                conn.targetHandle
-            );
-        });
-
-        // Update ID counter
-        const maxId = Math.max(
-            ...Array.from(this.editor.nodes.keys())
-                .map(id => parseInt(id.replace(/\D/g, ''), 10) || 0),
-            0
-        );
-        this.editor._idCounter = maxId;
-    }
 }

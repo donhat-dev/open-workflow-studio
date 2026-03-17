@@ -465,7 +465,7 @@ export class CodeEditor extends Component {
             scrollBeyondLastLine: false,
             automaticLayout: true,
             fontSize: 13,
-            fontFamily: "'Fira Code', 'Consolas', 'Monaco', monospace",
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace",
             tabSize: 2,
             wordWrap: "on",
             readOnly: this.props.readonly,

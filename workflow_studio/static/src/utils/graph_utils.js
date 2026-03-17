@@ -16,7 +16,7 @@ function getConnectionKey(connection) {
         String(connection.sourceHandle || connection.sourceSocket || ""),
         String(connection.target),
         String(connection.targetHandle || connection.targetSocket || ""),
-    ].join("→");
+    ].join("=>");
 }
 
 function buildForwardAdjacency(connections) {

@@ -334,23 +334,16 @@ class WorkflowType(models.Model):
         """
         types = self.search([('active', '=', True)])
 
-        def _merge_http_suggestion_defaults(config_schema):
-            schema = config_schema if isinstance(config_schema, dict) else {}
-            if not schema:
-                return schema
-
-            merged = dict(schema)
-            for control_key, default_meta in self._HTTP_CONFIG_SUGGESTION_DEFAULTS.items():
-                control = merged.get(control_key)
-                if not isinstance(control, dict):
-                    continue
-                control_merged = dict(control)
-                for meta_key, meta_value in default_meta.items():
-                    if meta_key in control_merged:
-                        continue
-                    control_merged[meta_key] = copy.deepcopy(meta_value)
-                merged[control_key] = control_merged
-            return merged
+        def _normalize_schema(raw_schema):
+            if isinstance(raw_schema, dict):
+                return raw_schema
+            if isinstance(raw_schema, str):
+                try:
+                    parsed = json.loads(raw_schema)
+                except (json.JSONDecodeError, TypeError):
+                    return {}
+                return parsed if isinstance(parsed, dict) else {}
+            return {}
 
         return [{
             'id': t.id,
@@ -361,9 +354,7 @@ class WorkflowType(models.Model):
             'icon': t.icon or '',
             'color': t.color or '',
             'is_custom': bool(t.is_custom),
-            'config_schema': _merge_http_suggestion_defaults(t.config_schema)
-            if t.node_type == 'http'
-            else (t.config_schema or {}),
-            'input_schema': t.input_schema or {},
-            'output_schema': t.output_schema or {},
+            'config_schema': _normalize_schema(t.config_schema),
+            'input_schema': _normalize_schema(t.input_schema),
+            'output_schema': _normalize_schema(t.output_schema),
         } for t in types]

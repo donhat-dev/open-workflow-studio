@@ -244,7 +244,10 @@ export class EditorCanvas extends Component {
         });
 
         // Resize observer to update viewport on window resize
-        this._resizeObserver = new ResizeObserver(() => this.viewportHook.updateViewRect());
+        this._resizeObserver = new ResizeObserver(() => {
+            this.viewportHook.updateViewRect();
+            this._dismissConnectionToolbar();
+        });
         onMounted(() => {
             if (this.rootRef.el) {
                 this._resizeObserver.observe(this.rootRef.el);
@@ -652,6 +655,32 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Active toolbar connection: hover takes priority, then single selected connection.
+     * Recomputes screen position from canvas midpoint on every access so that
+     * zoom/pan/resize automatically updates the toolbar position.
+     */
+    get toolbarConnection() {
+        const hovered = this.hoveredConnection;
+        if (hovered.id) return hovered;
+
+        // Show toolbar for a single selected connection
+        const selectedIds = this.selectedConnectionIds;
+        if (selectedIds.length !== 1) return { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null };
+
+        const connId = selectedIds[0];
+        const conn = this.renderedConnections.find(c => c.id === connId);
+        if (!conn) return { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null };
+
+        const midpoint = this.getConnectionMidpoint(conn);
+        const screenPos = this.getScreenPosition(midpoint.x, midpoint.y);
+        return {
+            id: connId,
+            midpoint: screenPos,
+            canvasMidpoint: midpoint,
+        };
+    }
+
+    /**
      * Get callback props for NodeMenu
      * @returns {Object} { onNodeSelected, onClose }
      */
@@ -681,7 +710,7 @@ export class EditorCanvas extends Component {
                     this.multiNodeDrag.onNodeDragStart({ nodeId, event });
                 },
                 onExecute: (nodeId) => {
-                    this.editor.actions.openPanel("config", { nodeId });
+                    this.onNodeOpenConfig(nodeId);
                 },
                 onSocketMouseDown: (data) => {
                     this.connectionDrawing.onSocketMouseDown(data);
@@ -691,6 +720,18 @@ export class EditorCanvas extends Component {
                 },
                 onSocketQuickAdd: (data) => {
                     this.onSocketQuickAdd(data);
+                },
+                onDelete: (nodeId) => {
+                    this.onNodeDelete(nodeId);
+                },
+                onToggleDisable: (nodeId) => {
+                    this.onNodeToggleDisable(nodeId);
+                },
+                onOpenConfig: (nodeId) => {
+                    this.onNodeOpenConfig(nodeId);
+                },
+                onNodeDoubleClick: (nodeId) => {
+                    this.onNodeDoubleClick(nodeId);
                 },
             };
         }
@@ -716,6 +757,10 @@ export class EditorCanvas extends Component {
             props.onSocketMouseDown = this._nodeActionCallbacksCache.onSocketMouseDown;
             props.onSocketMouseUp = this._nodeActionCallbacksCache.onSocketMouseUp;
             props.onSocketQuickAdd = this._nodeActionCallbacksCache.onSocketQuickAdd;
+            props.onDelete = this._nodeActionCallbacksCache.onDelete;
+            props.onToggleDisable = this._nodeActionCallbacksCache.onToggleDisable;
+            props.onOpenConfig = this._nodeActionCallbacksCache.onOpenConfig;
+            props.onNodeDoubleClick = this._nodeActionCallbacksCache.onNodeDoubleClick;
         }
 
         return props;
@@ -886,6 +931,8 @@ export class EditorCanvas extends Component {
      */
     onWheel(ev) {
         this.viewportHook.onWheel(ev);
+        // Hide connection toolbar immediately — position would be stale after zoom
+        this._dismissConnectionToolbar();
     }
 
     /**
@@ -1287,6 +1334,16 @@ export class EditorCanvas extends Component {
         // Connection selection is cleared by select() action via service
     }
 
+    onNodeOpenConfig(nodeId) {
+        if (this.isReadonly) return;
+        if (!this.canEdit) return;
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        
+        // Open config panel via service
+        this.editor.actions.openPanel("config", { nodeId });
+    }
+
     onNodeExecute(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
@@ -1300,11 +1357,27 @@ export class EditorCanvas extends Component {
     onNodeDelete(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
+
+        // Capture connections before removal for auto-reconnect (A→B, B→C → A→C)
+        const incoming = this.connections.filter(c => c.target === nodeId);
+        const outgoing = this.connections.filter(c => c.source === nodeId);
+
         this.editor.actions.removeNode(nodeId);
+
         // Deselect if it was the only one or among selected
         const current = this.editorUiState.selection.nodeIds;
         if (current.includes(nodeId)) {
             this.editor.actions.select(current.filter(id => id !== nodeId));
+        }
+
+        // Auto-reconnect: bridge each incoming→outgoing pair
+        for (const inc of incoming) {
+            for (const out of outgoing) {
+                if (inc.source === out.target) continue; // skip self-loops
+                this.editor.actions.addConnection(
+                    inc.source, inc.sourceHandle, out.target, out.targetHandle
+                );
+            }
         }
     }
 
@@ -1381,6 +1454,8 @@ export class EditorCanvas extends Component {
      * @param {MouseEvent} ev
      */
     onCanvasMouseDown(ev) {
+        // Hide connection toolbar immediately when starting pan/selection
+        this._dismissConnectionToolbar();
         this.gestures.onCanvasMouseDown(ev);
     }
 
@@ -1524,6 +1599,21 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Immediately dismiss connection toolbar (zoom / pan / resize invalidates position)
+     */
+    _dismissConnectionToolbar() {
+        if (this._connectionHoverTimeout) {
+            clearTimeout(this._connectionHoverTimeout);
+            this._connectionHoverTimeout = null;
+        }
+        this._isHoveringConnection = false;
+        this._isHoveringToolbar = false;
+        if (this.editor && this.hoveredConnection.id) {
+            this.editor.actions.setHoveredConnection();
+        }
+    }
+
+    /**
      * Handle connection hover end - schedule potential hide
      * Toolbar persists while user is in hover zone
      */
@@ -1590,9 +1680,9 @@ export class EditorCanvas extends Component {
      */
     onConnectionAddNode(connectionId, position) {
         if (!this.canEdit) return;
-        // position here is the screen-relative midpoint from state.ui.hoveredConnection.midpoint
+        // position here is the screen-relative midpoint from toolbarConnection
         // We use the stored canvasMidpoint for the actual node placement
-        let canvasPos = this.hoveredConnection.canvasMidpoint;
+        let canvasPos = this.toolbarConnection.canvasMidpoint;
         if (!canvasPos) {
             const rect = this.rootRef.el.getBoundingClientRect();
             canvasPos = this.viewportHook.getCanvasPosition({
@@ -1678,6 +1768,13 @@ export class EditorCanvas extends Component {
      * Calculate connection midpoint for toolbar positioning
      */
     getConnectionMidpoint(conn) {
+        // For multi-path connections (backedge, vertical stack), the join point
+        // is precomputed by getConnectionPath and stored on the conn object.
+        if (conn.midpoint) {
+            return conn.midpoint;
+        }
+
+        // Forward bezier: simple socket average is visually close enough.
         const sourceNode = this.nodes.find(n => n.id === conn.source);
         const targetNode = this.nodes.find(n => n.id === conn.target);
         if (!sourceNode || !targetNode) return { x: 0, y: 0 };
@@ -1767,7 +1864,7 @@ export class EditorCanvas extends Component {
      */
     onNodeDoubleClick = (nodeId) => {
         if (!this.canEdit && !this.isInExecutionView) return;
-        this.editor.actions.openPanel("config", { nodeId });
+        this.onNodeOpenConfig
     };
 
     /**

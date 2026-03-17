@@ -49,23 +49,29 @@
 				<!-- SVG Connection Layer -->
 				<svg class="workflow-connections" t-ref="svgConnections">
 					<defs>
-						<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
-							<polygon points="0 0, 10 3.5, 0 7" fill="currentColor"/>
+						<!-- Arrowhead for stable connections (inherits color via currentColor) -->
+						<marker id="wf-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+							<polygon points="0 0, 8 3, 0 6" fill="currentColor"/>
+						</marker>
+						<!-- Arrowhead for in-progress drawing connection -->
+						<marker id="wf-arrow-temp" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+							<polygon points="0 0, 8 3, 0 6" fill="currentColor"/>
 						</marker>
 					</defs>
 					<!-- Render connection paths -->
 					<t t-foreach="renderedConnections" t-as="conn" t-key="conn.id">
-						<g class="workflow-connection-group" t-att-class="{ 'selected': selectedConnectionIds.includes(conn.id), 'vertical-stack': conn.isVerticalStack }" t-on-click.stop="() => this.onConnectionSelect(conn.id)" t-on-mouseenter="(ev) => this.handleConnectionEnter(ev, conn)" t-on-mouseleave="onConnectionMouseLeave">
+						<g class="workflow-connection-group"
+						t-att-class="{ 'selected': selectedConnectionIds.includes(conn.id), 'hovered': toolbarConnection.id === conn.id, 'vertical-stack': conn.isVerticalStack }" t-on-click.stop="() => this.onConnectionSelect(conn.id)" t-on-mouseenter="(ev) => this.handleConnectionEnter(ev, conn)" t-on-mouseleave="onConnectionMouseLeave">
 							<t t-foreach="conn.paths" t-as="pathD" t-key="conn.id + '_' + pathD_index">
 								<!-- Thicker invisible path for easier clicking -->
 								<path t-att-d="pathD" class="workflow-connection-hitarea" stroke="transparent" stroke-width="12" fill="none" />
-								<!-- Visible path (arrow only on last segment) -->
-										<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" t-att-marker-end="pathD_last ? 'url(#arrowhead)' : undefined"/>
+								<!-- Visible path (arrowhead only on last segment) -->
+								<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" t-att-marker-end="'url(#wf-arrow)'"/>
 							</t>
 						</g>
 					</t>
 					<!-- Temp connection line while drawing -->
-					<path t-if="isDrawingConnection" t-att-d="tempConnectionPath" class="workflow-connection workflow-connection--temp" stroke-width="2" fill="none"/>
+					<path t-if="isDrawingConnection" t-att-d="tempConnectionPath" class="workflow-connection workflow-connection--temp" stroke-width="2" fill="none" marker-end="url(#wf-arrow-temp)"/>
 				</svg>
 				<div class="workflow-editor-canvas__hint small text-muted text-center" t-if="nodes.length === 0">
 					Drop nodes here (or click in the palette)
@@ -78,7 +84,7 @@
 			<!-- Fixed-size overlays (positioned relative to canvas root, NOT affected by zoom/pan) -->
 			<div class="workflow-editor-canvas__overlays">
 				<!-- Connection Toolbar (on hover) -->
-				<ConnectionToolbar t-if="hoveredConnection.id" position="hoveredConnection.midpoint" connectionId="hoveredConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
+				<ConnectionToolbar t-if="toolbarConnection.id" position="toolbarConnection.midpoint" connectionId="toolbarConnection.id" zoom="viewport.zoom" onInsertNode="connectionToolbarProps.onInsertNode" onHoverChange="connectionToolbarProps.onHoverChange"/>
 				<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
 				<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 			</div>

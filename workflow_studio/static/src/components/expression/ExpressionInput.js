@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onWillUpdateProps, useRef } from "@odoo/owl";
 import {
     wrapExpression,
     evaluateExpression,
@@ -55,6 +55,9 @@ export class ExpressionInput extends Component {
         const initialMode = this._normalizeMode(this.props.mode)
             || this._inferModeFromValue(initialStoredValue);
         const initialValue = this._toDisplayValue(initialStoredValue, initialMode);
+
+        this.fieldRef = useRef("fieldRef");
+        this._dragEnterCount = 0;
 
         this.state = useState({
             isFocused: false,
@@ -268,6 +271,13 @@ export class ExpressionInput extends Component {
         return this.filteredSuggestions.length > 0;
     }
 
+    get suggestionsStyle() {
+        const el = this.fieldRef.el;
+        if (!el) return "";
+        const rect = el.getBoundingClientRect();
+        return `position: fixed; top: ${rect.bottom + 4}px; left: ${rect.left}px; width: ${rect.width}px; z-index: 10000;`;
+    }
+
     get previewResult() {
         if (!this.isExpression || !this.props.context) {
             return null;
@@ -388,12 +398,17 @@ export class ExpressionInput extends Component {
 
     onDragEnter(ev) {
         ev.preventDefault();
+        this._dragEnterCount++;
         this.state.isDragOver = true;
     }
 
     onDragLeave(ev) {
         ev.preventDefault();
-        this.state.isDragOver = false;
+        this._dragEnterCount--;
+        if (this._dragEnterCount <= 0) {
+            this._dragEnterCount = 0;
+            this.state.isDragOver = false;
+        }
     }
 
     onDragOver(ev) {
@@ -427,6 +442,7 @@ export class ExpressionInput extends Component {
 
     onDrop(ev) {
         ev.preventDefault();
+        this._dragEnterCount = 0;
         this.state.isDragOver = false;
 
         const dropPayload = this._getDropPayload(ev);

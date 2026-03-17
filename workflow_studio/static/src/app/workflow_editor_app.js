@@ -2,7 +2,7 @@
 import { Component, useState, onMounted, onWillUnmount, useSubEnv } from "@odoo/owl";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { AlertDialog, ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
-import { useEditor } from "@workflow_studio/store/use_editor";
+import { useEditor } from "@workflow_studio/store/hooks";
 import { EditorCanvas } from "@workflow_studio/components/editor_canvas";
 import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 import { View } from "@web/views/view";

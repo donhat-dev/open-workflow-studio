@@ -335,7 +335,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             'model': model._name,
             'count': len(records),
             'ids': records.ids,
-            'records': records.read(fields_list) if fields_list else records.read(['id', 'display_name']),
+            'records': records,
             'fields': fields_list,
             'limit': limit,
             'order': order or '',
@@ -350,7 +350,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             'model': model._name,
             'count': len(created),
             'ids': created.ids,
-            'records': created.read(['id', 'display_name']),
+            'records': created,
         }
 
     def _run_write(self, model, node_config, eval_context):

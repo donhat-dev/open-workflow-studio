@@ -52,14 +52,15 @@ export class FieldValuesControl extends Component {
             if (nextProps.resModel !== this.props.resModel) {
                 this._loadFields(nextProps.resModel);
             }
-            // Sync when parent resets value externally (e.g. on model change)
-            if (nextProps.value !== this.props.value) {
+            // Sync when parent resets value externally (e.g. on model change).
+            // Skip if the incoming value matches what we'd serialize — this is just
+            // the parent echoing back our own onChange, and re-parsing would create
+            // new row IDs that break t-key continuity (causing focus loss).
+            if (nextProps.value !== this.props.value && nextProps.value !== this._serialize()) {
                 const incoming = this._parseToRows(nextProps.value);
-                if (this._sig(incoming) !== this._sig(this.state.rows)) {
-                    this.state.rows = incoming;
-                    this.state.fieldModes = this._buildFieldModes(incoming);
-                    this.state.valueModes = this._buildValueModes(incoming);
-                }
+                this.state.rows = incoming;
+                this.state.fieldModes = this._buildFieldModes(incoming);
+                this.state.valueModes = this._buildValueModes(incoming);
             }
         });
     }
@@ -190,9 +191,7 @@ export class FieldValuesControl extends Component {
     }
 
     onFieldChange(index, fieldName) {
-        this.state.rows = this.state.rows.map((r, i) =>
-            i === index ? { ...r, field: fieldName } : r
-        );
+        this.state.rows[index].field = fieldName;
         this.props.onChange(this._serialize());
     }
 
@@ -222,9 +221,7 @@ export class FieldValuesControl extends Component {
     }
 
     onValueChange(index, val) {
-        this.state.rows = this.state.rows.map((r, i) =>
-            i === index ? { ...r, value: val } : r
-        );
+        this.state.rows[index].value = val;
         this.props.onChange(this._serialize());
     }
 

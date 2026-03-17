@@ -23,7 +23,7 @@
 				</div>
 			</div>
 			<!-- Input field -->
-			<div class="expression-input__field" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
+			<div class="expression-input__field" t-ref="fieldRef" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
 				<button
 					t-if="showSideToggle"
 					type="button"
@@ -57,7 +57,7 @@
 				
 				</div>
 				<!-- Suggestions -->
-				<div t-if="shouldShowSuggestions" class="expression-input__suggestions">
+				<div t-if="shouldShowSuggestions" class="expression-input__suggestions" t-att-style="suggestionsStyle">
 					<button type="button" t-foreach="filteredSuggestions" t-as="item" t-key="item.value" class="expression-input__suggestion-item" t-att-class="{ active: item_index === state.activeSuggestionIndex }" t-on-mousedown="(ev) => this.onSuggestionMouseDown(ev, item)">
 						<span class="suggestion-label" t-esc="item.label"/>
 						<span t-if="item.description" class="suggestion-description" t-esc="item.description"/>

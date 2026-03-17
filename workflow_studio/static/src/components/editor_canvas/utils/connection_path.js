@@ -38,17 +38,23 @@ export function getBackEdgePath(sourceX, sourceY, targetX, targetY) {
     const rightX = sourceX + CORNER_RADIUS;
     const leftX = targetX - CORNER_RADIUS;
     const bottomY = Math.max(sourceY, targetY) + EDGE_PADDING_BOTTOM;
+    const midBottomX = (rightX + leftX) / 2;
 
-    return `M ${sourceX} ${sourceY}
+    const path1 = `M ${sourceX} ${sourceY}
             L ${rightX} ${sourceY}
             Q ${rightX + CORNER_RADIUS} ${sourceY}, ${rightX + CORNER_RADIUS} ${sourceY + CORNER_RADIUS}
             L ${rightX + CORNER_RADIUS} ${bottomY - CORNER_RADIUS}
             Q ${rightX + CORNER_RADIUS} ${bottomY}, ${rightX} ${bottomY}
+            L ${midBottomX} ${bottomY}`;
+
+    const path2 = `M ${midBottomX} ${bottomY}
             L ${leftX} ${bottomY}
             Q ${leftX - CORNER_RADIUS} ${bottomY}, ${leftX - CORNER_RADIUS} ${bottomY - CORNER_RADIUS}
             L ${leftX - CORNER_RADIUS} ${targetY + CORNER_RADIUS}
             Q ${leftX - CORNER_RADIUS} ${targetY}, ${leftX} ${targetY}
             L ${targetX} ${targetY}`;
+
+    return { path1, path2, midpoint: { x: midBottomX, y: bottomY } };
 }
 
 /**
@@ -100,19 +106,24 @@ export function getConnectionPath(sourcePos, targetPos, connectionType) {
         const { path1, path2 } = getVerticalStackPath(
             sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
         );
-        return { paths: [path1, path2], isBackEdge: false, isVerticalStack: true };
+        const midX = (sourcePos.x + targetPos.x) / 2;
+        const midY = (sourcePos.y + targetPos.y) / 2;
+        return { paths: [path1, path2], isBackEdge: false, isVerticalStack: true, midpoint: { x: midX, y: midY } };
     }
 
     if (isBackEdge) {
-        const path = getBackEdgePath(
+        const { path1, path2, midpoint } = getBackEdgePath(
             sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
         );
-        return { paths: [path], isBackEdge: true, isVerticalStack: false };
+        return { paths: [path1, path2], isBackEdge: true, isVerticalStack: false, midpoint };
     }
 
     const path = getBezierPath(
         sourcePos.x, sourcePos.y, targetPos.x, targetPos.y
     );
+    // For a cubic bezier C(s, cp1, cp2, t), the midpoint at t=0.5 is
+    // a weighted average; but the simple average of source/target is close
+    // enough for toolbar positioning on forward edges.
     return { paths: [path], isBackEdge: false, isVerticalStack: false };
 }
 

@@ -37,7 +37,7 @@ export class Connection {
      * Generate unique connection ID from endpoints
      */
     static generateId(sourceId, sourceHandle, targetId, targetHandle) {
-        return `${sourceId}:${sourceHandle}→${targetId}:${targetHandle}`;
+        return `${sourceId}:${sourceHandle}=>${targetId}:${targetHandle}`;
     }
 
     /**

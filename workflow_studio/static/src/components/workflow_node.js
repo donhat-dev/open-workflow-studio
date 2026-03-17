@@ -32,6 +32,10 @@ export class WorkflowNode extends Component {
         onSocketMouseDown: { type: Function, optional: true },
         onSocketMouseUp: { type: Function, optional: true },
         onSocketQuickAdd: { type: Function, optional: true },
+        onDelete: { type: Function, optional: true },
+        onToggleDisable: { type: Function, optional: true },
+        onOpenConfig: { type: Function, optional: true },
+        onNodeDoubleClick: { type: Function, optional: true },
     };
 
     setup() {
@@ -77,8 +81,9 @@ export class WorkflowNode extends Component {
         this._onToolbarDelete = () => this.onDeleteNode();
         this._onToolbarToggleDisable = () => this.onToggleDisable();
         this._onToolbarOpenConfig = () => {
-            if (this.editor && this.editor.actions && this.editor.actions.openPanel) {
-                this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+            const onOpenConfig = this.props.onOpenConfig;
+            if (onOpenConfig) {
+                onOpenConfig(this.props.node.id);
             }
         };
     }
@@ -202,7 +207,10 @@ export class WorkflowNode extends Component {
         }
 
         ev.stopPropagation();
-        this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+        const onOpenConfig = this.props.onOpenConfig;
+        if (onOpenConfig) {
+            onOpenConfig(this.props.node.id);
+        }
     }
 
     /**
@@ -210,7 +218,10 @@ export class WorkflowNode extends Component {
      */
     onDeleteNode() {
         if (this.isReadonly) return;
-        this.editor.actions.removeNode(this.props.node.id);
+        const onDelete = this.props.onDelete;
+        if (onDelete) {
+            onDelete(this.props.node.id);
+        }
     }
 
     /**
@@ -230,7 +241,10 @@ export class WorkflowNode extends Component {
      */
     onToggleDisable() {
         if (this.isReadonly) return;
-        this.editor.actions.toggleDisable(this.props.node.id);
+        const onToggleDisable = this.props.onToggleDisable;
+        if (onToggleDisable) {
+            onToggleDisable(this.props.node.id);
+        }
     }
 
     get nodeIcon() {

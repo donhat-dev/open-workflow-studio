@@ -2,7 +2,7 @@
 import { _t } from "@web/core/l10n/translation";
 
 import { Component, xml } from "@odoo/owl";
-import { useEditor } from "@workflow_studio/store/use_editor";
+import { useEditor } from "@workflow_studio/store/hooks";
 import { LucideIcon } from "./common/lucide_icon";
 
 export class NodePaletteItem extends Component {

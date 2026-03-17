@@ -4,6 +4,7 @@ import json
 
 from odoo.tests import common, tagged
 
+from ..models.runners.record_operation_runner import RecordOperationNodeRunner
 from ..models.workflow_executor import WorkflowExecutor
 
 
@@ -82,3 +83,44 @@ class TestRecordOutputRefs(common.TransactionCase):
         self.assertTrue(isinstance(redacted['display_text'], str))
         parsed = json.loads(redacted['display_text'])
         self.assertIn(executor._RECORD_REFS_KEY, parsed['partner'])
+
+    def test_record_operation_search_records_normalize_to_marker(self):
+        executor = self._new_executor()
+        runner = RecordOperationNodeRunner(executor)
+
+        result = runner._run_search(
+            self.env['res.partner'],
+            {
+                'domain_expr': "[('id', '=', %d)]" % self.partner.id,
+                'fields_expr': "={{ ['id', 'display_name'] }}",
+                'limit': '1',
+            },
+            {},
+        )
+
+        normalized = executor._normalize_output_value(result)
+
+        self.assertEqual(normalized['count'], 1)
+        self.assertIn(executor._RECORD_REFS_KEY, normalized['records'])
+        self.assertEqual(
+            normalized['records'][executor._RECORD_REFS_KEY][0]['id'],
+            self.partner.id,
+        )
+
+    def test_record_operation_create_records_normalize_to_marker(self):
+        executor = self._new_executor()
+        runner = RecordOperationNodeRunner(executor)
+
+        result = runner._run_create(
+            self.env['res.partner'],
+            {
+                'vals_expr': '{"name": "Created From Record Ref Test"}',
+            },
+            {},
+        )
+
+        normalized = executor._normalize_output_value(result)
+
+        self.assertEqual(normalized['count'], 1)
+        self.assertIn(executor._RECORD_REFS_KEY, normalized['records'])
+        self.assertEqual(len(normalized['ids']), 1)
