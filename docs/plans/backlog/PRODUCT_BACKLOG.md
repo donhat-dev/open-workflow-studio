@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
-> **Version**: 1.2.0
-> **Last Updated**: 2026-03-05
+> **Version**: 1.3.0
+> **Last Updated**: 2026-03-18
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -13,50 +13,56 @@
 | **E1: Core Infrastructure**     | P0       | 34           | 95%     | Near Complete |
 | **E9: Variable System**         | P0       | 19           | 100%    | ✅ Done        |
 | **E2: Node Execution Engine**   | P0       | 55           | 68%     | In Progress   |
-| **E10: Python Runtime Engine**  | P0       | 40           | 65%     | In Progress   |
-| **E3: Node Library**            | P0       | 45           | 60%     | In Progress   |
-| **E4: UI/UX Editor**            | P1       | 48           | 86%     | In Progress   |
-| **E4.6: Editor State Refactor** | P1       | 32           | 70%     | 🔄 In Progress |
-| **E5: Expression System**       | P1       | 24           | 66%     | In Progress   |
+| **E10: Python Runtime Engine**  | P0       | 40           | 75%     | In Progress   |
+| **E3: Node Library**            | P0       | 45           | 68%     | In Progress   |
+| **E4: UI/UX Editor**            | P1       | 48           | 90%     | In Progress   |
+| **E4.6: Editor State Refactor** | P1       | 32           | 75%     | 🔄 In Progress |
+| **E5: Expression System**       | P1       | 24           | 75%     | In Progress   |
 | **E6: Persistence & Storage**   | P1       | 26           | 55%     | In Progress   |
-| **E7: Production Features**     | P2       | 34           | 28%     | In Progress   |
+| **E7: Production Features**     | P2       | 34           | 33%     | In Progress   |
 | **E8: Integrations**            | P2       | 40           | 0%      | Planned       |
-| **TOTAL**                       |          | **357**      | **65%** |               |
+| **TOTAL**                       |          | **357**      | **69%** |               |
 
 > Note (2026-01): E2 (JS StackExecutor) remains a *prototype track* for UX/learning.
 > The production direction is E10: backend-owned execution in Python with a hybrid/feature-flagged integration.
-> Update basis (2026-03-05): commit evidence from `2026-01-06..2026-03-05` on `workflow_pilot` + `workflow_studio` runtime/UI/backend paths.
+> Update basis (2026-03-18): commit evidence from `2026-01-06..2026-03-17` on `workflow_pilot` + `workflow_studio` runtime/UI/backend paths.
 
 ### Recent Commit Highlights
 
-- **2026-03-05** `99dd04b` — Added record/recordset UI expansion path (`RecordBadge`, JSON tree integration, backend resolve API/tests).
-- **2026-02-13** `70ad2f7` — Refactored key/value input UX pipeline, removing `InputAutoComplete` from key flows.
-- **2026-02-12** `46fba96` — Added Runs tab/history enhancements, HTTP suggestion metadata, and expanded backend/frontend runtime wiring.
-- **2026-02-11** `29f986f` — Performance optimization pass across executor/context/runtime + UI rendering improvements.
-- **2026-02-10** `9c81829` — Renamed module track to `workflow_studio`, consolidated runtime/editor architecture.
-- **2026-02-03** `2fdfc0e` — Zero-trust backend execution hardening (security proxies/runners/contracts).
-- **2026-01-29** `9f534f6` — Added `execute_until` backend path for preview execution.
-- **2026-01-28** `8a4bafc` — Introduced Phase 4 backend execution engine foundation.
+- **2026-03-17** `d7a4549` — Refactored editor canvas connection handling, node registry, graph utils, and adapter layer.
+- **2026-03-16** `636d3f2` — Enhanced Node Configuration Panel with output socket management, tab primitives, and vendor libs.
+- **2026-03-12** `28fff84` — Enhanced workflow execution logging, loop runner input/output semantics, and graph traversal guards.
+- **2026-03-11** `47b955e` — Enhanced execution log panel with input/output data display, detail view, and node auto-title.
+- **2026-03-11** `049f565` — Added execution log panel (new component) and SVG timeline component.
+- **2026-03-10** `ff7a220` — Refactored expression handling: strict `=` contract, SmartExpressionResolver, all runners migrated.
+- **2026-03-10** `e5c6bc9` — Introduced SCSS shared variable layer (`primary_variables`, `secondary_variables`, `bootstrap_overridden`).
+- **2026-03-10** `69a7b43` — Enhanced ExpressionInput with expression token highlighting and scroll-synced overlay.
+- **2026-03-09** `a63f7df` — Implemented Workflow Domain Builder and Tree Editor; unified expression resolver across all runners.
+- **2026-03-08** `8365f9b` — Added Record Operation node type (search/create/write/delete) with DomainControl and FieldValuesControl.
 
 ### Commit → Epic Mapping (Evidence Matrix)
 
 | Date | Commit | Primary Epics | Key Evidence (files) | Impact Summary |
 | --- | --- | --- | --- | --- |
-| 2026-03-05 | `99dd04b` | E4, E10 | `workflow_studio/static/src/components/data_panel/RecordBadge.*`, `workflow_studio/controllers/main.py`, `workflow_studio/tests/test_record_output_refs.py` | Record/recordset expand UX + backend resolve path + tests |
-| 2026-02-13 | `70ad2f7` | E4, E5 | `workflow_studio/static/src/components/control_renderer.*`, `workflow_studio/static/src/components/controls/*`, `workflow_studio/static/src/components/node_config_panel.*` | Key-value input UX refactor and expression-entry consistency |
-| 2026-02-12 | `46fba96` | E4, E5, E10 | `workflow_studio/static/src/components/workflow_history_panel/*`, `workflow_studio/static/src/utils/input_suggestion_utils.js`, `workflow_studio/models/runners/http_runner.py` | Runs/history UX + suggestion metadata + backend runner expansion |
-| 2026-02-11 | `29f986f` | E7, E10 | `workflow_studio/models/workflow_executor.py`, `workflow_studio/models/context_objects.py`, `workflow_studio/models/workflow_run.py` | Runtime and performance optimization across executor/context |
-| 2026-02-10 | `9c81829` | E4.6, E10 | `workflow_studio/static/src/store/workflow_store.js`, `workflow_studio/models/runners/*`, `workflow_studio/models/workflow_executor.py` | Consolidated architecture under `workflow_studio`, service/runtime maturation |
-| 2026-02-10 | `0ec4e46` | E2, E4, E10 | `workflow_pilot/models/workflow_executor.py`, `workflow_pilot/static/src/components/workflow_node.*`, `workflow_pilot/static/src/services/workflow_bus_service.js` | Execution tracking + UI feedback loop integration |
-| 2026-02-09 | `1a49fad` | E2, E4, E10 | `workflow_pilot/controllers/main.py`, `workflow_pilot/models/workflow_executor.py`, `workflow_pilot/static/src/store/workflow_store.js` | Execution visualization and contract propagation |
-| 2026-02-09 | `71a8b3c` | E5, E10 | `workflow_pilot/models/context_objects.py`, `workflow_pilot/models/runners/code_runner.py` | `_input` parity fix for code evaluation context |
-| 2026-02-07 | `887ea5d` | E4, E6 | `workflow_pilot/static/src/components/workflow_history_panel/*`, `workflow_pilot/static/src/components/node_config_panel.*` | History panel and node/panel UX refactor |
-| 2026-02-05 | `1841862` | E6 | `workflow_pilot/models/workflow_milestone.py`, `workflow_pilot/models/workflow_diff_utils.py`, `workflow_pilot/static/src/components/workflow_history_dialog/*` | Version history and milestone model introduction |
-| 2026-02-03 | `2fdfc0e` | E7, E10 | `workflow_pilot/models/security/*`, `workflow_pilot/models/workflow_executor.py`, `workflow_pilot/models/runners/*` | Zero-trust backend runtime hardening |
-| 2026-02-02 | `9b14d32` | E3, E10 | `workflow_pilot/models/runners/*`, `workflow_pilot/models/workflow_executor.py`, `workflow_pilot/data/workflow_type_data.xml` | Backend runner registry baseline and node execution wiring |
-| 2026-01-29 | `9f534f6` | E2, E10 | `workflow_pilot/controllers/main.py`, `workflow_pilot/models/ir_workflow.py`, `workflow_pilot/models/workflow_executor.py` | `execute_until` preview execution API |
-| 2026-01-28 | `e444c01` | E3, E5 | `workflow_pilot/data/workflow_type_data.xml`, `workflow_pilot/static/src/nodes/manual_trigger.js`, `workflow_pilot/static/src/utils/expression_utils.js` | Manual trigger and expression syntax expansion |
-| 2026-01-28 | `8a4bafc` | E10 | `workflow_pilot/models/workflow_executor.py`, `workflow_pilot/models/ir_workflow.py`, `workflow_pilot/controllers/main.py` | Phase 4 backend execution engine bootstrap |
+| 2026-03-17 | `d7a4549` | E4, E4.6, E10 | `editor_canvas.js`, `connection.js`, `adapter.js`, `graph_utils.js`, `node_type_registry.js`, `record_operation_runner.py` | Editor canvas/connection refactor + adapter/registry cleanup + runner fixes |
+| 2026-03-16 | `636d3f2` | E4, E4.6 | `node_config_panel.*`, `tab_nav/*`, `shared_primitives.scss`, `dagre.min.js`, `lucide.min.js` | Output socket tabs in config panel + tab primitives + vendor lib vendoring |
+| 2026-03-12 | `28fff84` | E3, E7, E10 | `loop_runner.py`, `record_operation_runner.py`, `workflow_executor.py`, `execution_log_panel/*`, `graph_utils.js` | Loop input/output semantics fix + execution logging enhancements + graph traversal guards |
+| 2026-03-11 | `47b955e` | E4, E7, E10 | `execution_log_panel/*`, `node_config_panel.js`, `adapter.js`, `editor.js`, `workflow_executor.py`, `schemas/execution.py` | Execution log input/output display + auto-title + execution schema expansion |
+| 2026-03-11 | `049f565` | E4, E7 | `execution_log_panel/*` (new), `svg_timeline/*` (new), `workflow_editor_app.*`, `workflow_store.js` | New execution log panel + SVG timeline component + editor app integration |
+| 2026-03-10 | `ff7a220` | E5, E10 | `runners/base.py` (SmartExpressionResolver), all runner files, `expression_utils.js`, `test_smart_resolver.py` | Strict `=` expression contract + SmartExpressionResolver + all runners migrated |
+| 2026-03-10 | `e5c6bc9` | E4 | `primary_variables.scss`, `secondary_variables.scss`, `bootstrap_overridden.scss`, component SCSS files | SCSS shared variable layer for theming/maintainability |
+| 2026-03-10 | `69a7b43` | E4, E5 | `ExpressionInput.js/.scss/.xml`, `node_config_panel.js` | Expression token highlighting overlay + control mode inference |
+| 2026-03-10 | `a8af0d5` | E4, E5 | `expression_value_editor.js`, `workflow_tree_editor.xml`, `ExpressionInput.*`, `field_values_control.js` | Domain value expression handling + tree editor UX improvements |
+| 2026-03-09 | `a63f7df` | E3, E4, E5, E10 | `domain_builder/*` (new), `domain_control/*`, `runners/*`, `test_smart_resolver.py` | Workflow Domain Builder + Tree Editor + unified expression resolver across runners |
+| 2026-03-08 | `8365f9b` | E3, E4, E10 | `record_operation_runner.py` (new), `domain_control/*` (new), `field_values_control/*` (new), `workflow_type_data.xml` | Record Operation node (search/create/write/delete) + DomainControl + FieldValuesControl |
+| 2026-03-05 | `99dd04b` | E4, E10 | `RecordBadge.*`, `controllers/main.py`, `test_record_output_refs.py` | Record/recordset expand UX + backend resolve path + tests |
+| 2026-02-13 | `70ad2f7` | E4, E5 | `control_renderer.*`, `controls/*`, `node_config_panel.*` | Key-value input UX refactor and expression-entry consistency |
+| 2026-02-12 | `46fba96` | E4, E5, E10 | `workflow_history_panel/*`, `input_suggestion_utils.js`, `http_runner.py` | Runs/history UX + suggestion metadata + backend runner expansion |
+| 2026-02-11 | `29f986f` | E7, E10 | `workflow_executor.py`, `context_objects.py`, `workflow_run.py` | Runtime and performance optimization across executor/context |
+| 2026-02-10 | `9c81829` | E4.6, E10 | `workflow_store.js`, `runners/*`, `workflow_executor.py` | Consolidated architecture under `workflow_studio` |
+| 2026-02-03 | `2fdfc0e` | E7, E10 | `security/*`, `workflow_executor.py`, `runners/*` | Zero-trust backend runtime hardening |
+| 2026-01-29 | `9f534f6` | E2, E10 | `controllers/main.py`, `ir_workflow.py`, `workflow_executor.py` | `execute_until` preview execution API |
+| 2026-01-28 | `8a4bafc` | E10 | `workflow_executor.py`, `ir_workflow.py`, `controllers/main.py` | Phase 4 backend execution engine bootstrap |
 
 > Scope note: This matrix emphasizes commits with direct backlog impact and intentionally excludes merge-only housekeeping commits.
 
@@ -68,27 +74,27 @@
 
 | ID        | Feature                                          |     SP | Priority | % Done | Status    | Notes                                            |
 | --------- | ------------------------------------------------ | -----: | -------- | -----: | --------- | ------------------------------------------------ |
-| **E10.1** | **Execution API Contract**                       |  **5** | P0       | **80%** | 🔄 In Progress | API/response contracts implemented across controllers/schemas (`9f534f6`, `4d4ec8a`, `0ec4e46`) |
+| **E10.1** | **Execution API Contract**                       |  **5** | P0       | **85%** | 🔄 In Progress | API/response contracts expanded with execution events, timing schemas (`049f565`, `47b955e`, `28fff84`28fff84`) |
 | E10.1.1   | `execute_until(workflow_id, node_id, input)` RPC |      3 | P0       |   100% | ✅         | Added and integrated in backend flow (`9f534f6`) |
-| E10.1.2   | Trace/Run IDs + minimal metadata                 |      2 | P1       |    50% | 🔄         | Run metadata and history endpoints expanded (`46fba96`, `29f986f`) |
+| E10.1.2   | Trace/Run IDs + minimal metadata                 |      2 | P1       |    70% | 🔄         | Execution events, timing data, and run detail schemas expanded (`049f565`, `47b955e`, `28fff84`049f565`, `47b955e`, `28fff84`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.2** | **Python ExecutionContext**                      |  **8** | P0       | **70%** | 🔄 In Progress | Context wrappers and safe resolution in active use (`2fdfc0e`, `94a170f`, `29f986f`) |
+| **E10.2** | **Python ExecutionContext**                      |  **8** | P0       | **75%** | 🔄 In Progress | Context wrappers hardened; loop/branch semantics fixed (`28fff84`, `ff7a220
 | E10.2.1   | Context object + serialization                   |      5 | P0       |    70% | 🔄         | Context object and snapshot payloads are used by run/execution views |
-| E10.2.2   | Loop/branch state primitives                     |      3 | P0       |    65% | 🔄         | Loop/branch runtime state and routing implemented in executor/runners |
+| E10.2.2   | Loop/branch state primitives                     |      3 | P0       |    75% | 🔄         | Loop input/output semantics fixed; branch routing improved (`28fff84`)) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.3** | **Python Stack Executor MVP**                    | **13** | P0       | **75%** | 🔄 In Progress | Backend executor became primary production track (`8a4bafc`, `9b14d32`, `29f986f`) |
+| **E10.3** | **Python Stack Executor MVP**                    | **13** | P0       | **80%** | 🔄 In Progress | Executor hardened with logging, graph traversal guards, timing precision (`28fff84`, `47b955e84`, `47b955e`) |
 | E10.3.1   | Graph execution loop (executeUntil)              |      5 | P0       |    85% | 🔄         | Execution loop + stop-at-node flow implemented and iterated |
 | E10.3.2   | Branch routing (If)                              |      4 | P0       |    70% | 🔄         | IF routing exists in runner/executor paths       |
-| E10.3.3   | Loop routing (Loop)                              |      4 | P0       |    70% | 🔄         | Loop runner/runtime behavior in place; further hardening pending |
+| E10.3.3   | Loop routing (Loop)                              |      4 | P0       |    80% | 🔄         | Loop runner input/output semantics reworked (`28fff84`, `a63f7df`)`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.4** | **Node Runner Registry (MVP set)**               |  **8** | P0       | **68%** | 🔄 In Progress | Multi-runner backend registry active (`9b14d32`, `2fdfc0e`, `9c81829`) |
+| **E10.4** | **Node Runner Registry (MVP set)**               |  **8** | P0       | **80%** | 🔄 In Progress | All runners migrated to SmartExpressionResolver; RecordOperation runner added (`a63f7df`, `ff7a220`, `8365f9bner added (`a63f7df`, `ff7a220`, `8365f9b`) |
 | E10.4.1   | HTTP Request runner                              |      3 | P0       |    80% | 🔄         | HTTP runner continuously improved (`46fba96`, `29f986f`) |
-| E10.4.2   | Variable runner (set/get/append/merge)           |      2 | P0       |    50% | 🔄         | Variable runner exists; production hardening pending |
-| E10.4.3   | Set Data / Mapping runner                        |      3 | P0       |    60% | 🔄         | Data/expression execution parity partially integrated |
+| E10.4.2   | Variable runner (set/get/append/merge)           |      2 | P0       |    55% | 🔄         | Variable runner migrated to SmartExpressionResolver (`a63f7df`)(`a63f7df`) |
+| E10.4.3   | Set Data / Mapping runner                        |      3 | P0       |    65% | 🔄         | Data/expression execution parity via SmartExpressionResolver (`ff7a220`)esolver (`ff7a220`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.5** | **Hybrid UI Integration**                        |  **6** | P0       | **55%** | 🔄 In Progress | UI now consumes backend execution state/run details across panels/canvas |
-| E10.5.1   | `workflow_runtime_service` (frontend)            |      3 | P0       |    60% | 🔄         | Adapter/store/controller integration is active (naming and service layout still evolving) |
-| E10.5.2   | Context snapshot caching for preview             |      3 | P0       |    50% | 🔄         | Run snapshot/history-driven preview available (`46fba96`, `29f986f`) |
+| **E10.5** | **Hybrid UI Integration**                        |  **6** | P0       | **65%** | 🔄 In Progress | UI consumes execution events, socket-level data, and log panel across oss canvas |
+| E10.5.1   | `workflow_runtime_service` (frontend)            |      3 | P0       |    70% | 🔄         | Store/adapter/canvas refactored for execution events and socket data (`d7a4549`, `636d3f2`2`) |
+| E10.5.2   | Context snapshot caching for preview             |      3 | P0       |    60% | 🔄         | Execution log panel + socket-level output display available (`636d3f2`, `28fff843f2`, `28fff84`) |
 
 ---
 
@@ -251,7 +257,7 @@
 | E4.4.5   | Subgraph grouping                                           |      5 | P3       |       0% | ❌             | Collapsible groups                       |
 |          |                                                             |        |          |          |               |                                          |
 | **E4.5** | **Expression Builder UX (Major)**                           | **10** | P0       | **100%** | ✅ Done        |                                          |
-| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **70%** | 🔄 In Progress | Service-driven migration progressed strongly after Sprint 3             |
+| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **75%** | 🔄 In Progress | Service-driven migration progressed strongly after Sprint 3             |
 | E4.6.1   | workflowEditor service (reactive state + actions + history) |      8 | P0       |     100% | ✅             | Canonical graph/ui state                 |
 | E4.6.2   | Per-editor useSubEnv + scoped editorBus                     |      6 | P0       |      20% | 🔄             | Scoped runtime patterns introduced, full multi-editor isolation pending |
 | E4.6.3   | Refactor EditorCanvas to service-driven                     |      6 | P0       |      80% | 🔄             | Most interaction flows moved to service/actions                         |

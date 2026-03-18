@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <!-- WorkflowDashboardStats: chart block with generic toggle (cloned from hr_payroll.DashboardStats) -->
+    <t t-name="workflow_studio.WorkflowDashboardStats">
+        <div class="o_wf_dashboard_stats card d-flex align-items-stretch flex-column h-100">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center w-100 border-0 bg-view">
+                <h6 class="card-title mb-0 fw-bold" t-esc="props.title"/>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa fa-question-circle-o text-muted" t-if="props.help"
+                       t-att-title="props.help"/>
+                    <!-- Generic toggle: btn-group for any number of options -->
+                    <div class="btn-group btn-group-sm" role="group">
+                        <t t-foreach="props.toggleOptions" t-as="opt" t-key="opt.key">
+                            <button t-attf-class="btn btn-sm {{state.activeToggle === opt.key ? 'btn-primary' : 'btn-outline-secondary'}}"
+                                    t-on-click="() => this.setToggle(opt.key)"
+                                    t-esc="opt.label"/>
+                        </t>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body d-flex flex-column flex-grow-1 min-height-0">
+                <!-- Action links (cloned from Payroll pattern) -->
+                <t t-foreach="props.actions" t-as="action" t-key="action_index">
+                    <a t-if="action.count > 0" class="d-flex w-100 small" href="#"
+                       t-on-click.prevent="() => this.actionService.doAction(action.action)">
+                        <span class="me-1" t-esc="action.count"/>
+                        <t t-esc="action.string"/>
+                    </a>
+                </t>
+                <!-- Chart canvas -->
+                <div t-attf-class="d-flex align-items-end flex-grow-1 min-height-0 {{props.type === 'line' ? 'o_wf_chart_line' : 'o_wf_chart_bar'}}">
+                    <canvas t-ref="canvas" class="w-100"/>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

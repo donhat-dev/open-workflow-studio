@@ -244,6 +244,33 @@
   padding: 4px;
 }
 
+/* Pin toggle button in output header */
+.pin-toggle-btn {
+  color: $o-gray-500;
+  font-size: 0.875rem;
+  transition: color 0.15s;
+
+  &:hover {
+    color: $o-warning;
+  }
+
+  &.pin-active {
+    color: $o-warning;
+  }
+}
+
+/* Pinned data banner */
+.pinned-data-banner {
+  background: rgba($o-warning, 0.08);
+  color: $o-gray-700;
+  font-size: 0.813rem;
+  flex-shrink: 0;
+
+  i {
+    font-size: 0.75rem;
+  }
+}
+
 .output-error-banner {
   display: flex;
   align-items: center;

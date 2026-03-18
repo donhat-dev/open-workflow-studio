@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { Component, useRef, useState, useExternalListener, onMounted, onPatched, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
-import { useBus } from "@web/core/utils/hooks";
+import { useBus, useService } from "@web/core/utils/hooks";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
@@ -89,8 +89,10 @@ export class EditorCanvas extends Component {
             if (!this.editor) {
                 throw new Error('[EditorCanvas] Editor mode requires workflowEditor service in env');
             }
+            this.actionService = useService("action");
         } else {
             this.editor = this.env.workflowEditor || null;
+            this.actionService = null;
         }
 
         // Local state for widget mode (or fallback defaults if service state unavailable)
@@ -140,6 +142,17 @@ export class EditorCanvas extends Component {
             executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
                 this.editor.executeUntilNode(nodeId, inputData, configOverrides),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
+            // Pin data actions
+            pinNodeData: (nodeId, outputData) => this.editor.actions.pinNodeData(nodeId, outputData),
+            unpinNodeData: (nodeId) => this.editor.actions.unpinNodeData(nodeId),
+            isNodePinned: (nodeId) => this.editor.actions.isNodePinned(nodeId),
+            resolveRecordRefs: (...args) => {
+                // Proxy for record ref resolution
+                if (this.editor.actions.resolveRecordRefs) {
+                    return this.editor.actions.resolveRecordRefs(...args);
+                }
+                return null;
+            },
         } : null;
 
         if (this.isEditorMode) {
@@ -733,6 +746,9 @@ export class EditorCanvas extends Component {
                 onNodeDoubleClick: (nodeId) => {
                     this.onNodeDoubleClick(nodeId);
                 },
+                onExecuteFromNode: (nodeId) => {
+                    this.onExecuteFromNode(nodeId);
+                },
             };
         }
 
@@ -761,6 +777,7 @@ export class EditorCanvas extends Component {
             props.onToggleDisable = this._nodeActionCallbacksCache.onToggleDisable;
             props.onOpenConfig = this._nodeActionCallbacksCache.onOpenConfig;
             props.onNodeDoubleClick = this._nodeActionCallbacksCache.onNodeDoubleClick;
+            props.onExecuteFromNode = this._nodeActionCallbacksCache.onExecuteFromNode;
         }
 
         return props;
@@ -1334,14 +1351,59 @@ export class EditorCanvas extends Component {
         // Connection selection is cleared by select() action via service
     }
 
+    /**
+     * Trigger node types that should NOT open the normal config panel.
+     * schedule_trigger / record_event_trigger / webhook_trigger → open linked backend record.
+     * manual_trigger → no config (has execute button instead).
+     */
+    static TRIGGER_NODE_TYPES = new Set([
+        'schedule_trigger',
+        'record_event_trigger',
+        'webhook_trigger',
+        'manual_trigger',
+    ]);
+
     onNodeOpenConfig(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
-        
+
+        // Trigger nodes: redirect to linked backend record instead of config panel
+        if (EditorCanvas.TRIGGER_NODE_TYPES.has(node.type)) {
+            this._handleTriggerNodeOpen(node);
+            return;
+        }
+
         // Open config panel via service
         this.editor.actions.openPanel("config", { nodeId });
+    }
+
+    /**
+     * Handle opening a trigger node — redirect to linked backend record
+     * or block if not yet implemented.
+     */
+    async _handleTriggerNodeOpen(node) {
+        const nodeType = node.type;
+
+        if (nodeType === 'schedule_trigger' || nodeType === 'record_event_trigger' || nodeType === 'webhook_trigger') {
+            const action = await this.editor.getTriggerNodeAction(node.id);
+            if (action) {
+                this.actionService.doAction(action);
+            }
+            return;
+        }
+
+        // manual_trigger: no config to open (execute button on the node itself)
+    }
+
+    /**
+     * Execute the workflow starting only from a specific manual trigger node.
+     */
+    async onExecuteFromNode(nodeId) {
+        if (this.isReadonly) return;
+        if (!this.isEditorMode) return;
+        await this.editor.executeFromNode(nodeId);
     }
 
     onNodeExecute(nodeId) {
@@ -1864,7 +1926,7 @@ export class EditorCanvas extends Component {
      */
     onNodeDoubleClick = (nodeId) => {
         if (!this.canEdit && !this.isInExecutionView) return;
-        this.onNodeOpenConfig
+        this.onNodeOpenConfig(nodeId);
     };
 
     /**

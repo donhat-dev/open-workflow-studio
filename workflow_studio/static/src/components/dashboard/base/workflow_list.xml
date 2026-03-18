@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <!-- WorkflowList: embedded list/kanban view inside a dashboard block -->
+    <t t-name="workflow_studio.WorkflowList">
+        <!-- Error state -->
+        <div t-if="state.error"
+             class="d-flex flex-column align-items-center justify-content-center h-100 text-muted p-4">
+            <i class="fa fa-2x fa-exclamation-circle mb-2"/>
+            <span class="small">Failed to load view</span>
+        </div>
+
+        <!-- Loading state -->
+        <div t-elif="!state.isLoaded"
+             class="d-flex justify-content-center align-items-center h-100">
+            <i class="fa fa-lg fa-spin fa-spinner text-muted"/>
+        </div>
+
+        <!-- Loaded: render the View (list/kanban) -->
+        <div t-else="" class="o_workflow_list_view h-100" tabindex="-1">
+            <View t-props="embeddedViewProps"/>
+        </div>
+    </t>
+</templates>

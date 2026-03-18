@@ -3,6 +3,7 @@
 import hashlib
 import json
 import copy
+import logging
 from .workflow_executor import WorkflowExecutor
 
 from odoo import api, fields, models, _
@@ -10,6 +11,8 @@ from odoo.exceptions import ValidationError, UserError
 from odoo.tools import safe_eval
 from odoo.tools import safe_eval as safe_eval_module
 from odoo.tools.safe_eval import wrap_module
+
+_logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +213,20 @@ class Workflow(models.Model):
         help='Execution history'
     )
 
+    # === Trigger / Activation ===
+    is_activated = fields.Boolean(
+        string='Activated',
+        default=False,
+        tracking=True,
+        help='Master switch: when True, all configured triggers are armed',
+    )
+    trigger_ids = fields.One2many(
+        'workflow.trigger',
+        'workflow_id',
+        string='Triggers',
+        help='Backend trigger registrations (cron, webhook, automation)',
+    )
+
     _sql_constraints = [
         ('name_company_uniq', 'UNIQUE(name, company_id)',
          'Workflow name must be unique per company!'),
@@ -370,13 +387,19 @@ class Workflow(models.Model):
         if 'metadata' not in snapshot or not isinstance(snapshot.get('metadata'), dict):
             snapshot['metadata'] = {}
         
-        # Save draft_snapshot
+        # Save draft_snapshot (pinData is preserved for editor use)
         self.write({'draft_snapshot': snapshot})
         
         # Also publish (save to both draft and published)
         if snapshot.get('nodes'):
+            published = snapshot.copy()
+            # Strip pin data from published snapshot — pinned outputs are
+            # development-time fixtures that must never run in production.
+            pub_meta = published.get('metadata')
+            if isinstance(pub_meta, dict):
+                pub_meta.pop('pinData', None)
             self.write({
-                'published_snapshot': snapshot.copy(),
+                'published_snapshot': published,
                 'published_version': self.version,
                 'published_at': fields.Datetime.now(),
             })
@@ -390,11 +413,58 @@ class Workflow(models.Model):
         }
 
     # === Execution Methods ===
+    # Node types that are automated triggers (not manually invoked).
+    _AUTOMATED_TRIGGER_TYPES = {
+        'schedule_trigger', 'webhook_trigger', 'record_event_trigger',
+    }
+
+    def _find_manual_start_nodes(self, snapshot):
+        """Return node IDs suitable for the Run-button execution.
+
+        Strategy:
+        1. Collect all start nodes (no incoming connections).
+        2. If any of them are ``manual_trigger``, return only those.
+        3. Otherwise exclude automated trigger types (schedule/webhook/
+           record_event) so they don't fire from a manual Run.
+        4. If nothing remains, fall back to all start nodes (let the
+           executor raise a meaningful error if truly empty).
+        """
+        nodes_by_id = {n['id']: n for n in snapshot.get('nodes', [])}
+        targets = {
+            c.get('target')
+            for c in snapshot.get('connections', [])
+            if c.get('target')
+        }
+        start_ids = [
+            nid for nid in nodes_by_id
+            if nid not in targets
+        ]
+
+        # Prefer manual_trigger nodes
+        manual = [
+            nid for nid in start_ids
+            if nodes_by_id[nid].get('type') == 'manual_trigger'
+        ]
+        if manual:
+            return manual
+
+        # Exclude automated triggers
+        non_auto = [
+            nid for nid in start_ids
+            if nodes_by_id[nid].get('type') not in self._AUTOMATED_TRIGGER_TYPES
+        ]
+        return non_auto or start_ids
+
     def execute_workflow(self, input_data=None, notify_user=False):
         """Execute published workflow synchronously.
         
         Creates a workflow.run record and executes all nodes from start
         to completion. Partial results are persisted for debugging.
+
+        When multiple trigger nodes exist, only ``manual_trigger`` nodes
+        are used as entry points (automated triggers are skipped).  This
+        prevents schedule/webhook/record-event triggers from firing when
+        the user clicks the **Run** button.
         
         Args:
             input_data: Initial input data for workflow (optional)
@@ -415,6 +485,9 @@ class Workflow(models.Model):
         
         if not self.published_snapshot.get('nodes'):
             raise UserError(_("Published workflow has no nodes."))
+
+        # Determine which start nodes to push (manual triggers only)
+        start_node_ids = self._find_manual_start_nodes(self.published_snapshot)
         
         # Create run record with snapshot copy
         run = self.env['workflow.run'].create({
@@ -433,7 +506,10 @@ class Workflow(models.Model):
             rollback_on_failure=self.rollback_on_failure,
         )
         try:
-            output_data = executor.execute(input_data)
+            output_data = executor.execute(
+                input_data,
+                start_node_ids=start_node_ids or None,
+            )
             last_node_id = executor.executed_order[-1] if executor.executed_order else None
             last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
             context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
@@ -755,3 +831,316 @@ class Workflow(models.Model):
             existing.name = name
         
         return True
+
+    # === Trigger / Activation System (ADR-008) ===
+
+    def action_activate_triggers(self):
+        """Activate all configured triggers on published workflows.
+
+        Reads the published_snapshot, finds trigger-category nodes,
+        and creates / updates ``workflow.trigger`` records plus their
+        backend activation records (ir.cron, base.automation, webhook).
+        """
+        for wf in self:
+            if not wf.is_published or not wf.published_snapshot:
+                raise UserError(_(
+                    "Workflow '%(name)s' must be published before activation.",
+                    name=wf.name,
+                ))
+
+            snapshot = wf.published_snapshot
+            trigger_nodes = wf._extract_trigger_nodes(snapshot)
+            if not trigger_nodes:
+                raise UserError(_(
+                    "Workflow '%(name)s' has no trigger nodes.",
+                    name=wf.name,
+                ))
+
+            trigger_model = self.env['workflow.trigger'].with_context(active_test=False)
+            existing_triggers = {
+                t.node_id: t
+                for t in trigger_model.search([('workflow_id', '=', wf.id)])
+            }
+            seen_node_ids = set()
+
+            for node in trigger_nodes:
+                node_id = node['id']
+                trigger_type = wf._resolve_trigger_type(node)
+                seen_node_ids.add(node_id)
+
+                trigger = existing_triggers.get(node_id)
+                if trigger:
+                    # Update type if changed
+                    if trigger.trigger_type != trigger_type:
+                        trigger.action_deactivate()
+                        trigger.trigger_type = trigger_type
+                    trigger.action_activate()
+                else:
+                    trigger = self.env['workflow.trigger'].create({
+                        'workflow_id': wf.id,
+                        'node_id': node_id,
+                        'trigger_type': trigger_type,
+                    })
+                    trigger.action_activate()
+
+            # Deactivate stale triggers (nodes removed from snapshot)
+            for node_id, trigger in existing_triggers.items():
+                if node_id not in seen_node_ids:
+                    trigger.action_deactivate()
+
+            wf.is_activated = True
+
+    def action_deactivate_triggers(self):
+        """Deactivate all triggers for these workflows."""
+        trigger_model = self.env['workflow.trigger'].with_context(active_test=False)
+        for wf in self:
+            for trigger in trigger_model.search([('workflow_id', '=', wf.id)]):
+                trigger.action_deactivate()
+            wf.is_activated = False
+
+    def _execute_from_trigger(self, node_id, trigger_type, trigger_data):
+        """Entry point called by ir.cron / base.automation / webhook controller.
+
+        The trigger runner receives ``env.context`` merged with
+        ``trigger_data`` as its output for downstream nodes.
+
+        Args:
+            node_id: Graph node ID of the trigger that fired
+            trigger_type: 'schedule' | 'webhook' | 'record_event'
+            trigger_data: Dict with trigger-specific payload
+        """
+        self.ensure_one()
+
+        if not self.is_published or not self.published_snapshot:
+            return
+
+        # Update audit fields on the trigger record
+        trigger_rec = self.env['workflow.trigger'].with_context(active_test=False).search([
+            ('workflow_id', '=', self.id),
+            ('node_id', '=', node_id),
+        ], limit=1)
+        if trigger_rec:
+            trigger_rec._record_triggered()
+
+        # Build input_data: merge env.context + trigger metadata
+        input_data = {
+            '_trigger': {
+                'type': trigger_type,
+                'node_id': node_id,
+                'context': self._sanitize_context(self.env.context),
+                **trigger_data,
+            },
+        }
+
+        self.execute_from_node(
+            start_node_id=node_id,
+            input_data=input_data,
+            notify_user=False,
+        )
+
+    def execute_from_node(self, start_node_id, input_data=None, notify_user=False):
+        """Execute published workflow starting from a specific trigger node.
+
+        Unlike ``execute_workflow`` which pushes ALL start nodes, this
+        method pushes only ``start_node_id`` onto the stack.  Used by
+        the Manual Trigger "execute" button to avoid activating sibling
+        trigger nodes.
+
+        Args:
+            start_node_id: The single trigger node to start from
+            input_data: Optional input data
+            notify_user: Whether to send bus notifications
+
+        Returns:
+            dict with run_id, status, output_data, etc.
+        """
+        self.ensure_one()
+
+        if not self.is_published or not self.published_snapshot:
+            raise UserError(_("Workflow must be published before execution."))
+
+        snapshot = self.published_snapshot
+        if not snapshot.get('nodes'):
+            raise UserError(_("Published workflow has no nodes."))
+
+        # Validate the node exists in snapshot
+        node_ids = {n.get('id') for n in snapshot.get('nodes', [])}
+        if start_node_id not in node_ids:
+            raise UserError(_(
+                "Node '%(node_id)s' not found in the published workflow.",
+                node_id=start_node_id,
+            ))
+
+        run = self.env['workflow.run'].create({
+            'workflow_id': self.id,
+            'status': 'pending',
+            'input_data': input_data or {},
+            'execution_mode': 'manual',
+            'executed_version': self.published_version,
+            'executed_snapshot': snapshot.copy(),
+        })
+
+        notify_channel = self.env.user.partner_id if notify_user else None
+        executor = WorkflowExecutor(
+            self.env, run,
+            notify_channel=notify_channel,
+            rollback_on_failure=self.rollback_on_failure,
+        )
+        try:
+            output_data = executor.execute(
+                input_data=input_data,
+                start_node_ids=[start_node_id],
+            )
+            last_node_id = executor.executed_order[-1] if executor.executed_order else None
+            last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
+            context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
+            return {
+                'run_id': run.id,
+                'run_name': run.name,
+                'status': run.status,
+                'output_data': output_data,
+                'context_snapshot': context_snapshot,
+                'node_count_executed': run.node_count_executed,
+                'execution_count': run.execution_count,
+                'duration_seconds': run.duration_seconds,
+            }
+        except Exception as e:
+            return {
+                'run_id': run.id,
+                'run_name': run.name,
+                'status': 'failed',
+                'error': str(e),
+                'node_count_executed': run.node_count_executed,
+                'execution_count': run.execution_count,
+                'duration_seconds': run.duration_seconds,
+            }
+
+    def get_trigger_node_action(self, node_id):
+        """Return an ir.actions dict to open the linked backend record.
+
+        For schedule_trigger → opens the linked ir.cron form.
+        For record_event_trigger → opens the linked base.automation form.
+        For others → returns False (no linked record).
+
+        Args:
+            node_id: Graph node ID of the trigger node
+
+        Returns:
+            ir.actions dict or False
+        """
+        self.ensure_one()
+
+        trigger_model = self.env['workflow.trigger'].with_context(active_test=False)
+        trigger = trigger_model.search([
+            ('workflow_id', '=', self.id),
+            ('node_id', '=', node_id),
+        ], limit=1)
+
+        if not trigger:
+            # FIXME: find a more efficient way to make sure a trigger record exists
+            node = self._get_graph_node(node_id)
+            if not node:
+                return False
+            trigger_vals = {
+                'workflow_id': self.id,
+                'node_id': node_id,
+                'trigger_type': self._resolve_trigger_type(node),
+                'active': False,
+            }
+            try:
+                with self.env.cr.savepoint():
+                    trigger = trigger_model.create(trigger_vals)
+            except Exception:
+                trigger = trigger_model.search([
+                    ('workflow_id', '=', self.id),
+                    ('node_id', '=', node_id),
+                ], limit=1)
+                if not trigger:
+                    raise
+
+        trigger.ensure_linked_backend_record()
+
+        if trigger.trigger_type == 'schedule' and trigger.cron_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Scheduled Action'),
+                'res_model': 'ir.cron',
+                'res_id': trigger.cron_id.id,
+                'view_mode': 'form',
+                'views': [(False, 'form')],
+                'target': 'new',
+            }
+
+        if trigger.trigger_type == 'record_event' and trigger.automation_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Automated Action'),
+                'res_model': 'base.automation',
+                'res_id': trigger.automation_id.id,
+                'view_mode': 'form',
+                'views': [(False, 'form')],
+                'target': 'new',
+            }
+
+        if trigger.trigger_type == 'webhook':
+            view_id = self.env.ref(
+                'workflow_studio.view_workflow_trigger_webhook_form',
+                raise_if_not_found=False,
+            )
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Webhook Trigger'),
+                'res_model': 'workflow.trigger',
+                'res_id': trigger.id,
+                'view_mode': 'form',
+                'views': [(view_id and view_id.id or False, 'form')],
+                'target': 'new',
+            }
+
+        return False
+
+    def _get_graph_node(self, node_id):
+        """Return a graph node from draft snapshot first, then published snapshot."""
+        self.ensure_one()
+        for snapshot in (self.draft_snapshot or {}, self.published_snapshot or {}):
+            for node in snapshot.get('nodes', []):
+                if node.get('id') == node_id:
+                    return node
+        return None
+
+    def _extract_trigger_nodes(self, snapshot):
+        """Return list of trigger-category nodes from a snapshot."""
+        nodes = snapshot.get('nodes', [])
+        trigger_types = set(
+            self.env['workflow.type'].search([
+                ('category', '=', 'trigger'),
+            ]).mapped('node_type')
+        )
+        return [n for n in nodes if n.get('type') in trigger_types]
+
+    def _resolve_trigger_type(self, node):
+        """Map a node's type key to a workflow.trigger trigger_type value."""
+        node_type = node.get('type', '')
+        mapping = {
+            'manual_trigger': 'manual',
+            'schedule_trigger': 'schedule',
+            'webhook_trigger': 'webhook',
+            'record_event_trigger': 'record_event',
+        }
+        return mapping.get(node_type, 'manual')
+
+    @staticmethod
+    def _sanitize_context(ctx):
+        """Strip non-serializable / internal keys from env.context."""
+        if not ctx:
+            return {}
+        safe = {}
+        for key, value in ctx.items():
+            if key.startswith('_'):
+                continue
+            try:
+                json.dumps(value)
+                safe[key] = value
+            except (TypeError, ValueError):
+                continue
+        return safe

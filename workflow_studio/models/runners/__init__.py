@@ -25,6 +25,9 @@ from .validation_runner import ValidationNodeRunner
 from .code_runner import CodeNodeRunner
 from .switch_runner import SwitchNodeRunner
 from .record_operation_runner import RecordOperationNodeRunner
+from .schedule_trigger_runner import ScheduleTriggerNodeRunner
+from .webhook_trigger_runner import WebhookTriggerNodeRunner
+from .record_event_trigger_runner import RecordEventTriggerNodeRunner
 
 __all__ = [
     'BaseNodeRunner',
@@ -38,4 +41,7 @@ __all__ = [
     'CodeNodeRunner',
     'SwitchNodeRunner',
     'RecordOperationNodeRunner',
+    'ScheduleTriggerNodeRunner',
+    'WebhookTriggerNodeRunner',
+    'RecordEventTriggerNodeRunner',
 ]

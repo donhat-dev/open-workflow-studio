@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <t t-name="workflow_studio.WorkflowDashboardSummary">
+        <!-- Purchase-style flat stats bar: no cards, no shadows -->
+        <div class="o_wf_stat_bar d-flex border-bottom bg-view">
+            <t t-foreach="stats" t-as="stat" t-key="stat.label">
+                <div class="o_wf_stat_item flex-grow-1 d-flex flex-column align-items-center justify-content-center text-center"
+                     t-on-click="() => this.onStatClick(stat.filter)">
+                    <div class="o_wf_stat_value" t-esc="stat.value"/>
+                    <div class="o_wf_stat_label mt-1" t-esc="stat.label"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

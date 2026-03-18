@@ -17,6 +17,7 @@
         'views/workflow_type_views.xml',
         'views/workflow_run_views.xml',
         'views/ir_logging_views.xml',
+        'views/workflow_trigger_views.xml',
     ],
     'assets': {
         # Core libs bundle - can be lazy-loaded or included separately
@@ -46,6 +47,8 @@
             'workflow_studio/static/src/scss/shared_primitives.scss',
             # Components (use services)
             'workflow_studio/static/src/components/**/*',
+            # View extensions (list/kanban dashboard overlays)
+            'workflow_studio/static/src/views/**/*',
             # Entry points and styles
             'workflow_studio/static/src/*.js',
             'workflow_studio/static/src/*.css',

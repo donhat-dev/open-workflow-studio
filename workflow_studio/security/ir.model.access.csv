@@ -29,3 +29,6 @@ access_ir_workflow_milestone_admin,ir.workflow.milestone.admin,model_ir_workflow
 access_ir_workflow_snapshot_blob_user,ir.workflow.snapshot.blob.user,model_ir_workflow_snapshot_blob,workflow_studio.group_workflow_user,1,0,1,0
 access_ir_workflow_snapshot_blob_manager,ir.workflow.snapshot.blob.manager,model_ir_workflow_snapshot_blob,workflow_studio.group_workflow_manager,1,0,1,0
 access_ir_workflow_snapshot_blob_admin,ir.workflow.snapshot.blob.admin,model_ir_workflow_snapshot_blob,workflow_studio.group_workflow_admin,1,1,1,1
+access_workflow_trigger_user,workflow.trigger.user,model_workflow_trigger,workflow_studio.group_workflow_user,1,0,0,0
+access_workflow_trigger_manager,workflow.trigger.manager,model_workflow_trigger,workflow_studio.group_workflow_manager,1,1,1,0
+access_workflow_trigger_admin,workflow.trigger.admin,model_workflow_trigger,workflow_studio.group_workflow_admin,1,1,1,1

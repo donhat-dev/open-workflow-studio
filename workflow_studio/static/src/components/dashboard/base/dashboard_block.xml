@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <t t-name="workflow_studio.DashboardBlock">
+        <div t-att-class="rootClass">
+            <!-- Card header: custom header slot OR title string + optional header_actions -->
+            <div t-if="props.title or props.slots.header or props.slots.header_actions"
+                 class="card-header bg-view border-0 d-flex align-items-center justify-content-between">
+                <t t-if="props.slots.header" t-slot="header"/>
+                <h6 t-elif="props.title" class="mb-0 fw-bold" t-esc="props.title"/>
+                <t t-if="props.slots.header_actions" t-slot="header_actions"/>
+            </div>
+
+            <!-- Card body: default slot -->
+            <div t-att-class="bodyContainerClass">
+                <t t-slot="default"/>
+            </div>
+        </div>
+    </t>
+</templates>

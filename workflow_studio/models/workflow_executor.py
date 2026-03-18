@@ -34,6 +34,9 @@ from .runners import (
     CodeNodeRunner,
     SwitchNodeRunner,
     RecordOperationNodeRunner,
+    ScheduleTriggerNodeRunner,
+    WebhookTriggerNodeRunner,
+    RecordEventTriggerNodeRunner,
 )
 from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
@@ -86,6 +89,9 @@ class WorkflowExecutor:
         'code': CodeNodeRunner,
         'switch': SwitchNodeRunner,
         'record_operation': RecordOperationNodeRunner,
+        'schedule_trigger': ScheduleTriggerNodeRunner,
+        'webhook_trigger': WebhookTriggerNodeRunner,
+        'record_event_trigger': RecordEventTriggerNodeRunner,
     }
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
@@ -421,11 +427,13 @@ class WorkflowExecutor:
         if output_vals:
             self.env['workflow.node.output'].create(output_vals)
 
-    def execute(self, input_data=None):
+    def execute(self, input_data=None, start_node_ids=None):
         """Execute workflow from start to completion.
         
         Args:
             input_data: Initial input data
+            start_node_ids: Optional list of specific node IDs to start from.
+                            If None, auto-discovers start nodes (no incoming).
             
         Returns:
             Final output data
@@ -445,8 +453,11 @@ class WorkflowExecutor:
                 })
                 self.env.cr.commit()
             
-            # Find start nodes (nodes with no incoming connections)
-            start_nodes = self._find_start_nodes()
+            # Find start nodes (explicit or auto-discover)
+            if start_node_ids:
+                start_nodes = start_node_ids
+            else:
+                start_nodes = self._find_start_nodes()
             if not start_nodes:
                 raise UserError(_("Workflow has no start nodes"))
             
@@ -1192,6 +1203,22 @@ class WorkflowExecutor:
 
         return result
 
+    # Node types that cannot use pinned data (triggers, structural nodes).
+    _PIN_DATA_DENY_TYPES = {
+        'manual_trigger', 'schedule_trigger', 'webhook_trigger',
+        'record_event_trigger', 'loop',
+    }
+
+    def _get_pin_data(self, node_id):
+        """Return pinned output data for a node, or None if not pinned.
+
+        Pin data is stored in ``snapshot.metadata.pinData[node_id]`` and
+        is only honoured during manual / preview execution (not production).
+        """
+        metadata = self.snapshot.get('metadata') or {}
+        pin_store = metadata.get('pinData') or {}
+        return pin_store.get(node_id)
+
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
 
@@ -1199,6 +1226,10 @@ class WorkflowExecutor:
         (``_node_run_buffer``) instead of writing to DB per-node.
         ``_persist_all_node_runs()`` batch-creates all records after the
         execution loop finishes.
+
+        Pin data check: if the node has pinned output in
+        ``snapshot.metadata.pinData`` and the node type is not in the
+        deny list, return the pinned data directly (skip execution).
 
         Args:
             node_id: Node ID to execute
@@ -1214,10 +1245,32 @@ class WorkflowExecutor:
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
 
+        # --- Pin data gate ---------------------------------------------------
+        # Honour pinned data for all executor invocations *except* production
+        # triggers (those create their own run with execution_mode != manual).
+        node_type = node.get('type', '')
+        if node_type not in self._PIN_DATA_DENY_TYPES:
+            pin_data = self._get_pin_data(node_id)
+            if pin_data is not None:
+                result = dict(pin_data)  # shallow copy to avoid mutating snapshot
+                if persist:
+                    self._node_run_buffer.append({
+                        'node_id': node_id,
+                        'node_type': node_type,
+                        'node_label': node.get('label', ''),
+                        'status': 'pinned',
+                        'started_at': datetime.now(),
+                        'duration_ms': 0,
+                        'output_socket': self._get_primary_output_socket(node, result),
+                        'sequence': len(self.executed_order),
+                        '_raw_json': result.get('json'),
+                        '_input_data': input_data,
+                    })
+                return result
+
         if not persist:
             return self._execute_node_core(node_id, input_data, node=node)
 
-        node_type = node.get('type')
         started_at = datetime.now()
         t0 = time.monotonic()
 

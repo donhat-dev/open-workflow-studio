@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <t t-name="workflow_studio.WorkflowDashboardMain">
+        <div class="o_workflow_dashboard_main o_action d-flex flex-column h-100">
+            <t t-if="state.loading">
+                <div class="d-flex justify-content-center align-items-center flex-grow-1">
+                    <i class="fa fa-3x fa-spin fa-spinner text-muted"/>
+                </div>
+            </t>
+            <t t-else="">
+                <!-- Full-width stat bar (fixed height, Purchase pattern) -->
+                <WorkflowDashboardSummary data="dashboardData.summary" onNavigate.bind="onNavigate"/>
+
+                <!-- DashboardNotebook: base shell providing scrollable container -->
+                <DashboardNotebook className="'p-3 flex-grow-1 overflow-hidden'">
+                    <div class="row g-2 h-100">
+                        <!-- Left column: chart + top workflows -->
+                        <div class="col-12 col-lg-6 d-flex flex-column h-100 gap-2">
+                            <div class="o_wf_card_slot" style="flex: 1;">
+                                <!-- Execution Runs: stacked_bar via WorkflowDashboardStats -->
+                                <WorkflowDashboardStats
+                                    title="'Execution Runs'"
+                                    type="'stacked_bar'"
+                                    data="dashboardData.runs"
+                                    toggleOptions="runChartToggleOptions"
+                                    defaultToggle="'7d'"
+                                    colors="runChartColors"/>
+                            </div>
+                            <div class="o_wf_card_slot" style="flex: 1;">
+                                <!-- Top Workflows: card via DashboardBlock, body-only sub-component -->
+                                <DashboardBlock title="'Top Workflows'" bodyClass="'p-0'" blockClass="'o_workflow_dashboard_block'">
+                                    <WorkflowDashboardTopWorkflows data="dashboardData.performance"/>
+                                </DashboardBlock>
+                            </div>
+                        </div>
+
+                        <!-- Right column: errors + recent activity (both via WorkflowList) -->
+                        <div class="col-12 col-lg-6 d-flex flex-column h-100 gap-2">
+                            <div class="o_wf_card_slot" style="flex: 1;">
+                                <!-- Recent Errors: embedded list via WorkflowList -->
+                                <DashboardBlock scrollable="true" blockClass="'o_workflow_dashboard_block'">
+                                    <WorkflowList
+                                        actionXmlId="'workflow_studio.action_workflow_run_errors'"
+                                        viewType="'list'"
+                                        context="{'create': false}"
+                                        limit="7"/>
+                                </DashboardBlock>
+                            </div>
+                            <div class="o_wf_card_slot" style="flex: 1;">
+                                <!-- Recent Activity: embedded list via WorkflowList -->
+                                <DashboardBlock  scrollable="true" blockClass="'o_workflow_dashboard_block'">
+                                    <WorkflowList
+                                        actionXmlId="'workflow_studio.action_workflow_run_activity'"
+                                        viewType="'list'"
+                                        context="{'create': false}"
+                                        limit="5"/>
+                                </DashboardBlock>
+                            </div>
+                        </div>
+                    </div>
+                </DashboardNotebook>
+            </t>
+        </div>
+    </t>
+</templates>

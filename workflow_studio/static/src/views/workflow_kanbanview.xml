@@ -1,0 +1,7 @@
+<templates>
+    <t t-name="workflow_studio.WorkflowKanbanView" t-inherit="web.KanbanRenderer" t-inherit-mode="primary">
+        <xpath expr="//div[hasclass('o_kanban_renderer')]" position="before">
+            <WorkflowDashboard />
+        </xpath>
+    </t>
+</templates>

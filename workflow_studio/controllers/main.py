@@ -315,6 +315,107 @@ class WorkflowPilotController(http.Controller):
             _logger.exception(f"Workflow execution failed: {workflow_id}")
             return ExecutionErrorSchema(error=str(e)).model_dump()
 
+    @http.route('/workflow_studio/execute_from', type='json', auth='user', methods=['POST'])
+    def execute_from_node(self, workflow_id=None, node_id=None, input_data=None, **kwargs):
+        """Execute a published workflow starting from a specific trigger node.
+
+        Only the given node is pushed onto the execution stack, so sibling
+        triggers are not activated.
+
+        Args:
+            workflow_id: Database ID of workflow
+            node_id: Graph node ID of the specific trigger node to start from
+            input_data: Optional input data
+
+        Returns:
+            ExecutionResultSchema dict
+        """
+        payload = request.httprequest.json or {}
+        if workflow_id is None:
+            workflow_id = payload.get('workflow_id')
+        if node_id is None:
+            node_id = payload.get('node_id')
+        if input_data is None:
+            input_data = payload.get('input_data', {})
+
+        if workflow_id is None:
+            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
+        if node_id is None:
+            return ExecutionErrorSchema(error='Node ID is required').model_dump()
+
+        workflow_id = int(workflow_id)
+        workflow = request.env['ir.workflow'].browse(workflow_id)
+        if not workflow.exists():
+            return ExecutionErrorSchema(error='Workflow not found').model_dump()
+
+        try:
+            result = workflow.execute_from_node(
+                start_node_id=node_id,
+                input_data=input_data or {},
+                notify_user=True,
+            )
+            run_id = result.get('run_id')
+
+            node_results = []
+            execution_events = []
+            node_outputs_map = {}
+            executed_order = []
+            executed_connections = []
+            context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
+            if run_id:
+                run = request.env['workflow.run'].browse(run_id)
+                if run.exists():
+                    executed_connections = run.executed_connections or []
+                    run_result_data = self._collect_run_node_results(run)
+                    node_results = run_result_data['node_results']
+                    execution_events = run_result_data['execution_events']
+                    node_outputs_map = run_result_data['node_outputs_map']
+                    executed_order = run_result_data['executed_order']
+
+                    if not context_snapshot:
+                        context_snapshot = ContextSnapshotSchema(
+                            json=run.output_data,
+                            node=node_outputs_map,
+                            execution={
+                                'id': run.id,
+                                'name': run.name,
+                                'status': run.status,
+                            },
+                            workflow={
+                                'id': workflow.id,
+                                'name': workflow.name,
+                                'active': workflow.active,
+                            },
+                            now=datetime.now().isoformat(),
+                            today=datetime.now().date().isoformat(),
+                        )
+
+            return ExecutionResultSchema(
+                run_id=run_id,
+                run_name=result.get('run_name'),
+                status=result.get('status', 'completed'),
+                error=result.get('error'),
+                execution_count=result.get('execution_count'),
+                node_count_executed=result.get('node_count_executed'),
+                duration_seconds=result.get('duration_seconds'),
+                executed_order=executed_order,
+                executed_connection_ids=[
+                    entry.get('connection_id')
+                    for entry in executed_connections
+                    if isinstance(entry, dict) and entry.get('connection_id')
+                ],
+                executed_connections=executed_connections,
+                input_data=input_data or {},
+                output_data=result.get('output_data'),
+                node_results=node_results,
+                execution_events=execution_events,
+                context_snapshot=context_snapshot,
+            ).model_dump()
+
+        except Exception as e:
+            _logger.exception("execute_from_node failed: workflow=%s node=%s", workflow_id, node_id)
+            return ExecutionErrorSchema(error=str(e)).model_dump()
+
     @http.route('/workflow_studio/run/<int:run_id>', type='json', auth='user', methods=['GET', 'POST'])
     def get_run(self, run_id):
         """Get workflow run details.
@@ -487,3 +588,118 @@ class WorkflowPilotController(http.Controller):
         except Exception as e:
             _logger.exception("Workflow preview execution failed")
             return ExecutionErrorSchema(error=str(e)).model_dump()
+
+    # === Webhook Trigger Endpoint ===
+
+    @http.route(
+        '/workflow_studio/webhook/<string:webhook_uuid>',
+        type='http',
+        auth='public',
+        methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        csrf=False,
+    )
+    def webhook_trigger(self, webhook_uuid, **kwargs):
+        """Public endpoint for webhook triggers.
+
+        Looks up the ``workflow.trigger`` by UUID, validates it is
+        active, and calls ``_execute_from_trigger`` on the linked
+        workflow.  Response behaviour depends on the node's
+        ``response_mode`` config:
+
+        - ``immediate`` (default): returns ``200 OK`` immediately.
+        - ``last_node``: waits for execution and returns the output
+          of the last node as JSON.
+        """
+        import json as _json
+        import werkzeug
+
+        trigger = request.env['workflow.trigger'].sudo().search([
+            ('webhook_uuid', '=', webhook_uuid),
+            ('active', '=', True),
+            ('trigger_type', '=', 'webhook'),
+        ], limit=1)
+
+        if not trigger:
+            return werkzeug.exceptions.NotFound(
+                'Webhook not found or inactive'
+            )
+
+        workflow = trigger.workflow_id
+        if not workflow.is_published:
+            return werkzeug.exceptions.NotFound(
+                'Workflow is not published'
+            )
+
+        # Collect safe request data
+        req = request.httprequest
+        safe_headers = {
+            k: v for k, v in req.headers
+            if k.lower() in (
+                'content-type', 'accept', 'user-agent',
+                'x-request-id', 'x-forwarded-for',
+            )
+        }
+
+        body = {}
+        if req.content_type and 'json' in req.content_type:
+            try:
+                body = req.get_json(silent=True) or {}
+            except Exception:
+                body = {}
+        elif req.form:
+            body = dict(req.form)
+
+        trigger_data = {
+            'method': req.method,
+            'headers': safe_headers,
+            'query': dict(req.args),
+            'body': body,
+        }
+
+        # Determine response mode from node config
+        node_config = trigger._get_node_config()
+        response_mode = node_config.get('response_mode', 'immediate')
+
+        trigger._record_triggered()
+
+        if response_mode == 'last_node':
+            # Synchronous: execute and return last node output
+            try:
+                input_data = {
+                    '_trigger': {
+                        'type': 'webhook',
+                        'node_id': trigger.node_id,
+                        'context': workflow._sanitize_context(
+                            request.env.context,
+                        ),
+                        **trigger_data,
+                    },
+                }
+                result = workflow.execute_workflow(
+                    input_data=input_data,
+                    notify_user=False,
+                )
+                output = result.get('output_data', {})
+                return request.make_json_response(output)
+            except Exception as e:
+                _logger.exception(
+                    "Webhook execution failed for workflow %s",
+                    workflow.id,
+                )
+                return request.make_json_response(
+                    {'error': str(e)}, status=500,
+                )
+        else:
+            # Immediate: fire-and-forget, return 200
+            try:
+                workflow._execute_from_trigger(
+                    trigger.node_id, 'webhook', trigger_data,
+                )
+            except Exception:
+                _logger.exception(
+                    "Webhook fire-and-forget failed for workflow %s",
+                    workflow.id,
+                )
+            return request.make_json_response(
+                {'status': 'accepted', 'webhook_uuid': webhook_uuid},
+            )

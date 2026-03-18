@@ -231,5 +231,51 @@
 }</field>
         </record>
 
+        <!-- ================================ -->
+        <!-- Trigger Nodes (Phase A)          -->
+        <!-- ================================ -->
+
+        <record id="workflow_type_schedule_trigger" model="workflow.type">
+            <field name="name">Schedule Trigger</field>
+            <field name="node_type">schedule_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-clock-o</field>
+            <field name="description">Execute workflow on a recurring schedule (cron)</field>
+            <field name="config_schema">{}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Trigger Output"}
+}</field>
+        </record>
+
+        <record id="workflow_type_webhook_trigger" model="workflow.type">
+            <field name="name">Webhook Trigger</field>
+            <field name="node_type">webhook_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-globe</field>
+            <field name="description">Execute workflow when a webhook URL is called</field>
+            <field name="config_schema">{
+    "http_method": {"type": "select", "label": "HTTP Method", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "POST", "section": "webhook"},
+    "response_mode": {"type": "select", "label": "Response Mode", "options": ["immediate", "last_node"], "default": "immediate", "section": "webhook", "help": "immediate: 200 OK right away; last_node: wait for execution and return output"}
+}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Webhook Data"}
+}</field>
+        </record>
+
+        <record id="workflow_type_record_event_trigger" model="workflow.type">
+            <field name="name">Record Event Trigger</field>
+            <field name="node_type">record_event_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-pencil-square-o</field>
+            <field name="description">Execute workflow when Odoo records are created, updated, or deleted</field>
+            <field name="config_schema">{}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Record Data"}
+}</field>
+        </record>
+
     </data>
 </odoo>

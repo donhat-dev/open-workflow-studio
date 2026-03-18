@@ -44,9 +44,9 @@ export class NodeConfigPanel extends Component {
         viewMode: { type: String, optional: true },  // 'edit' (default) or 'execution'
     };
 
-    static INPUT_TREE_EXPAND_DEPTH = 1;
-    static OUTPUT_TREE_EXPAND_DEPTH = 1;
-    static CONTEXT_TREE_EXPAND_DEPTH = 1;
+    static INPUT_TREE_EXPAND_DEPTH = 3;
+    static OUTPUT_TREE_EXPAND_DEPTH = 3;
+    static CONTEXT_TREE_EXPAND_DEPTH = 3;
     static TREE_AUTO_COLLAPSE_CHILD_THRESHOLD = 40;
 
     setup() {
@@ -624,18 +624,78 @@ export class NodeConfigPanel extends Component {
     
     get executionDisplayResult() {
         const runResult = this.executionNodeResult;
-        if (!runResult) return null;
-        if (runResult.error_message) {
+        if (runResult) {
+            if (runResult.error_message) {
+                return {
+                    error: runResult.error_message,
+                    output: null,
+                    source: 'execution',
+                };
+            }
+            const output = runResult.output_data === undefined ? null : runResult.output_data;
             return {
-                error: runResult.error_message,
-                output: null,
+                error: null,
+                output,
+                source: 'execution',
             };
         }
-        const output = runResult.output_data === undefined ? null : runResult.output_data;
-        return {
-            error: null,
-            output,
+        // Fall back to pinned data when no execution result exists
+        if (this.isNodePinned) {
+            const pinData = this.actions.isNodePinned(this.props.node.id)
+                ? this._getPinnedOutputForDisplay()
+                : null;
+            if (pinData !== null) {
+                return {
+                    error: null,
+                    output: pinData,
+                    source: 'pinned',
+                };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the current node has pinned data.
+     */
+    get isNodePinned() {
+        if (!this.actions || !this.actions.isNodePinned) return false;
+        return this.actions.isNodePinned(this.props.node.id);
+    }
+
+    /**
+     * Toggle pin state for the current node.
+     * If pinned → unpin. If not pinned → pin current execution output.
+     */
+    onTogglePin() {
+        const nodeId = this.props.node.id;
+        if (this.isNodePinned) {
+            this.actions.unpinNodeData(nodeId);
+            return;
+        }
+        // Pin the current execution result
+        const result = this.executionNodeResult;
+        if (!result || result.error_message) return;
+        const output = result.output_data;
+        if (output == null) return;
+        const pinOutput = {
+            outputs: Array.isArray(output) ? [output] : [[output]],
+            json: Array.isArray(output) ? output[0] : output,
         };
+        this.actions.pinNodeData(nodeId, pinOutput);
+    }
+
+    /**
+     * Extract display-friendly data from pinned output.
+     * @private
+     */
+    _getPinnedOutputForDisplay() {
+        const editor = this.env.workflowEditor;
+        if (!editor) return null;
+        const pinStore = editor.state.pinData || {};
+        const pinData = pinStore[this.props.node.id];
+        if (!pinData) return null;
+        return pinData.json !== undefined ? pinData.json : pinData;
     }
 
     get outputItemCount() {

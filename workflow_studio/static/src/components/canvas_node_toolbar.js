@@ -14,10 +14,12 @@ export class CanvasNodeToolbar extends Component {
     static props = {
         nodeId: String,
         isDisabled: { type: Boolean, optional: true },
+        isPinned: { type: Boolean, optional: true },
         isExecuting: { type: Boolean, optional: true },
         onExecute: { type: Function, optional: true },
         onDelete: { type: Function, optional: true },
         onToggleDisable: { type: Function, optional: true },
+        onTogglePin: { type: Function, optional: true },
         onOpenConfig: { type: Function, optional: true },
         onOpenMenu: { type: Function, optional: true },
     };
@@ -59,6 +61,18 @@ export class CanvasNodeToolbar extends Component {
     }
 
     /**
+     * Toggle pin/unpin
+     */
+    onTogglePinClick(ev) {
+        ev.stopPropagation();
+        const onTogglePin = this.props.onTogglePin;
+        if (!onTogglePin) {
+            throw new Error("[CanvasNodeToolbar] Missing onTogglePin prop");
+        }
+        onTogglePin(this.props.nodeId);
+    }
+
+    /**
      * Open config panel
      */
     onConfigClick(ev) {
@@ -94,5 +108,19 @@ export class CanvasNodeToolbar extends Component {
      */
     get toggleIcon() {
         return this.props.isDisabled ? "fa-toggle-off" : "fa-toggle-on";
+    }
+
+    /**
+     * Get pin button title
+     */
+    get pinTitle() {
+        return this.props.isPinned ? "Unpin output data" : "Pin output data";
+    }
+
+    /**
+     * Get pin button icon
+     */
+    get pinIcon() {
+        return "fa-thumb-tack";
     }
 }

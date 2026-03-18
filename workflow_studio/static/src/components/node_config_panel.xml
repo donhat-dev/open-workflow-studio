@@ -143,6 +143,15 @@
 								<span>OUTPUT</span>
 							</div>
 							<div class="d-flex align-items-center gap-2">
+								<!-- Pin / Unpin button -->
+								<button t-if="!isExecutionView and executionDisplayResult and !executionDisplayResult.error"
+									class="btn btn-sm btn-link p-0 border-0 pin-toggle-btn"
+									t-att-class="{ 'pin-active': isNodePinned }"
+									t-on-click="onTogglePin"
+									t-att-title="isNodePinned ? 'Unpin data (resume live execution)' : 'Pin output data (skip execution)'"
+									type="button">
+									<i t-att-class="'fa ' + (isNodePinned ? 'fa-thumb-tack text-warning' : 'fa-thumb-tack')"/>
+								</button>
 								<!-- Version selector dropdown (when multiple executions for active socket) -->
 								<t t-if="versionOptions.length > 0">
 									<select class="output-version-select form-select form-select-sm" t-on-change="onVersionChange">
@@ -159,6 +168,14 @@
 									</span>
 								</t>
 							</div>
+						</div>
+						<!-- Pinned data banner -->
+						<div t-if="isNodePinned" class="pinned-data-banner d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+							<i class="fa fa-thumb-tack text-warning"/>
+							<span class="small">Output is pinned — this node will be skipped during execution</span>
+							<button class="btn btn-sm btn-link p-0 ms-auto text-muted" t-on-click="onTogglePin" title="Unpin" type="button">
+								<i class="fa fa-times"/>
+							</button>
 						</div>
 						<!-- Socket tabs (when node has multiple output sockets) -->
 						<div t-if="outputSocketTabs.length > 0" class="output-socket-tabs d-flex border-bottom">

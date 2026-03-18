@@ -120,6 +120,12 @@ export const workflowEditorService = {
              */
             executionProgress: null,
             nodeTypes: [],
+            /**
+             * Pin data map: { [nodeId]: NodeOutput }.
+             * Pinned outputs replace real execution for the node during manual runs.
+             * Persisted inside snapshot.metadata.pinData on save.
+             */
+            pinData: {},
         });
 
         // Keep reactive history flags in sync for future toolbar bindings.
@@ -135,6 +141,21 @@ export const workflowEditorService = {
                 return inputData;
             }
             return {};
+        }
+
+        /**
+         * Build a full snapshot (nodes + connections + metadata) from
+         * the adapter graph plus store-level data such as pin data.
+         * @returns {Object} snapshot suitable for backend save / execute
+         */
+        function buildFullSnapshot() {
+            const base = adapter.toJSON();
+            const metadata = {};
+            const pinKeys = Object.keys(state.pinData);
+            if (pinKeys.length) {
+                metadata.pinData = { ...state.pinData };
+            }
+            return { ...base, metadata };
         }
 
         /**
@@ -467,6 +488,8 @@ export const workflowEditorService = {
                 if (!node) return false;
                 // Graph changed → stale execution highlights no longer valid
                 actions.clearExecution();
+                // Clean up any pinned data for the removed node
+                delete state.pinData[nodeId];
 
                 const relatedConnections = state.graph.connections.filter(
                     (c) => c.source === nodeId || c.target === nodeId
@@ -695,6 +718,61 @@ export const workflowEditorService = {
                 };
             },
 
+            /**
+             * Debug in Editor — load a historical execution run and pin
+             * the root (start) node outputs so the user can re-run
+             * downstream nodes with real data.
+             *
+             * @param {Object} runData  Run detail from getRunDetails() or
+             *   execution log.  Must include ``node_results`` and the
+             *   executed_snapshot's start nodes.
+             */
+            debugExecution(runData) {
+                if (!runData || !Array.isArray(runData.node_results)) {
+                    throw new Error("debugExecution requires runData with node_results");
+                }
+                // Exit execution view if active
+                if (executionView.active) {
+                    actions.endExecutionView();
+                }
+                // Determine root nodes (no incoming connections in current graph)
+                const targets = new Set();
+                for (const c of state.graph.connections) {
+                    if (c.target) targets.add(c.target);
+                }
+                const rootNodeIds = new Set(
+                    state.graph.nodes
+                        .filter(n => !targets.has(n.id))
+                        .map(n => n.id)
+                );
+                // Pin each root node's output from the run data
+                for (const nr of runData.node_results) {
+                    if (!rootNodeIds.has(nr.node_id)) continue;
+                    const output = nr.output_data;
+                    if (output == null) continue;
+                    // Build a NodeOutput-shaped object
+                    const pinOutput = {
+                        outputs: Array.isArray(output) ? [output] : [[output]],
+                        json: Array.isArray(output) ? output[0] : output,
+                    };
+                    actions.pinNodeData(nr.node_id, pinOutput);
+                }
+                // Populate execution progress so highlights are visible
+                actions.setExecutionResult({
+                    runId: runData.run_id || runData.id || null,
+                    status: runData.status || 'completed',
+                    error: runData.error || runData.error_message || null,
+                    errorNodeId: runData.error_node_id || null,
+                    executedOrder: runData.executed_order || [],
+                    executedConnectionIds: runData.executed_connection_ids || [],
+                    executedConnections: runData.executed_connections || [],
+                    executionEvents: runData.execution_events || [],
+                    nodeResults: runData.node_results || [],
+                    inputData: runData.input_data || {},
+                    contextSnapshot: runData.context_snapshot || null,
+                });
+            },
+
             openPanel(panelType, context = {}) {
                 if (panelType === "config") {
                     state.ui.panels.configOpen = true;
@@ -806,6 +884,63 @@ export const workflowEditorService = {
                 return meta.disabled === true;
             },
 
+            // =========================================================
+            // Pin Data actions
+            // =========================================================
+
+            /**
+             * Pin (freeze) output data for a node.
+             * On next manual execution the executor will return this data
+             * instead of running the node.
+             *
+             * @param {string} nodeId
+             * @param {Object} outputData  NodeOutput shape (outputs, json, …)
+             */
+            pinNodeData(nodeId, outputData) {
+                if (!nodeId || !outputData) {
+                    throw new Error("pinNodeData requires nodeId and outputData");
+                }
+                const MAX_PIN_BYTES = 5 * 1024 * 1024; // 5 MB
+                const serialised = JSON.stringify(outputData);
+                if (serialised.length > MAX_PIN_BYTES) {
+                    throw new Error(
+                        `Pin data for node ${nodeId} exceeds 5 MB limit ` +
+                        `(${(serialised.length / 1024 / 1024).toFixed(1)} MB)`
+                    );
+                }
+                state.pinData[nodeId] = outputData;
+                editorBus.trigger("PIN_DATA:CHANGED", { nodeId, pinned: true });
+            },
+
+            /**
+             * Unpin a single node so it executes normally again.
+             * @param {string} nodeId
+             */
+            unpinNodeData(nodeId) {
+                delete state.pinData[nodeId];
+                editorBus.trigger("PIN_DATA:CHANGED", { nodeId, pinned: false });
+            },
+
+            /**
+             * Remove all pin data.
+             */
+            clearAllPinData() {
+                const keys = Object.keys(state.pinData);
+                for (const k of keys) {
+                    delete state.pinData[k];
+                }
+                editorBus.trigger("PIN_DATA:CHANGED", { nodeId: null, pinned: false });
+            },
+
+            /**
+             * Check if a node has pinned data.
+             * @param {string} nodeId
+             * @returns {boolean}
+             */
+            isNodePinned(nodeId) {
+                return nodeId in state.pinData;
+            },
+
             beginBatch() {
                 history.startBatch();
             },
@@ -886,6 +1021,18 @@ export const workflowEditorService = {
                 versionHash = data.version_hash;
                 workflowId = id;
                 autoSave = data.auto_save !== false;
+                // Restore pinData from saved snapshot metadata
+                const savedPin = data.draft_snapshot
+                    && data.draft_snapshot.metadata
+                    && data.draft_snapshot.metadata.pinData;
+                // Reset then repopulate to keep reactivity
+                const oldKeys = Object.keys(state.pinData);
+                for (const k of oldKeys) {
+                    delete state.pinData[k];
+                }
+                if (savedPin && typeof savedPin === 'object') {
+                    Object.assign(state.pinData, savedPin);
+                }
                 return data;
             },
             getAutoSave() {
@@ -909,7 +1056,7 @@ export const workflowEditorService = {
                 return backendTypes;
             },
             async saveWorkflow() {
-                const snapshot = adapter.toJSON();
+                const snapshot = buildFullSnapshot();
                 const result = await rpc('/web/dataset/call_kw', {
                     model: 'ir.workflow',
                     method: 'save_workflow',
@@ -999,7 +1146,7 @@ export const workflowEditorService = {
                         workflow_id: workflowId,
                         target_node_id: targetNodeId,
                         input_data: safeInput,
-                        snapshot: adapter.toJSON(),
+                        snapshot: buildFullSnapshot(),
                         config_overrides: configOverrides,
                     });
                     if (result && (result.status === 'completed' || result.status === 'failed')) {
@@ -1035,6 +1182,66 @@ export const workflowEditorService = {
                     throw error;
                 }
             },
+            async executeFromNode(startNodeId, inputData = {}) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                if (!startNodeId) {
+                    throw new Error('Start node ID is required');
+                }
+                const safeInput = normalizeInputData(inputData);
+                state.executionProgress = createFreshProgress();
+                state.executionProgress.inputData = safeInput;
+
+                const result = await rpc('/workflow_studio/execute_from', {
+                    workflow_id: workflowId,
+                    node_id: startNodeId,
+                    input_data: safeInput,
+                });
+                if (result && result.run_id) {
+                    const run = await rpc(`/workflow_studio/run/${result.run_id}`, {});
+                    if (!run || typeof run !== 'object' || run.jsonrpc) {
+                        actions.setExecutionResult({
+                            runId: result.run_id,
+                            status: result.status || 'failed',
+                            error: result.error || 'Failed to load run details',
+                            inputData: safeInput,
+                        });
+                        return result;
+                    }
+                    actions.setExecutionResult({
+                        runId: run.run_id || run.id || result.run_id,
+                        status: run.status || result.status || 'completed',
+                        error: run.error || run.error_message || result.error || null,
+                        errorNodeId: run.error_node_id || null,
+                        outputData: run.output_data || null,
+                        executedOrder: run.executed_order || result.executed_order || [],
+                        executedConnectionIds:
+                            run.executed_connection_ids
+                            || result.executed_connection_ids
+                            || [],
+                        executedConnections:
+                            run.executed_connections
+                            || result.executed_connections
+                            || [],
+                        executionCount: run.execution_count || null,
+                        durationSeconds: run.duration_seconds || result.duration_seconds || null,
+                        nodeCountExecuted: run.node_count_executed || null,
+                        inputData: run.input_data || safeInput,
+                        contextSnapshot: result.context_snapshot || run.context_snapshot || null,
+                        executionEvents: run.execution_events || result.execution_events || [],
+                        nodeResults: run.node_results || [],
+                    });
+                    editorBus.trigger('refresh');
+                } else if (result && result.error) {
+                    actions.setExecutionResult({
+                        status: result.status || 'failed',
+                        error: result.error,
+                        inputData: safeInput,
+                    });
+                }
+                return result;
+            },
             async getRunDetails(runId) {
                 return await rpc(`/workflow_studio/run/${runId}`, {});
             },
@@ -1042,6 +1249,15 @@ export const workflowEditorService = {
                 const safeRefs = Array.isArray(refs) ? refs : [];
                 return await rpc('/workflow_studio/resolve_record_refs', {
                     refs: safeRefs,
+                });
+            },
+            async getTriggerNodeAction(nodeId) {
+                if (!workflowId) return false;
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'get_trigger_node_action',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
                 });
             },
             getWorkflowId() {

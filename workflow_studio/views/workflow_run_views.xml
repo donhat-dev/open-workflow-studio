@@ -125,9 +125,34 @@
 		<field name="view_mode">list,form</field>
 		<field name="search_view_id" ref="view_workflow_run_search"/>
 		<field name="context">{}</field>
+		<field name="path">workflow-runs</field>
 		<field name="help" type="html">
 			<p class="o_view_nocontent_smiling_face">                No workflow executions yet            </p>
 			<p>                Workflow execution logs will appear here when workflows are run.                You can view input/output data, timing, and per-node results.            </p>
+		</field>
+	</record>
+	<record id="action_workflow_run_errors" model="ir.actions.act_window">
+		<field name="name">Recent Errors</field>
+		<field name="res_model">workflow.run</field>
+		<field name="view_mode">list,form</field>
+		<field name="search_view_id" ref="view_workflow_run_search"/>
+		<field name="domain">[("status", "=", "failed")]
+		</field>
+		<field name="context">{"search_default_failed": 1}</field>
+		<field name="help" type="html">
+			<p class="o_view_nocontent_smiling_face">No failed workflow executions.</p>
+			<p>Failed workflow runs will appear here for quick triage from the dashboard.</p>
+		</field>
+	</record>
+	<record id="action_workflow_run_activity" model="ir.actions.act_window">
+		<field name="name">Recent Activity</field>
+		<field name="res_model">workflow.run</field>
+		<field name="view_mode">list,form</field>
+		<field name="search_view_id" ref="view_workflow_run_search"/>
+		<field name="context">{}</field>
+		<field name="help" type="html">
+			<p class="o_view_nocontent_smiling_face">No workflow activity yet.</p>
+			<p>Recent workflow runs across all statuses will appear here.</p>
 		</field>
 	</record>
 	<!-- Menu Item -->

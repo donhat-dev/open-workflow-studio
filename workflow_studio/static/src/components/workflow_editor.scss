@@ -420,6 +420,35 @@
   color: $o-gray-500;
 }
 
+/* Pinned Node State */
+.workflow-node.wf-node--pinned {
+  border-color: $o-warning;
+  border-style: dashed;
+  box-shadow: 0 0 0 1px rgba($o-warning, 0.4), 0 2px 8px rgba($o-warning, 0.12);
+}
+
+.workflow-node.wf-node--pinned::before {
+  background: $o-warning;
+}
+
+/* Pin Badge (top-right of node card) */
+.workflow-node__pin-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: $o-warning;
+  color: $o-white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  z-index: 11;
+  box-shadow: 0 1px 3px rgba($o-black, 0.2);
+}
+
 /* Execution Status States (n8n-style) */
 .workflow-node.execution-success {
   border-color: $o-success;
@@ -479,6 +508,38 @@
   color: rgba($o-info, 0.95);
 }
 
+/* Manual Trigger: Execute button (left side of node) */
+.workflow-node__trigger-execute {
+  position: absolute;
+  left: -104px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 92px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: $o-success;
+  color: $o-white;
+  border: 1px solid darken($o-success, 6%);
+  box-shadow: 0 1px 4px rgba($o-black, 0.15);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 5;
+  opacity: 1;
+  transition: transform 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: darken($o-success, 8%);
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .fa-play {
+    margin-left: 1px; // optical center for play icon
+  }
+}
+
 /* Running / executing state (info border + pulse) */
 .workflow-node.execution-running {
   border-color: $o-info;
@@ -526,6 +587,10 @@
 .workflow-node__socket {
   height: var(--socket-spacing);
 }
+  .workflow-node__socket--input,
+  .workflow-node__socket--output {
+    cursor: pointer;
+  }
 
 /* First socket vertical alignment (matches getSocketPosition) */
 .workflow-node__socket:first-child {
@@ -550,6 +615,9 @@
 /* Socket Label */
 .workflow-node__socket-label {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
 
   /* Output styling for overlap */
   position: relative;
@@ -565,8 +633,9 @@
 
 /* Socket Quick-Add Connector (output only) */
 .socket-quick-add-connector {
-  position: absolute; /* Take out of flow to sit behind label */
-  left: 10px; /* Start from center of socket dot radius*2 */
+  position: absolute; /* Sit behind label */
+  left: 10px; /* Start from socket dot center */
+  right: -28px; /* Extend past node right edge so button is always visible */
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -577,7 +646,8 @@
 }
 
 .socket-quick-add-line {
-  width: 80px; /* Long dash line to reach button */
+  flex: 1; /* Fill space between dot and button, adapts to label width */
+  min-width: 16px;
   height: 0;
   border-top: 2px dashed $o-gray-400;
 }
@@ -611,17 +681,10 @@
   top: 16px;
   left: 16px;
   z-index: 100;
-  -webkit-user-select: none;
-  user-select: none;
-
-  button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
 }
 
 .fit-view-dropdown__main {
+  white-space: nowrap;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -636,6 +699,7 @@
 
 .fit-view-dropdown.is-open .fit-view-dropdown__toggle {
   background: $o-gray-300;
+  opacity: 1;
 }
 
 .fit-view-dropdown__menu {

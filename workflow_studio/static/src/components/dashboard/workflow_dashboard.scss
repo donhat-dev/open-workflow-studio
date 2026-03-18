@@ -1,0 +1,159 @@
+// Dashboard main layout — Odoo-native (no shadow, no rounded cards)
+.o_workflow_dashboard_main {
+    background-color: $wf-surface-base;
+
+    // Card slots fill their flex container
+    .o_wf_card_slot {
+        min-height: 0; // allow flex shrink
+        display: flex;
+        flex-direction: column;
+
+        > .card {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+
+            .card-body,
+            .o_wf_scrollable_panel {
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+            }
+        }
+    }
+
+    // KPI stat bar (Purchase dashboard pattern)
+    .o_wf_stat_bar {
+        background-color: $wf-surface-base;
+
+        .o_wf_stat_item {
+            cursor: pointer;
+            padding: 12px 16px;
+            border-right: 1px solid $wf-border-base;
+            transition: background-color 0.15s ease;
+
+            &:last-child {
+                border-right: 0;
+            }
+
+            &:hover {
+                background-color: $wf-surface-subtle;
+            }
+
+            &:active {
+                transform: scale(0.98);
+            }
+        }
+
+        .o_wf_stat_value {
+            font-family: var(--bs-font-monospace);
+            font-weight: 700;
+            font-size: 1.75rem; // fs-2 equivalent
+            line-height: 1;
+            color: $wf-text-base;
+        }
+
+        .o_wf_stat_label {
+            font-size: 0.8125rem;
+            color: $wf-text-muted;
+        }
+    }
+
+    // Odoo-native card treatment (Payroll pattern)
+    .card {
+        .card-header {
+            background-color: $wf-surface-base;
+            border-bottom: 0;
+        }
+    }
+
+    // Scrollable panels (height controlled by flex parent)
+    .o_wf_scrollable_panel {
+        overflow-y: auto;
+
+        &::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: $wf-border-base;
+            border-radius: 3px;
+
+            &:hover {
+                background: $wf-border-strong;
+            }
+        }
+    }
+
+    // Monospace for all duration/numeric data (cockpit density)
+    .o_wf_mono {
+        font-family: var(--bs-font-monospace);
+    }
+
+    // Chart container
+    canvas {
+        max-width: 100%;
+    }
+
+    // Table refinement
+    .table {
+        th {
+            font-weight: 600;
+            border-top: 0;
+        }
+    }
+
+    // WorkflowList embedded view — constrain within card block
+    .o_workflow_list_view {
+        overflow: hidden;
+
+        // Reset embedded view padding to fit card body
+        .o_action_manager,
+        .o_view_controller {
+            height: 100%;
+        }
+
+        // Compact the search bar inside embedded context
+        .o_control_panel {
+            // padding: 0 !important;
+
+            .o_cp_searchview {
+                max-width: 100%;
+            }
+        }
+
+        // List view fills available height
+        .o_list_view {
+            height: 100%;
+        }
+    }
+}
+
+// WorkflowDashboardStats — chart block (Payroll clone)
+.o_wf_dashboard_stats {
+    min-height: 0;
+
+    .card-body {
+        min-height: 0;
+    }
+
+    .o_wf_chart_line,
+    .o_wf_chart_bar {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    canvas {
+        height: 100% !important;
+    }
+}
+
+// DashboardBlock generic — flex body
+.o_dashboard_notebook {
+    .card {
+        .card-body {
+            min-height: 0;
+        }
+    }
+}
