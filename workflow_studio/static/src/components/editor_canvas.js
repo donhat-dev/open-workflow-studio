@@ -142,14 +142,16 @@ export class EditorCanvas extends Component {
             executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
                 this.editor.executeUntilNode(nodeId, inputData, configOverrides),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
-            // Pin data actions
-            pinNodeData: (nodeId, outputData) => this.editor.actions.pinNodeData(nodeId, outputData),
+            pinNodeData: (nodeId, nodeRunId) => this.editor.actions.pinNodeData(nodeId, nodeRunId),
             unpinNodeData: (nodeId) => this.editor.actions.unpinNodeData(nodeId),
             isNodePinned: (nodeId) => this.editor.actions.isNodePinned(nodeId),
+            replaceExecutionNodeResult: (nodeResult) => this.editor.actions.replaceExecutionNodeResult(nodeResult),
+            saveWorkflow: () => this.editor.saveWorkflow(),
+            getNodeRunDetails: (nodeRunId) => this.editor.getNodeRunDetails(nodeRunId),
             resolveRecordRefs: (...args) => {
                 // Proxy for record ref resolution
-                if (this.editor.actions.resolveRecordRefs) {
-                    return this.editor.actions.resolveRecordRefs(...args);
+                if (this.editor.resolveRecordRefs) {
+                    return this.editor.resolveRecordRefs(...args);
                 }
                 return null;
             },
@@ -2046,6 +2048,11 @@ export class EditorCanvas extends Component {
         this.editor.actions.redo();
     };
 
+    onCopyToEditor = () => {
+        if (!this.isEditorMode) return;
+        this.editor.copyExecutionToEditor();
+    };
+
     /**
      * Get button definitions for the controls bar
      * Returns array of button config objects with properties:
@@ -2084,6 +2091,17 @@ export class EditorCanvas extends Component {
                     classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
                 }
             );
+            if (this.isInExecutionView) {
+                buttons.push({
+                    name: 'copy-to-editor',
+                    label: 'Copy To Editor',
+                    icon: 'Copy',
+                    callback: () => this.onCopyToEditor(),
+                    visible: true,
+                    disabled: !this.executionState,
+                    classes: 'btn btn-warning btn-sm d-inline-flex align-items-center gap-1',
+                });
+            }
             buttons.push({ name: 'divider-1', divider: true });
         }
 
@@ -2221,6 +2239,15 @@ export class EditorCanvas extends Component {
                     disabled: this.isExecuting || this.isSaving || this.isReadonly,
                     classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
                 },
+                ...(this.isInExecutionView ? [{
+                    name: 'copy-to-editor',
+                    label: 'Copy To Editor',
+                    icon: 'Copy',
+                    callback: () => this.onCopyToEditor(),
+                    visible: true,
+                    disabled: !this.executionState,
+                    classes: 'btn btn-warning btn-sm d-inline-flex align-items-center gap-1',
+                }] : []),
                 { name: 'divider-1', divider: true }
             );
         }

@@ -121,11 +121,11 @@ export const workflowEditorService = {
             executionProgress: null,
             nodeTypes: [],
             /**
-             * Pin data map: { [nodeId]: NodeOutput }.
-             * Pinned outputs replace real execution for the node during manual runs.
-             * Persisted inside snapshot.metadata.pinData on save.
+             * Pin data map: { [nodeId]: workflow.run.node.id }.
+             * Persisted inside snapshot.metadata.pin_data on save.
              */
             pinData: {},
+            workflowMetadata: {},
         });
 
         // Keep reactive history flags in sync for future toolbar bindings.
@@ -150,10 +150,13 @@ export const workflowEditorService = {
          */
         function buildFullSnapshot() {
             const base = adapter.toJSON();
-            const metadata = {};
+            const metadata = { ...(state.workflowMetadata || {}) };
+            delete metadata.pinData;
             const pinKeys = Object.keys(state.pinData);
             if (pinKeys.length) {
-                metadata.pinData = { ...state.pinData };
+                metadata.pin_data = { ...state.pinData };
+            } else {
+                delete metadata.pin_data;
             }
             return { ...base, metadata };
         }
@@ -278,6 +281,11 @@ export const workflowEditorService = {
                 ) {
                     state.ui.panels.executionLogOpen = true;
                 }
+            },
+            replaceExecutionResult(fields) {
+                const runId = fields && fields.runId ? fields.runId : null;
+                state.executionProgress = createFreshProgress(runId);
+                actions.setExecutionResult(fields || {});
             },
             clearExecution() {
                 state.executionProgress = null;
@@ -696,12 +704,12 @@ export const workflowEditorService = {
 
                 // Populate execution highlights from run data
                 if (executionData) {
-                    actions.setExecutionResult(executionData);
+                    actions.replaceExecutionResult(executionData);
                 }
             },
 
-            endExecutionView() {
-                if (executionView.active && executionView.originalSnapshot) {
+            endExecutionView({ restoreOriginal = true, clearExecution = true } = {}) {
+                if (executionView.active && restoreOriginal && executionView.originalSnapshot) {
                     adapter.fromJSON(executionView.originalSnapshot);
                 }
                 executionView.active = false;
@@ -709,7 +717,9 @@ export const workflowEditorService = {
                 executionView.originalSnapshot = null;
                 state.ui.executionView = { active: false, runId: null };
                 state.ui.readonly = false;
-                state.executionProgress = null;
+                if (clearExecution) {
+                    state.executionProgress = null;
+                }
                 state.ui.selection = { nodeIds: [], connectionIds: [] };
                 state.ui.hoveredConnection = {
                     id: null,
@@ -718,47 +728,29 @@ export const workflowEditorService = {
                 };
             },
 
+            copyExecutionToEditor() {
+                if (!executionView.active) {
+                    return;
+                }
+                actions.endExecutionView({ restoreOriginal: true, clearExecution: false });
+            },
+
             /**
-             * Debug in Editor — load a historical execution run and pin
-             * the root (start) node outputs so the user can re-run
-             * downstream nodes with real data.
+             * Apply a historical execution run back into the current editor
+             * UI state without pinning snapshot payloads.
              *
-             * @param {Object} runData  Run detail from getRunDetails() or
-             *   execution log.  Must include ``node_results`` and the
-             *   executed_snapshot's start nodes.
+             * @param {Object} runData Run detail from getRunDetails() or
+             *   execution log.
              */
             debugExecution(runData) {
                 if (!runData || !Array.isArray(runData.node_results)) {
                     throw new Error("debugExecution requires runData with node_results");
                 }
-                // Exit execution view if active
+                // Apply historical results back into the current editable UI state.
                 if (executionView.active) {
-                    actions.endExecutionView();
+                    actions.endExecutionView({ restoreOriginal: true, clearExecution: true });
                 }
-                // Determine root nodes (no incoming connections in current graph)
-                const targets = new Set();
-                for (const c of state.graph.connections) {
-                    if (c.target) targets.add(c.target);
-                }
-                const rootNodeIds = new Set(
-                    state.graph.nodes
-                        .filter(n => !targets.has(n.id))
-                        .map(n => n.id)
-                );
-                // Pin each root node's output from the run data
-                for (const nr of runData.node_results) {
-                    if (!rootNodeIds.has(nr.node_id)) continue;
-                    const output = nr.output_data;
-                    if (output == null) continue;
-                    // Build a NodeOutput-shaped object
-                    const pinOutput = {
-                        outputs: Array.isArray(output) ? [output] : [[output]],
-                        json: Array.isArray(output) ? output[0] : output,
-                    };
-                    actions.pinNodeData(nr.node_id, pinOutput);
-                }
-                // Populate execution progress so highlights are visible
-                actions.setExecutionResult({
+                actions.replaceExecutionResult({
                     runId: runData.run_id || runData.id || null,
                     status: runData.status || 'completed',
                     error: runData.error || runData.error_message || null,
@@ -893,22 +885,38 @@ export const workflowEditorService = {
              * On next manual execution the executor will return this data
              * instead of running the node.
              *
+             * Accepts either:
+             * - A number/string: workflow.run.node ID (reference pin)
+             * - An object with output_data: inline data pin (for preview runs)
+             *
              * @param {string} nodeId
-             * @param {Object} outputData  NodeOutput shape (outputs, json, …)
+             * @param {number|string|Object} pinValue  node_run_id or inline data object
              */
-            pinNodeData(nodeId, outputData) {
-                if (!nodeId || !outputData) {
-                    throw new Error("pinNodeData requires nodeId and outputData");
+            pinNodeData(nodeId, pinValue) {
+                if (!nodeId || pinValue === undefined || pinValue === null) {
+                    throw new Error("pinNodeData requires nodeId and pinValue");
                 }
-                const MAX_PIN_BYTES = 5 * 1024 * 1024; // 5 MB
-                const serialised = JSON.stringify(outputData);
-                if (serialised.length > MAX_PIN_BYTES) {
-                    throw new Error(
-                        `Pin data for node ${nodeId} exceeds 5 MB limit ` +
-                        `(${(serialised.length / 1024 / 1024).toFixed(1)} MB)`
-                    );
+                let storedValue;
+                if (typeof pinValue === 'object' && pinValue !== null) {
+                    // Inline data pin (preview execution without persisted record)
+                    storedValue = { ...pinValue };
+                } else {
+                    // Reference pin (workflow.run.node ID)
+                    const normalizedNodeRunId = parseInt(pinValue, 10);
+                    if (isNaN(normalizedNodeRunId) || normalizedNodeRunId <= 0) {
+                        throw new Error(`Invalid nodeRunId for pinNodeData: ${pinValue}`);
+                    }
+                    storedValue = normalizedNodeRunId;
                 }
-                state.pinData[nodeId] = outputData;
+                state.pinData[nodeId] = storedValue;
+                const nextPinData = {
+                    ...((state.workflowMetadata && state.workflowMetadata.pin_data) || {}),
+                    [nodeId]: storedValue,
+                };
+                state.workflowMetadata = {
+                    ...(state.workflowMetadata || {}),
+                    pin_data: nextPinData,
+                };
                 editorBus.trigger("PIN_DATA:CHANGED", { nodeId, pinned: true });
             },
 
@@ -918,6 +926,16 @@ export const workflowEditorService = {
              */
             unpinNodeData(nodeId) {
                 delete state.pinData[nodeId];
+                const nextMetadata = { ...(state.workflowMetadata || {}) };
+                const nextPinData = { ...((nextMetadata.pin_data) || {}) };
+                delete nextPinData[nodeId];
+                if (Object.keys(nextPinData).length) {
+                    nextMetadata.pin_data = nextPinData;
+                } else {
+                    delete nextMetadata.pin_data;
+                }
+                delete nextMetadata.pinData;
+                state.workflowMetadata = nextMetadata;
                 editorBus.trigger("PIN_DATA:CHANGED", { nodeId, pinned: false });
             },
 
@@ -929,6 +947,10 @@ export const workflowEditorService = {
                 for (const k of keys) {
                     delete state.pinData[k];
                 }
+                const nextMetadata = { ...(state.workflowMetadata || {}) };
+                delete nextMetadata.pin_data;
+                delete nextMetadata.pinData;
+                state.workflowMetadata = nextMetadata;
                 editorBus.trigger("PIN_DATA:CHANGED", { nodeId: null, pinned: false });
             },
 
@@ -939,6 +961,42 @@ export const workflowEditorService = {
              */
             isNodePinned(nodeId) {
                 return nodeId in state.pinData;
+            },
+
+            replaceExecutionNodeResult(nodeResult) {
+                if (!nodeResult || !nodeResult.node_id) {
+                    throw new Error("replaceExecutionNodeResult requires nodeResult.node_id");
+                }
+                if (!state.executionProgress) {
+                    state.executionProgress = createFreshProgress();
+                }
+                const normalized = { ...nodeResult };
+                const replaceItems = (items = []) => {
+                    const nextItems = [];
+                    let replaced = false;
+                    for (const item of items) {
+                        if (!item || typeof item !== 'object') {
+                            nextItems.push(item);
+                            continue;
+                        }
+                        const matchesByRunId = normalized.node_run_id && item.node_run_id === normalized.node_run_id;
+                        const matchesByNode = !normalized.node_run_id && item.node_id === normalized.node_id && item.sequence === normalized.sequence && item.iteration === normalized.iteration;
+                        if (matchesByRunId || matchesByNode) {
+                            nextItems.push(normalized);
+                            replaced = true;
+                        } else {
+                            nextItems.push(item);
+                        }
+                    }
+                    if (!replaced) {
+                        nextItems.push(normalized);
+                    }
+                    return nextItems;
+                };
+
+                state.executionProgress.nodeResults = replaceItems(state.executionProgress.nodeResults || []);
+                state.executionProgress.executionEvents = replaceItems(state.executionProgress.executionEvents || []);
+                state.executionProgress.nodeStatuses[normalized.node_id] = normalized.error_message ? 'error' : 'success';
             },
 
             beginBatch() {
@@ -1011,6 +1069,12 @@ export const workflowEditorService = {
                 return adapter.getNodeClass(type);
             },
             async loadWorkflow(id) {
+                // Reset execution state from any previous session
+                actions.clearExecution();
+                state.ui.panels.executionLogOpen = false;
+                state.ui.executing = false;
+                state.ui.executionView = { active: false, runId: null };
+
                 const data = await rpc('/web/dataset/call_kw', {
                     model: 'ir.workflow',
                     method: 'load_workflow',
@@ -1021,10 +1085,14 @@ export const workflowEditorService = {
                 versionHash = data.version_hash;
                 workflowId = id;
                 autoSave = data.auto_save !== false;
-                // Restore pinData from saved snapshot metadata
-                const savedPin = data.draft_snapshot
+                const rawMetadata = data.draft_snapshot
                     && data.draft_snapshot.metadata
-                    && data.draft_snapshot.metadata.pinData;
+                    && typeof data.draft_snapshot.metadata === 'object'
+                    ? JSON.parse(JSON.stringify(data.draft_snapshot.metadata))
+                    : {};
+                state.workflowMetadata = rawMetadata;
+                // Restore pinData references from saved snapshot metadata
+                const savedPin = rawMetadata.pin_data || rawMetadata.pinData;
                 // Reset then repopulate to keep reactivity
                 const oldKeys = Object.keys(state.pinData);
                 for (const k of oldKeys) {
@@ -1245,6 +1313,9 @@ export const workflowEditorService = {
             async getRunDetails(runId) {
                 return await rpc(`/workflow_studio/run/${runId}`, {});
             },
+            async getNodeRunDetails(nodeRunId) {
+                return await rpc(`/workflow_studio/node_run/${nodeRunId}`, {});
+            },
             async resolveRecordRefs(refs = []) {
                 const safeRefs = Array.isArray(refs) ? refs : [];
                 return await rpc('/workflow_studio/resolve_record_refs', {
@@ -1262,6 +1333,9 @@ export const workflowEditorService = {
             },
             getWorkflowId() {
                 return workflowId;
+            },
+            copyExecutionToEditor() {
+                return actions.copyExecutionToEditor();
             },
             hasUnsavedChanges() {
                 return history.canUndo();

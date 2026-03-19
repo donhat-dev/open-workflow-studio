@@ -45,6 +45,7 @@ class WorkflowPilotController(http.Controller):
 
     def _build_node_result_schema(self, node_run):
         return NodeResultSchema(
+            node_run_id=node_run.id,
             node_id=node_run.node_id,
             node_type=node_run.node_type,
             node_label=node_run.node_label,
@@ -478,6 +479,14 @@ class WorkflowPilotController(http.Controller):
             context_snapshot=context_snapshot,
             executed_snapshot=run.executed_snapshot or {},
         ).model_dump()
+
+    @http.route('/workflow_studio/node_run/<int:node_run_id>', type='json', auth='user', methods=['GET', 'POST'])
+    def get_node_run(self, node_run_id):
+        """Return a single workflow.run.node payload for pin-data selection."""
+        node_run = request.env['workflow.run.node'].browse(node_run_id)
+        if not node_run.exists():
+            return ExecutionErrorSchema(error='Node run not found').model_dump()
+        return self._build_node_result_schema(node_run).model_dump()
 
     @http.route('/workflow_studio/execute_until', type='json', auth='user', methods=['POST'])
     def execute_until(self, workflow_id=None, target_node_id=None, input_data=None, snapshot=None, config_overrides=None, **kwargs):

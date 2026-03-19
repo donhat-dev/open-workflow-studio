@@ -27,11 +27,6 @@
 				<t t-if="isRecordRefMarker">
 					<div class="json-tree-node__record-refs">
 						<RecordBadge data="recordRefLabels" max="5" getLabel.bind="identity"/>
-						<button t-if="canExpandRecordRefs" class="json-tree-node__record-expand" type="button" t-on-click="onToggleRecordRefs">
-							<i t-att-class="state.recordRefsExpanded ? 'fa fa-chevron-up' : 'fa fa-chevron-down'"/>
-							<span t-if="!state.recordRefsLoading" t-esc="state.recordRefsExpanded ? 'Collapse' : 'Expand'"/>
-							<span t-else="">Loading...</span>
-						</button>
 					</div>
 				</t>
 				<t t-else="">

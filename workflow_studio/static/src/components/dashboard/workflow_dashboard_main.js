@@ -100,16 +100,6 @@ export class WorkflowDashboardMain extends Component {
         ];
     }
 
-    /** Bootstrap status colors for stacked bar datasets: Completed / Failed / Cancelled */
-    get runChartColors() {
-        const style = getComputedStyle(document.documentElement);
-        return [
-            style.getPropertyValue("--bs-success").trim() || "#198754",
-            style.getPropertyValue("--bs-danger").trim() || "#dc3545",
-            style.getPropertyValue("--bs-warning").trim() || "#ffc107",
-        ];
-    }
-
     onNavigate(actionXmlId, context) {
         this.actionService.doAction(actionXmlId || "workflow_studio.action_ir_workflow", {
             additionalContext: context || {},

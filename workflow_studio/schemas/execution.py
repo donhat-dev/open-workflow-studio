@@ -31,6 +31,7 @@ class NodeResultSchema:
     """Individual node execution result."""
     
     node_id: str
+    node_run_id: Optional[int] = None
     node_type: Optional[str] = None
     node_label: Optional[str] = None
     sequence: Optional[int] = None

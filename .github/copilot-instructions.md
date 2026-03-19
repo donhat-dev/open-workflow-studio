@@ -5,45 +5,6 @@
 - Target use case: **SMB retail/e-commerce** (Shopee/TikTok + carriers), **near real-time**, **\>15k orders/day** (+ stock/picking transactions).
 - Key differentiator vs generic tools: production-grade **throughput**, **rate-limit/backpressure**, **idempotency/dedupe**, **observability** (accept Redis/queue/OTel/etc.).
 
-## Repo reality (important)
-- This repo is a **browser-only playground** (CDN globals). It contains **working prototypes**, not production-ready Odoo architecture.
-- Two tracks:
-  - **Working UI prototype**: `index.html` → `app.js` + `nodes.js` + `styles.css` (manual graph; smooth connect; can execute).
-  - **Rete v2 spike**: `rete-owl-test.html` (real `Rete.NodeEditor` + `AreaPlugin` + `ConnectionPlugin` + custom OWL render plugin).
-- Rete docs are vendored as reference: `llms-full.txt`.
-- For “real Rete” work, use patterns from official render plugins (React/Lit/Vue) and mirror them for OWL/native.
-
-## How the working prototype is wired
-- `nodes.js`: node models (`Rete.ClassicPreset.Node`) exposed as `window.WorkflowNodes`; execution is `async data(inputs)`.
-- `app.js`: OWL UI shell + `SimpleEditor` (custom graph) + `DomRenderer` (manual DOM + SVG `<path>` connections).
-
-## Where to look (core paths)
-- Core architecture: `workflow_pilot/static/src/store/workflow_store.js`
-- Canvas behavior: `workflow_pilot/static/src/components/editor_canvas/`
-- Node system: `workflow_pilot/static/src/core/node.js` + `workflow_pilot/static/src/nodes/`
-- Expression engine: `workflow_pilot/static/src/utils/expression_utils.js`
-- Backend execution: `workflow_pilot/models/workflow_executor.py`
-- Node runners: `workflow_pilot/models/runners/`
-- Controllers: `workflow_pilot/controllers/main.py`
-- Backend views: `workflow_pilot/views/`
-
-## Overall plan (roadmap)
-1) **Keep the prototype usable** for UX/learning (don’t break `index.html`).
-2) **Migrate graph core to real Rete v2**: replace `SimpleEditor` with `NodeEditor` + plugins (use `rete-owl-test.html` as the reference).
-3) **Renderer strategy**: prefer OWL component rendering via a render plugin; minimize manual DOM.
-4) **Odoo module shape (future)**: split into many OWL components (node/socket/connection/panels) + server-side runtime (queue workers) + connectors.
-5) **Throughput features (must-have)**: per-connector rate-limit, retries/backoff, idempotency keys, dedupe, DLQ/replay, tracing/metrics.
-
-## Developer workflow
-- Serve over HTTP (avoids `file://` quirks): `python3 -m http.server` → open `http://localhost:8000/index.html`.
-- Debug handles: `window.app`, `window.app.editor`, `window.WorkflowNodes`.
-  - Add node: `window.app.editor.addNode(window.WorkflowNodes.HttpRequestNode, { x: 300, y: 300 })`
-  - Export: `window.app.editor.getWorkflow()`
-- **Restart Odoo (On-Demand)**:
-  - Run `python C:\Users\ODOO\Documents\workflow_automation_builder\trigger_restart.py`
-  - Only needed for Python code changes.
-  - No auto-restart/watchdog enabled.
-
 ## Project conventions (must follow)
 - **Language**: Vietnamese in conversation, English for code/docs.
 - **Fail-First**: no optional chaining (`?.`) for service/dependency access.
@@ -78,8 +39,20 @@
 - Use `useActiveElement(refName)` to scope hotkeys/commands to a component subtree; prevents conflicts with Odoo forms/dialogs.
 
 ## Odoo integration patterns
-- RPC via `/web/dataset/call_kw` with `{ model, method, args, kwargs }`.
+- ORM via `this.env.orm.call(model, method, args, kwargs)`.
 - Client actions: workflow id from `this.props.action.context.active_id`.
+
+## Human-confirmation MCP usage
+- Treat `human-confirmation` MCP as the primary channel for **human-in-the-loop confirmations and runtime user-state checks** during implementation, debugging, and testing when the answer must come from the user instead of from code or logs.
+- Before asking the user to approve, answer, or fill a form through `human-confirmation`, first use normal code/runtime inspection to gather everything the workspace can already prove (logs, API responses, DB state, local server status, active route/tool behavior). Do **not** ask the user for facts that can be verified directly from the repo or runtime.
+- When the workflow depends on whether the user is currently available, check availability first via `is_user_focus` / `is_user_awake` before sending a disruptive realtime/modal/form prompt.
+- Match the MCP interaction type to the job:
+	- `ask_realtime_question` for short blocking confirmations/branching decisions.
+	- `ask_modal_questions` for minor-to-medium structured text input.
+	- `ask_form_questions` for richer async surveys or when the user may respond later.
+- If you need environment/runtime facts that only the user can confirm (for example: which local instance they are looking at, whether a Discord/form prompt appeared, or whether credentials belong to the intended account), prefer a focused `human-confirmation` prompt over guessing.
+- Do not overuse `human-confirmation` MCP for routine progress chatter. Use it only when the user’s answer changes the implementation, validation path, or debugging conclusion.
+- When a `human-confirmation` interaction affects the technical conclusion, record the verified outcome in `CONTINUITY.md` so later turns do not rely on memory or assumptions.
 
 ## Anti-patterns (forbidden)
 - Optional chaining `?.` for services/dependencies.

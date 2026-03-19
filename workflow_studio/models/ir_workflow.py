@@ -303,9 +303,15 @@ class Workflow(models.Model):
         self.ensure_one()
         if not self.draft_snapshot or not self.draft_snapshot.get('nodes'):
             raise UserError(_("Cannot publish an empty workflow."))
-        
+
+        published_snapshot = copy.deepcopy(self.draft_snapshot)
+        metadata = published_snapshot.get('metadata')
+        if isinstance(metadata, dict):
+            metadata.pop('pin_data', None)
+            metadata.pop('pinData', None)
+
         self.write({
-            'published_snapshot': self.draft_snapshot.copy(),
+            'published_snapshot': published_snapshot,
             'published_version': self.version,
             'published_at': fields.Datetime.now(),
         })
@@ -387,16 +393,17 @@ class Workflow(models.Model):
         if 'metadata' not in snapshot or not isinstance(snapshot.get('metadata'), dict):
             snapshot['metadata'] = {}
         
-        # Save draft_snapshot (pinData is preserved for editor use)
+        # Save draft_snapshot (pin_data is preserved for editor use)
         self.write({'draft_snapshot': snapshot})
         
         # Also publish (save to both draft and published)
         if snapshot.get('nodes'):
-            published = snapshot.copy()
+            published = copy.deepcopy(snapshot)
             # Strip pin data from published snapshot — pinned outputs are
             # development-time fixtures that must never run in production.
             pub_meta = published.get('metadata')
             if isinstance(pub_meta, dict):
+                pub_meta.pop('pin_data', None)
                 pub_meta.pop('pinData', None)
             self.write({
                 'published_snapshot': published,
@@ -486,8 +493,19 @@ class Workflow(models.Model):
         if not self.published_snapshot.get('nodes'):
             raise UserError(_("Published workflow has no nodes."))
 
+        execution_snapshot = copy.deepcopy(self.published_snapshot)
+        draft_metadata = (self.draft_snapshot or {}).get('metadata') or {}
+        pin_data = draft_metadata.get('pin_data') or draft_metadata.get('pinData')
+        if pin_data:
+            metadata = execution_snapshot.get('metadata')
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata['pin_data'] = copy.deepcopy(pin_data)
+            metadata.pop('pinData', None)
+            execution_snapshot['metadata'] = metadata
+
         # Determine which start nodes to push (manual triggers only)
-        start_node_ids = self._find_manual_start_nodes(self.published_snapshot)
+        start_node_ids = self._find_manual_start_nodes(execution_snapshot)
         
         # Create run record with snapshot copy
         run = self.env['workflow.run'].create({
@@ -495,7 +513,7 @@ class Workflow(models.Model):
             'status': 'pending',
             'input_data': input_data or {},
             'executed_version': self.published_version,
-            'executed_snapshot': self.published_snapshot.copy(),
+            'executed_snapshot': execution_snapshot,
         })
         
         # Execute using WorkflowExecutor
@@ -959,7 +977,16 @@ class Workflow(models.Model):
         if not self.is_published or not self.published_snapshot:
             raise UserError(_("Workflow must be published before execution."))
 
-        snapshot = self.published_snapshot
+        snapshot = copy.deepcopy(self.published_snapshot)
+        draft_metadata = (self.draft_snapshot or {}).get('metadata') or {}
+        pin_data = draft_metadata.get('pin_data') or draft_metadata.get('pinData')
+        if pin_data:
+            metadata = snapshot.get('metadata')
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata['pin_data'] = copy.deepcopy(pin_data)
+            metadata.pop('pinData', None)
+            snapshot['metadata'] = metadata
         if not snapshot.get('nodes'):
             raise UserError(_("Published workflow has no nodes."))
 

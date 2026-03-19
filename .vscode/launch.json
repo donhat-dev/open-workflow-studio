@@ -42,25 +42,5 @@
       },
       "justMyCode": true
     },
-    // {
-    //   "name": "Odoo Dev (on-demand restart)",
-    //   "type": "debugpy",
-    //   "request": "launch",
-    //   "program": "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS\\dev_server.py",
-    //   "python": "C:\\Users\\ODOO\\Documents\\.venv18\\Scripts\\python.exe",
-    //   "console": "integratedTerminal",
-    //   "args": [
-    //     "--",
-    //     "-c", "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS\\conf.conf",
-    //     "--dev", "xml",
-    //     "-d", "hrm_pro_18",
-    //     "--addons-path",
-    //     "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS\\odoo\\addons,C:\\Users\\ODOO\\Documents\\workflow_automation_builder"
-    //   ],
-    //   "env": {
-    //     "ODOO_ROOT": "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS"
-    //   },
-    //   "justMyCode": false
-    // }
   ]
 }

@@ -46,7 +46,6 @@ export class WorkflowNode extends Component {
         this._toolbarPropsCache = null;
         this._toolbarPropsNodeId = null; 
         this._toolbarPropsDisabled = null;
-        this._toolbarPropsPinned = null;
 
         this._onInputSocketMouseDown = (data) => {
             const onSocketMouseDown = this.props.onSocketMouseDown;
@@ -82,7 +81,6 @@ export class WorkflowNode extends Component {
         this._onToolbarExecute = () => this.onExecuteNode();
         this._onToolbarDelete = () => this.onDeleteNode();
         this._onToolbarToggleDisable = () => this.onToggleDisable();
-        this._onToolbarTogglePin = () => this.onTogglePin();
         this._onToolbarOpenConfig = () => {
             const onOpenConfig = this.props.onOpenConfig;
             if (onOpenConfig) {
@@ -251,21 +249,6 @@ export class WorkflowNode extends Component {
     }
 
     /**
-     * Toggle pin/unpin for this node.
-     * If pinned → unpin. If not → requires execution data (handled by config panel).
-     */
-    onTogglePin() {
-        if (this.isReadonly) return;
-        if (!this.editor || !this.editor.actions) return;
-        const nodeId = this.props.node.id;
-        if (this.isPinned) {
-            this.editor.actions.unpinNodeData(nodeId);
-        }
-        // Pinning from Canvas toolbar only unpins;
-        // pinning requires execution data — done from config panel.
-    }
-
-    /**
      * Whether this node is a manual trigger (shows execute button).
      */
     get isManualTrigger() {
@@ -354,6 +337,17 @@ export class WorkflowNode extends Component {
     }
 
     /**
+     * Whether this node has pinned data.
+     * @returns {boolean}
+     */
+    get isPinned() {
+        if (!this.editor || !this.editor.actions || !this.editor.actions.isNodePinned) {
+            return false;
+        }
+        return this.editor.actions.isNodePinned(this.props.node.id) || false;
+    }
+
+    /**
      * Check if this node is disabled
      * @returns {boolean}
      */
@@ -362,17 +356,6 @@ export class WorkflowNode extends Component {
             return false;
         }
         return this.editor.actions.isNodeDisabled(this.props.node.id) || false;
-    }
-
-    /**
-     * Check if this node has pinned output data.
-     * @returns {boolean}
-     */
-    get isPinned() {
-        if (!this.editor || !this.editor.actions || !this.editor.actions.isNodePinned) {
-            return false;
-        }
-        return this.editor.actions.isNodePinned(this.props.node.id);
     }
 
     /**
@@ -450,20 +433,16 @@ export class WorkflowNode extends Component {
         if (this.isReadonly) return null;
         const nodeId = this.props.node.id;
         const isDisabled = this.props.node.disabled;
-        const isPinned = this.isPinned;
 
-        if (!this._toolbarPropsCache || this._toolbarPropsNodeId !== nodeId || this._toolbarPropsDisabled !== isDisabled || this._toolbarPropsPinned !== isPinned) {
+        if (!this._toolbarPropsCache || this._toolbarPropsNodeId !== nodeId || this._toolbarPropsDisabled !== isDisabled) {
             this._toolbarPropsNodeId = nodeId;
             this._toolbarPropsDisabled = isDisabled;
-            this._toolbarPropsPinned = isPinned;
             this._toolbarPropsCache = {
                 nodeId,
                 isDisabled,
-                isPinned,
                 onExecute: this._onToolbarExecute,
                 onDelete: this._onToolbarDelete,
                 onToggleDisable: this._onToolbarToggleDisable,
-                onTogglePin: this._onToolbarTogglePin,
                 onOpenConfig: this._onToolbarOpenConfig,
             };
         }

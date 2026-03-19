@@ -7,10 +7,6 @@
 				<button class="toolbar-btn btn btn-sm btn-link p-0 border-0" t-on-click="onConfigClick" title="Open configuration" type="button">
 					<i class="fa fa-cog"/>
 				</button>
-				<!-- Pin/Unpin Toggle -->
-				<button t-if="props.onTogglePin" class="toolbar-btn btn btn-sm btn-link p-0 border-0" t-att-class="{ 'toolbar-btn--pin-active': props.isPinned }" t-on-click="onTogglePinClick" t-att-title="pinTitle" type="button">
-					<i t-att-class="'fa ' + pinIcon"/>
-				</button>
 				<!-- Disable/Enable Toggle -->
 				<button class="toolbar-btn btn btn-sm btn-link p-0 border-0" t-on-click="onToggleClick" t-att-title="toggleTitle" type="button">
 					<i t-att-class="'fa ' + toggleIcon"/>

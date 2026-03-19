@@ -78,6 +78,7 @@ export class NodeConfigPanel extends Component {
             // Version/socket selection for output display
             selectedOutputSocket: null,  // null = first available socket
             selectedExecutionVersion: null,  // null = latest version
+            pinBusy: false,
         });
 
         this.panelRef = useRef("panel");
@@ -639,20 +640,21 @@ export class NodeConfigPanel extends Component {
                 source: 'execution',
             };
         }
-        // Fall back to pinned data when no execution result exists
-        if (this.isNodePinned) {
-            const pinData = this.actions.isNodePinned(this.props.node.id)
-                ? this._getPinnedOutputForDisplay()
-                : null;
-            if (pinData !== null) {
-                return {
-                    error: null,
-                    output: pinData,
-                    source: 'pinned',
-                };
-            }
-        }
         return null;
+    }
+
+    get canTogglePin() {
+        if (this.isNodePinned) {
+            return true;
+        }
+        const event = this.selectedExecutionEvent;
+        if (!event || event.error_message) return false;
+        // Allow pin when there's either a persisted node_run_id or output data
+        return !!(event.node_run_id || event.output_data !== undefined && event.output_data !== null);
+    }
+
+    get isPinButtonDisabled() {
+        return this.state.pinBusy || !this.canTogglePin;
     }
 
     /**
@@ -667,35 +669,57 @@ export class NodeConfigPanel extends Component {
      * Toggle pin state for the current node.
      * If pinned → unpin. If not pinned → pin current execution output.
      */
-    onTogglePin() {
-        const nodeId = this.props.node.id;
-        if (this.isNodePinned) {
-            this.actions.unpinNodeData(nodeId);
+    async onTogglePin() {
+        if (this.state.pinBusy) {
             return;
         }
-        // Pin the current execution result
-        const result = this.executionNodeResult;
-        if (!result || result.error_message) return;
-        const output = result.output_data;
-        if (output == null) return;
-        const pinOutput = {
-            outputs: Array.isArray(output) ? [output] : [[output]],
-            json: Array.isArray(output) ? output[0] : output,
-        };
-        this.actions.pinNodeData(nodeId, pinOutput);
-    }
+        const nodeId = this.props.node.id;
+        if (!this.actions.saveWorkflow) {
+            throw new Error("[NodeConfigPanel] Missing saveWorkflow action");
+        }
+        this.state.pinBusy = true;
+        try {
+            if (this.isNodePinned) {
+                this.actions.unpinNodeData(nodeId);
+                await this.actions.saveWorkflow();
+                return;
+            }
 
-    /**
-     * Extract display-friendly data from pinned output.
-     * @private
-     */
-    _getPinnedOutputForDisplay() {
-        const editor = this.env.workflowEditor;
-        if (!editor) return null;
-        const pinStore = editor.state.pinData || {};
-        const pinData = pinStore[this.props.node.id];
-        if (!pinData) return null;
-        return pinData.json !== undefined ? pinData.json : pinData;
+            const selectedEvent = this.selectedExecutionEvent;
+            if (!selectedEvent || selectedEvent.error_message) {
+                return;
+            }
+
+            if (selectedEvent.node_run_id) {
+                // Persisted run: pin by reference
+                if (!this.actions.getNodeRunDetails) {
+                    throw new Error("[NodeConfigPanel] Missing getNodeRunDetails action");
+                }
+                const nodeRun = await this.actions.getNodeRunDetails(selectedEvent.node_run_id);
+                if (!nodeRun || nodeRun.error) {
+                    throw new Error(nodeRun && nodeRun.error ? nodeRun.error : "Node run details not found");
+                }
+                if (this.actions.replaceExecutionNodeResult) {
+                    this.actions.replaceExecutionNodeResult(nodeRun);
+                }
+                this.actions.pinNodeData(nodeId, nodeRun.node_run_id || selectedEvent.node_run_id);
+            } else {
+                // Preview execution: pin inline data
+                const inlineData = {
+                    output_data: selectedEvent.output_data,
+                    input_data: selectedEvent.input_data,
+                    node_type: selectedEvent.node_type,
+                    node_label: selectedEvent.node_label || selectedEvent.title,
+                    output_socket: selectedEvent.output_socket,
+                };
+                this.actions.pinNodeData(nodeId, inlineData);
+            }
+            await this.actions.saveWorkflow();
+        } catch (error) {
+            console.error('[NodeConfigPanel] Pin toggle failed:', error);
+        } finally {
+            this.state.pinBusy = false;
+        }
     }
 
     get outputItemCount() {

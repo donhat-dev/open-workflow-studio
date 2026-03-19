@@ -69,16 +69,6 @@
     background: rgba(220, 53, 69, 0.12);
   }
 
-  /* Pin active state - warning accent */
-  &--pin-active {
-    color: var(--o-warning, #f0ad4e);
-
-    &:hover:not(:disabled) {
-      color: var(--o-warning, #f0ad4e);
-      background: rgba(240, 173, 78, 0.12);
-    }
-  }
-
   .fa {
     font-size: 11px;
   }

@@ -73,6 +73,7 @@ export class WorkflowEditorApp extends Component {
         useBus(this.editorService.bus, "run", () => this.execute());
         
         onWillUnmount(() => {
+            this.editorService.actions.clearExecution();
             this._uninstallWindowAppFacade();
         });
          

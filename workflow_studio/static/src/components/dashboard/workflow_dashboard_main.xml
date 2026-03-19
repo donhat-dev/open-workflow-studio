@@ -23,8 +23,7 @@
                                     type="'stacked_bar'"
                                     data="dashboardData.runs"
                                     toggleOptions="runChartToggleOptions"
-                                    defaultToggle="'7d'"
-                                    colors="runChartColors"/>
+                                    defaultToggle="'7d'"/>
                             </div>
                             <div class="o_wf_card_slot" style="flex: 1;">
                                 <!-- Top Workflows: card via DashboardBlock, body-only sub-component -->

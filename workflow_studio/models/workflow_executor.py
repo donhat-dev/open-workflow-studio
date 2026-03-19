@@ -1209,15 +1209,124 @@ class WorkflowExecutor:
         'record_event_trigger', 'loop',
     }
 
-    def _get_pin_data(self, node_id):
-        """Return pinned output data for a node, or None if not pinned.
-
-        Pin data is stored in ``snapshot.metadata.pinData[node_id]`` and
-        is only honoured during manual / preview execution (not production).
-        """
+    def _get_pin_reference(self, node_id):
+        """Return pinned node-run reference for a node, or None."""
         metadata = self.snapshot.get('metadata') or {}
-        pin_store = metadata.get('pinData') or {}
+        pin_store = metadata.get('pin_data')
+        if not isinstance(pin_store, dict):
+            pin_store = metadata.get('pinData') or {}
         return pin_store.get(node_id)
+
+    def _build_pinned_result(self, node, node_run):
+        """Convert a persisted workflow.run.node to a NodeOutput payload."""
+        if node_run.error_message:
+            return {
+                'outputs': [],
+                'json': None,
+                'error': node_run.error_message,
+                'meta': {'pinned_node_run_id': node_run.id},
+            }
+
+        output_value = self._normalize_output_value(node_run.output_data)
+        output_socket = node_run.output_socket or 'output'
+        output_index = self._socket_to_index(node or {}, output_socket)
+        if output_index < 0:
+            output_index = 0
+
+        outputs = [[] for _ in range(max(output_index + 1, 1))]
+        if output_value is None:
+            outputs[output_index] = []
+            json_value = None
+        elif isinstance(output_value, list):
+            outputs[output_index] = output_value
+            json_value = output_value[0] if len(output_value) == 1 else output_value
+        else:
+            outputs[output_index] = [output_value]
+            json_value = output_value
+
+        return {
+            'outputs': outputs,
+            'json': json_value,
+            'meta': {'pinned_node_run_id': node_run.id},
+        }
+
+    def _build_inline_pin_result(self, node_id, pin_data):
+        """Convert an inline pin data dict to a NodeOutput payload."""
+        output_value = self._normalize_output_value(pin_data.get('output_data'))
+        output_socket = pin_data.get('output_socket') or 'output'
+        node = self.nodes.get(node_id) or {}
+        output_index = self._socket_to_index(node, output_socket)
+        if output_index < 0:
+            output_index = 0
+
+        outputs = [[] for _ in range(max(output_index + 1, 1))]
+        if output_value is None:
+            outputs[output_index] = []
+            json_value = None
+        elif isinstance(output_value, list):
+            outputs[output_index] = output_value
+            json_value = output_value[0] if len(output_value) == 1 else output_value
+        else:
+            outputs[output_index] = [output_value]
+            json_value = output_value
+
+        return {
+            'outputs': outputs,
+            'json': json_value,
+            'meta': {'pinned_inline': True},
+        }
+
+    def _get_pin_data(self, node_id):
+        """Resolve pinned output data for a node, or None if not pinned.
+
+        Pin metadata stores either:
+        - ``node_id -> workflow.run.node.id`` integer references, or
+        - ``node_id -> {output_data: ...}`` inline data objects
+        in ``snapshot.metadata.pin_data``.
+
+        Integer references are resolved from the database at execution time.
+        Inline objects are converted directly into NodeOutput payloads.
+        """
+        pin_ref = self._get_pin_reference(node_id)
+        if not pin_ref:
+            return None
+
+        # Inline data pin (object with output_data)
+        if isinstance(pin_ref, dict):
+            return self._build_inline_pin_result(node_id, pin_ref)
+
+        try:
+            pin_ref = int(pin_ref)
+        except Exception:
+            _logger.warning("Invalid pin_data reference for node %s: %r", node_id, pin_ref)
+            return None
+
+        node_run = self.env['workflow.run.node'].browse(pin_ref)
+        if not node_run.exists():
+            _logger.warning("Pinned node run %s not found for node %s", pin_ref, node_id)
+            return None
+
+        if node_run.node_id != node_id:
+            _logger.warning(
+                "Pinned node run %s belongs to node %s, expected %s",
+                pin_ref,
+                node_run.node_id,
+                node_id,
+            )
+            return None
+
+        workflow = self._get_execution_workflow()
+        if workflow and node_run.run_id and node_run.run_id.workflow_id != workflow:
+            _logger.warning(
+                "Pinned node run %s belongs to workflow %s, expected workflow %s",
+                pin_ref,
+                node_run.run_id.workflow_id.id,
+                workflow.id,
+            )
+            return None
+
+        node = self.nodes.get(node_id) or {}
+        return self._build_pinned_result(node, node_run)
 
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
@@ -1227,8 +1336,8 @@ class WorkflowExecutor:
         ``_persist_all_node_runs()`` batch-creates all records after the
         execution loop finishes.
 
-        Pin data check: if the node has pinned output in
-        ``snapshot.metadata.pinData`` and the node type is not in the
+        Pin data check: if the node has a pinned node-run reference in
+        ``snapshot.metadata.pin_data`` and the node type is not in the
         deny list, return the pinned data directly (skip execution).
 
         Args:

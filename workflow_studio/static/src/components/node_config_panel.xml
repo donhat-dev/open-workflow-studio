@@ -36,9 +36,9 @@
 					</div>
 				</div>
 				<!-- Three Column Content -->
-				<div class="node-config-content d-flex" t-att-class="{ 'execution-view-mode': isExecutionView }">
+				<div class="node-config-content row g-0" t-att-class="{ 'execution-view-mode': isExecutionView }">
 					<!-- LEFT COLUMN: Ancestor Node Outputs (Input) -->
-					<div class="node-config-col-input d-flex flex-column">
+					<div class="node-config-col-input d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
 						<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
 							<div class="d-flex align-items-center gap-2">
 								<i class="fa fa-database"/>
@@ -99,7 +99,7 @@
 						</div>
 					</div>
 					<!-- CENTER COLUMN: Node Configuration -->
-					<div class="node-config-col-config d-flex flex-column" t-att-class="{ 'readonly-config': isExecutionView }">
+					<div class="node-config-col-config d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView, 'readonly-config': isExecutionView }">
 						<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
 						<!-- Tab Content -->
 						<div class="tab-content p-3">
@@ -136,7 +136,7 @@
 						</TabNav>
 					</div>
 					<!-- RIGHT COLUMN: Output (always visible) -->
-					<div class="node-config-col-output d-flex flex-column">
+					<div class="node-config-col-output d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
 						<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
 							<div class="d-flex align-items-center gap-2">
 								<i class="fa fa-terminal"/>
@@ -144,13 +144,15 @@
 							</div>
 							<div class="d-flex align-items-center gap-2">
 								<!-- Pin / Unpin button -->
-								<button t-if="!isExecutionView and executionDisplayResult and !executionDisplayResult.error"
-									class="btn btn-sm btn-link p-0 border-0 pin-toggle-btn"
+								<button t-if="!isExecutionView"
+									class="btn btn-sm pin-toggle-btn"
 									t-att-class="{ 'pin-active': isNodePinned }"
 									t-on-click="onTogglePin"
+									t-att-disabled="isPinButtonDisabled ? 'disabled' : undefined"
 									t-att-title="isNodePinned ? 'Unpin data (resume live execution)' : 'Pin output data (skip execution)'"
 									type="button">
-									<i t-att-class="'fa ' + (isNodePinned ? 'fa-thumb-tack text-warning' : 'fa-thumb-tack')"/>
+									<i t-if="state.pinBusy" class="fa fa-spinner fa-spin"/>
+									<i t-else="" t-att-class="'fa ' + (isNodePinned ? 'fa-thumb-tack text-warning' : 'fa-thumb-tack')"/>
 								</button>
 								<!-- Version selector dropdown (when multiple executions for active socket) -->
 								<t t-if="versionOptions.length > 0">
@@ -172,8 +174,8 @@
 						<!-- Pinned data banner -->
 						<div t-if="isNodePinned" class="pinned-data-banner d-flex align-items-center gap-2 px-3 py-2 border-bottom">
 							<i class="fa fa-thumb-tack text-warning"/>
-							<span class="small">Output is pinned — this node will be skipped during execution</span>
-							<button class="btn btn-sm btn-link p-0 ms-auto text-muted" t-on-click="onTogglePin" title="Unpin" type="button">
+							<span class="small">Pinned to saved run data — this node will skip runner execution in editor runs</span>
+							<button class="btn btn-sm btn-link p-0 ms-auto text-muted" t-on-click="onTogglePin" t-att-disabled="state.pinBusy ? 'disabled' : undefined" title="Unpin" type="button">
 								<i class="fa fa-times"/>
 							</button>
 						</div>

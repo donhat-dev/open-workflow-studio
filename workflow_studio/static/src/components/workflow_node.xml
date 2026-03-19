@@ -50,11 +50,6 @@
 				<!-- Footer actions removed -->
 			</div>
 
-			<!-- Pin Badge (top-right) -->
-			<div t-if="isPinned" class="workflow-node__pin-badge" title="Output pinned — node will be skipped during execution">
-				<i class="fa fa-thumb-tack"/>
-			</div>
-
 			<!-- Execution Status Badge (bottom-right) -->
 			<div t-if="props.executionStatus" t-att-class="'workflow-node__exec-badge workflow-node__exec-badge--' + props.executionStatus">
 				<i t-if="props.executionStatus === 'running'" class="ms-1 fa fa-spinner fa-spin"/>

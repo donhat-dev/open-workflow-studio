@@ -138,25 +138,20 @@
   border-bottom-color: $o-action;
 }
 
-/* Content - Three Column Layout (Input | Config | Output) */
+/* Content - Three Column Layout (Input | Config | Output) — uses Bootstrap row/col */
 .node-config-content {
   flex: 1;
   min-height: 0; /* Critical for flex scrollability */
   overflow: hidden; /* Children handle their own scrolling */
-  gap: 0;
 }
 
 .node-config-col-input {
-  width: 25%;
-  min-width: 200px;
   min-height: 0;
   border-right: 1px solid $o-gray-300;
   background: $o-gray-100;
 }
 
 .node-config-col-config {
-  flex: 1;
-  min-width: 300px;
   min-height: 0;
   overflow: hidden;
   border-right: 1px solid $o-gray-300;
@@ -175,28 +170,8 @@
 }
 
 .node-config-col-output {
-  width: 25%;
-  min-width: 200px;
   min-height: 0;
   background: $o-gray-100;
-}
-
-// Execution view mode: show all three columns with equal weight
-.node-config-content.execution-view-mode {
-  .node-config-col-input {
-    width: 33.33%;
-    min-width: 200px;
-  }
-
-  .node-config-col-config {
-    width: 33.33%;
-    min-width: 200px;
-  }
-
-  .node-config-col-output {
-    width: 33.33%;
-    min-width: 200px;
-  }
 }
 
 // Readonly config column styling (execution view)
@@ -246,16 +221,44 @@
 
 /* Pin toggle button in output header */
 .pin-toggle-btn {
-  color: $o-gray-500;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $o-gray-300;
+  border-radius: 6px;
+  background: $o-white;
+  color: $o-gray-600;
   font-size: 0.875rem;
-  transition: color 0.15s;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 
   &:hover {
+    border-color: rgba($o-warning, 0.45);
+    background: rgba($o-warning, 0.06);
     color: $o-warning;
   }
 
   &.pin-active {
+    border-color: rgba($o-warning, 0.55);
+    background: rgba($o-warning, 0.08);
     color: $o-warning;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba($o-warning, 0.18);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: $o-gray-100;
+    color: $o-gray-400;
+    border-color: $o-gray-300;
+    box-shadow: none;
   }
 }
 
