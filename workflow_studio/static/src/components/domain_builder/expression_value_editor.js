@@ -164,7 +164,12 @@ export class ExpressionValueEditor extends Component {
             mode: shouldUseExpressionMode(initialValue) ? "expression" : "literal",
             expressionValid: isExpressionContentValid(initialValue),
             hasExplicitModeSelection: false,
+            dragOver: false,
         });
+        /** @type {boolean} true when drag-enter auto-toggled to expression mode */
+        this._dragAutoToggled = false;
+        /** @type {number} nested enter/leave counter (child elements fire extra events) */
+        this._dragEnterCount = 0;
 
         onWillUpdateProps((nextProps) => {
             const nextValue = nextProps ? nextProps.value : undefined;
@@ -225,6 +230,74 @@ export class ExpressionValueEditor extends Component {
             //          {{ _input.item.records[0].id }} => _input.item.records[0].id
             this.state.mode = "literal";
             this.props.update(toLiteralSeed(this.props.value, this.props.nativeEditorInfo.defaultValue()));
+        }
+    }
+
+    /**
+     * Returns true when the drag payload contains an expression path
+     * (i.e. comes from JsonTreeNode in the input panel).
+     */
+    _isExpressionDrag(ev) {
+        return ev.dataTransfer.types.includes("application/x-expression");
+    }
+
+    onDragEnter(ev) {
+        if (!this._isExpressionDrag(ev)) {
+            return;
+        }
+        ev.preventDefault();
+        this._dragEnterCount++;
+        this.state.dragOver = true;
+        // Auto-toggle to expression mode so the ExpressionInput is ready
+        if (this.state.mode === "literal") {
+            this._dragAutoToggled = true;
+            this.state.mode = "expression";
+        }
+    }
+
+    onDragOver(ev) {
+        if (!this._isExpressionDrag(ev)) {
+            return;
+        }
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "copy";
+    }
+
+    onDragLeave(ev) {
+        if (!this._isExpressionDrag(ev)) {
+            return;
+        }
+        this._dragEnterCount--;
+        if (this._dragEnterCount > 0) {
+            return; // still inside nested children
+        }
+        this.state.dragOver = false;
+        // Revert auto-toggle when drag leaves without drop
+        if (this._dragAutoToggled) {
+            this._dragAutoToggled = false;
+            this.state.mode = "literal";
+        }
+    }
+
+    onDrop(ev) {
+        ev.preventDefault();
+        this._dragEnterCount = 0;
+        this.state.dragOver = false;
+
+        const expr = ev.dataTransfer.getData("application/x-expression")
+            || ev.dataTransfer.getData("text/plain");
+        if (expr) {
+            // Commit: lock into expression mode (no longer "auto")
+            this._dragAutoToggled = false;
+            this.state.hasExplicitModeSelection = true;
+            if (this.state.mode !== "expression") {
+                this.state.mode = "expression";
+            }
+            this.props.update(ensureExpressionPrefix(expr));
+        } else if (this._dragAutoToggled) {
+            // No useful data — revert
+            this._dragAutoToggled = false;
+            this.state.mode = "literal";
         }
     }
 

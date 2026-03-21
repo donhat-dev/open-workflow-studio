@@ -52,7 +52,7 @@
                                         actionXmlId="'workflow_studio.action_workflow_run_activity'"
                                         viewType="'list'"
                                         context="{'create': false}"
-                                        limit="5"/>
+                                        limit="7"/>
                                 </DashboardBlock>
                             </div>
                         </div>

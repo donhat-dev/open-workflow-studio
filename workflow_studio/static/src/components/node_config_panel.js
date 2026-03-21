@@ -1,15 +1,39 @@
 /** @odoo-module **/
 
-import { Component, useState, useRef, onMounted, onWillUpdateProps } from "@odoo/owl";
+import { Component, useState, onMounted, onWillUnmount, onWillUpdateProps } from "@odoo/owl";
+import { useService } from "@web/core/utils/hooks";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
 import { TabNav } from "./primitives/tab_nav/tab_nav";
+import { UrlBox } from "./primitives/url_box/url_box";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 import {
     getLatestNodeResultsByNodeIds,
     getStructuralPredecessorIds,
 } from "@workflow_studio/utils/graph_utils";
+
+function normalizeTriggerFields(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value
+        .filter((item) => typeof item === "string" && item.trim())
+        .map((item) => item.trim());
+}
+
+function formatDateTime(value) {
+    if (!value || typeof value !== "string") {
+        return "Never";
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleString();
+}
 
 function inferControlMode(control, value) {
     if (inferExpressionModeFromValue(value)) {
@@ -22,6 +46,89 @@ function normalizeControlValue(control, value) {
     return value;
 }
 
+const TRIGGER_NODE_TYPES = new Set([
+    "manual_trigger",
+    "schedule_trigger",
+    "webhook_trigger",
+    "record_event_trigger",
+]);
+
+const SCHEDULE_INTERVAL_OPTIONS = ["minutes", "hours", "days", "weeks", "months"];
+const WEBHOOK_METHOD_OPTIONS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const WEBHOOK_RESPONSE_OPTIONS = ["immediate", "last_node"];
+const RECORD_EVENT_OPTIONS = ["on_create_or_write", "on_create", "on_write", "on_unlink"];
+
+function makeSelectOptions(values) {
+    return values.map((value) => ({ value, label: value }));
+}
+
+function buildFallbackTriggerControls(node) {
+    const config = node && node.config ? node.config : {};
+    switch (node.type) {
+        case "schedule_trigger":
+            return [
+                {
+                    key: "interval_number",
+                    type: "number",
+                    label: "Every",
+                    value: config.interval_number || 1,
+                    min: 1,
+                },
+                {
+                    key: "interval_type",
+                    type: "select",
+                    label: "Unit",
+                    value: config.interval_type || "hours",
+                    options: makeSelectOptions(SCHEDULE_INTERVAL_OPTIONS),
+                },
+            ];
+        case "webhook_trigger":
+            return [
+                {
+                    key: "http_method",
+                    type: "select",
+                    label: "HTTP Method",
+                    value: config.http_method || "POST",
+                    section: "webhook",
+                    options: makeSelectOptions(WEBHOOK_METHOD_OPTIONS),
+                },
+                {
+                    key: "response_mode",
+                    type: "select",
+                    label: "Response Mode",
+                    value: config.response_mode || "immediate",
+                    section: "webhook",
+                    options: makeSelectOptions(WEBHOOK_RESPONSE_OPTIONS),
+                },
+            ];
+        case "record_event_trigger":
+            return [
+                {
+                    key: "model_name",
+                    type: "model_select",
+                    label: "Model",
+                    value: config.model_name || "",
+                    placeholder: "res.partner",
+                },
+                {
+                    key: "trigger_event",
+                    type: "select",
+                    label: "Trigger Event",
+                    value: config.trigger_event || "on_create_or_write",
+                    options: makeSelectOptions(RECORD_EVENT_OPTIONS),
+                },
+                {
+                    key: "filter_domain",
+                    type: "domain",
+                    label: "Filter Domain",
+                    value: typeof config.filter_domain === "string" ? config.filter_domain : "[]",
+                },
+            ];
+        default:
+            return [];
+    }
+}
+
 /**
  * NodeConfigPanel Component
  *
@@ -30,8 +137,20 @@ function normalizeControlValue(control, value) {
  * runService for node/workflow execution.
  */
 export class NodeConfigPanel extends Component {
-    static template = "workflow_studio.node_config_panel";
-    static components = { ControlRenderer, JsonTreeNode, TabNav };
+    static template = "workflow_studio.ConfigPanel";
+    static components = { ControlRenderer, JsonTreeNode, TabNav, UrlBox };
+    static subTemplates = {
+        header: "workflow_studio.ConfigPanel.Header",
+        input: "workflow_studio.ConfigPanel.Input",
+        config: "workflow_studio.ConfigPanel.Config",
+        output: "workflow_studio.ConfigPanel.Output",
+        genericConfig: "workflow_studio.ConfigPanel.GenericConfig",
+        triggerConfig: "workflow_studio.ConfigPanel.TriggerConfig",
+        triggerManual: "workflow_studio.ConfigPanel.TriggerConfig.Manual",
+        triggerSchedule: "workflow_studio.ConfigPanel.TriggerConfig.Schedule",
+        triggerWebhook: "workflow_studio.ConfigPanel.TriggerConfig.Webhook",
+        triggerRecordEvent: "workflow_studio.ConfigPanel.TriggerConfig.RecordEvent",
+    };
 
     static props = {
         node: { type: Object },  // Required: node data object (plain, no _node)
@@ -55,9 +174,14 @@ export class NodeConfigPanel extends Component {
             throw new Error("[NodeConfigPanel] Missing actions prop");
         }
 
+        this.notification = useService("notification");
+        this.fieldService = useService("field");
+        this.workflowEditor = useService("workflowEditor");
+
         // Kick off background fetch of Odoo model list for model_select controls.
         // getOdooModels() returns cached list immediately (fallback during fetch).
         this._odooModels = useOdooModels();
+        this._triggerPollTimer = null;
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -68,10 +192,6 @@ export class NodeConfigPanel extends Component {
             pairModes: {},  // { [controlKey]: { [pairId]: { key, value } } }
             // Collapsed ancestor sections
             collapsedSections: {},  // { nodeId: true/false }
-            // Panel resize state
-            isExpanded: false,  // Full width mode
-            customWidth: null,  // Custom width from drag (in pixels)
-            isResizing: false,  // Currently dragging to resize
             // Lazy-loaded record ref details cache.
             // Key format: `${model}:${id}`
             recordRefCache: {},
@@ -79,17 +199,27 @@ export class NodeConfigPanel extends Component {
             selectedOutputSocket: null,  // null = first available socket
             selectedExecutionVersion: null,  // null = latest version
             pinBusy: false,
+            triggerLoading: false,
+            triggerBusy: false,
+            activeWebhookTab: "production",
+            triggerPanelData: null,
+            triggerFieldSuggestions: [],
+            triggerErrorMessage: "",
         });
 
-        this.panelRef = useRef("panel");
         this._saveDebounceTimer = null;
 
         // Initialize control values from adapter
-        onMounted(() => {
+        onMounted(async () => {
             this.initControlValues();
+            if (this.isTriggerNode) {
+                await this._bootstrapTriggerPanel(this.props.node);
+            } else {
+                this._resetTriggerState();
+            }
         });
 
-        onWillUpdateProps((nextProps) => {
+        onWillUpdateProps(async (nextProps) => {
             if (nextProps.node.id !== this.props.node.id) {
                 this.state.activeTab = "parameters";
                 this.state.controlValues = {};
@@ -100,7 +230,16 @@ export class NodeConfigPanel extends Component {
                 this.state.selectedOutputSocket = null;
                 this.state.selectedExecutionVersion = null;
                 this.initControlValues(nextProps.node);
+                if (TRIGGER_NODE_TYPES.has(nextProps.node.type)) {
+                    await this._bootstrapTriggerPanel(nextProps.node);
+                } else {
+                    this._resetTriggerState();
+                }
             }
+        });
+
+        onWillUnmount(() => {
+            this._stopTriggerPolling();
         });
     }
 
@@ -128,7 +267,10 @@ export class NodeConfigPanel extends Component {
         if (!this.actions.getControls) {
             throw new Error("[NodeConfigPanel] Missing actions.getControls");
         }
-        const controls = this.actions.getControls(nodeId);
+        let controls = this.actions.getControls(nodeId);
+        if (TRIGGER_NODE_TYPES.has(targetNode.type) && (!Array.isArray(controls) || controls.length === 0)) {
+            controls = buildFallbackTriggerControls(targetNode);
+        }
         this.state.controls = controls;
 
         // Extract values for local state
@@ -141,6 +283,9 @@ export class NodeConfigPanel extends Component {
                 valuesNormalized = true;
             }
             control.value = normalizedValue;
+        }
+        if (targetNode.type === "record_event_trigger") {
+            values.trigger_fields = normalizeTriggerFields(targetNode.config && targetNode.config.trigger_fields);
         }
         this.state.controlValues = values;
 
@@ -199,12 +344,25 @@ export class NodeConfigPanel extends Component {
      */
     getControls() {
         const raw = this.state.controls || [];
-        return raw.map((ctrl) => {
+        const controls = raw.map((ctrl) => {
             if (ctrl.type === "model_select") {
                 return { ...ctrl, suggestions: this._getModelSuggestions() };
             }
             return ctrl;
         });
+
+        if (this.isRecordEventTrigger && this.showTriggerFields) {
+            controls.push({
+                key: "trigger_fields",
+                type: "trigger_fields",
+                label: "Watch only these updated fields",
+                section: "filters",
+                suggestions: this.triggerFieldSuggestions,
+                value: normalizeTriggerFields(this.state.controlValues.trigger_fields),
+            });
+        }
+
+        return controls;
     }
 
     /**
@@ -273,6 +431,10 @@ export class NodeConfigPanel extends Component {
     _getSectionIcon(section) {
         const icons = {
             general: 'fa-cube',
+            trigger: 'fa-bolt',
+            webhook: 'fa-link',
+            filters: 'fa-filter',
+            runtime: 'fa-play-circle',
             request: 'fa-globe',
             authentication: 'fa-lock',
             body: 'fa-file-text-o',
@@ -283,6 +445,15 @@ export class NodeConfigPanel extends Component {
     }
 
     formatSectionName(section) {
+        if (section === "webhook") {
+            return "Webhook";
+        }
+        if (section === "filters") {
+            return "Filters";
+        }
+        if (section === "trigger") {
+            return "Trigger";
+        }
         return section.charAt(0).toUpperCase() + section.slice(1);
     }
 
@@ -293,12 +464,16 @@ export class NodeConfigPanel extends Component {
         return this.props.node.title || this.props.node.type || 'Node Configuration';
     }
 
+    get canEditNodeTitle() {
+        return !this.isExecutionView;
+    }
+
     /**
      * Value shown in the Settings > Node Name input.
      * For auto-titled nodes shows the computed label; for custom-titled shows the stored title.
      */
     get nodeNameInputValue() {
-        return this.props.node.title || '';
+        return this.nodeTitle || '';
     }
 
     /**
@@ -347,6 +522,193 @@ export class NodeConfigPanel extends Component {
 
     get isExecutionView() {
         return this.props.viewMode === 'execution';
+    }
+
+    get isTriggerNode() {
+        return TRIGGER_NODE_TYPES.has(this.props.node.type);
+    }
+
+    get isManualTrigger() {
+        return this.props.node.type === "manual_trigger";
+    }
+
+    get isScheduleTrigger() {
+        return this.props.node.type === "schedule_trigger";
+    }
+
+    get isWebhookTrigger() {
+        return this.props.node.type === "webhook_trigger";
+    }
+
+    get isRecordEventTrigger() {
+        return this.props.node.type === "record_event_trigger";
+    }
+
+    get triggerPanelData() {
+        return this.state.triggerPanelData;
+    }
+
+    get backendState() {
+        const panelData = this.triggerPanelData;
+        if (panelData && panelData.backend) {
+            return panelData.backend;
+        }
+        return {
+            active: false,
+            workflow_is_published: false,
+            workflow_is_activated: false,
+            trigger_count: 0,
+            webhook_test_active: false,
+        };
+    }
+
+    get warnings() {
+        const panelData = this.triggerPanelData;
+        if (panelData && Array.isArray(panelData.warnings)) {
+            return panelData.warnings;
+        }
+        return [];
+    }
+
+    get triggerHeaderSummary() {
+        if (!this.isTriggerNode) {
+            return "";
+        }
+        const triggerCount = this.backendState.trigger_count || 0;
+        const triggerLabel = triggerCount === 1 ? "time" : "times";
+        return `Triggered ${triggerCount} ${triggerLabel} • ${this.workflowStatusLabel} • ${this.workflowActivationLabel}`;
+    }
+
+    get triggerHeaderStatusLabel() {
+        if (!this.isTriggerNode) {
+            return "";
+        }
+        return this.backendState.active ? "Active" : "Inactive";
+    }
+
+    get triggerHeaderStatusClass() {
+        return this.backendState.active ? "is-active" : "is-inactive";
+    }
+
+    get triggerHeaderButtons() {
+        if (!this.isTriggerNode) {
+            return [];
+        }
+
+        const buttons = [];
+        const isDisabled = this.state.triggerBusy || this.state.triggerLoading;
+
+        if (this.isManualTrigger && !this.isExecutionView) {
+            buttons.push({
+                id: "execute-trigger",
+                label: "Execute trigger",
+                icon: "fa-play",
+                className: "btn-success",
+                disabled: isDisabled,
+                onClick: () => this.onExecuteManualTrigger(),
+            });
+        }
+
+        if (!this.isManualTrigger && !this.isExecutionView) {
+            buttons.push({
+                id: "toggle-activation",
+                label: this.backendState.active ? "Deactivate" : "Activate",
+                icon: this.backendState.active ? "fa-pause" : "fa-bolt",
+                className: "btn-primary",
+                disabled: isDisabled,
+                onClick: () => this.onToggleTriggerActivation(),
+            });
+        }
+
+        if (this.hasOpenBackendAction && !this.isExecutionView) {
+            buttons.push({
+                id: "open-backend-record",
+                label: "Open backend record",
+                icon: "fa-external-link",
+                className: "btn-outline-secondary",
+                disabled: isDisabled,
+                onClick: () => this.onOpenTriggerBackendRecord(),
+            });
+        }
+
+        return buttons;
+    }
+
+    get workflowStatusLabel() {
+        return this.backendState.workflow_is_published ? "Published" : "Draft";
+    }
+
+    get workflowActivationLabel() {
+        return this.backendState.workflow_is_activated ? "Workflow live" : "Workflow paused";
+    }
+
+    get webhookUrlTabs() {
+        return [
+            { id: "production", label: "Production", icon: "fa-link" },
+            { id: "test", label: "Test", icon: "fa-flask" },
+        ];
+    }
+
+    get isProductionWebhookTab() {
+        return this.state.activeWebhookTab === "production";
+    }
+
+    get isTestWebhookTab() {
+        return this.state.activeWebhookTab === "test";
+    }
+
+    get hasWebhookTestPayload() {
+        const payload = this.backendState.webhook_last_test_payload;
+        return payload !== undefined && payload !== null && payload !== false;
+    }
+
+    get lastTestTriggerLabel() {
+        if (!this.backendState.webhook_last_test_triggered) {
+            return "No test payload received yet";
+        }
+        return formatDateTime(this.backendState.webhook_last_test_triggered);
+    }
+
+    get triggerOutputTitle() {
+        if (this.isWebhookTrigger) {
+            return "Test output";
+        }
+        if (this.isManualTrigger) {
+            return "Run notes";
+        }
+        return "Runtime status";
+    }
+
+    get triggerOutputSubtitle() {
+        if (this.isWebhookTrigger) {
+            return this.backendState.webhook_test_active
+                ? "Waiting for the next test webhook call."
+                : "Captured payloads from the temporary test listener appear here.";
+        }
+        if (this.isManualTrigger) {
+            return "Use the manual execute action when you want to kick off the workflow from this node.";
+        }
+        return "Linked backend records and recent runtime activity stay visible here.";
+    }
+
+    get showTriggerFields() {
+        const eventType = this.state.controlValues.trigger_event;
+        return eventType === "on_create_or_write" || eventType === "on_write";
+    }
+
+    get hasOpenBackendAction() {
+        return this.isScheduleTrigger || this.isRecordEventTrigger || this.isWebhookTrigger;
+    }
+
+    get triggerGroupedControls() {
+        if (!this.isTriggerNode) {
+            return [];
+        }
+        return this.groupedControls;
+    }
+
+    get triggerFieldSuggestions() {
+        return this.state.triggerFieldSuggestions || [];
     }
 
     // ============================================
@@ -606,6 +968,186 @@ export class NodeConfigPanel extends Component {
     get treeAutoCollapseChildrenThreshold() {
         return NodeConfigPanel.TREE_AUTO_COLLAPSE_CHILD_THRESHOLD;
     }
+
+    _resetTriggerState() {
+        this._stopTriggerPolling();
+        this.state.triggerLoading = false;
+        this.state.triggerBusy = false;
+        this.state.activeWebhookTab = "production";
+        this.state.triggerPanelData = null;
+        this.state.triggerFieldSuggestions = [];
+        this.state.triggerErrorMessage = "";
+    }
+
+    async _bootstrapTriggerPanel(node) {
+        this._resetTriggerState();
+        this.state.triggerLoading = true;
+        this.state.activeWebhookTab = "production";
+        this.state.triggerErrorMessage = "";
+        await this._loadTriggerFieldSuggestions(this.state.controlValues.model_name);
+        await this._reloadTriggerPanelData(node.id);
+    }
+
+    async _reloadTriggerPanelData(nodeId) {
+        try {
+            const data = await this.actions.getTriggerPanelData(nodeId);
+            this.state.triggerPanelData = data;
+            this.state.triggerErrorMessage = "";
+            this._syncTriggerPolling();
+        } catch (error) {
+            this.state.triggerErrorMessage = error && error.message ? error.message : "Failed to load trigger state.";
+            this.state.triggerPanelData = null;
+            this._stopTriggerPolling();
+        } finally {
+            this.state.triggerLoading = false;
+        }
+    }
+
+    async _loadTriggerFieldSuggestions(modelName) {
+        const safeModel = typeof modelName === "string" ? modelName.trim() : "";
+        if (!safeModel) {
+            this.state.triggerFieldSuggestions = [];
+            return;
+        }
+        try {
+            const defs = await this.fieldService.loadFields(safeModel);
+            this.state.triggerFieldSuggestions = Object.entries(defs)
+                .map(([name, definition]) => ({
+                    value: name,
+                    name,
+                    label: definition && definition.string ? definition.string : name,
+                    type: definition && definition.type ? definition.type : "unknown",
+                }))
+                .sort((left, right) => left.name.localeCompare(right.name));
+        } catch {
+            this.state.triggerFieldSuggestions = [];
+        }
+    }
+
+    _syncTriggerPolling() {
+        if (this.isWebhookTrigger && this.backendState.webhook_test_active) {
+            if (this._triggerPollTimer) {
+                return;
+            }
+            this._triggerPollTimer = setInterval(() => {
+                this._reloadTriggerPanelData(this.props.node.id);
+            }, 2000);
+            return;
+        }
+        this._stopTriggerPolling();
+    }
+
+    _stopTriggerPolling() {
+        if (this._triggerPollTimer) {
+            clearInterval(this._triggerPollTimer);
+            this._triggerPollTimer = null;
+        }
+    }
+
+    async _saveWorkflowForTriggerRuntime() {
+        this._syncToAdapter();
+        await this.actions.saveWorkflow();
+    }
+
+    async _runTriggerRuntimeAction(callback, fallbackErrorMessage) {
+        if (this.state.triggerBusy || this.isExecutionView) {
+            return;
+        }
+        this.state.triggerBusy = true;
+        this.state.triggerErrorMessage = "";
+        try {
+            await this._saveWorkflowForTriggerRuntime();
+            const data = await callback();
+            this.state.triggerPanelData = data;
+            this._syncTriggerPolling();
+        } catch (error) {
+            this.state.triggerErrorMessage = error && error.message ? error.message : fallbackErrorMessage;
+            this.notification.add(this.state.triggerErrorMessage, { type: "danger" });
+        } finally {
+            this.state.triggerBusy = false;
+        }
+    }
+
+    onWebhookTabClick(tabId) {
+        this.state.activeWebhookTab = tabId;
+    }
+
+    async onToggleTriggerActivation() {
+        await this._runTriggerRuntimeAction(() => {
+            if (this.backendState.active) {
+                return this.actions.deactivateTriggerNode(this.props.node.id);
+            }
+            return this.actions.activateTriggerNode(this.props.node.id);
+        }, "Trigger action failed.");
+    }
+
+    async onRotateTriggerWebhook() {
+        await this._runTriggerRuntimeAction(
+            () => this.actions.rotateTriggerWebhook(this.props.node.id),
+            "Failed to rotate webhook URL."
+        );
+    }
+
+    async onStartWebhookTest() {
+        await this._runTriggerRuntimeAction(
+            () => this.actions.startTriggerWebhookTest(this.props.node.id),
+            "Failed to start webhook test listener."
+        );
+    }
+
+    async onStopWebhookTest() {
+        if (this.state.triggerBusy || this.isExecutionView) {
+            return;
+        }
+        this.state.triggerBusy = true;
+        try {
+            const data = await this.actions.stopTriggerWebhookTest(this.props.node.id);
+            this.state.triggerPanelData = data;
+            this._syncTriggerPolling();
+        } catch (error) {
+            this.state.triggerErrorMessage = error && error.message ? error.message : "Failed to stop test listener.";
+            this.notification.add(this.state.triggerErrorMessage, { type: "danger" });
+        } finally {
+            this.state.triggerBusy = false;
+        }
+    }
+
+    async onExecuteManualTrigger() {
+        if (this.state.triggerBusy || this.isExecutionView) {
+            return;
+        }
+        this.state.triggerBusy = true;
+        try {
+            await this._saveWorkflowForTriggerRuntime();
+            await this.actions.executeFromNode(this.props.node.id, {});
+            await this._reloadTriggerPanelData(this.props.node.id);
+        } catch (error) {
+            this.state.triggerErrorMessage = error && error.message ? error.message : "Manual trigger execution failed.";
+            this.notification.add(this.state.triggerErrorMessage, { type: "danger" });
+        } finally {
+            this.state.triggerBusy = false;
+        }
+    }
+
+    async onOpenTriggerBackendRecord() {
+        if (this.isExecutionView) {
+            return;
+        }
+        try {
+            await this._saveWorkflowForTriggerRuntime();
+            await this.actions.openTriggerNodeRecord(this.props.node.id);
+        } catch (error) {
+            this.state.triggerErrorMessage = error && error.message ? error.message : "Failed to open backend record.";
+            this.notification.add(this.state.triggerErrorMessage, { type: "danger" });
+        }
+    }
+
+    copyToClipboard = async (value, label) => {
+        if (!value) {
+            return;
+        }
+        await this.workflowEditor.copyText(value, { label });
+    };
     
     /**
      * Filter execution results to show only predecessors of the current node.
@@ -1097,8 +1639,9 @@ export class NodeConfigPanel extends Component {
     // EVENT HANDLERS
     // ============================================
 
-    onControlChange = (controlKey, value) => {
+    onControlChange = async (controlKey, value) => {
         const control = this.state.controls.find(c => c.key === controlKey);
+        const previousValue = this.state.controlValues[controlKey];
         const normalizedValue = normalizeControlValue(control, value);
         this.state.controlValues[controlKey] = normalizedValue;
 
@@ -1107,6 +1650,15 @@ export class NodeConfigPanel extends Component {
             if (control.type === 'keyvalue') {
                 this._reconcilePairModes(controlKey, normalizedValue);
             }
+        }
+
+        if (this.isRecordEventTrigger && controlKey === "model_name" && normalizedValue !== previousValue) {
+            this.state.controlValues.trigger_fields = [];
+            await this._loadTriggerFieldSuggestions(normalizedValue);
+        }
+
+        if (this.isRecordEventTrigger && controlKey === "trigger_event" && !this.showTriggerFields) {
+            this.state.controlValues.trigger_fields = [];
         }
 
         this._debouncedLocalSave();
@@ -1208,78 +1760,4 @@ export class NodeConfigPanel extends Component {
     onClose() {
         this.props.onClose();
     }
-
-    onBackdropClick(ev) {
-        // Close if clicking backdrop (outside panel)
-        if (ev.target === ev.currentTarget) {
-            this.onClose();
-        }
-    }
-
-    // ============================================
-    // PANEL RESIZE FUNCTIONALITY
-    // ============================================
-
-    /**
-     * Computed style for panel width
-     */
-    get panelStyle() {
-        if (this.state.isExpanded) {
-            return 'width: calc(100vw - 60px);';  // Full width minus small margin
-        }
-        if (this.state.customWidth) {
-            return `width: ${this.state.customWidth}px;`;
-        }
-        return '';  // Use default CSS (50vw)
-    }
-
-    /**
-     * Toggle between expanded (full-width) and default mode
-     */
-    onToggleExpand() {
-        this.state.isExpanded = !this.state.isExpanded;
-        // Reset custom width when toggling
-        if (this.state.isExpanded) {
-            this.state.customWidth = null;
-        }
-    }
-
-    /**
-     * Start drag resize
-     */
-    onResizeStart = (ev) => {
-        ev.preventDefault();
-        this.state.isResizing = true;
-        this.state.isExpanded = false;  // Exit expanded mode when manually resizing
-
-        const startX = ev.clientX;
-        const panel = this.panelRef.el;
-        const startWidth = panel.offsetWidth;
-
-        const onMouseMove = (moveEv) => {
-            // Calculate new width (dragging from left edge)
-            const deltaX = startX - moveEv.clientX;
-            let newWidth = startWidth + deltaX;
-
-            // Clamp width between min and max
-            const minWidth = 500;
-            const maxWidth = window.innerWidth - 60;
-            newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
-
-            this.state.customWidth = newWidth;
-        };
-
-        const onMouseUp = () => {
-            this.state.isResizing = false;
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        };
-
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-        document.body.style.cursor = 'ew-resize';
-        document.body.style.userSelect = 'none';
-    };
 }

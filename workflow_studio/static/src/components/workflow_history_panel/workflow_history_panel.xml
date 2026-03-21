@@ -7,7 +7,7 @@
                     <i class="fa fa-history"/>
                     <span>History</span>
                 </div>
-                <button class="btn btn-light btn-sm" t-on-click="props.onClose" title="Close">
+                <button class="btn btn-light d-inline-flex" t-on-click="props.onClose" title="Close">
                     <i class="fa fa-times"/>
                 </button>
             </div>

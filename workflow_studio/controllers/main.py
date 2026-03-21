@@ -600,6 +600,130 @@ class WorkflowPilotController(http.Controller):
 
     # === Webhook Trigger Endpoint ===
 
+    def _collect_webhook_request_data(self):
+        req = request.httprequest
+        safe_headers = {
+            k: v for k, v in req.headers
+            if k.lower() in (
+                'content-type', 'accept', 'user-agent',
+                'x-request-id', 'x-forwarded-for',
+            )
+        }
+
+        body = {}
+        raw_body = req.get_data(cache=True, as_text=True) or ''
+        if req.content_type and 'json' in req.content_type:
+            try:
+                body = req.get_json(silent=True) or {}
+            except Exception:
+                body = {}
+        elif req.form:
+            body = dict(req.form)
+        elif raw_body:
+            body = raw_body
+
+        return {
+            'method': req.method,
+            'headers': safe_headers,
+            'query': dict(req.args),
+            'body': body,
+        }
+
+    def _find_webhook_trigger(self, webhook_uuid, *, test_mode=False):
+        trigger_model = request.env['workflow.trigger'].sudo().with_context(active_test=False)
+        domain = [
+            ('trigger_type', '=', 'webhook'),
+        ]
+        if test_mode:
+            domain.extend([
+                ('webhook_test_uuid', '=', webhook_uuid),
+                ('webhook_test_active', '=', True),
+            ])
+        else:
+            domain.extend([
+                ('webhook_uuid', '=', webhook_uuid),
+                ('active', '=', True),
+            ])
+        return trigger_model.search(domain, limit=1)
+
+    def _handle_webhook_trigger(self, trigger, webhook_uuid, *, test_mode=False):
+        import werkzeug
+
+        workflow = trigger.workflow_id
+        if not workflow.is_published:
+            return werkzeug.exceptions.NotFound('Workflow is not published')
+
+        node_config = trigger._get_node_config()
+        allowed_method = (node_config.get('http_method') or 'POST').upper()
+        request_data = self._collect_webhook_request_data()
+
+        if allowed_method and request_data['method'] != allowed_method:
+            return request.make_json_response(
+                {
+                    'error': 'Method not allowed',
+                    'expected_method': allowed_method,
+                    'received_method': request_data['method'],
+                },
+                status=405,
+            )
+
+        if test_mode:
+            trigger.record_test_webhook_call(request_data)
+
+        response_mode = node_config.get('response_mode', 'immediate')
+        trigger_payload = {
+            **request_data,
+            'test_mode': test_mode,
+        }
+
+        if response_mode == 'last_node':
+            try:
+                trigger._record_triggered()
+                input_data = {
+                    '_trigger': {
+                        'type': 'webhook',
+                        'node_id': trigger.node_id,
+                        'context': workflow._sanitize_context(request.env.context),
+                        **trigger_payload,
+                    },
+                }
+                result = workflow.execute_from_node(
+                    start_node_id=trigger.node_id,
+                    input_data=input_data,
+                    notify_user=False,
+                )
+                if result.get('status') == 'failed':
+                    return request.make_json_response(
+                        {'error': result.get('error') or 'Execution failed'},
+                        status=500,
+                    )
+                return request.make_json_response(result.get('output_data', {}))
+            except Exception as e:
+                _logger.exception(
+                    "Webhook execution failed for workflow %s",
+                    workflow.id,
+                )
+                return request.make_json_response(
+                    {'error': str(e)}, status=500,
+                )
+
+        try:
+            workflow._execute_from_trigger(
+                trigger.node_id, 'webhook', trigger_payload,
+            )
+        except Exception:
+            _logger.exception(
+                "Webhook fire-and-forget failed for workflow %s",
+                workflow.id,
+            )
+        return request.make_json_response(
+            {
+                'status': 'accepted',
+                'webhook_uuid': webhook_uuid,
+                'mode': 'test' if test_mode else 'production',
+            },
+        )
+
     @http.route(
         '/workflow_studio/webhook/<string:webhook_uuid>',
         type='http',
@@ -619,96 +743,25 @@ class WorkflowPilotController(http.Controller):
         - ``last_node``: waits for execution and returns the output
           of the last node as JSON.
         """
-        import json as _json
         import werkzeug
 
-        trigger = request.env['workflow.trigger'].sudo().search([
-            ('webhook_uuid', '=', webhook_uuid),
-            ('active', '=', True),
-            ('trigger_type', '=', 'webhook'),
-        ], limit=1)
-
+        trigger = self._find_webhook_trigger(webhook_uuid, test_mode=False)
         if not trigger:
-            return werkzeug.exceptions.NotFound(
-                'Webhook not found or inactive'
-            )
+            return werkzeug.exceptions.NotFound('Webhook not found or inactive')
+        return self._handle_webhook_trigger(trigger, webhook_uuid, test_mode=False)
 
-        workflow = trigger.workflow_id
-        if not workflow.is_published:
-            return werkzeug.exceptions.NotFound(
-                'Workflow is not published'
-            )
+    @http.route(
+        '/workflow_studio/webhook-test/<string:webhook_uuid>',
+        type='http',
+        auth='public',
+        methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        csrf=False,
+    )
+    def webhook_trigger_test(self, webhook_uuid, **kwargs):
+        """Temporary editor endpoint used to test webhook trigger payloads."""
+        import werkzeug
 
-        # Collect safe request data
-        req = request.httprequest
-        safe_headers = {
-            k: v for k, v in req.headers
-            if k.lower() in (
-                'content-type', 'accept', 'user-agent',
-                'x-request-id', 'x-forwarded-for',
-            )
-        }
-
-        body = {}
-        if req.content_type and 'json' in req.content_type:
-            try:
-                body = req.get_json(silent=True) or {}
-            except Exception:
-                body = {}
-        elif req.form:
-            body = dict(req.form)
-
-        trigger_data = {
-            'method': req.method,
-            'headers': safe_headers,
-            'query': dict(req.args),
-            'body': body,
-        }
-
-        # Determine response mode from node config
-        node_config = trigger._get_node_config()
-        response_mode = node_config.get('response_mode', 'immediate')
-
-        trigger._record_triggered()
-
-        if response_mode == 'last_node':
-            # Synchronous: execute and return last node output
-            try:
-                input_data = {
-                    '_trigger': {
-                        'type': 'webhook',
-                        'node_id': trigger.node_id,
-                        'context': workflow._sanitize_context(
-                            request.env.context,
-                        ),
-                        **trigger_data,
-                    },
-                }
-                result = workflow.execute_workflow(
-                    input_data=input_data,
-                    notify_user=False,
-                )
-                output = result.get('output_data', {})
-                return request.make_json_response(output)
-            except Exception as e:
-                _logger.exception(
-                    "Webhook execution failed for workflow %s",
-                    workflow.id,
-                )
-                return request.make_json_response(
-                    {'error': str(e)}, status=500,
-                )
-        else:
-            # Immediate: fire-and-forget, return 200
-            try:
-                workflow._execute_from_trigger(
-                    trigger.node_id, 'webhook', trigger_data,
-                )
-            except Exception:
-                _logger.exception(
-                    "Webhook fire-and-forget failed for workflow %s",
-                    workflow.id,
-                )
-            return request.make_json_response(
-                {'status': 'accepted', 'webhook_uuid': webhook_uuid},
-            )
+        trigger = self._find_webhook_trigger(webhook_uuid, test_mode=True)
+        if not trigger:
+            return werkzeug.exceptions.NotFound('Test webhook not found or not listening')
+        return self._handle_webhook_trigger(trigger, webhook_uuid, test_mode=True)

@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.trigger_config_panel">
+        <div class="trigger-config-panel d-flex flex-column h-100">
+            <div class="trigger-config-panel__content row g-0 flex-grow-1">
+                <div class="trigger-config-panel__config col-7 d-flex flex-column">
+                    <div class="trigger-config-panel__body flex-grow-1 overflow-auto px-4 py-4">
+                        <div t-if="state.loading" class="trigger-panel-state text-center text-muted py-5">
+                            <i class="fa fa-spinner fa-spin me-2"/> Loading trigger details...
+                        </div>
+
+                        <t t-else="">
+                            <div t-if="state.errorMessage" class="alert alert-danger" role="alert">
+                                <i class="fa fa-exclamation-circle me-2"/>
+                                <span t-esc="state.errorMessage"/>
+                            </div>
+
+                            <t t-foreach="warnings" t-as="warning" t-key="warning">
+                                <div class="alert alert-warning" role="alert">
+                                    <i class="fa fa-exclamation-triangle me-2"/>
+                                    <span t-esc="warning"/>
+                                </div>
+                            </t>
+
+                            <t t-if="isManualTrigger">
+                                <section class="trigger-card">
+                                    <div class="trigger-card__header">
+                                        <h4>Manual trigger</h4>
+                                        <p>Click <strong>Execute trigger</strong> to run this branch on demand. Save first to include latest graph changes.</p>
+                                    </div>
+                                    <div class="trigger-card__body">
+                                        <ul class="trigger-facts mb-0">
+                                            <li>Only this branch runs — other trigger paths are not activated.</li>
+                                        </ul>
+                                    </div>
+                                </section>
+                            </t>
+
+                            <t t-if="isScheduleTrigger">
+                                <section class="trigger-card">
+                                    <div class="trigger-card__header">
+                                        <h4>Schedule</h4>
+                                        <p>Define the cadence that will be synced to the linked <code>ir.cron</code> record.</p>
+                                    </div>
+                                    <div class="trigger-card__body row g-3 align-items-end trigger-schedule-input-group">
+                                        <div class="col-md-5">
+                                            <label class="form-label">Every</label>
+                                            <input class="form-control" type="number" min="1" style="min-width: 80px;" t-att-value="state.values.interval_number" t-on-input="onIntervalNumberChange" t-att-disabled="isReadonly ? 'disabled' : undefined"/>
+                                        </div>
+                                        <div class="col-md-7">
+                                            <label class="form-label">Unit</label>
+                                            <select class="form-select" t-att-value="state.values.interval_type" t-on-change="(ev) => this.onTextInput('interval_type', ev)" t-att-disabled="isReadonly ? 'disabled' : undefined">
+                                                <t t-foreach="scheduleIntervalOptions" t-as="option" t-key="option.value">
+                                                    <option t-att-value="option.value" t-esc="option.label"/>
+                                                </t>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </section>
+                            </t>
+
+                            <t t-if="isWebhookTrigger">
+                                <section class="trigger-card">
+                                    <div class="trigger-card__header">
+                                        <h4>Webhook behavior</h4>
+                                    </div>
+                                    <div class="trigger-card__body row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">HTTP method</label>
+                                            <select class="form-select" t-att-value="state.values.http_method" t-on-change="(ev) => this.onTextInput('http_method', ev)" t-att-disabled="isReadonly ? 'disabled' : undefined">
+                                                <t t-foreach="webhookMethodOptions" t-as="option" t-key="option">
+                                                    <option t-att-value="option" t-esc="option"/>
+                                                </t>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Respond</label>
+                                            <select class="form-select" t-att-value="state.values.response_mode" t-on-change="(ev) => this.onTextInput('response_mode', ev)" t-att-disabled="isReadonly ? 'disabled' : undefined">
+                                                <t t-foreach="webhookResponseOptions" t-as="option" t-key="option.value">
+                                                    <option t-att-value="option.value" t-esc="option.label"/>
+                                                </t>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="trigger-card">
+                                    <div class="trigger-card__header d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                                        <div>
+                                            <h4>Webhook URLs</h4>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <button t-if="isProductionWebhookTab and !isReadonly" class="btn btn-outline-secondary btn-sm" t-on-click="onRotateWebhook" t-att-disabled="state.busy ? 'disabled' : undefined" type="button">
+                                                <i class="fa fa-refresh me-1"/> Rotate URL
+                                            </button>
+                                            <button t-if="isTestWebhookTab and !backendState.webhook_test_active and !isReadonly" class="btn btn-primary btn-sm" t-on-click="onStartWebhookTest" t-att-disabled="state.busy ? 'disabled' : undefined" type="button">
+                                                <i class="fa fa-headphones me-1"/> Listen for test event
+                                            </button>
+                                            <button t-if="isTestWebhookTab and backendState.webhook_test_active and !isReadonly" class="btn btn-outline-danger btn-sm" t-on-click="onStopWebhookTest" t-att-disabled="state.busy ? 'disabled' : undefined" type="button">
+                                                <i class="fa fa-stop me-1"/> Stop listening
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="trigger-card__body p-0">
+                                        <TabNav tabs="webhookUrlTabs" activeTab="state.activeWebhookTab" onTabClick.bind="onWebhookTabClick">
+                                            <div class="trigger-webhook-tabs p-3 d-flex flex-column gap-3">
+                                                <t t-if="isProductionWebhookTab">
+                                                    <UrlBox value="backendState.webhook_url" placeholder="'Activate to provision a production URL.'" label="'Production URL'" onCopy.bind="copyToClipboard"/>
+                                                </t>
+                                                <t t-if="isTestWebhookTab">
+                                                    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                                                        <span class="trigger-badge trigger-badge--soft" t-att-class="backendState.webhook_test_active ? 'is-active' : 'is-inactive'">
+                                                            <t t-esc="backendState.webhook_test_active ? 'Listening' : 'Idle'"/>
+                                                        </span>
+                                                    </div>
+                                                    <UrlBox value="backendState.webhook_test_url" placeholder="'Click Listen for test event to generate a temporary URL.'" label="'Test URL'" tone="'success'" onCopy.bind="copyToClipboard"/>
+                                                </t>
+                                            </div>
+                                        </TabNav>
+                                    </div>
+                                </section>
+                            </t>
+
+                            <t t-if="isRecordEventTrigger">
+                                <section class="trigger-card">
+                                    <div class="trigger-card__header">
+                                        <h4>Record event mapping</h4>
+                                        <p>Configure this trigger directly in the editor, then sync it to the linked <code>base.automation</code> rule.</p>
+                                    </div>
+                                    <div class="trigger-card__body row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label">Target model</label>
+                                            <input class="form-control" t-att-list="modelDatalistId" t-att-value="state.values.model_name" t-on-input="onModelNameChange" placeholder="res.partner" t-att-disabled="isReadonly ? 'disabled' : undefined"/>
+                                            <datalist t-att-id="modelDatalistId">
+                                                <t t-foreach="modelSuggestions" t-as="model" t-key="model.model">
+                                                    <option t-att-value="model.model"><t t-esc="model.description"/></option>
+                                                </t>
+                                            </datalist>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Trigger event</label>
+                                            <select class="form-select" t-att-value="state.values.trigger_event" t-on-change="(ev) => this.onTextInput('trigger_event', ev)" t-att-disabled="isReadonly ? 'disabled' : undefined">
+                                                <t t-foreach="recordEventOptions" t-as="option" t-key="option.value">
+                                                    <option t-att-value="option.value" t-esc="option.label"/>
+                                                </t>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Scope</label>
+                                            <div class="trigger-inline-note h-100 d-flex align-items-center">Creates or updates one automation rule bound to the chosen model.</div>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Filter domain</label>
+                                            <DomainControl resModel="state.values.model_name" value="state.values.filter_domain" onChange.bind="onFilterDomainChange" readonly="isReadonly"/>
+                                        </div>
+                                        <div class="col-12" t-if="showTriggerFields">
+                                            <label class="form-label">Watch only these updated fields</label>
+                                            <div class="trigger-field-grid">
+                                                <t t-foreach="state.fieldSuggestions" t-as="field" t-key="field.name">
+                                                    <label class="trigger-field-pill">
+                                                        <input type="checkbox" t-att-checked="state.values.trigger_fields.includes(field.name)" t-on-change="(ev) => this.onToggleTriggerField(field.name, ev)" t-att-disabled="isReadonly ? 'disabled' : undefined"/>
+                                                        <span class="fw-medium" t-esc="field.name"/>
+                                                        <span class="text-muted">(<t t-esc="field.type"/>)</span>
+                                                    </label>
+                                                </t>
+                                                <div t-if="state.fieldSuggestions.length === 0" class="text-muted small">Choose a valid model to load available fields.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </t>
+                        </t>
+                    </div>
+                </div>
+
+                <div class="trigger-config-panel__output col-5 d-flex flex-column border-start">
+                    <div class="col-panel-header d-flex align-items-start justify-content-between gap-3 text-uppercase small fw-bold">
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa fa-terminal"/>
+                                <span t-esc="triggerOutputTitle"/>
+                            </div>
+                            <div class="trigger-output-subtitle text-muted text-lowercase fw-normal mt-1" t-esc="triggerOutputSubtitle"/>
+                        </div>
+                    </div>
+                    <div class="col-panel-content trigger-output-panel">
+                        <t t-if="isWebhookTrigger">
+                            <t t-if="hasWebhookTestPayload">
+                                <div class="output-tree-container trigger-output-tree">
+                                    <JsonTreeNode data="backendState.webhook_last_test_payload" path="[]" level="0" initialExpandDepth="3" autoCollapseChildrenThreshold="40" draggable="false" resolveRecordRefs="actions.resolveRecordRefs" recordRefCache="state.recordRefCache" onRecordRefCachePatch.bind="onRecordRefCachePatch"/>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <div class="input-data-empty output-empty-hint trigger-output-empty">
+                                    <i class="fa fa-flask"/>
+                                    <p>No test payload yet</p>
+                                    <span>Start the listener, call the temporary URL, and the captured JSON will appear here.</span>
+                                </div>
+                            </t>
+                        </t>
+
+                        <t t-if="!isWebhookTrigger">
+                            <div class="input-data-empty output-empty-hint trigger-output-empty trigger-output-empty--compact">
+                                <i t-att-class="'fa ' + (isManualTrigger ? 'fa-play-circle' : isScheduleTrigger ? 'fa-clock-o' : 'fa-database')"/>
+                                <p t-esc="isManualTrigger ? 'Ready to run' : 'Backend status only'"/>
+                                <span t-esc="isManualTrigger ? 'Use Execute trigger to run this branch immediately.' : 'This trigger type exposes runtime state and linked-record metadata rather than a JSON payload.'"/>
+                            </div>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

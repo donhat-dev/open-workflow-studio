@@ -1,0 +1,223 @@
+.trigger-config-panel {
+    min-height: 0;
+    background: $o-view-background-color;
+}
+
+.trigger-config-panel__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-wrap: nowrap;
+
+    > [class*="col-"] {
+        min-height: 0;
+    }
+}
+
+.trigger-config-panel__config,
+.trigger-config-panel__output {
+    min-height: 0;
+}
+
+.trigger-config-panel__output {
+    background: $wf-surface-subtle;
+}
+
+.trigger-config-panel__body {
+    min-height: 0;
+}
+
+.trigger-panel-state {
+    font-size: 0.95rem;
+}
+
+.trigger-card {
+    border: 1px solid $wf-border-base;
+    border-radius: $wf-radius-lg;
+    background: $wf-surface-base;
+    box-shadow: $wf-shadow-sm;
+
+    & + .trigger-card {
+        margin-top: 1rem;
+    }
+}
+
+.trigger-card__header {
+    padding: 0.875rem 1rem 0.75rem;
+    border-bottom: 1px solid $wf-border-base;
+
+    h4 {
+        margin: 0 0 0.375rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: $o-gray-900;
+    }
+
+    p {
+        margin: 0;
+        color: $o-gray-500;
+        font-size: 0.8125rem;
+        line-height: 1.45;
+    }
+}
+
+.trigger-card__body {
+    padding: 0.875rem 1rem 1rem;
+
+    // Label / value contrast: field labels are muted, values pop
+    .form-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: $o-gray-500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 0.375rem;
+    }
+}
+
+.trigger-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: $o-gray-100;
+    color: $o-gray-700;
+
+    &.is-active {
+        background: rgba($o-success, 0.12);
+        color: $o-success;
+    }
+
+    &.is-inactive {
+        background: rgba($o-warning, 0.12);
+        color: $o-warning;
+    }
+}
+
+.trigger-badge--soft {
+    font-size: 0.6875rem;
+    padding: 0.2rem 0.5rem;
+}
+
+.trigger-inline-note {
+    padding: 0.75rem 0.875rem;
+    border: 1px dashed $o-gray-300;
+    border-radius: $wf-radius-md;
+    background: $wf-surface-subtle;
+    color: $o-gray-500;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.trigger-webhook-tabs {
+    .wf-tab-nav {
+        border-bottom-color: $o-gray-200;
+    }
+
+    // Extra breathing room between tab content and tab strip
+    > .trigger-webhook-tabs {
+        padding-top: 0.5rem;
+    }
+}
+
+// Schedule: visual separator between number input and unit select
+.trigger-schedule-input-group {
+    .col-md-5 .form-control {
+        border-right: 2px solid $o-gray-200;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+}
+
+.trigger-json-preview {
+    margin: 0;
+    padding: 1rem;
+    min-height: 140px;
+    max-height: 280px;
+    overflow: auto;
+    border-radius: $wf-radius-md;
+    background: $o-gray-900;
+    color: $o-gray-100;
+    font-size: 0.8125rem;
+}
+
+.trigger-output-subtitle {
+    font-size: 0.75rem;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.4;
+    color: $o-gray-500;
+}
+
+.trigger-output-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.trigger-output-tree {
+    padding: 0.25rem;
+    border: 1px solid $wf-border-base;
+    border-radius: $wf-radius-md;
+    background: $wf-surface-base;
+    margin-top: 0.5rem;
+    border-top: 2px solid $wf-border-base;
+}
+
+.trigger-output-empty {
+    min-height: 130px;
+    border: 1px dashed $o-gray-300;
+    border-radius: $wf-radius-lg;
+    background: $wf-surface-subtle;
+
+    p {
+        font-weight: 600;
+        color: $o-gray-600;
+    }
+
+    span {
+        color: $o-gray-500;
+        font-size: 0.8125rem;
+    }
+}
+
+.trigger-output-empty--compact {
+    min-height: 110px;
+}
+
+.trigger-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.75rem;
+    max-height: 280px;
+    overflow: auto;
+    padding: 0.25rem;
+}
+
+.trigger-field-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid $wf-border-base;
+    border-radius: $wf-radius-md;
+    background: $wf-surface-subtle;
+}
+
+.trigger-facts {
+    padding-left: 1rem;
+    color: $o-gray-600;
+    font-size: 0.875rem;
+    line-height: 1.65;
+
+    li {
+        margin-bottom: 0.25rem;
+    }
+
+    li:last-child {
+        margin-bottom: 0;
+    }
+}

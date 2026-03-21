@@ -1126,6 +1126,133 @@ class Workflow(models.Model):
 
         return False
 
+    def _ensure_trigger_record(self, node_id):
+        """Return the trigger record for a graph trigger node, creating it if needed."""
+        self.ensure_one()
+        node = self._get_graph_node(node_id)
+        if not node:
+            raise UserError(_("Trigger node '%s' was not found.") % node_id)
+
+        trigger_model = self.env['workflow.trigger'].with_context(active_test=False)
+        trigger = trigger_model.search([
+            ('workflow_id', '=', self.id),
+            ('node_id', '=', node_id),
+        ], limit=1)
+        if trigger:
+            return trigger
+
+        trigger_vals = {
+            'workflow_id': self.id,
+            'node_id': node_id,
+            'trigger_type': self._resolve_trigger_type(node),
+            'active': False,
+        }
+        try:
+            with self.env.cr.savepoint():
+                return trigger_model.create(trigger_vals)
+        except Exception:
+            trigger = trigger_model.search([
+                ('workflow_id', '=', self.id),
+                ('node_id', '=', node_id),
+            ], limit=1)
+            if trigger:
+                return trigger
+            raise
+
+    def get_trigger_panel_data(self, node_id):
+        """Return dedicated trigger-panel data for a trigger node."""
+        self.ensure_one()
+        node = self._get_graph_node(node_id)
+        if not node:
+            raise UserError(_("Trigger node '%s' was not found.") % node_id)
+
+        trigger = self._ensure_trigger_record(node_id)
+        backend_warning = False
+        should_ensure_backend = False
+        if trigger.trigger_type == 'webhook':
+            should_ensure_backend = True
+        elif trigger.trigger_type in {'schedule', 'record_event'} and self.is_published:
+            should_ensure_backend = True
+
+        if should_ensure_backend:
+            try:
+                trigger.ensure_linked_backend_record()
+            except UserError as err:
+                backend_warning = err.args[0] if err.args else str(err)
+
+        config = copy.deepcopy(node.get('config') or {})
+        warnings = []
+        if trigger.trigger_type == 'record_event' and 'base.automation' not in self.env:
+            warnings.append(_("Install the Automated Actions module to activate record-event triggers."))
+        if trigger.trigger_type != 'manual' and not self.is_published:
+            warnings.append(_("Save the workflow before activating or testing this trigger."))
+        if backend_warning:
+            warnings.append(backend_warning)
+
+        return {
+            'node_id': node_id,
+            'node_type': node.get('type'),
+            'node_title': node.get('label') or node.get('title') or node.get('type'),
+            'config': config,
+            'warnings': warnings,
+            'backend': trigger.get_panel_state(),
+        }
+
+    def activate_trigger_node(self, node_id):
+        """Activate a single trigger node from the dedicated editor panel."""
+        self.ensure_one()
+        if not self.is_published or not self.published_snapshot:
+            raise UserError(_("Workflow must be saved before activation."))
+        trigger = self._ensure_trigger_record(node_id)
+        trigger.action_activate()
+        active_count = self.env['workflow.trigger'].with_context(active_test=False).search_count([
+            ('workflow_id', '=', self.id),
+            ('active', '=', True),
+        ])
+        self.is_activated = bool(active_count)
+        return self.get_trigger_panel_data(node_id)
+
+    def deactivate_trigger_node(self, node_id):
+        """Deactivate a single trigger node from the dedicated editor panel."""
+        self.ensure_one()
+        trigger = self._ensure_trigger_record(node_id)
+        trigger.action_deactivate()
+        active_count = self.env['workflow.trigger'].with_context(active_test=False).search_count([
+            ('workflow_id', '=', self.id),
+            ('active', '=', True),
+        ])
+        self.is_activated = bool(active_count)
+        return self.get_trigger_panel_data(node_id)
+
+    def rotate_trigger_webhook(self, node_id):
+        """Rotate the production webhook secret for a node and return panel data."""
+        self.ensure_one()
+        trigger = self._ensure_trigger_record(node_id)
+        if trigger.trigger_type != 'webhook':
+            raise UserError(_("Only webhook triggers support URL rotation."))
+        trigger.action_rotate_webhook_uuid()
+        return self.get_trigger_panel_data(node_id)
+
+    def start_trigger_webhook_test(self, node_id):
+        """Start listening on the temporary editor test webhook endpoint."""
+        self.ensure_one()
+        if not self.is_published or not self.published_snapshot:
+            raise UserError(_("Workflow must be saved before starting test mode."))
+        trigger = self._ensure_trigger_record(node_id)
+        if trigger.trigger_type != 'webhook':
+            raise UserError(_("Only webhook triggers support test listening."))
+        trigger.action_start_test_webhook()
+        return self.get_trigger_panel_data(node_id)
+
+    def stop_trigger_webhook_test(self, node_id):
+        """Stop listening on the temporary editor test webhook endpoint."""
+        self.ensure_one()
+        trigger = self._ensure_trigger_record(node_id)
+        if trigger.trigger_type != 'webhook':
+            raise UserError(_("Only webhook triggers support test listening."))
+        trigger.action_stop_test_webhook()
+        return self.get_trigger_panel_data(node_id)
+
     def _get_graph_node(self, node_id):
         """Return a graph node from draft snapshot first, then published snapshot."""
         self.ensure_one()

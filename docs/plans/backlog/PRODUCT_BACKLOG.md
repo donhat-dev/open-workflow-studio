@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
 > **Version**: 1.3.0
-> **Last Updated**: 2026-03-18
+> **Last Updated**: 2026-03-19
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -13,22 +13,24 @@
 | **E1: Core Infrastructure**     | P0       | 34           | 95%     | Near Complete |
 | **E9: Variable System**         | P0       | 19           | 100%    | ✅ Done        |
 | **E2: Node Execution Engine**   | P0       | 55           | 68%     | In Progress   |
-| **E10: Python Runtime Engine**  | P0       | 40           | 75%     | In Progress   |
-| **E3: Node Library**            | P0       | 45           | 68%     | In Progress   |
-| **E4: UI/UX Editor**            | P1       | 48           | 90%     | In Progress   |
-| **E4.6: Editor State Refactor** | P1       | 32           | 75%     | 🔄 In Progress |
+| **E10: Python Runtime Engine**  | P0       | 40           | 80%     | In Progress   |
+| **E3: Node Library**            | P0       | 45           | 72%     | In Progress   |
+| **E4: UI/UX Editor**            | P1       | 48           | 92%     | In Progress   |
+| **E4.6: Editor State Refactor** | P1       | 32           | 79%     | 🔄 In Progress |
 | **E5: Expression System**       | P1       | 24           | 75%     | In Progress   |
-| **E6: Persistence & Storage**   | P1       | 26           | 55%     | In Progress   |
-| **E7: Production Features**     | P2       | 34           | 33%     | In Progress   |
+| **E6: Persistence & Storage**   | P1       | 26           | 59%     | In Progress   |
+| **E7: Production Features**     | P2       | 34           | 40%     | In Progress   |
 | **E8: Integrations**            | P2       | 40           | 0%      | Planned       |
-| **TOTAL**                       |          | **357**      | **69%** |               |
+| **TOTAL**                       |          | **357**      | **72%** |               |
 
 > Note (2026-01): E2 (JS StackExecutor) remains a *prototype track* for UX/learning.
 > The production direction is E10: backend-owned execution in Python with a hybrid/feature-flagged integration.
-> Update basis (2026-03-18): commit evidence from `2026-01-06..2026-03-17` on `workflow_pilot` + `workflow_studio` runtime/UI/backend paths.
+> Update basis (2026-03-19): incremental commit evidence from `2026-03-18..2026-03-19`, layered on the prior baseline.
 
 ### Recent Commit Highlights
 
+- **2026-03-19** `3a40d56` — Hardened pin-data execution flow, execution-state reset, and copy-to-editor UX across store/canvas/config panel.
+- **2026-03-19** `f16c5b7` — Added hybrid trigger foundation (bridge model + runners + views) and scaffolded workflow dashboard/search integrations.
 - **2026-03-17** `d7a4549` — Refactored editor canvas connection handling, node registry, graph utils, and adapter layer.
 - **2026-03-16** `636d3f2` — Enhanced Node Configuration Panel with output socket management, tab primitives, and vendor libs.
 - **2026-03-12** `28fff84` — Enhanced workflow execution logging, loop runner input/output semantics, and graph traversal guards.
@@ -44,6 +46,8 @@
 
 | Date | Commit | Primary Epics | Key Evidence (files) | Impact Summary |
 | --- | --- | --- | --- | --- |
+| 2026-03-19 | `3a40d56` | E4, E4.6, E6, E10 | `workflow_store.js`, `node_config_panel.*`, `editor_canvas.js`, `workflow_editor_app.js`, `workflow_executor.py`, `schemas/execution.py` | Pin-data execution flow hardened, history/execution-state isolation fixed, and copy-to-editor + config-panel pin UX refined |
+| 2026-03-19 | `f16c5b7` | E3, E6, E7, E10 | `workflow_trigger.py`, `models/runners/*trigger_runner.py`, `controllers/main.py`, `workflow_dashboard_*`, `workflow_*view*.xml/js`, `ir.model.access.csv` | Hybrid trigger architecture landed, workflow dashboard/list/kanban integrations added, and storage/search surfaces expanded |
 | 2026-03-17 | `d7a4549` | E4, E4.6, E10 | `editor_canvas.js`, `connection.js`, `adapter.js`, `graph_utils.js`, `node_type_registry.js`, `record_operation_runner.py` | Editor canvas/connection refactor + adapter/registry cleanup + runner fixes |
 | 2026-03-16 | `636d3f2` | E4, E4.6 | `node_config_panel.*`, `tab_nav/*`, `shared_primitives.scss`, `dagre.min.js`, `lucide.min.js` | Output socket tabs in config panel + tab primitives + vendor lib vendoring |
 | 2026-03-12 | `28fff84` | E3, E7, E10 | `loop_runner.py`, `record_operation_runner.py`, `workflow_executor.py`, `execution_log_panel/*`, `graph_utils.js` | Loop input/output semantics fix + execution logging enhancements + graph traversal guards |
@@ -74,27 +78,27 @@
 
 | ID        | Feature                                          |     SP | Priority | % Done | Status    | Notes                                            |
 | --------- | ------------------------------------------------ | -----: | -------- | -----: | --------- | ------------------------------------------------ |
-| **E10.1** | **Execution API Contract**                       |  **5** | P0       | **85%** | 🔄 In Progress | API/response contracts expanded with execution events, timing schemas (`049f565`, `47b955e`, `28fff84`28fff84`) |
+| **E10.1** | **Execution API Contract**                       |  **5** | P0       | **90%** | 🔄 In Progress | API/response contracts now cover trigger entry points, execution events, timing schemas, and `node_run_id` metadata (`f16c5b7`, `3a40d56`) |
 | E10.1.1   | `execute_until(workflow_id, node_id, input)` RPC |      3 | P0       |   100% | ✅         | Added and integrated in backend flow (`9f534f6`) |
-| E10.1.2   | Trace/Run IDs + minimal metadata                 |      2 | P1       |    70% | 🔄         | Execution events, timing data, and run detail schemas expanded (`049f565`, `47b955e`, `28fff84`049f565`, `47b955e`, `28fff84`) |
+| E10.1.2   | Trace/Run IDs + minimal metadata                 |      2 | P1       |    85% | 🔄         | Run detail schemas now expose `node_run_id` and richer trigger/run metadata for editor hydration (`f16c5b7`, `3a40d56`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.2** | **Python ExecutionContext**                      |  **8** | P0       | **75%** | 🔄 In Progress | Context wrappers hardened; loop/branch semantics fixed (`28fff84`, `ff7a220
+| **E10.2** | **Python ExecutionContext**                      |  **8** | P0       | **75%** | 🔄 In Progress | Context wrappers hardened; loop/branch semantics fixed (`28fff84`, `ff7a220`) |
 | E10.2.1   | Context object + serialization                   |      5 | P0       |    70% | 🔄         | Context object and snapshot payloads are used by run/execution views |
-| E10.2.2   | Loop/branch state primitives                     |      3 | P0       |    75% | 🔄         | Loop input/output semantics fixed; branch routing improved (`28fff84`)) |
+| E10.2.2   | Loop/branch state primitives                     |      3 | P0       |    75% | 🔄         | Loop input/output semantics fixed; branch routing improved (`28fff84`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.3** | **Python Stack Executor MVP**                    | **13** | P0       | **80%** | 🔄 In Progress | Executor hardened with logging, graph traversal guards, timing precision (`28fff84`, `47b955e84`, `47b955e`) |
-| E10.3.1   | Graph execution loop (executeUntil)              |      5 | P0       |    85% | 🔄         | Execution loop + stop-at-node flow implemented and iterated |
+| **E10.3** | **Python Stack Executor MVP**                    | **13** | P0       | **85%** | 🔄 In Progress | Executor now handles trigger-scoped starts, pinned node replay, and improved execution replacement/hydration (`f16c5b7`, `3a40d56`) |
+| E10.3.1   | Graph execution loop (executeUntil)              |      5 | P0       |    90% | 🔄         | Execution loop supports stop-at-node, trigger-scoped starts, and pinned-output replay |
 | E10.3.2   | Branch routing (If)                              |      4 | P0       |    70% | 🔄         | IF routing exists in runner/executor paths       |
-| E10.3.3   | Loop routing (Loop)                              |      4 | P0       |    80% | 🔄         | Loop runner input/output semantics reworked (`28fff84`, `a63f7df`)`) |
+| E10.3.3   | Loop routing (Loop)                              |      4 | P0       |    80% | 🔄         | Loop runner input/output semantics reworked (`28fff84`, `a63f7df`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.4** | **Node Runner Registry (MVP set)**               |  **8** | P0       | **80%** | 🔄 In Progress | All runners migrated to SmartExpressionResolver; RecordOperation runner added (`a63f7df`, `ff7a220`, `8365f9bner added (`a63f7df`, `ff7a220`, `8365f9b`) |
+| **E10.4** | **Node Runner Registry (MVP set)**               |  **8** | P0       | **88%** | 🔄 In Progress | SmartExpressionResolver migration remains in place; webhook/schedule/record-event trigger runners were added to the backend registry (`f16c5b7`) |
 | E10.4.1   | HTTP Request runner                              |      3 | P0       |    80% | 🔄         | HTTP runner continuously improved (`46fba96`, `29f986f`) |
-| E10.4.2   | Variable runner (set/get/append/merge)           |      2 | P0       |    55% | 🔄         | Variable runner migrated to SmartExpressionResolver (`a63f7df`)(`a63f7df`) |
-| E10.4.3   | Set Data / Mapping runner                        |      3 | P0       |    65% | 🔄         | Data/expression execution parity via SmartExpressionResolver (`ff7a220`)esolver (`ff7a220`) |
+| E10.4.2   | Variable runner (set/get/append/merge)           |      2 | P0       |    55% | 🔄         | Variable runner migrated to SmartExpressionResolver (`a63f7df`) |
+| E10.4.3   | Set Data / Mapping runner                        |      3 | P0       |    65% | 🔄         | Data/expression execution parity via SmartExpressionResolver (`ff7a220`) |
 |           |                                                  |        |          |        |           |                                                  |
-| **E10.5** | **Hybrid UI Integration**                        |  **6** | P0       | **65%** | 🔄 In Progress | UI consumes execution events, socket-level data, and log panel across oss canvas |
-| E10.5.1   | `workflow_runtime_service` (frontend)            |      3 | P0       |    70% | 🔄         | Store/adapter/canvas refactored for execution events and socket data (`d7a4549`, `636d3f2`2`) |
-| E10.5.2   | Context snapshot caching for preview             |      3 | P0       |    60% | 🔄         | Execution log panel + socket-level output display available (`636d3f2`, `28fff843f2`, `28fff84`) |
+| **E10.5** | **Hybrid UI Integration**                        |  **6** | P0       | **78%** | 🔄 In Progress | UI now consumes trigger actions, socket-level data, execution replacement, pin-data replay, and copy-to-editor flows across the canvas (`f16c5b7`, `3a40d56`) |
+| E10.5.1   | `workflow_runtime_service` (frontend)            |      3 | P0       |    82% | 🔄         | Store/canvas/panel integration expanded for trigger actions, pinning state, and execution reset/hydration (`f16c5b7`, `3a40d56`) |
+| E10.5.2   | Context snapshot caching for preview             |      3 | P0       |    72% | 🔄         | Draft snapshot metadata now carries pin-data references and supports execution-to-editor restoration (`f16c5b7`, `3a40d56`) |
 
 ---
 
@@ -209,10 +213,10 @@
 | E3.2.3   | Switch (Multi-branch)                                 |      3 | P1       |      20% | 🔄             | Switch runner scaffold exists; branch semantics need further QA        |
 | E3.2.4   | NoOp (Placeholder)                                    |      1 | P0       |     100% | ✅             | Passthrough                                                            |
 |          |                                                       |        |          |          |               |                                                                        |
-| **E3.3** | **Trigger Nodes**                                     | **10** | P1       |  **30%** | 🔄 In Progress | Manual trigger shipped; webhook/schedule pending                       |
-| E3.3.1   | Webhook Trigger                                       |      5 | P1       |       0% | ❌             | Receive HTTP events                                                    |
-| E3.3.2   | Schedule Trigger                                      |      3 | P1       |       0% | ❌             | Cron-based                                                             |
-| E3.3.3   | Manual Trigger                                        |      2 | P1       |     100% | ✅             | Added to type data/editor flows (`e444c01`)                            |
+| **E3.3** | **Trigger Nodes**                                     | **10** | P1       |  **75%** | 🔄 In Progress | Hybrid trigger architecture landed: `workflow.trigger` bridge, backend runners, and node-specific open/execute flows (`f16c5b7`) |
+| E3.3.1   | Webhook Trigger                                       |      5 | P1       |      70% | 🔄             | Webhook route, backend model/view, and runner are in place; richer frontend config UX remains pending (`f16c5b7`) |
+| E3.3.2   | Schedule Trigger                                      |      3 | P1       |      75% | 🔄             | Cron-backed activation path and runner added; editor opens linked backend record for configuration (`f16c5b7`) |
+| E3.3.3   | Manual Trigger                                        |      2 | P1       |     100% | ✅             | Manual trigger remains the editor-native start node; execute-from-node flow refined in canvas/node UI (`f16c5b7`) |
 |          |                                                       |        |          |          |               |                                                                        |
 | **E3.4** | **Advanced Nodes**                                    |  **8** | P2       |  **45%** | 🔄 In Progress | Code/custom runtime path is live in backend track                      |
 | E3.4.1   | Code (JS/Python)                                      |      5 | P2       |      70% | 🔄             | Code runner + safe-eval context hardened (`2fdfc0e`, `71a8b3c`)       |
@@ -243,7 +247,7 @@
 | E4.2.3   | Quick-add button                                            |      1 | P0       |     100% | ✅             | + on unconnected                         |
 | E4.2.4   | Selection highlight                                         |      2 | P0       |     100% | ✅             | Border + shadow                          |
 |          |                                                             |        |          |          |               |                                          |
-| **E4.3** | **Config Panel**                                            |  **8** | P0       | **100%** | ✅ Done        |                                          |
+| **E4.3** | **Config Panel**                                            |  **8** | P0       | **100%** | ✅ Done        | Three-column inspector is live; pin/unpin, socket output selection, and trigger-aware open behavior were refined further (`f16c5b7`, `3a40d56`) |
 | E4.3.1   | Parameters tab                                              |      3 | P0       |     100% | ✅             | Control rendering                        |
 | E4.3.2   | Output tab                                                  |      2 | P0       |     100% | ✅             | Execution result                         |
 | E4.3.3   | Input data panel                                            |      2 | P0       |     100% | ✅             | Previous node output                     |
@@ -257,11 +261,11 @@
 | E4.4.5   | Subgraph grouping                                           |      5 | P3       |       0% | ❌             | Collapsible groups                       |
 |          |                                                             |        |          |          |               |                                          |
 | **E4.5** | **Expression Builder UX (Major)**                           | **10** | P0       | **100%** | ✅ Done        |                                          |
-| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **75%** | 🔄 In Progress | Service-driven migration progressed strongly after Sprint 3             |
+| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **79%** | 🔄 In Progress | Service-driven migration advanced via trigger actions, execution replacement, and pin-data state handling (`f16c5b7`, `3a40d56`) |
 | E4.6.1   | workflowEditor service (reactive state + actions + history) |      8 | P0       |     100% | ✅             | Canonical graph/ui state                 |
 | E4.6.2   | Per-editor useSubEnv + scoped editorBus                     |      6 | P0       |      20% | 🔄             | Scoped runtime patterns introduced, full multi-editor isolation pending |
-| E4.6.3   | Refactor EditorCanvas to service-driven                     |      6 | P0       |      80% | 🔄             | Most interaction flows moved to service/actions                         |
-| E4.6.4   | Refactor panels/menu/toolbar to service-driven              |      6 | P0       |      95% | 🔄             | Config/history/toolbar mostly service-driven                            |
+| E4.6.3   | Refactor EditorCanvas to service-driven                     |      6 | P0       |      85% | 🔄             | Canvas now orchestrates trigger open/execute, socket interactions, and copy-to-editor through service-backed flows (`f16c5b7`, `3a40d56`) |
+| E4.6.4   | Refactor panels/menu/toolbar to service-driven              |      6 | P0       |      98% | 🔄             | Pinning moved into the config-panel/service flow and execution cleanup now happens on editor teardown (`3a40d56`) |
 | E4.6.5   | Extract Studio-like hooks + pure utils                      |      4 | P0       |      70% | 🔄             | Hooks/util extraction completed for major canvas behaviors              |
 | E4.6.6   | Undo/redo batching + UI feedback                            |      2 | P0       |      60% | 🔄             | Batching and user feedback improved, final polish pending               |
 
@@ -304,16 +308,16 @@
 | E6.1.2   | Export JSON         |      2 | P1       |     100% | ✅             | Copy to clipboard   |
 | E6.1.3   | Legacy migration    |      1 | P1       |     100% | ✅             | fromLegacyFormat()  |
 |          |                     |        |          |          |               |                     |
-| **E6.2** | **Backend Storage** | **13** | P1       |  **45%** | 🔄 In Progress | Core persistence path exists for workflow/run data |
+| **E6.2** | **Backend Storage** | **13** | P1       |  **52%** | 🔄 In Progress | Workflow/run persistence now includes trigger records, expanded search views, and supporting access rules (`f16c5b7`) |
 | E6.2.1   | Odoo model          |      3 | P1       |     100% | ✅             | Models for workflow, run, node output are in active use |
-| E6.2.2   | CRUD endpoints      |      3 | P1       |      80% | 🔄             | Load/save/run details endpoints integrated into UI        |
-| E6.2.3   | User permissions    |      2 | P1       |      70% | 🔄             | Access groups/rules expanded in backend track             |
+| E6.2.2   | CRUD endpoints      |      3 | P1       |      85% | 🔄             | Load/save/run details endpoints are integrated into UI, and trigger/open-execute routes expanded the surface (`f16c5b7`) |
+| E6.2.3   | User permissions    |      2 | P1       |      75% | 🔄             | Access rules now include `workflow.trigger` model coverage (`f16c5b7`) |
 | E6.2.4   | Folder organization |      2 | P1       |       0% | ❌             | Workflow categories |
-| E6.2.5   | Search & filter     |      3 | P1       |      60% | 🔄             | Type/run views include search/filter progression          |
+| E6.2.5   | Search & filter     |      3 | P1       |      70% | 🔄             | Workflow list/kanban/search views gained published/draft/user filters and dashboard entry points (`f16c5b7`) |
 | E6.2.6   | Workflow run sequence|      1 | P1       |     100% | ✅ Done        | Added `workflow.run` sequence data + manifest entry |
 |          |                     |        |          |          |               |                     |
-| **E6.3** | **Versioning**      |  **8** | P2       |  **65%** | 🔄 In Progress | History panel and milestone/version model introduced (`1841862`, `64d33cc`, `887ea5d`) |
-| E6.3.1   | Version snapshots   |      3 | P2       |      80% | 🔄             | Snapshot/history storage model integrated in UI/backend   |
+| **E6.3** | **Versioning**      |  **8** | P2       |  **68%** | 🔄 In Progress | History panel and milestone/version model are live; draft snapshot metadata now also carries editor pin-data references (`3a40d56`) |
+| E6.3.1   | Version snapshots   |      3 | P2       |      85% | 🔄             | Snapshot/history storage model is integrated in UI/backend, and draft snapshots now preserve pin-data metadata (`3a40d56`) |
 | E6.3.2   | Diff view           |      3 | P2       |      60% | 🔄             | Diff utilities and history UX path present                |
 | E6.3.3   | Rollback            |      2 | P2       |      50% | 🔄             | Restore flow exists, still needs production hardening     |
 
@@ -330,11 +334,11 @@
 | E7.1.3   | Cycle detection       |      2 | P1       |   100% | ✅         | DFS algorithm done   |
 | E7.1.4   | Pre-run validation    |      1 | P1       |    30% | 🔄         | Pre-execution checks expanded with run/contract enforcement |
 |          |                       |        |          |        |           |                      |
-| **E7.2** | **Monitoring**        | **10** | P2       | **35%** | 🔄 In Progress | Run-node traces, durations, status and failure context are now persisted |
+| **E7.2** | **Monitoring**        | **10** | P2       | **48%** | 🔄 In Progress | Run-node traces remain in place, and the repo now has a workflow dashboard shell plus recent error/activity views (`f16c5b7`) |
 | E7.2.1   | Execution logs        |      3 | P2       |    60% | 🔄         | Workflow/run node logging and views are available       |
 | E7.2.2   | Performance metrics   |      3 | P2       |    45% | 🔄         | Duration/perf tracking improved in executor/runtime      |
 | E7.2.3   | Error tracking        |      2 | P2       |    35% | 🔄         | Error-node contracts and failure payloads preserved      |
-| E7.2.4   | Dashboard             |      2 | P2       |     0% | ❌         | Overview UI          |
+| E7.2.4   | Dashboard             |      2 | P2       |    65% | 🔄         | Dashboard components, client action, and list/kanban embedding landed with mock data; backend metrics provider is still pending (`f16c5b7`) |
 |          |                       |        |          |        |           |                      |
 | **E7.3** | **Scaling**           | **16** | P2       | **20%** | 🔄 In Progress | Batching/transaction strategy evolved; queue/idempotency remains pending |
 | E7.3.1   | Queue workers         |      5 | P2       |    20% | 🔄         | Queue-job direction established but not fully productized |

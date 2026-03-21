@@ -69,9 +69,9 @@ const DEFAULT_UI_STATE = () => ({
 });
 
 export const workflowEditorService = {
-    dependencies: [],
+    dependencies: ["notification"],
 
-    start() {
+    start(env, { notification }) {
         const history = new HistoryManager();
         const editorBus = new EventBus();
         let adapter = new WorkflowAdapter();
@@ -1020,6 +1020,31 @@ export const workflowEditorService = {
             state,
             bus: editorBus,
             actions,
+            async copyText(value, options = {}) {
+                const safeLabel = typeof options.label === "string" && options.label.trim()
+                    ? options.label.trim()
+                    : "Text";
+                if (!value) {
+                    return false;
+                }
+
+                const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : null;
+                if (!clipboard || typeof clipboard.writeText !== "function") {
+                    notification.add(`Copy ${safeLabel} manually — clipboard API unavailable.`, {
+                        type: "warning",
+                    });
+                    return false;
+                }
+
+                try {
+                    await clipboard.writeText(value);
+                    notification.add(`${safeLabel} copied to clipboard.`, { type: "success" });
+                    return true;
+                } catch {
+                    notification.add(`Failed to copy ${safeLabel}.`, { type: "danger" });
+                    return false;
+                }
+            },
             setAdapter(nextAdapter) {
                 adapter = nextAdapter;
             },
@@ -1327,6 +1352,72 @@ export const workflowEditorService = {
                 return await rpc('/web/dataset/call_kw', {
                     model: 'ir.workflow',
                     method: 'get_trigger_node_action',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async getTriggerPanelData(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'get_trigger_panel_data',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async activateTriggerNode(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'activate_trigger_node',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async deactivateTriggerNode(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'deactivate_trigger_node',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async rotateTriggerWebhook(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'rotate_trigger_webhook',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async startTriggerWebhookTest(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'start_trigger_webhook_test',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async stopTriggerWebhookTest(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'stop_trigger_webhook_test',
                     args: [[workflowId], nodeId],
                     kwargs: {},
                 });

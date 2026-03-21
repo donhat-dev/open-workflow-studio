@@ -17,8 +17,8 @@
 									</t>
 									<t t-if="btn.label"><span t-esc="btn.label"/></t>
 								</button>
-								<button class="btn btn-light btn-sm fit-view-dropdown__toggle" t-on-click="btn.menu.toggle" t-att-disabled="btn.menu.disabled ? 'disabled' : undefined" title="More fit options">
-									<LucideIcon t-props="{ name: 'ChevronDown', size: 14 }"/>
+								<button class="btn btn-light d-inline-flex fit-view-dropdown__toggle" t-on-click="btn.menu.toggle" t-att-disabled="btn.menu.disabled ? 'disabled' : undefined" title="More fit options">
+									<LucideIcon t-props="{ name: 'ChevronDown', size: 16 }"/>
 								</button>
 								<div class="fit-view-dropdown__menu" t-if="btn.menu.open" t-on-click.stop="" t-on-mousedown.stop="" t-on-wheel.stop="">
 									<t t-foreach="btn.menu.items" t-as="item" t-key="item.key">
@@ -88,8 +88,6 @@
 				<!-- Node Menu (context menu) - reads from service state via nodeMenu getter -->
 				<NodeMenu t-if="nodeMenu.visible" position="{ x: nodeMenu.x, y: nodeMenu.y }" variant="nodeMenu.variant" connectionContext="nodeMenu.connectionContext" onNodeSelected="nodeMenuProps.onNodeSelected" onClose="nodeMenuProps.onClose"/>
 			</div>
-			<!-- Node Config Panel (outside content to avoid transform containment) -->
-			<NodeConfigPanel t-if="isConfigPanelOpen and configPanelNode" node="configPanelNode" workflow="workflowData" actions="nodeConfigActions" execution="executionProp" viewMode="configPanelViewMode" onClose="onConfigPanelClose" onSave="onConfigPanelSave"/>
 		</div>
 	</t>
 </templates>

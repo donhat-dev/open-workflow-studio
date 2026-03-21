@@ -110,11 +110,15 @@ class HttpNodeRunner(BaseNodeRunner):
                     _logger.warning("HTTP response truncated to %d bytes", self.MAX_RESPONSE_SIZE)
                 response_data = {'body': content, 'text': True}
 
-            result = {
-                'data': response_data,
-                'status': response.status_code,
-                'headers': dict(response.headers),
-            }
+            raw_response = node_config.get('raw_response', False)
+            if raw_response:
+                result = {
+                    'data': response_data,
+                    'status': response.status_code,
+                    'headers': dict(response.headers),
+                }
+            else:
+                result = response_data
 
             if not response.ok:
                 raise ValueError(f"HTTP {response.status_code}: {response.reason}")

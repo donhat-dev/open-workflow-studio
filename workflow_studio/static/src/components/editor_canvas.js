@@ -5,7 +5,7 @@ import { useBus, useService } from "@web/core/utils/hooks";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
-import { NodeConfigPanel } from "./node_config_panel";
+import { ConfigPanelDialog } from "./config_panel_dialog";
 import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
 import {
     getBezierPath,
@@ -32,7 +32,7 @@ import {
  */
 export class EditorCanvas extends Component {
     static template = "workflow_studio.editor_canvas";
-    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel, LucideIcon };
+    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, LucideIcon };
 
     static props = {
         // Graph data (required for standalone/widget mode, ignored in editor mode)
@@ -73,6 +73,8 @@ export class EditorCanvas extends Component {
         this._executedConnectionIdsLength = 0;
         this._lastExecutedOrderLength = 0;
         this._lastFocusNodeRequest = null;
+        this._removeConfigPanelDialog = null;
+        this._configPanelDialogNodeId = null;
 
         // Determine operating mode FIRST (before any state/hooks)
         // Mode 1: Editor Mode - service exists, no graphData prop
@@ -90,9 +92,11 @@ export class EditorCanvas extends Component {
                 throw new Error('[EditorCanvas] Editor mode requires workflowEditor service in env');
             }
             this.actionService = useService("action");
+            this.dialogService = useService("dialog");
         } else {
             this.editor = this.env.workflowEditor || null;
             this.actionService = null;
+            this.dialogService = null;
         }
 
         // Local state for widget mode (or fallback defaults if service state unavailable)
@@ -133,6 +137,7 @@ export class EditorCanvas extends Component {
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
             renameNode: (nodeId, label) => this.editor.renameNode(nodeId, label),
+            openNodeConfig: (nodeId) => this.onNodeOpenConfig(nodeId),
             getNodeConfig: (nodeId) => this.editor.getNodeConfig(nodeId),
             getExpressionContext: (options) => buildExecutionContext ? buildExecutionContext(options) : null,
             buildContextForNode: () => ({
@@ -141,6 +146,7 @@ export class EditorCanvas extends Component {
             }),
             executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
                 this.editor.executeUntilNode(nodeId, inputData, configOverrides),
+            executeFromNode: (nodeId, inputData = {}) => this.editor.executeFromNode(nodeId, inputData),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
             pinNodeData: (nodeId, nodeRunId) => this.editor.actions.pinNodeData(nodeId, nodeRunId),
             unpinNodeData: (nodeId) => this.editor.actions.unpinNodeData(nodeId),
@@ -148,6 +154,18 @@ export class EditorCanvas extends Component {
             replaceExecutionNodeResult: (nodeResult) => this.editor.actions.replaceExecutionNodeResult(nodeResult),
             saveWorkflow: () => this.editor.saveWorkflow(),
             getNodeRunDetails: (nodeRunId) => this.editor.getNodeRunDetails(nodeRunId),
+            getTriggerPanelData: (nodeId) => this.editor.getTriggerPanelData(nodeId),
+            activateTriggerNode: (nodeId) => this.editor.activateTriggerNode(nodeId),
+            deactivateTriggerNode: (nodeId) => this.editor.deactivateTriggerNode(nodeId),
+            rotateTriggerWebhook: (nodeId) => this.editor.rotateTriggerWebhook(nodeId),
+            startTriggerWebhookTest: (nodeId) => this.editor.startTriggerWebhookTest(nodeId),
+            stopTriggerWebhookTest: (nodeId) => this.editor.stopTriggerWebhookTest(nodeId),
+            openTriggerNodeRecord: async (nodeId) => {
+                const action = await this.editor.getTriggerNodeAction(nodeId);
+                if (action) {
+                    this.actionService.doAction(action);
+                }
+            },
             resolveRecordRefs: (...args) => {
                 // Proxy for record ref resolution
                 if (this.editor.resolveRecordRefs) {
@@ -269,9 +287,11 @@ export class EditorCanvas extends Component {
             }
             // Debug handle for QA – accessible as window.canvas in browser console
             window.canvas = this;
+            this._syncConfigPanelDialog();
         });
         onWillUnmount(() => {
             this._resizeObserver.disconnect();
+            this._removeActiveConfigDialog();
             if (this._mouseMoveFrame) {
                 cancelAnimationFrame(this._mouseMoveFrame);
                 this._mouseMoveFrame = null;
@@ -297,10 +317,12 @@ export class EditorCanvas extends Component {
         onPatched(() => {
             const request = this.uiState.focusNodeRequest;
             if (!request || request === this._lastFocusNodeRequest) {
+                this._syncConfigPanelDialog();
                 return;
             }
             this._lastFocusNodeRequest = request;
             this.viewportHook.panToNode(request.nodeId, this.nodes);
+            this._syncConfigPanelDialog();
         });
 
         useBus(this.env.bus, "execution-log:focus-node", (payload) => {
@@ -1353,50 +1375,13 @@ export class EditorCanvas extends Component {
         // Connection selection is cleared by select() action via service
     }
 
-    /**
-     * Trigger node types that should NOT open the normal config panel.
-     * schedule_trigger / record_event_trigger / webhook_trigger → open linked backend record.
-     * manual_trigger → no config (has execute button instead).
-     */
-    static TRIGGER_NODE_TYPES = new Set([
-        'schedule_trigger',
-        'record_event_trigger',
-        'webhook_trigger',
-        'manual_trigger',
-    ]);
-
     onNodeOpenConfig(nodeId) {
-        if (this.isReadonly) return;
-        if (!this.canEdit) return;
+        if (!this.canEdit && !this.isInExecutionView) return;
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
 
-        // Trigger nodes: redirect to linked backend record instead of config panel
-        if (EditorCanvas.TRIGGER_NODE_TYPES.has(node.type)) {
-            this._handleTriggerNodeOpen(node);
-            return;
-        }
-
         // Open config panel via service
         this.editor.actions.openPanel("config", { nodeId });
-    }
-
-    /**
-     * Handle opening a trigger node — redirect to linked backend record
-     * or block if not yet implemented.
-     */
-    async _handleTriggerNodeOpen(node) {
-        const nodeType = node.type;
-
-        if (nodeType === 'schedule_trigger' || nodeType === 'record_event_trigger' || nodeType === 'webhook_trigger') {
-            const action = await this.editor.getTriggerNodeAction(node.id);
-            if (action) {
-                this.actionService.doAction(action);
-            }
-            return;
-        }
-
-        // manual_trigger: no config to open (execute button on the node itself)
     }
 
     /**
@@ -1918,6 +1903,58 @@ export class EditorCanvas extends Component {
         });
     };
 
+    _removeActiveConfigDialog() {
+        if (!this._removeConfigPanelDialog) {
+            return;
+        }
+        const removeDialog = this._removeConfigPanelDialog;
+        this._removeConfigPanelDialog = null;
+        this._configPanelDialogNodeId = null;
+        this._isProgrammaticDialogClose = true;
+        removeDialog();
+        this._isProgrammaticDialogClose = false;
+    }
+
+    _syncConfigPanelDialog() {
+        if (!this.isEditorMode || !this.dialogService) {
+            return;
+        }
+
+        const node = this.configPanelNode;
+        const shouldOpen = !!(this.isConfigPanelOpen && node);
+        if (!shouldOpen) {
+            this._removeActiveConfigDialog();
+            return;
+        }
+
+        if (this._removeConfigPanelDialog && this._configPanelDialogNodeId === node.id) {
+            return;
+        }
+
+        this._removeActiveConfigDialog();
+        this._configPanelDialogNodeId = node.id;
+        this._removeConfigPanelDialog = this.dialogService.add(
+            ConfigPanelDialog,
+            {
+                node,
+                workflow: this.workflowData,
+                actions: this.nodeConfigActions,
+                execution: this.executionProp,
+                viewMode: this.configPanelViewMode,
+                onSave: this.onConfigPanelSave,
+            },
+            {
+                onClose: () => {
+                    this._removeConfigPanelDialog = null;
+                    this._configPanelDialogNodeId = null;
+                    if (!this._isProgrammaticDialogClose && this.uiState.panels.configOpen) {
+                        this.editor.actions.closePanel("config");
+                    }
+                },
+            }
+        );
+    }
+
     // ============================================
     // CONFIG PANEL HANDLERS
     // ============================================
@@ -1968,6 +2005,7 @@ export class EditorCanvas extends Component {
     onConfigPanelClose = () => {
         if (!this.canEdit && !this.isInExecutionView) return;
         this.editor.actions.closePanel("config");
+        this._removeActiveConfigDialog();
     };
 
     /**
@@ -2115,7 +2153,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canUndo,
                     title: 'Undo (Ctrl+Z)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'redo',
@@ -2124,7 +2162,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canRedo,
                     title: 'Redo (Ctrl+Y)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 }
             );
             buttons.push({ name: 'divider-2', divider: true });
@@ -2138,7 +2176,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: this.nodes.length === 0,
                     title: 'Tidy Up',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'add-node',
@@ -2162,7 +2200,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: this.nodes.length === 0,
                 title: 'Fit to View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
                 menu: {
                     open: this.isFitMenuOpen,
                     disabled: this.isReadonly || this.nodes.length === 0,
@@ -2177,7 +2215,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom Out',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'zoom-in',
@@ -2186,7 +2224,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom In',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'reset-zoom',
@@ -2195,7 +2233,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Reset View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             }
         );
 
@@ -2262,7 +2300,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canUndo,
                     title: 'Undo (Ctrl+Z)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'redo',
@@ -2271,7 +2309,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canRedo,
                     title: 'Redo (Ctrl+Y)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 { name: 'divider-2', divider: true },
                 {
@@ -2281,7 +2319,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: this.nodes.length === 0,
                     title: 'Tidy Up',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'add-node',
@@ -2305,7 +2343,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: this.nodes.length === 0,
                 title: 'Fit to View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
                 menu: {
                     open: this.isFitMenuOpen,
                     disabled: this.isReadonly || this.nodes.length === 0,
@@ -2320,7 +2358,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom Out',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'zoom-in',
@@ -2329,7 +2367,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom In',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'reset-zoom',
@@ -2338,7 +2376,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Reset View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             }
         );
 

@@ -159,9 +159,22 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         return result
 
     def _resolve_fields(self, node_config, eval_context):
+        """Resolve fields_expr to a list of field names.
+        
+        Accepts three formats:
+                    1. ``={{ ['field1', 'field2'] }}`` — explicit expression mode
+                    2. ``'field1, field2'``           — comma-separated string from FieldSelector
+                    3. Already a list of field names
+        
+        If the resolved value is empty or None, defaults to ['id', 'display_name'].
+        Returns a list of strings.
+        """
+
         fields_value = self.resolver.resolve(node_config.get('fields_expr', "={{ ['id', 'display_name'] }}"), eval_context)
         if fields_value in (None, ''):
             return ['id', 'display_name']
+        if isinstance(fields_value, str):
+            return [field.strip() for field in fields_value.split(',') if field.strip()]
         if not isinstance(fields_value, list):
             raise ValueError("Fields must evaluate to a list")
         return [str(field) for field in fields_value if field]
@@ -311,6 +324,12 @@ class RecordOperationNodeRunner(BaseNodeRunner):
                     continue
             return result
         raise ValueError("Record IDs must evaluate to int or list of ints")
+    
+    def _resolve_order(self, node_config, eval_context):
+        order_value = self.resolver.resolve(node_config.get('order'), eval_context)
+        if order_value is None:
+            return ''
+        return str(order_value).strip()
 
     def _resolve_target_records(self, model, node_config, eval_context):
         ids = self._resolve_ids(node_config, eval_context)
@@ -325,8 +344,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         domain = self._resolve_domain(node_config, eval_context)
         fields_list = self._resolve_fields(node_config, eval_context)
         limit = self._resolve_int(node_config.get('limit'), eval_context, default=20)
-        order_value = self.resolver.resolve(node_config.get('order'), eval_context)
-        order = str(order_value).strip() if order_value else None
+        order = self._resolve_order(node_config, eval_context)
 
         records = model.search(domain, limit=limit or None, order=order or None)
         return {

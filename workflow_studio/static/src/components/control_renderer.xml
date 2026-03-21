@@ -122,6 +122,15 @@
 					inputContext="props.inputContext"
 				/>
 			</t>
+			<!-- TRIGGER FIELDS — model-aware checkbox grid for record-event triggers -->
+			<t t-elif="controlType === 'trigger_fields'">
+				<TriggerFieldsControl
+					value="value"
+					suggestions="suggestions"
+					onChange.bind="onTriggerFieldsChange"
+					readonly="props.readonly"
+				/>
+			</t>
 		</div>
 	</t>
 </templates>

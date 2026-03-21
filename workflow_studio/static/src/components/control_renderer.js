@@ -9,6 +9,7 @@ import { QueryParamsControl } from "./controls/query_params_control";
 import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
 import { DomainControl } from "./domain_control/domain_control";
 import { FieldValuesControl } from "./field_values_control/field_values_control";
+import { TriggerFieldsControl } from "./controls/trigger_fields_control";
 import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
@@ -40,7 +41,7 @@ import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl, DomainControl, FieldValuesControl };
+    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl, DomainControl, FieldValuesControl, TriggerFieldsControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -303,6 +304,13 @@ export class ControlRenderer extends Component {
      * Handle body type control change (composite value)
      */
     onBodyTypeChange = (value) => {
+        this.props.onChange(this.props.control.key, value);
+    };
+
+    /**
+     * Handle trigger fields control change (array value)
+     */
+    onTriggerFieldsChange = (value) => {
         this.props.onChange(this.props.control.key, value);
     };
 

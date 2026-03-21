@@ -2,7 +2,13 @@
 <templates xml:space="preserve">
 
     <t t-name="workflow_studio.ExpressionValueEditor">
-        <div class="o_expression_value_editor d-flex align-items-center w-100 gap-1">
+        <div class="o_expression_value_editor d-flex align-items-center w-100 gap-1"
+            t-att-class="{ 'o_drag_over': state.dragOver }"
+            t-on-dragenter="onDragEnter"
+            t-on-dragover="onDragOver"
+            t-on-dragleave="onDragLeave"
+            t-on-drop="onDrop"
+        >
             <!-- Native or expression editor -->
             <div class="flex-grow-1 overflow-hidden">
                 <t t-if="isExpression">

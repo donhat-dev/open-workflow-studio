@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.trigger_fields_control">
+        <div class="trigger-field-grid">
+            <t t-foreach="fields" t-as="field" t-key="field.name">
+                <label class="trigger-field-pill">
+                    <input
+                        type="checkbox"
+                        t-att-checked="isChecked(field.name)"
+                        t-on-change="(ev) => this.onToggle(field.name, ev)"
+                        t-att-disabled="props.readonly ? 'disabled' : undefined"
+                    />
+                    <span class="fw-medium" t-esc="field.label"/>
+                    <span class="text-muted">(<t t-esc="field.type"/>)</span>
+                </label>
+            </t>
+            <div t-if="fields.length === 0" class="text-muted small">Choose a valid model to load available fields.</div>
+        </div>
+    </t>
+</templates>
