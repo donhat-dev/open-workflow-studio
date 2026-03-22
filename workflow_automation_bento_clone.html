@@ -431,6 +431,328 @@
       margin-top: 28px;
     }
 
+    .canvas-shell {
+      margin-top: 28px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .canvas-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .connection-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 0 16px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.84rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+
+    .canvas-stage {
+      position: relative;
+      min-height: 640px;
+      padding: 34px;
+      background:
+        linear-gradient(to right, rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+        rgba(248, 250, 252, 0.52);
+      background-size: 72px 72px, 72px 72px, auto;
+    }
+
+    .canvas-caption {
+      margin-bottom: 24px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .canvas-node {
+      position: absolute;
+      width: min(31%, 340px);
+      padding: 22px 22px 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .canvas-node-webhook {
+      top: 72px;
+      left: 34px;
+    }
+
+    .canvas-node-manual {
+      left: 34px;
+      bottom: 72px;
+    }
+
+    .canvas-node-transform {
+      top: 208px;
+      right: 34px;
+      width: min(30%, 330px);
+      min-height: 142px;
+    }
+
+    .canvas-node-head {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .canvas-node-icon {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      flex: 0 0 46px;
+      border: 2px solid var(--line);
+      background: var(--background);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .canvas-node-icon::before {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 1px solid rgba(17, 24, 39, 0.12);
+    }
+
+    .canvas-node-kicker {
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .canvas-node-title {
+      margin: 0;
+      font-size: 1.32rem;
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+    }
+
+    .canvas-node-copy {
+      margin: 0 0 16px;
+      color: var(--muted-foreground);
+      font-size: 0.98rem;
+      line-height: 1.58;
+    }
+
+    .canvas-node-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .canvas-code,
+    .canvas-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.84);
+      font-size: 0.84rem;
+      color: var(--muted-foreground);
+    }
+
+    .canvas-code {
+      font-family: "SFMono-Regular", "SF Mono", Consolas, monospace;
+      letter-spacing: 0.02em;
+    }
+
+    .canvas-socket {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--line);
+      background: var(--background);
+      z-index: 3;
+    }
+
+    .canvas-socket::before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border: 1px solid rgba(17, 24, 39, 0.12);
+    }
+
+    .canvas-socket.out {
+      top: 50%;
+      right: -9px;
+      transform: translateY(-50%);
+    }
+
+    .canvas-socket.in {
+      left: -9px;
+    }
+
+    .canvas-socket.in.top {
+      top: 54px;
+    }
+
+    .canvas-socket.in.bottom {
+      top: 106px;
+    }
+
+    .connection-path {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .connection-segment {
+      position: absolute;
+      background: rgba(17, 24, 39, 0.22);
+    }
+
+    .connection-segment.horizontal {
+      height: 2px;
+    }
+
+    .connection-segment.vertical {
+      width: 2px;
+    }
+
+    .connection-accent {
+      background: rgba(0, 68, 255, 0.42);
+    }
+
+    .connection-label {
+      position: absolute;
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.92);
+      font-size: 0.76rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+
+    .connection-arrow {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-top: 2px solid rgba(0, 68, 255, 0.42);
+      border-right: 2px solid rgba(0, 68, 255, 0.42);
+      transform: rotate(45deg);
+    }
+
+    .connection-webhook-stub {
+      top: 114px;
+      left: 31.6%;
+      height: 56px;
+    }
+
+    .connection-webhook-1 {
+      top: 170px;
+      left: 31.6%;
+      width: 25.8%;
+    }
+
+    .connection-webhook-2 {
+      top: 170px;
+      left: 57.4%;
+      height: 100px;
+    }
+
+    .connection-webhook-3 {
+      top: 270px;
+      left: 57.4%;
+      width: 11.7%;
+    }
+
+    .connection-webhook-label {
+      top: 130px;
+      left: 39.8%;
+    }
+
+    .connection-webhook-arrow {
+      top: 264px;
+      left: calc(69.1% - 8px);
+    }
+
+    .connection-manual-1 {
+      top: 518px;
+      left: 31.6%;
+      width: 27.8%;
+    }
+
+    .connection-manual-2 {
+      top: 322px;
+      left: 59.4%;
+      height: 196px;
+    }
+
+    .connection-manual-3 {
+      top: 322px;
+      left: 59.4%;
+      width: 9.7%;
+    }
+
+    .connection-manual-label {
+      top: 542px;
+      left: 41.7%;
+    }
+
+    .connection-manual-arrow {
+      top: 316px;
+      left: calc(69.1% - 8px);
+    }
+
+    .canvas-legend {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      padding: 0 34px 34px;
+    }
+
+    .canvas-legend-card {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.84);
+      padding: 18px;
+    }
+
+    .canvas-legend-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.98rem;
+      color: var(--foreground);
+    }
+
+    .canvas-legend-card p {
+      margin: 0;
+      font-size: 0.94rem;
+      line-height: 1.58;
+      color: var(--muted-foreground);
+    }
+
     .token-card,
     .spec-card {
       grid-column: span 4;
@@ -554,7 +876,8 @@
     @media (max-width: 980px) {
       .detail-grid,
       .token-grid,
-      .spec-grid {
+      .spec-grid,
+      .canvas-legend {
         grid-template-columns: 1fr;
       }
 
@@ -565,6 +888,29 @@
       .tile.wide,
       .tile.full {
         grid-column: span 12;
+      }
+
+      .canvas-stage {
+        min-height: auto;
+        display: grid;
+        gap: 18px;
+      }
+
+      .canvas-node {
+        position: relative;
+        top: auto;
+        right: auto;
+        bottom: auto;
+        left: auto;
+        width: 100%;
+      }
+
+      .connection-path {
+        display: none;
+      }
+
+      .canvas-legend {
+        padding-top: 20px;
       }
     }
 
@@ -619,6 +965,17 @@
       .cta-row {
         flex-direction: column;
         align-items: stretch;
+      }
+
+      .canvas-stage,
+      .canvas-legend {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .canvas-toolbar {
+        padding-left: 18px;
+        padding-right: 18px;
       }
     }
   </style>
@@ -749,6 +1106,91 @@
                 <p class="tile-copy">This concept page keeps the tone of a style-library showcase while clearly positioning the product: an Odoo-native workflow builder for orchestration, execution, visibility, and operational trust.</p>
               </div>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="macro-components">
+        <div class="shell">
+          <div class="eyebrow">Macro component demo</div>
+          <h2 class="section-title">A canvas layout demo for nodes, sockets, and connections</h2>
+          <p class="section-copy">This section turns the Swiss-editorial shell into a lightweight workflow canvas: trigger cards sit on the left, an action card receives fan-in on the right, orthogonal paths stay crisp, and square sockets borrow the same framed-border idea used in the hero headline.</p>
+          <div class="canvas-shell">
+            <div class="canvas-toolbar">
+              <span class="connection-chip">workflow canvas</span>
+              <span class="connection-chip">orthogonal connectors</span>
+              <span class="connection-chip">square sockets</span>
+              <span class="connection-chip">macro node cards</span>
+            </div>
+            <div class="canvas-stage">
+              <div class="canvas-caption">Canvas layout / trigger fan-in / boxed sockets / sharp routing</div>
+
+              <article class="canvas-node canvas-node-webhook">
+                <div class="canvas-node-head">
+                  <div class="canvas-node-icon">W</div>
+                  <div>
+                    <div class="canvas-node-kicker">Webhook</div>
+                    <h3 class="canvas-node-title">Capture inbound event</h3>
+                  </div>
+                </div>
+                <span class="canvas-socket out" aria-hidden="true"></span>
+              </article>
+
+              <article class="canvas-node canvas-node-manual">
+                <div class="canvas-node-head">
+                  <div class="canvas-node-icon">M</div>
+                  <div>
+                    <div class="canvas-node-kicker">Manual trigger</div>
+                    <h3 class="canvas-node-title">Launch from operator panel</h3>
+                  </div>
+                </div>
+                <span class="canvas-socket out" aria-hidden="true"></span>
+              </article>
+
+              <article class="canvas-node canvas-node-transform">
+                <div class="canvas-node-head">
+                  <div class="canvas-node-icon">ƒx</div>
+                  <div>
+                    <div class="canvas-node-kicker">Data transform</div>
+                    <h3 class="canvas-node-title">Normalize and map payload</h3>
+                  </div>
+                </div>
+                <span class="canvas-socket in top" aria-hidden="true"></span>
+                <span class="canvas-socket in bottom" aria-hidden="true"></span>
+              </article>
+
+              <div class="connection-path" aria-hidden="true">
+                <span class="connection-segment vertical connection-webhook-stub"></span>
+                <span class="connection-segment horizontal connection-webhook-1"></span>
+                <span class="connection-segment vertical connection-webhook-2"></span>
+                <span class="connection-segment horizontal connection-accent connection-webhook-3"></span>
+                <span class="connection-label connection-webhook-label">payload</span>
+                <span class="connection-arrow connection-webhook-arrow"></span>
+              </div>
+
+              <div class="connection-path" aria-hidden="true">
+                <span class="connection-segment horizontal connection-manual-1"></span>
+                <span class="connection-segment vertical connection-manual-2"></span>
+                <span class="connection-segment horizontal connection-accent connection-manual-3"></span>
+                <span class="connection-label connection-manual-label">manual run</span>
+                <span class="connection-arrow connection-manual-arrow"></span>
+              </div>
+            </div>
+
+            <div class="canvas-legend">
+              <article class="canvas-legend-card">
+                <strong>Node card</strong>
+                <p>Uses the same border, quiet shadow, uppercase kicker, and mono metadata language as the rest of the page, so the canvas feels native to the system rather than pasted in.</p>
+              </article>
+              <article class="canvas-legend-card">
+                <strong>Connection path</strong>
+                <p>Built from straight horizontal and vertical segments only. The blue accent is reserved for the final delivery edge so the eye knows where data lands.</p>
+              </article>
+              <article class="canvas-legend-card">
+                <strong>Socket treatment</strong>
+                <p>Each socket is a framed square with an inset border, intentionally echoing the hero headline corners to keep the visual grammar consistent.</p>
+              </article>
+            </div>
           </div>
         </div>
       </section>
