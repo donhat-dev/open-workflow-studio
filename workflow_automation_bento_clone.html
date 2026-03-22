@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The First Odoo Workflow Builder</title>
+  <meta name="description" content="A standalone static page inspired by the Bento Grid style treatment, reframed for workflow automation in Odoo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --background: hsl(0 0% 100%);
+      --foreground: hsl(222 47% 11%);
+      --primary: hsl(225 100% 50%);
+      --primary-foreground: hsl(0 0% 100%);
+      --secondary: hsl(220 14% 96%);
+      --secondary-foreground: hsl(222 47% 11%);
+      --muted: hsl(220 14% 96%);
+      --muted-foreground: hsl(220 9% 46%);
+      --accent: hsl(24 100% 50%);
+      --accent-foreground: hsl(0 0% 100%);
+      --border: hsl(220 13% 91%);
+      --line: hsla(222, 47%, 11%, 0.18);
+      --surface: hsla(220, 14%, 96%, 0.84);
+      --radius: 0px;
+      --shadow-soft: 0 18px 40px rgba(17, 24, 39, 0.04);
+      --font-display: "Space Grotesk", sans-serif;
+      --font-body: "Space Grotesk", sans-serif;
+      --container: min(1180px, calc(100vw - 48px));
+      --grid-size: 124px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--foreground);
+      background:
+        linear-gradient(to right, rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(17, 24, 39, 0.04) 1px, transparent 1px),
+        var(--background);
+      background-size: var(--grid-size) var(--grid-size), var(--grid-size) var(--grid-size), auto;
+      min-height: 100vh;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      max-width: 100%;
+      display: block;
+    }
+
+    .page {
+      width: 100%;
+    }
+
+    .shell {
+      width: var(--container);
+      margin: 0 auto;
+    }
+
+    .section {
+      padding: 48px 0;
+    }
+
+    .section + .section {
+      padding-top: 24px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: 0.38em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .hero {
+      padding-top: 28px;
+      padding-bottom: 56px;
+      text-align: center;
+    }
+
+    .hero .eyebrow {
+      justify-content: center;
+    }
+
+    .hero-title {
+      margin: 0 auto 28px;
+      max-width: 1120px;
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 8vw, 6.1rem);
+      line-height: 0.98;
+      letter-spacing: -0.055em;
+      font-weight: 700;
+    }
+
+    .hero-title .base {
+      color: var(--foreground);
+      display: block;
+      margin-bottom: 0.14em;
+    }
+
+    .framed-text {
+      position: relative;
+      display: inline-block;
+      padding: 0.2em 0.42em;
+      color: var(--primary);
+      background: var(--background);
+      isolation: isolate;
+    }
+
+    .framed-text::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--line);
+      z-index: -1;
+    }
+
+    .corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--line);
+      background: var(--background);
+      z-index: 1;
+    }
+
+    .corner.tl {
+      top: -12px;
+      left: -12px;
+    }
+
+    .corner.tr {
+      top: -12px;
+      right: -12px;
+    }
+
+    .corner.bl {
+      bottom: -12px;
+      left: -12px;
+    }
+
+    .corner.br {
+      bottom: -12px;
+      right: -12px;
+    }
+
+    .hero-copy {
+      width: min(960px, 100%);
+      margin: 0 auto;
+      font-size: clamp(1.18rem, 2vw, 1.5rem);
+      line-height: 1.65;
+      color: var(--muted-foreground);
+    }
+
+    .cta-row {
+      margin-top: 42px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 62px;
+      padding: 0 34px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 700;
+      transition: transform 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button-primary {
+      min-width: 320px;
+      background: var(--primary);
+      color: var(--primary-foreground);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .button-secondary {
+      background: var(--background);
+      color: var(--foreground);
+      border-color: var(--border);
+    }
+
+    .meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.92rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.24em;
+      color: var(--muted-foreground);
+    }
+
+    .label-featured {
+      color: var(--primary);
+      border-color: rgba(29, 78, 216, 0.32);
+      background: rgba(29, 78, 216, 0.05);
+    }
+
+    .star {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .detail-kicker {
+      margin-bottom: 22px;
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.8fr);
+      gap: 48px;
+      align-items: start;
+    }
+
+    .detail-title {
+      margin: 0 0 18px;
+      font-family: var(--font-display);
+      font-size: clamp(2.7rem, 5vw, 5rem);
+      line-height: 1;
+      letter-spacing: -0.05em;
+      color: var(--primary);
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      font-size: clamp(1.3rem, 2.5vw, 1.78rem);
+      line-height: 1.35;
+      color: var(--foreground);
+    }
+
+    .detail-copy {
+      margin: 0;
+      font-size: 1.18rem;
+      line-height: 1.62;
+      color: var(--muted-foreground);
+      max-width: 860px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 0 18px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.75);
+      font-size: 0.95rem;
+      color: var(--muted-foreground);
+    }
+
+    .panel-stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.8);
+      padding: 22px 22px 20px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .panel h3,
+    .panel h4 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--primary);
+    }
+
+    .panel p,
+    .panel li {
+      margin: 0;
+      font-size: 0.99rem;
+      line-height: 1.6;
+      color: var(--muted-foreground);
+    }
+
+    .panel ul {
+      padding-left: 18px;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .tile {
+      grid-column: span 4;
+      min-height: 180px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 180ms ease, border-color 180ms ease;
+    }
+
+    .tile:hover {
+      transform: translateY(-3px);
+      border-color: rgba(29, 78, 216, 0.28);
+    }
+
+    .tile.tall {
+      grid-column: span 5;
+      min-height: 260px;
+    }
+
+    .tile.wide {
+      grid-column: span 7;
+      min-height: 260px;
+    }
+
+    .tile.full {
+      grid-column: span 12;
+      min-height: 210px;
+    }
+
+    .tile-kicker {
+      font-size: 0.84rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.24em;
+      color: var(--primary);
+      margin-bottom: 16px;
+    }
+
+    .tile-title {
+      margin: 0 0 10px;
+      font-size: 1.6rem;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+
+    .tile-copy {
+      margin: 0;
+      color: var(--muted-foreground);
+      line-height: 1.55;
+      font-size: 1rem;
+    }
+
+    .metric {
+      font-size: clamp(2rem, 3vw, 3.2rem);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--primary);
+    }
+
+    .section-title {
+      margin: 10px 0 16px;
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.04;
+      letter-spacing: -0.05em;
+    }
+
+    .section-copy {
+      margin: 0;
+      max-width: 820px;
+      font-size: 1.12rem;
+      line-height: 1.65;
+      color: var(--muted-foreground);
+    }
+
+    .token-grid,
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 28px;
+    }
+
+    .token-card,
+    .spec-card {
+      grid-column: span 4;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.86);
+      padding: 22px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .token-card h3,
+    .spec-card h3 {
+      margin: 0 0 14px;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--primary);
+    }
+
+    .swatches {
+      display: grid;
+      gap: 12px;
+    }
+
+    .swatch {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .swatch-box {
+      height: 44px;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-background {
+      background: hsl(0 0% 100%);
+    }
+
+    .swatch-foreground {
+      background: hsl(222 47% 11%);
+    }
+
+    .swatch-primary {
+      background: hsl(225 100% 50%);
+    }
+
+    .swatch-border {
+      background: hsl(220 13% 91%);
+    }
+
+    .swatch-meta strong,
+    .spec-card strong,
+    .token-card strong {
+      display: block;
+      font-size: 1rem;
+      color: var(--foreground);
+      margin-bottom: 4px;
+    }
+
+    .swatch-meta span,
+    .token-card p,
+    .spec-card p,
+    .token-card li,
+    .spec-card li {
+      color: var(--muted-foreground);
+      font-size: 0.96rem;
+      line-height: 1.58;
+    }
+
+    .type-scale {
+      display: grid;
+      gap: 16px;
+    }
+
+    .type-line {
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .type-line:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .display-sample {
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.05em;
+      color: var(--foreground);
+      margin-bottom: 6px;
+    }
+
+    .stack-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .stack-list li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stack-list li:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .footer-note {
+      padding: 18px 0 60px;
+      color: var(--muted-foreground);
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .detail-grid,
+      .token-grid,
+      .spec-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .token-card,
+      .spec-card,
+      .tile,
+      .tile.tall,
+      .tile.wide,
+      .tile.full {
+        grid-column: span 12;
+      }
+    }
+
+    @media (max-width: 720px) {
+      :root {
+        --container: min(100vw - 28px, 100%);
+        --grid-size: 74px;
+      }
+
+      .section {
+        padding: 34px 0;
+      }
+
+      .hero {
+        padding-top: 18px;
+      }
+
+      .framed-text {
+        padding: 0.16em 0.24em;
+      }
+
+      .corner {
+        width: 18px;
+        height: 18px;
+      }
+
+      .corner.tl,
+      .corner.tr {
+        top: -9px;
+      }
+
+      .corner.bl,
+      .corner.br {
+        bottom: -9px;
+      }
+
+      .corner.tl,
+      .corner.bl {
+        left: -9px;
+      }
+
+      .corner.tr,
+      .corner.br {
+        right: -9px;
+      }
+
+      .button-primary {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .cta-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="section hero">
+      <div class="shell">
+        <div class="eyebrow">Design Style Library / Workflow Automation</div>
+        <h1 class="hero-title">
+          <span class="base">Workflow automation for Odoo teams</span>
+          <span class="framed-text">
+            <span class="corner tl" aria-hidden="true"></span>
+            <span class="corner tr" aria-hidden="true"></span>
+            <span class="corner bl" aria-hidden="true"></span>
+            <span class="corner br" aria-hidden="true"></span>
+            The First Odoo Workflow Builder
+          </span>
+        </h1>
+        <p class="hero-copy">
+          A standalone static concept page inspired by the Bento Grid style language: modular storytelling, scan-friendly hierarchy, crisp accent color, and a product-marketing shell designed to explain how business teams can automate approvals, triggers, routing, and execution flows inside Odoo.
+        </p>
+        <div class="cta-row">
+          <a class="button button-primary" href="#workflow-overview">Explore the workflow canvas</a>
+          <a class="button button-secondary" href="#design-tokens">See tokens &amp; specs</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section" id="workflow-overview">
+        <div class="shell">
+          <div class="meta-strip">
+            <span class="label">Product automation</span>
+            <span class="label label-featured"><span class="star">★</span>Featured concept</span>
+          </div>
+          <div class="detail-grid">
+            <div>
+              <div class="detail-kicker">Rounded modular tiles / dense-but-readable overview</div>
+              <h2 class="detail-title">Workflow automation</h2>
+              <p class="lead">Orchestrate approvals, triggers, and actions across Odoo modules without losing operational clarity.</p>
+              <p class="detail-copy">
+                This layout borrows the original Bento-detail page rhythm: a precise hierarchy, a loud primary accent, and lots of whitespace around a dense story. The content reframes that system for workflow automation, so the page reads like a product library entry while still showing the shape of a serious automation platform.
+              </p>
+              <div class="tag-row">
+                <span class="tag">odoo-native</span>
+                <span class="tag">workflow canvas</span>
+                <span class="tag">approvals</span>
+                <span class="tag">automation</span>
+                <span class="tag">observability</span>
+              </div>
+            </div>
+            <aside class="panel-stack">
+              <section class="panel">
+                <h3>Why this fits</h3>
+                <ul>
+                  <li>Many product benefits can be shown above the fold.</li>
+                  <li>Tile hierarchy keeps complex automation stories easy to scan.</li>
+                  <li>The shell feels product-led, modern, and decisive.</li>
+                </ul>
+              </section>
+              <section class="panel">
+                <h3>Visual language</h3>
+                <ul>
+                  <li>White canvas + subtle grid = structured calm.</li>
+                  <li>Electric blue = clear conversion focus.</li>
+                  <li>Square radius + outlined chips = precise system feel.</li>
+                </ul>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="eyebrow">Workflow builder bento</div>
+          <h2 class="section-title">A dense-but-readable story through modular blocks</h2>
+          <p class="section-copy">
+            The blocks below are not meant to imitate dashboard chrome. They work more like editorial product tiles: each one reveals a capability, an operational promise, or a measurable benefit while preserving a clear reading order.
+          </p>
+          <div class="bento-grid">
+            <article class="tile tall">
+              <div>
+                <div class="tile-kicker">Trigger layer</div>
+                <h3 class="tile-title">Event, schedule, and webhook entry points</h3>
+                <p class="tile-copy">Launch flows from record changes, cron schedules, manual actions, or external services entering through a public webhook route.</p>
+              </div>
+              <div class="metric">4 sources</div>
+            </article>
+            <article class="tile wide">
+              <div>
+                <div class="tile-kicker">Execution layer</div>
+                <h3 class="tile-title">A canvas that turns business logic into traceable operations</h3>
+                <p class="tile-copy">Chain routing, code, conditions, approvals, and notifications into one controlled execution path with explicit state and safe hand-offs.</p>
+              </div>
+              <div class="tag-row">
+                <span class="tag">dedupe</span>
+                <span class="tag">backpressure</span>
+                <span class="tag">logging</span>
+              </div>
+            </article>
+            <article class="tile">
+              <div>
+                <div class="tile-kicker">Business value</div>
+                <h3 class="tile-title">Reduce manual coordination</h3>
+                <p class="tile-copy">Move repetitive approval routing and record updates out of chat threads and into explicit flows.</p>
+              </div>
+            </article>
+            <article class="tile">
+              <div>
+                <div class="tile-kicker">Governance</div>
+                <h3 class="tile-title">Versionable logic</h3>
+                <p class="tile-copy">Treat workflow changes as a product system with snapshots, milestones, and reproducible behavior.</p>
+              </div>
+            </article>
+            <article class="tile">
+              <div>
+                <div class="tile-kicker">Operator UX</div>
+                <h3 class="tile-title">Scan-first status surfaces</h3>
+                <p class="tile-copy">Show active runs, failed steps, and trigger context without burying operators under dense forms.</p>
+              </div>
+            </article>
+            <article class="tile full">
+              <div>
+                <div class="tile-kicker">Positioning statement</div>
+                <h3 class="tile-title">Built for teams that want automation inside Odoo, not beside it</h3>
+                <p class="tile-copy">This concept page keeps the tone of a style-library showcase while clearly positioning the product: an Odoo-native workflow builder for orchestration, execution, visibility, and operational trust.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="design-tokens">
+        <div class="shell">
+          <div class="eyebrow">Design tokens</div>
+          <h2 class="section-title">Token set used by this static clone</h2>
+          <p class="section-copy">The values below intentionally echo the analyzed Bento-detail page: clean white surfaces, blue-forward hierarchy, `Space Grotesk`, and a sharp no-radius silhouette.</p>
+          <div class="token-grid">
+            <article class="token-card">
+              <h3>Color system</h3>
+              <div class="swatches">
+                <div class="swatch">
+                  <div class="swatch-box swatch-background"></div>
+                  <div class="swatch-meta">
+                    <strong>Background</strong>
+                    <span>`hsl(0 0% 100%)` / pure white canvas</span>
+                  </div>
+                </div>
+                <div class="swatch">
+                  <div class="swatch-box swatch-foreground"></div>
+                  <div class="swatch-meta">
+                    <strong>Foreground</strong>
+                    <span>`hsl(222 47% 11%)` / deep navy-black text</span>
+                  </div>
+                </div>
+                <div class="swatch">
+                  <div class="swatch-box swatch-primary"></div>
+                  <div class="swatch-meta">
+                    <strong>Primary</strong>
+                    <span>`hsl(225 100% 50%)` / electric blue accent</span>
+                  </div>
+                </div>
+                <div class="swatch">
+                  <div class="swatch-box swatch-border"></div>
+                  <div class="swatch-meta">
+                    <strong>Border</strong>
+                    <span>`hsl(220 13% 91%)` / quiet framing and chip outlines</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article class="token-card">
+              <h3>Typography</h3>
+              <div class="type-scale">
+                <div class="type-line">
+                  <div class="display-sample">Space Grotesk</div>
+                  <span>Display + body family / bold geometric tone / strong for product storytelling</span>
+                </div>
+                <div class="type-line">
+                  <strong>Eyebrow</strong>
+                  <p>Uppercase, 0.28–0.38em tracking, medium weight, blue accent.</p>
+                </div>
+                <div class="type-line">
+                  <strong>Hero title</strong>
+                  <p>Clamp-driven display scale, tight leading, negative tracking, bold weight.</p>
+                </div>
+                <div class="type-line">
+                  <strong>Body copy</strong>
+                  <p>Muted gray foreground with generous line-height to keep dense content breathable.</p>
+                </div>
+              </div>
+            </article>
+            <article class="token-card">
+              <h3>Layout primitives</h3>
+              <ul class="stack-list">
+                <li>
+                  <strong>Radius</strong>
+                  <span>`0px` to keep the silhouette crisp and system-like.</span>
+                </li>
+                <li>
+                  <strong>Grid background</strong>
+                  <span>Two 1px linear gradients form the subtle square lattice.</span>
+                </li>
+                <li>
+                  <strong>Container</strong>
+                  <span>`min(1180px, calc(100vw - 48px))` for wide editorial spacing.</span>
+                </li>
+                <li>
+                  <strong>Shadow</strong>
+                  <span>Very soft depth only on cards and CTA, never theatrical.</span>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="shell">
+          <div class="eyebrow">Component spec</div>
+          <h2 class="section-title">Reusable components in this concept page</h2>
+          <p class="section-copy">Each block below documents the role, structure, and styling intent of the clone so the page doubles as its own mini component spec sheet. Sneaky, but respectable.</p>
+          <div class="spec-grid">
+            <article class="spec-card">
+              <h3>Hero display</h3>
+              <strong>Purpose</strong>
+              <p>Establish product positioning with a typography-first composition and a single decisive CTA.</p>
+              <strong>Structure</strong>
+              <p>Eyebrow → split display title → framed primary phrase → supporting paragraph → action row.</p>
+              <strong>Key treatment</strong>
+              <p>The boxed-corner phrase uses a full border plus four detached corner squares to echo the reference screenshots.</p>
+            </article>
+            <article class="spec-card">
+              <h3>Label system</h3>
+              <strong>Purpose</strong>
+              <p>Provide category and state metadata without competing with the main title.</p>
+              <strong>Structure</strong>
+              <p>Inline-flex pill, uppercase text, wide letter spacing, quiet outline. Featured state adds blue tint and icon.</p>
+              <strong>Key treatment</strong>
+              <p>Sharp edges, restrained color, and enough whitespace to feel catalog-like rather than app-like.</p>
+            </article>
+            <article class="spec-card">
+              <h3>Bento tile</h3>
+              <strong>Purpose</strong>
+              <p>Tell a dense product story through modules of varied size while preserving a reading order.</p>
+              <strong>Structure</strong>
+              <p>Kicker → short title → supporting copy → metric or keyword footer.</p>
+              <strong>Key treatment</strong>
+              <p>Mixed widths, low-contrast borders, and hover lift only for polish, not for gamification.</p>
+            </article>
+            <article class="spec-card">
+              <h3>Token card</h3>
+              <strong>Purpose</strong>
+              <p>Expose the palette, typography, and layout primitives directly in the page for handoff clarity.</p>
+              <strong>Structure</strong>
+              <p>Small uppercase heading plus grouped examples or list items.</p>
+              <strong>Key treatment</strong>
+              <p>Uses the same shell as content cards so documentation feels native to the design, not bolted on.</p>
+            </article>
+            <article class="spec-card">
+              <h3>Primary CTA</h3>
+              <strong>Purpose</strong>
+              <p>Drive one clear action from the hero without creating choice overload.</p>
+              <strong>Structure</strong>
+              <p>Single-line label, bold text, filled blue background, large horizontal padding.</p>
+              <strong>Key treatment</strong>
+              <p>No radius, no loud glow, no extra iconography — just confident contrast.</p>
+            </article>
+            <article class="spec-card">
+              <h3>Keyword tags</h3>
+              <strong>Purpose</strong>
+              <p>Expose searchable concepts and product themes in a secondary metadata layer.</p>
+              <strong>Structure</strong>
+              <p>Small outlined units with muted text and consistent vertical rhythm.</p>
+              <strong>Key treatment</strong>
+              <p>They support scanning and taxonomy, but never steal attention from core content.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell footer-note">
+      Standalone static prototype · Inspired by the Bento Grid detail-page style language · Tailored for workflow automation storytelling in Odoo.
+    </footer>
+  </div>
+</body>
+</html>
