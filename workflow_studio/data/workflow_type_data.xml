@@ -27,7 +27,8 @@
     "body_config": {"type": "body_type", "label": "Body", "section": "body", "visibleWhen": {"method": ["POST", "PUT", "PATCH"]}, "suggestionsByKey": {"form_data_value": ["true", "false", "null"]}},
     "headers": {"type": "keyvalue", "section": "headers", "suggestionsByKey": {"Content-Type": ["application/json", "application/x-www-form-urlencoded", "multipart/form-data"], "Accept": ["application/json", "*/*"], "Authorization": ["Bearer "]}},
     "timeout": {"type": "number", "default": 30, "min": 1, "max": 300, "label": "Timeout (seconds)", "section": "settings"},
-    "follow_redirects": {"type": "checkbox", "default": true, "label": "Follow Redirects", "section": "settings"}
+    "follow_redirects": {"type": "boolean", "default": true, "label": "Follow Redirects", "section": "settings"},
+    "raw_response": {"type": "boolean", "default": false, "label": "Raw Response", "section": "settings", "help": "If enabled, the output will include the full HTTP response object with status code, headers, and body. Otherwise, only the response body will be output."}
 }</field>
             <field name="input_schema">{
     "data": {"type": "DataSocket", "label": "Input Data"}
@@ -204,6 +205,83 @@
 }</field>
             <field name="output_schema">{
     "output": {"type": "DataSocket", "label": "Output"}
+}</field>
+        </record>
+
+        <record id="workflow_type_record_operation" model="workflow.type">
+            <field name="name">Record Operation</field>
+            <field name="node_type">record_operation</field>
+            <field name="category">data</field>
+            <field name="icon">fa-database</field>
+            <field name="description">Search, create, write, or delete Odoo records</field>
+            <field name="config_schema">{
+    "operation": {"type": "select", "label": "Operation", "options": ["search", "create", "write", "delete"], "default": "search", "section": "operation"},
+    "model": {"type": "model_select", "label": "Model", "required": true, "placeholder": "res.partner", "section": "operation"},
+    "domain_expr": {"type": "domain", "label": "Domain", "default": "[]", "section": "target", "visibleWhen": {"operation": ["search", "write", "delete"]}},
+    "ids_expr": {"type": "expression", "label": "Record IDs", "default": "={{ [] }}", "section": "target", "visibleWhen": {"operation": ["write", "delete"]}},
+    "fields_expr": {"type": "expression", "label": "Fields", "default": "={{ ['id', 'display_name'] }}", "section": "search", "visibleWhen": {"operation": ["search"]}},
+    "order": {"type": "string", "label": "Order", "placeholder": "id desc", "section": "search", "visibleWhen": {"operation": ["search"]}},
+    "limit": {"type": "number", "label": "Limit", "default": 20, "min": 1, "max": 2000, "section": "search", "visibleWhen": {"operation": ["search", "write", "delete"]}},
+    "vals_expr": {"type": "field_values", "label": "Values", "default": "{}", "section": "values", "visibleWhen": {"operation": ["create", "write"]}}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket", "label": "Input Data"}
+}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Output"}
+}</field>
+        </record>
+
+        <!-- ================================ -->
+        <!-- Trigger Nodes (Phase A)          -->
+        <!-- ================================ -->
+
+        <record id="workflow_type_schedule_trigger" model="workflow.type">
+            <field name="name">Schedule Trigger</field>
+            <field name="node_type">schedule_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-clock-o</field>
+            <field name="description">Execute workflow on a recurring schedule (cron)</field>
+            <field name="config_schema">{
+    "interval_number": {"type": "number", "label": "Every", "default": 1, "min": 1},
+    "interval_type": {"type": "select", "label": "Unit", "options": ["minutes", "hours", "days", "weeks", "months"], "default": "hours"}
+}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Trigger Output"}
+}</field>
+        </record>
+
+        <record id="workflow_type_webhook_trigger" model="workflow.type">
+            <field name="name">Webhook Trigger</field>
+            <field name="node_type">webhook_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-globe</field>
+            <field name="description">Execute workflow when a webhook URL is called</field>
+            <field name="config_schema">{
+    "http_method": {"type": "select", "label": "HTTP Method", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "POST", "section": "webhook"},
+    "response_mode": {"type": "select", "label": "Response Mode", "options": ["immediate", "last_node"], "default": "immediate", "section": "webhook", "help": "immediate: 200 OK right away; last_node: wait for execution and return output"}
+}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Webhook Data"}
+}</field>
+        </record>
+
+        <record id="workflow_type_record_event_trigger" model="workflow.type">
+            <field name="name">Record Event Trigger</field>
+            <field name="node_type">record_event_trigger</field>
+            <field name="category">trigger</field>
+            <field name="icon">fa-pencil-square-o</field>
+            <field name="description">Execute workflow when Odoo records are created, updated, or deleted</field>
+            <field name="config_schema">{
+    "model_name": {"type": "model_select", "label": "Model", "placeholder": "res.partner"},
+    "trigger_event": {"type": "select", "label": "Trigger Event", "options": ["on_create_or_write", "on_create", "on_write", "on_unlink"], "default": "on_create_or_write"},
+    "filter_domain": {"type": "domain", "label": "Filter Domain", "default": "[]"}
+}</field>
+            <field name="input_schema">{}</field>
+            <field name="output_schema">{
+    "output": {"type": "DataSocket", "label": "Record Data"}
 }</field>
         </record>
 

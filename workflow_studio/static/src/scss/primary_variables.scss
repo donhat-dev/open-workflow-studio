@@ -1,0 +1,69 @@
+$wf-white: $o-white !default;
+
+$wf-surface-base: $o-view-background-color !default;
+$wf-surface-subtle: $o-gray-100 !default;
+$wf-surface-emphasis: $o-gray-200 !default;
+$wf-surface-app: $o-webclient-background-color !default;
+
+$wf-border-base: $o-gray-300 !default;
+$wf-border-strong: $o-gray-400 !default;
+
+$wf-text-base: $o-main-text-color !default;
+$wf-text-muted: $o-gray-600 !default;
+$wf-text-muted-strong: $o-gray-700 !default;
+$wf-text-faint: $o-gray-500 !default;
+
+$wf-action-color: $o-action !default;
+$wf-success-color: $o-success !default;
+$wf-danger-color: $o-danger !default;
+$wf-warning-color: $o-warning !default;
+$wf-info-color: $o-info !default;
+$wf-pin-color: $o-warning !default;
+
+$wf-radius-sm: 4px !default;
+$wf-radius-md: 6px !default;
+$wf-radius-lg: 8px !default;
+
+$wf-shadow-sm: 0 2px 8px rgba($o-black, 0.08) !default;
+$wf-shadow-md: 0 4px 16px rgba($o-black, 0.12) !default;
+$wf-shadow-panel: -6px 0 18px rgba($o-black, 0.12) !default;
+
+.o_web_client {
+	--color--purple-50: hsl(247, 49%, 98%);
+	--color--purple-100: hsl(247, 49%, 95%);
+	--color--purple-200: hsl(247, 49%, 93%);
+	--color--purple-300: hsl(247, 49%, 83%);
+	--color--purple-400: hsl(247, 49%, 73%);
+	--color--purple-500: hsl(247, 49%, 63%);
+	--color--purple-600: hsl(247, 49%, 53%);
+	--color--purple-700: hsl(247, 49%, 43%);
+	--color--purple-800: hsl(247, 49%, 37%);
+	--color--purple-900: hsl(247, 49%, 30%);
+	--color--purple-950: hsl(247, 49%, 21%);
+	--color--purple-alpha-100: hsla(247, 49%, 53%, 0.1);
+	--color--purple-alpha-200: hsla(247, 49%, 53%, 0.25);
+
+	--color--green-50: hsl(144, 60%, 95%);
+	--color--green-100: hsl(145, 60%, 90%);
+	--color--green-200: hsl(145, 60%, 80%);
+	--color--green-300: hsl(146, 60%, 70%);
+	--color--green-400: hsl(147, 60%, 60%);
+	--color--green-500: hsl(147, 60%, 50%);
+	--color--green-600: hsl(147, 60%, 40%);
+	--color--green-700: hsl(147, 60%, 30%);
+	--color--green-800: hsl(148, 60%, 25%);
+	--color--green-900: hsl(148, 60%, 20%);
+	--color--green-950: hsl(151, 60%, 10%);
+	--color--green-alpha-100: hsla(147, 60%, 36%, 0.15);
+	--color--green-alpha-200: hsla(147, 60%, 36%, 0.25);
+
+	--color--mint-100: hsl(147, 83%, 90%);
+	--color--mint-200: hsl(147, 83%, 80%);
+	--color--mint-300: hsl(147, 83%, 70%);
+	--color--mint-400: hsl(147, 83%, 60%);
+	--color--mint-500: hsl(147, 83%, 50%);
+	--color--mint-600: hsl(147, 83%, 44%);
+	--color--mint-700: hsl(147, 83%, 30%);
+	--color--mint-800: hsl(147, 83%, 20%);
+	--color--mint-900: hsl(147, 83%, 10%);
+}

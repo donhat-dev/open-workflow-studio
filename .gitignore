@@ -30,10 +30,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-!workflow_studio/static/lib/
-!workflow_studio/static/lib/webawesome/
-!workflow_studio/static/lib/webawesome/**
 lib64/
 parts/
 sdist/

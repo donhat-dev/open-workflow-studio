@@ -15,7 +15,7 @@ Provides runner implementations for different node types:
     - SwitchNodeRunner: Multi-branch routing
 """
 
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner, SmartExpressionResolver
 from .http_runner import HttpNodeRunner
 from .if_runner import IfNodeRunner
 from .loop_runner import LoopNodeRunner
@@ -24,10 +24,14 @@ from .variable_runner import VariableNodeRunner
 from .validation_runner import ValidationNodeRunner
 from .code_runner import CodeNodeRunner
 from .switch_runner import SwitchNodeRunner
+from .record_operation_runner import RecordOperationNodeRunner
+from .schedule_trigger_runner import ScheduleTriggerNodeRunner
+from .webhook_trigger_runner import WebhookTriggerNodeRunner
+from .record_event_trigger_runner import RecordEventTriggerNodeRunner
 
 __all__ = [
     'BaseNodeRunner',
-    'ExpressionEvaluator',
+    'SmartExpressionResolver',
     'HttpNodeRunner',
     'IfNodeRunner',
     'LoopNodeRunner',
@@ -36,4 +40,8 @@ __all__ = [
     'ValidationNodeRunner',
     'CodeNodeRunner',
     'SwitchNodeRunner',
+    'RecordOperationNodeRunner',
+    'ScheduleTriggerNodeRunner',
+    'WebhookTriggerNodeRunner',
+    'RecordEventTriggerNodeRunner',
 ]

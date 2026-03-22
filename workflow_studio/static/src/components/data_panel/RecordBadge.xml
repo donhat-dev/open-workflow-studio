@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+	<t t-name="workflow_studio.record_badge">
+		<div class="record-badge-list" t-att-class="{ 'is-expanded': state.expanded }">
+			<!-- Collapse toggle — matches json-tree-node__toggle pattern -->
+			<span t-if="state.expanded" class="json-tree-node__toggle record-badge-list__toggle" t-on-click.stop="onCollapse" title="Collapse">
+				<i class="fa fa-caret-down"/>
+			</span>
+			<span t-else="" class="record-badge-list__spacer"/>
+
+			<!-- Badge list -->
+			<div class="record-badge-list__items">
+				<t t-foreach="visibleItems" t-as="item" t-key="item_index">
+					<span class="record-badge-list__badge"
+						t-att-data-record-label="getLabel(item)"
+						title="Double-click to open record"
+						t-on-dblclick.stop="onOpenRecord">
+						<t t-esc="getLabel(item)"/>
+					</span>
+				</t>
+
+				<!-- Overflow badge: "+ N more" — click to expand -->
+				<button t-if="isOverflowing" class="record-badge-list__overflow" type="button" t-on-click="onExpand" t-att-title="'Show ' + remainCount + ' more'">
+					<i class="fa fa-plus"/>
+					<t t-esc="remainCount"/>
+				</button>
+			</div>
+		</div>
+	</t>
+</templates>

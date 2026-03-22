@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.field_values_control">
+        <div class="o_workflow_field_values">
+            <t t-foreach="state.rows" t-as="row" t-key="row.id">
+                <div class="fv-row">
+                    <div class="fv-row-header">
+                        <span class="fv-label">Field</span>
+                        <button
+                            t-if="!props.readonly"
+                            class="fv-remove"
+                            t-on-click="() => this.removeRow(row_index)"
+                        >×</button>
+                    </div>
+                    <div class="fv-field-cell">
+                        <ExpressionInput
+                            value="row.field"
+                            placeholder="field_name"
+                            mode="getFieldMode(row.id)"
+                            suggestions="state.fieldSuggestions"
+                            onModeChange="(m) => this.onFieldModeChange(row.id, m)"
+                            onChange="(v) => this.onFieldChange(row_index, v)"
+                            onDrop="(payload) => this.onFieldDrop(row.id, payload)"
+                            readonly="props.readonly"
+                        />
+                    </div>
+                    <span class="fv-label">Value</span>
+                    <div class="fv-value-cell">
+                        <ExpressionInput
+                            value="row.value"
+                            placeholder="'value or {{ expression }}'"
+                            context="props.inputContext"
+                            mode="getValueMode(row.id)"
+                            onModeChange="(m) => this.onValueModeChange(row.id, m)"
+                            onChange="(v) => this.onValueChange(row_index, v)"
+                            readonly="props.readonly"
+                        />
+                    </div>
+                </div>
+            </t>
+            <button
+                t-if="!props.readonly"
+                class="fv-add"
+                t-on-click="addRow"
+            >+ Add Field</button>
+        </div>
+    </t>
+</templates>

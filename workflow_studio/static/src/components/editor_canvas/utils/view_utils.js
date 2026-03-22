@@ -28,16 +28,38 @@ export function estimateNodeHeight(node, dims) {
     );
 }
 
+function getFitZoom(mode, canvasRect, contentWidth, contentHeight, topOffsetPx) {
+    const availableHeight = Math.max(canvasRect.height - topOffsetPx, 1);
+    const widthZoom = canvasRect.width / contentWidth;
+    const heightZoom = availableHeight / contentHeight;
+
+    if (mode === "cover-width") {
+        return Math.min(widthZoom, 1);
+    }
+    if (mode === "cover-height") {
+        return Math.min(heightZoom, 1);
+    }
+
+    return Math.min(widthZoom, heightZoom, 1);
+}
+
 /**
  * Calculate viewport transform to fit nodes
  * @param {Array} nodes - Array of nodes
  * @param {Object} dims - Dimension config object
  * @param {Object} canvasRect - Canvas bounding client rect { width, height }
- * @param {number} [padding=50] - Padding around content
+ * @param {Object} [options] - Fit options
+ * @param {number} [options.padding=50] - Padding around content
+ * @param {"contain"|"cover-width"|"cover-height"} [options.mode="contain"] - Fit mode
+ * @param {number} [options.topOffsetPx=0] - Reserved top area in screen pixels (e.g. toolbar)
  * @returns {{ zoom: number, panX: number, panY: number } | null}
  */
-export function calculateFitView(nodes, dims, canvasRect, padding = 50) {
+export function calculateFitView(nodes, dims, canvasRect, options = {}) {
     if (!nodes || nodes.length === 0 || !canvasRect) return null;
+
+    const padding = typeof options.padding === "number" ? options.padding : 50;
+    const mode = options.mode || "contain";
+    const topOffsetPx = Math.max(0, options.topOffsetPx || 0);
 
     const xs = nodes.map((n) => n.x || 0);
     const ys = nodes.map((n) => n.y || 0);
@@ -53,19 +75,18 @@ export function calculateFitView(nodes, dims, canvasRect, padding = 50) {
         maxY,
     };
 
-    const contentWidth = bounds.maxX - bounds.minX + padding * 2;
-    const contentHeight = bounds.maxY - bounds.minY + padding * 2;
+    const contentWidth = Math.max(bounds.maxX - bounds.minX + padding * 2, 1);
+    const contentHeight = Math.max(bounds.maxY - bounds.minY + padding * 2, 1);
 
-    // Calculate zoom to fit (max 1 = don't zoom in beyond 100%)
-    const zoom = Math.min(
-        canvasRect.width / contentWidth,
-        canvasRect.height / contentHeight,
-        1
-    );
+    // Calculate zoom by fit mode (max 1 = don't zoom in beyond 100%)
+    const zoom = getFitZoom(mode, canvasRect, contentWidth, contentHeight, topOffsetPx);
+    const topOffsetWorld = topOffsetPx / zoom;
+    const availableHeightWorld = Math.max((canvasRect.height - topOffsetPx) / zoom, 1);
+    const centerYOffset = (availableHeightWorld - contentHeight) / 2;
+    const fitTopOffset = mode === "cover-width" ? 0 : centerYOffset;
 
-    // Calculate pan to center content
-    const panX = -bounds.minX + padding + (canvasRect.width / zoom - contentWidth) / 2;
-    const panY = -bounds.minY + padding + (canvasRect.height / zoom - contentHeight) / 2;
+    const panX = canvasRect.width / 2 - ((bounds.minX + bounds.maxX) / 2) * zoom;
+    const panY = -bounds.minY + padding + topOffsetWorld + fitTopOffset;
 
     return {
         zoom,

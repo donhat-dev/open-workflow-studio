@@ -4,6 +4,7 @@ import { Component, useRef } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
 import { CanvasNodeToolbar } from "./canvas_node_toolbar";
 import { LucideIcon } from "./common/lucide_icon";
+import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 
 /**
  * WorkflowNode Component
@@ -31,11 +32,17 @@ export class WorkflowNode extends Component {
         onSocketMouseDown: { type: Function, optional: true },
         onSocketMouseUp: { type: Function, optional: true },
         onSocketQuickAdd: { type: Function, optional: true },
+        onDelete: { type: Function, optional: true },
+        onToggleDisable: { type: Function, optional: true },
+        onOpenConfig: { type: Function, optional: true },
+        onNodeDoubleClick: { type: Function, optional: true },
+        onExecuteFromNode: { type: Function, optional: true },
     };
 
     setup() {
         this.rootRef = useRef("root");
         this.editor = this.env.workflowEditor || null;
+        this._odooModels = useOdooModels();
         this._toolbarPropsCache = null;
         this._toolbarPropsNodeId = null; 
         this._toolbarPropsDisabled = null;
@@ -75,10 +82,72 @@ export class WorkflowNode extends Component {
         this._onToolbarDelete = () => this.onDeleteNode();
         this._onToolbarToggleDisable = () => this.onToggleDisable();
         this._onToolbarOpenConfig = () => {
-            if (this.editor && this.editor.actions && this.editor.actions.openPanel) {
-                this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+            const onOpenConfig = this.props.onOpenConfig;
+            if (onOpenConfig) {
+                onOpenConfig(this.props.node.id);
             }
         };
+    }
+
+    _getRecordOperationModelName() {
+        if (!this.editor || !this.editor.getNodeConfig) {
+            return "";
+        }
+        const config = this.editor.getNodeConfig(this.props.node.id) || {};
+        const modelName = config.model;
+        if (typeof modelName !== "string") {
+            return "";
+        }
+        return modelName.trim();
+    }
+
+    _getRecordOperationOperation() {
+        if (!this.editor || !this.editor.getNodeConfig) {
+            return "";
+        }
+        const config = this.editor.getNodeConfig(this.props.node.id) || {};
+        const operation = config.operation;
+        if (typeof operation !== "string") {
+            return "";
+        }
+        return operation.trim().toLowerCase();
+    }
+
+    _getRecordOperationOperationLabel(operation) {
+        const operationMap = {
+            search: "Search",
+            create: "Create",
+            write: "Update",
+            delete: "Delete",
+        };
+        return operationMap[operation] || "Record Operation";
+    }
+
+    _getRecordOperationModelLabel() {
+        const modelName = this._getRecordOperationModelName();
+        if (!modelName) {
+            return "";
+        }
+        const meta = this._odooModels.getModelMetaByName(modelName);
+        if (meta && typeof meta.description === "string" && meta.description.trim()) {
+            return meta.description.trim();
+        }
+        return modelName;
+    }
+
+    _getRecordOperationIcon() {
+        if (this.props.node.type !== "record_operation") {
+            return "";
+        }
+        const modelName = this._getRecordOperationModelName();
+        if (!modelName) {
+            return "";
+        }
+        const meta = this._odooModels.getModelMetaByName(modelName);
+        if (meta && typeof meta.iconUrl === "string" && meta.iconUrl) {
+            return meta.iconUrl;
+        }
+        return "";
     }
 
     /**
@@ -139,7 +208,10 @@ export class WorkflowNode extends Component {
         }
 
         ev.stopPropagation();
-        this.editor.actions.openPanel("config", { nodeId: this.props.node.id });
+        const onOpenConfig = this.props.onOpenConfig;
+        if (onOpenConfig) {
+            onOpenConfig(this.props.node.id);
+        }
     }
 
     /**
@@ -147,7 +219,10 @@ export class WorkflowNode extends Component {
      */
     onDeleteNode() {
         if (this.isReadonly) return;
-        this.editor.actions.removeNode(this.props.node.id);
+        const onDelete = this.props.onDelete;
+        if (onDelete) {
+            onDelete(this.props.node.id);
+        }
     }
 
     /**
@@ -167,10 +242,36 @@ export class WorkflowNode extends Component {
      */
     onToggleDisable() {
         if (this.isReadonly) return;
-        this.editor.actions.toggleDisable(this.props.node.id);
+        const onToggleDisable = this.props.onToggleDisable;
+        if (onToggleDisable) {
+            onToggleDisable(this.props.node.id);
+        }
+    }
+
+    /**
+     * Whether this node is a manual trigger (shows execute button).
+     */
+    get isManualTrigger() {
+        return this.props.node.type === 'manual_trigger';
+    }
+
+    /**
+     * Handle "Execute" button click on manual_trigger node.
+     */
+    onTriggerExecute(ev) {
+        ev.stopPropagation();
+        if (this.isReadonly) return;
+        const onExecuteFromNode = this.props.onExecuteFromNode;
+        if (onExecuteFromNode) {
+            onExecuteFromNode(this.props.node.id);
+        }
     }
 
     get nodeIcon() {
+        const recordOperationIcon = this._getRecordOperationIcon();
+        if (recordOperationIcon) {
+            return recordOperationIcon;
+        }
         if (this.props.node.icon) {
             return this.props.node.icon;
         }
@@ -188,8 +289,39 @@ export class WorkflowNode extends Component {
         return icons[this.props.node.type] || "fa-cube";
     }
 
+    get isImageIcon() {
+        const icon = this.nodeIcon;
+        if (typeof icon !== "string") {
+            return false;
+        }
+        return icon.startsWith("/") || icon.startsWith("http://") || icon.startsWith("https://") || icon.startsWith("data:image/");
+    }
+
+    get isFontAwesomeIcon() {
+        const icon = this.nodeIcon;
+        return typeof icon === "string" && icon.startsWith("fa-");
+    }
+
+    get fontAwesomeClass() {
+        return `fa ${this.nodeIcon}`;
+    }
+
     get nodeTypeClass() {
         return `workflow-node--${this.props.node.type || "default"}`;
+    }
+
+    get displayTitle() {
+        if (this.props.node.type !== "record_operation") {
+            return this.props.node.title || this.props.node.type;
+        }
+
+        const operationLabel = this._getRecordOperationOperationLabel(this._getRecordOperationOperation());
+        const modelLabel = this._getRecordOperationModelLabel();
+
+        if (modelLabel) {
+            return `${operationLabel} ${modelLabel}`;
+        }
+        return operationLabel;
     }
 
     /**
@@ -202,6 +334,17 @@ export class WorkflowNode extends Component {
         if (status === 'success') return 'execution-success';
         if (status === 'error') return 'execution-error';
         return '';
+    }
+
+    /**
+     * Whether this node has pinned data.
+     * @returns {boolean}
+     */
+    get isPinned() {
+        if (!this.editor || !this.editor.actions || !this.editor.actions.isNodePinned) {
+            return false;
+        }
+        return this.editor.actions.isNodePinned(this.props.node.id) || false;
     }
 
     /**

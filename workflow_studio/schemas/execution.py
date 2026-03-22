@@ -31,10 +31,16 @@ class NodeResultSchema:
     """Individual node execution result."""
     
     node_id: str
+    node_run_id: Optional[int] = None
     node_type: Optional[str] = None
     node_label: Optional[str] = None
+    sequence: Optional[int] = None
+    iteration: Optional[int] = None
     status: str = "completed"
     duration_ms: Optional[float] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    input_data: Any = None
     output_data: Any = None
     output_socket: Optional[str] = None
     error_message: Optional[str] = None
@@ -43,7 +49,10 @@ class NodeResultSchema:
     
     def __post_init__(self):
         self.error_message = _normalize_false(self.error_message)
+        self.input_data = _normalize_false(self.input_data)
         self.output_data = _normalize_false(self.output_data)
+        self.started_at = _normalize_false(self.started_at)
+        self.completed_at = _normalize_false(self.completed_at)
     
     def model_dump(self) -> Dict[str, Any]:
         return asdict(self)
@@ -94,6 +103,7 @@ class ExecutionResultSchema:
     
     # Node results
     node_results: List[NodeResultSchema] = field(default_factory=list)
+    execution_events: List[NodeResultSchema] = field(default_factory=list)
     node_outputs: Optional[Dict[str, Any]] = None
     
     # Context snapshot
@@ -127,6 +137,10 @@ class ExecutionResultSchema:
             'node_results': [
                 nr.model_dump() if hasattr(nr, 'model_dump') else nr
                 for nr in self.node_results
+            ],
+            'execution_events': [
+                nr.model_dump() if hasattr(nr, 'model_dump') else nr
+                for nr in self.execution_events
             ],
             'node_outputs': self.node_outputs,
             'context_snapshot': (

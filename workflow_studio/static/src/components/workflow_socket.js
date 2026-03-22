@@ -44,6 +44,18 @@ export class WorkflowSocket extends Component {
     }
 
     /**
+     * Allow dragging from the whole output socket row (label + dot).
+     */
+    onSocketMouseDown(ev) {
+        if (this.props.type !== "output") return;
+        if (this.props.readonly) return;
+        if (ev.target && ev.target.closest && ev.target.closest(".socket-quick-add-connector")) {
+            return;
+        }
+        this.onPointMouseDown(ev);
+    }
+
+    /**
      * Handle mouse up on the socket point (complete connection)
      * @param {MouseEvent} ev 
      */
@@ -57,6 +69,15 @@ export class WorkflowSocket extends Component {
             socketType: this.props.type,
             event: ev
         });
+    }
+
+    /**
+     * Allow dropping onto the whole input socket row, not just the dot.
+     */
+    onSocketMouseUp(ev) {
+        if (this.props.type !== "input") return;
+        if (this.props.readonly) return;
+        this.onPointMouseUp(ev);
     }
 
     /**

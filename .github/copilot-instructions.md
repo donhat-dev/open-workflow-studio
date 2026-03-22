@@ -2,47 +2,7 @@
 
 ## Big picture (what we’re building)
 - A **workflow + integration builder** that will become an **Odoo-native module** (future “native iPaaS”).
-- Target use case: **SMB retail/e-commerce** (Shopee/TikTok + carriers), **near real-time**, **\>15k orders/day** (+ stock/picking transactions).
 - Key differentiator vs generic tools: production-grade **throughput**, **rate-limit/backpressure**, **idempotency/dedupe**, **observability** (accept Redis/queue/OTel/etc.).
-
-## Repo reality (important)
-- This repo is a **browser-only playground** (CDN globals). It contains **working prototypes**, not production-ready Odoo architecture.
-- Two tracks:
-  - **Working UI prototype**: `index.html` → `app.js` + `nodes.js` + `styles.css` (manual graph; smooth connect; can execute).
-  - **Rete v2 spike**: `rete-owl-test.html` (real `Rete.NodeEditor` + `AreaPlugin` + `ConnectionPlugin` + custom OWL render plugin).
-- Rete docs are vendored as reference: `llms-full.txt`.
-- For “real Rete” work, use patterns from official render plugins (React/Lit/Vue) and mirror them for OWL/native.
-
-## How the working prototype is wired
-- `nodes.js`: node models (`Rete.ClassicPreset.Node`) exposed as `window.WorkflowNodes`; execution is `async data(inputs)`.
-- `app.js`: OWL UI shell + `SimpleEditor` (custom graph) + `DomRenderer` (manual DOM + SVG `<path>` connections).
-
-## Where to look (core paths)
-- Core architecture: `workflow_pilot/static/src/store/workflow_store.js`
-- Canvas behavior: `workflow_pilot/static/src/components/editor_canvas/`
-- Node system: `workflow_pilot/static/src/core/node.js` + `workflow_pilot/static/src/nodes/`
-- Expression engine: `workflow_pilot/static/src/utils/expression_utils.js`
-- Backend execution: `workflow_pilot/models/workflow_executor.py`
-- Node runners: `workflow_pilot/models/runners/`
-- Controllers: `workflow_pilot/controllers/main.py`
-- Backend views: `workflow_pilot/views/`
-
-## Overall plan (roadmap)
-1) **Keep the prototype usable** for UX/learning (don’t break `index.html`).
-2) **Migrate graph core to real Rete v2**: replace `SimpleEditor` with `NodeEditor` + plugins (use `rete-owl-test.html` as the reference).
-3) **Renderer strategy**: prefer OWL component rendering via a render plugin; minimize manual DOM.
-4) **Odoo module shape (future)**: split into many OWL components (node/socket/connection/panels) + server-side runtime (queue workers) + connectors.
-5) **Throughput features (must-have)**: per-connector rate-limit, retries/backoff, idempotency keys, dedupe, DLQ/replay, tracing/metrics.
-
-## Developer workflow
-- Serve over HTTP (avoids `file://` quirks): `python3 -m http.server` → open `http://localhost:8000/index.html`.
-- Debug handles: `window.app`, `window.app.editor`, `window.WorkflowNodes`.
-  - Add node: `window.app.editor.addNode(window.WorkflowNodes.HttpRequestNode, { x: 300, y: 300 })`
-  - Export: `window.app.editor.getWorkflow()`
-- **Restart Odoo (On-Demand)**:
-  - Run `python C:\Users\ODOO\Documents\workflow_automation_builder\trigger_restart.py`
-  - Only needed for Python code changes.
-  - No auto-restart/watchdog enabled.
 
 ## Project conventions (must follow)
 - **Language**: Vietnamese in conversation, English for code/docs.
@@ -54,6 +14,8 @@
 - **File naming**: `snake_case.js` for files, `PascalCase` for classes.
 - **Template naming**: `module.template_name` (e.g., `workflow_pilot.workflow_editor_app`).
 - **Manifest assets**: use glob patterns; asset order: libs → registries → services → core → nodes → utils → components.
+- **SCSS architecture**: shared module styling tokens live in `workflow_studio/static/src/scss/`; load them in order `primary_variables.scss` → `secondary_variables.scss` → `bootstrap_overridden.scss` before component SCSS.
+- **SCSS usage**: shared colors/shadows/radii should be declared as `$wf-*` tokens in the shared SCSS layer; component SCSS should consume those tokens instead of repeating hardcoded/fallback values.
 - **Feature gating**: gate disabled features with a const flag + early return; keep services registered.
 - **Bus usage**: use bus for global events (save/execute) and scoped model/service events; prefer direct actions/callbacks for local UI.
 - **Clipboard**: use `workflowEditor` service (not adapter).
@@ -76,7 +38,7 @@
 - Use `useActiveElement(refName)` to scope hotkeys/commands to a component subtree; prevents conflicts with Odoo forms/dialogs.
 
 ## Odoo integration patterns
-- RPC via `/web/dataset/call_kw` with `{ model, method, args, kwargs }`.
+- ORM via `this.env.orm.call(model, method, args, kwargs)`.
 - Client actions: workflow id from `this.props.action.context.active_id`.
 
 ## Anti-patterns (forbidden)

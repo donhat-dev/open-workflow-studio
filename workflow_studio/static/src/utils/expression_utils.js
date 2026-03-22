@@ -3,7 +3,7 @@
 /**
  * Expression Utilities
  * 
- * Expression handling: {{ _json.field }}, {{ _vars.name }}, {{ _loop.item }}
+ * Expression handling: ={{ _json.field }}, =Name is {{ _json.field }}, ={{ _vars.name }}, ={{ _loop.item }}
  * 
  * Supports all ExecutionContext namespaces:
  * - _json: Previous node output (shortcut)
@@ -38,6 +38,76 @@ export const EXPRESSION_PATTERNS = {
  */
 export const NAMESPACES = ['_json', '_vars', '_loop', '_node', '_input', '_execution', '_workflow', '_now', '_today'];
 
+const SIMPLE_SELECTOR_PATTERN = /^_(json|vars|loop|node|input|execution|workflow|now|today)(?:(?:\.[a-zA-Z_][a-zA-Z0-9_]*)|(?:\[(?:\d+|'[^']+'|"[^"]+")\]))*$/;
+
+function containsSupportedNamespaceReference(expression) {
+    if (typeof expression !== 'string' || !expression) {
+        return false;
+    }
+    return NAMESPACES.some((namespace) => expression.includes(namespace));
+}
+
+function isSimpleSelectorExpression(expression) {
+    if (typeof expression !== 'string') {
+        return false;
+    }
+    return SIMPLE_SELECTOR_PATTERN.test(expression.trim());
+}
+
+function normalizePreviewExpression(expression) {
+    if (typeof expression !== 'string') {
+        return '';
+    }
+
+    return expression
+        .trim()
+        .replace(/\s+and\s+/g, ' && ')
+        .replace(/\s+or\s+/g, ' || ')
+        .replace(/(^|[\s(])not\s+/g, '$1!');
+}
+
+function buildPreviewScope(context = {}) {
+    return {
+        _json: context._json || {},
+        _vars: context._vars || {},
+        _loop: context._loop || {},
+        _node: context._node || {},
+        _input: context._input || {},
+        _execution: context._execution || {},
+        _workflow: context._workflow || {},
+        _now: context._now || null,
+        _today: context._today || null,
+        True: true,
+        False: false,
+        None: null,
+        globalThis: undefined,
+        window: undefined,
+        document: undefined,
+        Function: undefined,
+    };
+}
+
+function evaluatePreviewExpression(expression, context = {}) {
+    const scope = buildPreviewScope(context);
+    const normalizedExpression = normalizePreviewExpression(expression);
+    const argNames = Object.keys(scope);
+    const argValues = Object.values(scope);
+
+    const evaluator = new Function(
+        ...argNames,
+        '"use strict"; return (' + normalizedExpression + ');'
+    );
+
+    return evaluator(...argValues);
+}
+
+function resolvePreviewTemplate(expression, context = {}) {
+    if (isSimpleSelectorExpression(expression)) {
+        return resolveExpression(expression, context);
+    }
+    return evaluatePreviewExpression(expression, context);
+}
+
 /**
  * Check if a value contains expression templates
  * @param {string} value - Value to check
@@ -59,6 +129,45 @@ export function hasExpressions(value) {
 export function isExpressionMode(value) {
     if (typeof value !== 'string') return false;
     return value.startsWith('=');
+}
+
+/**
+ * Strip a leading expression-mode prefix from a stored value.
+ * @param {string} value
+ * @returns {string}
+ */
+export function stripExpressionPrefix(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return isExpressionMode(value) ? value.slice(1) : value;
+}
+
+/**
+ * Ensure a stored value is marked as expression mode.
+ * @param {string} value
+ * @returns {string}
+ */
+export function ensureExpressionPrefix(value) {
+    if (value === null || value === undefined) {
+        return '=';
+    }
+    const text = String(value);
+    return isExpressionMode(text) ? text : `=${text}`;
+}
+
+/**
+ * Infer expression mode from stored value.
+ * Only the leading '=' prefix marks expression mode.
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function inferExpressionModeFromValue(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+    return isExpressionMode(value);
 }
 
 /**
@@ -292,30 +401,74 @@ export function resolveExpression(expression, context = {}) {
  */
 export function evaluateExpression(expression, context = {}) {
     try {
+        const rawExpression = typeof expression === 'string' ? expression : '';
+        const prefixedExpression = isExpressionMode(rawExpression);
+
+        if (!prefixedExpression) {
+            return { value: rawExpression, error: null, type: _typeLabel(rawExpression) };
+        }
+
+        const expressionSource = stripExpressionPrefix(rawExpression);
+
         // Extract template content
-        const templates = extractExpressions(expression);
+        const templates = extractExpressions(expressionSource);
 
         if (templates.length === 0) {
-            // No templates, return as-is
-            return { value: expression, error: null };
+            if (!expressionSource.trim()) {
+                return { value: '', error: null, type: 'str' };
+            }
+            return {
+                value: expressionSource,
+                error: null,
+                type: _typeLabel(expressionSource),
+            };
         }
 
         // For single template, evaluate and return value
-        if (templates.length === 1 && templates[0].full === expression) {
-            const value = resolveExpression(templates[0].expression, context);
-            return { value, error: null };
+        if (templates.length === 1 && templates[0].full === expressionSource) {
+            const singleExpression = templates[0].expression;
+            try {
+                const value = resolvePreviewTemplate(singleExpression, context);
+                return { value, error: null, type: _typeLabel(value) };
+            } catch (err) {
+                // Preview fallback: complex expressions (e.g. list/boolean expressions)
+                // may reference valid namespaces but are not simple selector paths.
+                // Do not show a hard error in this case; backend safe_eval is source of truth.
+                if (
+                    err
+                    && containsSupportedNamespaceReference(singleExpression)
+                ) {
+                    return { value: undefined, error: null, type: null };
+                }
+                throw err;
+            }
         }
 
         // Multiple templates or mixed content: replace each
-        let result = expression;
+        let result = expressionSource;
         for (const tmpl of templates) {
-            const value = resolveExpression(tmpl.expression, context);
+            const value = resolvePreviewTemplate(tmpl.expression, context);
             const stringValue = value === undefined ? '' : String(value);
             result = result.replace(tmpl.full, stringValue);
         }
 
-        return { value: result, error: null };
+        return { value: result, error: null, type: 'str' };
     } catch (err) {
-        return { value: null, error: err.message };
+        return { value: null, error: err.message, type: null };
     }
+}
+
+/**
+ * Derive a short type label for a resolved value.
+ * @param {*} value
+ * @returns {string|null}
+ */
+function _typeLabel(value) {
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'boolean') return 'bool';
+    if (typeof value === 'number') return Number.isInteger(value) ? 'int' : 'float';
+    if (typeof value === 'string') return 'str';
+    if (Array.isArray(value)) return 'list';
+    if (typeof value === 'object') return 'object';
+    return null;
 }

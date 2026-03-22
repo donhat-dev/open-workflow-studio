@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates>
+    <!-- Body-only: card shell + title provided by DashboardBlock in parent.
+        Nav-pills moved into body since they are content-level controls. -->
+    <t t-name="workflow_studio.WorkflowDashboardTopWorkflows">
+        <div class="d-flex flex-column h-100">
+            <!-- Tab pills (content-level, inside body) -->
+            <div class="px-3 pt-2 pb-1 d-flex justify-content-end">
+                <ul class="nav nav-pills nav-pills-sm">
+                    <li class="nav-item">
+                        <a t-attf-class="nav-link py-1 px-2 small {{state.tab === 'failing' ? 'active' : ''}}"
+                           href="#" t-on-click.prevent="() => this.onTabChange('failing')">
+                            Most Failing
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a t-attf-class="nav-link py-1 px-2 small {{state.tab === 'slow' ? 'active' : ''}}"
+                           href="#" t-on-click.prevent="() => this.onTabChange('slow')">
+                            Slowest
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Tables -->
+            <div class="flex-grow-1 overflow-auto">
+                <t t-if="state.tab === 'failing'">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr class="small text-muted">
+                                <th class="border-0 px-3">Workflow</th>
+                                <th class="border-0 px-3 text-end">Failures</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="failingList" t-as="wf" t-key="wf.workflow_name">
+                                <tr>
+                                    <td class="px-3" t-esc="wf.workflow_name"/>
+                                    <td class="px-3 text-end">
+                                        <span class="badge bg-danger-subtle text-danger" t-esc="wf.fail_count"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </t>
+                <t t-if="state.tab === 'slow'">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr class="small text-muted">
+                                <th class="border-0 px-3">Workflow</th>
+                                <th class="border-0 px-3 text-end">Avg Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="slowList" t-as="wf" t-key="wf.workflow_name">
+                                <tr>
+                                    <td class="px-3" t-esc="wf.workflow_name"/>
+                                    <td class="px-3 text-end">
+                                        <span class="badge bg-warning-subtle text-warning o_wf_mono" t-esc="wf.avg_duration"/>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

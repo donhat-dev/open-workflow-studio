@@ -59,6 +59,18 @@ class WorkflowRun(models.Model):
         index=True,
         help='Current execution state'
     )
+    execution_mode = fields.Selection(
+        selection=[
+            ('manual', 'Manual'),
+            ('schedule', 'Schedule'),
+            ('webhook', 'Webhook'),
+            ('record_event', 'Record Event'),
+        ],
+        string='Execution Mode',
+        default='manual',
+        index=True,
+        help='How this execution was triggered',
+    )
 
     # === Timing ===
     started_at = fields.Datetime(
@@ -209,6 +221,7 @@ class WorkflowRunNode(models.Model):
             ('completed', 'Completed'),
             ('failed', 'Failed'),
             ('skipped', 'Skipped'),
+            ('pinned', 'Pinned'),
         ],
         string='Status',
         default='pending',

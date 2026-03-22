@@ -25,7 +25,6 @@ from odoo.exceptions import UserError, ValidationError
 
 from .runners import (
     BaseNodeRunner,
-    ExpressionEvaluator,
     HttpNodeRunner,
     IfNodeRunner,
     LoopNodeRunner,
@@ -34,9 +33,14 @@ from .runners import (
     ValidationNodeRunner,
     CodeNodeRunner,
     SwitchNodeRunner,
+    RecordOperationNodeRunner,
+    ScheduleTriggerNodeRunner,
+    WebhookTriggerNodeRunner,
+    RecordEventTriggerNodeRunner,
 )
 from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
+from .security.safe_model_proxy import SafeModelProxy
 from .security.secret_broker import SecretBrokerFactory
 
 _logger = logging.getLogger(__name__)
@@ -66,6 +70,14 @@ class WorkflowExecutor:
         (re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', re.IGNORECASE), '***@***.***'),
     ]
 
+    # Marker keys for Odoo record references in execution output.
+    _RECORD_REFS_KEY = '__wf_record_refs__'
+    _RECORD_REFS_COUNT_KEY = '__wf_record_refs_count__'
+    _RECORD_REFS_TRUNCATED_KEY = '__wf_record_refs_truncated__'
+    _RECORD_REFS_MODEL_KEY = '__wf_record_refs_model__'
+    _MAX_RECORD_REFS = 100
+    _MAX_NORMALIZE_DEPTH = 20
+
     # Node runner registry
     NODE_RUNNERS = {
         'http': HttpNodeRunner,
@@ -76,6 +88,10 @@ class WorkflowExecutor:
         'validation': ValidationNodeRunner,
         'code': CodeNodeRunner,
         'switch': SwitchNodeRunner,
+        'record_operation': RecordOperationNodeRunner,
+        'schedule_trigger': ScheduleTriggerNodeRunner,
+        'webhook_trigger': WebhookTriggerNodeRunner,
+        'record_event_trigger': RecordEventTriggerNodeRunner,
     }
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
@@ -363,6 +379,20 @@ class WorkflowExecutor:
                 redacted = self._redact_output(raw_json, entry['node_id'])
                 output_display = redacted['display']
 
+            # Normalize input_data for storage (plain Python, truncated)
+            raw_input = entry.get('_input_data')
+            input_display = None
+            if raw_input is not None:
+                try:
+                    plain_input = to_plain(raw_input)
+                    input_json_str = json.dumps(plain_input, ensure_ascii=False)
+                    # Truncate large payloads to stay within DB field limits
+                    if len(input_json_str) > 65536:
+                        plain_input = {'__truncated__': True, 'preview': input_json_str[:512]}
+                    input_display = plain_input
+                except Exception:
+                    input_display = None
+
             run_node_vals.append({
                 'run_id': self.run.id,
                 'node_id': entry['node_id'],
@@ -372,6 +402,7 @@ class WorkflowExecutor:
                 'started_at': started_at,
                 'completed_at': completed_at,
                 'duration_ms': duration_ms,
+                'input_data': input_display,
                 'output_data': output_display,
                 'output_socket': entry.get('output_socket'),
                 'error_message': entry.get('error_message'),
@@ -396,11 +427,13 @@ class WorkflowExecutor:
         if output_vals:
             self.env['workflow.node.output'].create(output_vals)
 
-    def execute(self, input_data=None):
+    def execute(self, input_data=None, start_node_ids=None):
         """Execute workflow from start to completion.
         
         Args:
             input_data: Initial input data
+            start_node_ids: Optional list of specific node IDs to start from.
+                            If None, auto-discovers start nodes (no incoming).
             
         Returns:
             Final output data
@@ -420,8 +453,11 @@ class WorkflowExecutor:
                 })
                 self.env.cr.commit()
             
-            # Find start nodes (nodes with no incoming connections)
-            start_nodes = self._find_start_nodes()
+            # Find start nodes (explicit or auto-discover)
+            if start_node_ids:
+                start_nodes = start_node_ids
+            else:
+                start_nodes = self._find_start_nodes()
             if not start_nodes:
                 raise UserError(_("Workflow has no start nodes"))
             
@@ -492,7 +528,9 @@ class WorkflowExecutor:
             
             # Complete run
             output_data_raw = self._collect_final_output()
+            output_data_raw = self._normalize_output_value(output_data_raw)
             output_data_display = self._mask_sensitive_data(output_data_raw)
+            output_data_display = self._normalize_output_value(output_data_display)
             if self.persist:
                 self._persist_all_node_runs()
                 self.run.write({
@@ -756,7 +794,7 @@ class WorkflowExecutor:
             workflow=self._get_workflow_context(),
         )
 
-        if node_type == 'code' or is_custom_node:
+        if node_type in ('code', 'record_operation') or is_custom_node:
             context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
 
         if is_custom_node:
@@ -1027,11 +1065,13 @@ class WorkflowExecutor:
         Returns:
             dict with raw/display objects and serialized strings
         """
-        output_raw = to_plain(output)
+        output_raw = self._normalize_output_value(to_plain(output))
         output_display = output_raw
 
         if not self._can_unmask_output(node_id):
             output_display = self._mask_sensitive_data(output_raw)
+
+        output_display = self._normalize_output_value(output_display)
 
         return {
             'raw': output_raw,
@@ -1049,12 +1089,96 @@ class WorkflowExecutor:
         return node_record._should_unmask_for_user(self.env.user, run=self.run)
 
     def _serialize_output(self, output):
+        output = self._normalize_output_value(output)
         if isinstance(output, str):
             return output
         try:
             return json.dumps(output, ensure_ascii=True)
         except Exception:
             return str(output)
+
+    def _is_record_refs_marker(self, value):
+        return isinstance(value, dict) and self._RECORD_REFS_KEY in value
+
+    def _build_record_refs_marker(self, recordset):
+        ids = list(recordset.ids or [])
+        limited_ids = ids[:self._MAX_RECORD_REFS]
+        refs = [
+            {
+                'model': recordset._name,
+                'id': rid,
+            }
+            for rid in limited_ids
+        ]
+        return {
+            self._RECORD_REFS_KEY: refs,
+            self._RECORD_REFS_MODEL_KEY: recordset._name,
+            self._RECORD_REFS_COUNT_KEY: len(ids),
+            self._RECORD_REFS_TRUNCATED_KEY: len(ids) > len(limited_ids),
+        }
+
+    def _normalize_output_value(self, value, depth=0):
+        """Convert output value to JSON-safe structure.
+
+        Key responsibility in Phase 1:
+        - convert Odoo record/recordset values to record-ref markers.
+        """
+        if depth > self._MAX_NORMALIZE_DEPTH:
+            return str(value)
+
+        if isinstance(value, SafeModelProxy):
+            value = value._model
+
+        if isinstance(value, models.BaseModel):
+            return self._build_record_refs_marker(value)
+
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+
+        if isinstance(value, bytes):
+            return value.decode('utf-8', errors='replace')
+
+        if isinstance(value, dict):
+            if self._is_record_refs_marker(value):
+                refs = value.get(self._RECORD_REFS_KEY) or []
+                normalized_refs = []
+                for ref in refs:
+                    if not isinstance(ref, dict):
+                        continue
+                    model_name = ref.get('model')
+                    record_id = ref.get('id')
+                    if not model_name:
+                        continue
+                    try:
+                        record_id = int(record_id)
+                    except Exception:
+                        continue
+                    normalized_refs.append({
+                        'model': model_name,
+                        'id': record_id,
+                    })
+                count = value.get(self._RECORD_REFS_COUNT_KEY)
+                if not isinstance(count, int):
+                    count = len(normalized_refs)
+                return {
+                    self._RECORD_REFS_KEY: normalized_refs,
+                    self._RECORD_REFS_MODEL_KEY: value.get(self._RECORD_REFS_MODEL_KEY),
+                    self._RECORD_REFS_COUNT_KEY: count,
+                    self._RECORD_REFS_TRUNCATED_KEY: bool(value.get(self._RECORD_REFS_TRUNCATED_KEY)),
+                }
+
+            normalized = {}
+            for key, item in value.items():
+                normalized[key] = self._normalize_output_value(item, depth + 1)
+            return normalized
+
+        if isinstance(value, (list, tuple, set)):
+            return [self._normalize_output_value(item, depth + 1) for item in value]
+
+        return str(value)
 
     def _mask_sensitive_data(self, value):
         """Mask sensitive patterns (API keys, passwords, tokens, emails).
@@ -1079,6 +1203,131 @@ class WorkflowExecutor:
 
         return result
 
+    # Node types that cannot use pinned data (triggers, structural nodes).
+    _PIN_DATA_DENY_TYPES = {
+        'manual_trigger', 'schedule_trigger', 'webhook_trigger',
+        'record_event_trigger', 'loop',
+    }
+
+    def _get_pin_reference(self, node_id):
+        """Return pinned node-run reference for a node, or None."""
+        metadata = self.snapshot.get('metadata') or {}
+        pin_store = metadata.get('pin_data')
+        if not isinstance(pin_store, dict):
+            pin_store = metadata.get('pinData') or {}
+        return pin_store.get(node_id)
+
+    def _build_pinned_result(self, node, node_run):
+        """Convert a persisted workflow.run.node to a NodeOutput payload."""
+        if node_run.error_message:
+            return {
+                'outputs': [],
+                'json': None,
+                'error': node_run.error_message,
+                'meta': {'pinned_node_run_id': node_run.id},
+            }
+
+        output_value = self._normalize_output_value(node_run.output_data)
+        output_socket = node_run.output_socket or 'output'
+        output_index = self._socket_to_index(node or {}, output_socket)
+        if output_index < 0:
+            output_index = 0
+
+        outputs = [[] for _ in range(max(output_index + 1, 1))]
+        if output_value is None:
+            outputs[output_index] = []
+            json_value = None
+        elif isinstance(output_value, list):
+            outputs[output_index] = output_value
+            json_value = output_value[0] if len(output_value) == 1 else output_value
+        else:
+            outputs[output_index] = [output_value]
+            json_value = output_value
+
+        return {
+            'outputs': outputs,
+            'json': json_value,
+            'meta': {'pinned_node_run_id': node_run.id},
+        }
+
+    def _build_inline_pin_result(self, node_id, pin_data):
+        """Convert an inline pin data dict to a NodeOutput payload."""
+        output_value = self._normalize_output_value(pin_data.get('output_data'))
+        output_socket = pin_data.get('output_socket') or 'output'
+        node = self.nodes.get(node_id) or {}
+        output_index = self._socket_to_index(node, output_socket)
+        if output_index < 0:
+            output_index = 0
+
+        outputs = [[] for _ in range(max(output_index + 1, 1))]
+        if output_value is None:
+            outputs[output_index] = []
+            json_value = None
+        elif isinstance(output_value, list):
+            outputs[output_index] = output_value
+            json_value = output_value[0] if len(output_value) == 1 else output_value
+        else:
+            outputs[output_index] = [output_value]
+            json_value = output_value
+
+        return {
+            'outputs': outputs,
+            'json': json_value,
+            'meta': {'pinned_inline': True},
+        }
+
+    def _get_pin_data(self, node_id):
+        """Resolve pinned output data for a node, or None if not pinned.
+
+        Pin metadata stores either:
+        - ``node_id -> workflow.run.node.id`` integer references, or
+        - ``node_id -> {output_data: ...}`` inline data objects
+        in ``snapshot.metadata.pin_data``.
+
+        Integer references are resolved from the database at execution time.
+        Inline objects are converted directly into NodeOutput payloads.
+        """
+        pin_ref = self._get_pin_reference(node_id)
+        if not pin_ref:
+            return None
+
+        # Inline data pin (object with output_data)
+        if isinstance(pin_ref, dict):
+            return self._build_inline_pin_result(node_id, pin_ref)
+
+        try:
+            pin_ref = int(pin_ref)
+        except Exception:
+            _logger.warning("Invalid pin_data reference for node %s: %r", node_id, pin_ref)
+            return None
+
+        node_run = self.env['workflow.run.node'].browse(pin_ref)
+        if not node_run.exists():
+            _logger.warning("Pinned node run %s not found for node %s", pin_ref, node_id)
+            return None
+
+        if node_run.node_id != node_id:
+            _logger.warning(
+                "Pinned node run %s belongs to node %s, expected %s",
+                pin_ref,
+                node_run.node_id,
+                node_id,
+            )
+            return None
+
+        workflow = self._get_execution_workflow()
+        if workflow and node_run.run_id and node_run.run_id.workflow_id != workflow:
+            _logger.warning(
+                "Pinned node run %s belongs to workflow %s, expected workflow %s",
+                pin_ref,
+                node_run.run_id.workflow_id.id,
+                workflow.id,
+            )
+            return None
+
+        node = self.nodes.get(node_id) or {}
+        return self._build_pinned_result(node, node_run)
+
     def _execute_node(self, node_id, input_data, persist=None):
         """Execute a single node.
 
@@ -1086,6 +1335,10 @@ class WorkflowExecutor:
         (``_node_run_buffer``) instead of writing to DB per-node.
         ``_persist_all_node_runs()`` batch-creates all records after the
         execution loop finishes.
+
+        Pin data check: if the node has a pinned node-run reference in
+        ``snapshot.metadata.pin_data`` and the node type is not in the
+        deny list, return the pinned data directly (skip execution).
 
         Args:
             node_id: Node ID to execute
@@ -1101,15 +1354,42 @@ class WorkflowExecutor:
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
 
+        # --- Pin data gate ---------------------------------------------------
+        # Honour pinned data for all executor invocations *except* production
+        # triggers (those create their own run with execution_mode != manual).
+        node_type = node.get('type', '')
+        if node_type not in self._PIN_DATA_DENY_TYPES:
+            pin_data = self._get_pin_data(node_id)
+            if pin_data is not None:
+                result = dict(pin_data)  # shallow copy to avoid mutating snapshot
+                if persist:
+                    self._node_run_buffer.append({
+                        'node_id': node_id,
+                        'node_type': node_type,
+                        'node_label': node.get('label', ''),
+                        'status': 'pinned',
+                        'started_at': datetime.now(),
+                        'duration_ms': 0,
+                        'output_socket': self._get_primary_output_socket(node, result),
+                        'sequence': len(self.executed_order),
+                        '_raw_json': result.get('json'),
+                        '_input_data': input_data,
+                    })
+                return result
+
         if not persist:
             return self._execute_node_core(node_id, input_data, node=node)
 
-        node_type = node.get('type')
         started_at = datetime.now()
         t0 = time.monotonic()
 
         try:
             result = self._execute_node_core(node_id, input_data, node=node)
+
+            # Some runners (e.g. loop back-edge) signal a preferred log input
+            # so the persisted input_data reflects the *original* data rather
+            # than whatever the back-edge child returned.
+            log_input = result.pop('_log_input', None)
 
             duration_ms = (time.monotonic() - t0) * 1000
             output_socket = self._get_primary_output_socket(node, result)
@@ -1124,6 +1404,7 @@ class WorkflowExecutor:
                 'output_socket': output_socket,
                 'sequence': len(self.executed_order),
                 '_raw_json': result.get('json'),
+                '_input_data': log_input if log_input is not None else input_data,
             })
 
             return result
@@ -1140,6 +1421,7 @@ class WorkflowExecutor:
                 'output_socket': None,
                 'error_message': str(e),
                 'sequence': len(self.executed_order),
+                '_input_data': input_data,
             })
             raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
     

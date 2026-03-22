@@ -7,7 +7,6 @@
 
 /**
  * Control - Base class for node configuration UI elements
- * Inspired by Rete.js ClassicPreset.Control
  * 
  * Controls represent configurable parameters within a node
  * (text inputs, selects, key-value pairs, etc.)

@@ -356,9 +356,50 @@ function createControl(controlKey, rawSchema) {
             });
             break;
         }
+        // -----------------------------------------------------------------------
+        // Record-operation specific control types
+        // -----------------------------------------------------------------------
+        case "model_select": {
+            // Renders as ExpressionInput (fixed mode only) with model autocomplete.
+            // Suggestions are injected at render time by NodeConfigPanel via useOdooModels.
+            control = new TextInputControl(controlKey, {
+                label,
+                placeholder,
+                multiline: false,
+                default: getDefaultValue(schema, ""),
+                ...suggestionOptions,
+            });
+            control.type = "model_select"; // Override so ControlRenderer can route correctly
+            break;
+        }
+        case "domain": {
+            // Renders with DomainControl (wraps Odoo's DomainSelector).
+            // Stores a plain Odoo domain string: "[]" or "[('field', 'op', val)]"
+            control = new TextInputControl(controlKey, {
+                label,
+                placeholder: "[]",
+                multiline: false,
+                default: getDefaultValue(schema, "[]"),
+                ...suggestionOptions,
+            });
+            control.type = "domain";
+            break;
+        }
+        case "field_values": {
+            // Renders with FieldValuesControl (field-name + value rows).
+            // Stores a JSON object string: '{"name": "Test", "email": "{{ _input.email }}"}'
+            control = new TextInputControl(controlKey, {
+                label,
+                placeholder: "{}",
+                multiline: false,
+                default: getDefaultValue(schema, "{}"),
+                ...suggestionOptions,
+            });
+            control.type = "field_values";
+            break;
+        }
         case "json":
         case "text":
-        case "expression":
         case "string":
         default: {
             const defaultMultiline = controlType === "text" || controlType === "json";
@@ -369,6 +410,9 @@ function createControl(controlKey, rawSchema) {
                 default: getDefaultValue(schema, ""),
                 ...suggestionOptions,
             });
+            if (controlType === "expression") {
+                control.type = "expression";
+            }
             break;
         }
     }

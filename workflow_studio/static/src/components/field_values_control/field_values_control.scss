@@ -1,0 +1,84 @@
+.o_workflow_field_values {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .fv-row {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding: 8px;
+        background: $wf-field-row-bg;
+        border-radius: $wf-radius-sm;
+        border: 1px solid $wf-field-row-border;
+    }
+
+    .fv-row-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2px;
+    }
+
+    .fv-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: $wf-text-muted;
+        letter-spacing: 0.03em;
+    }
+
+    .fv-remove {
+        background: none;
+        border: none;
+        color: $wf-text-faint;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        border-radius: 3px;
+        font-size: 14px;
+
+        &:hover {
+            color: $wf-danger-color;
+        }
+
+        &:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+    }
+
+    .fv-add {
+        margin-top: 2px;
+        padding: 5px 10px;
+        font-size: 12px;
+        background: none;
+        border: 1px dashed $wf-action-color;
+        color: $wf-action-color;
+        border-radius: $wf-radius-sm;
+        cursor: pointer;
+        width: 100%;
+        text-align: center;
+        transition: background 0.15s, color 0.15s;
+
+        &:hover {
+            background: $wf-action-color;
+            color: $wf-white;
+        }
+    }
+}
+
+// Ensure DomainSelector fits within the config panel width
+.o_workflow_domain_control {
+    .o_domain_selector {
+        width: 100%;
+    }
+
+    .o_workflow_domain_placeholder {
+        padding: 8px;
+        background: $wf-field-placeholder-bg;
+        border-radius: $wf-radius-sm;
+        border: 1px dashed $wf-field-placeholder-border;
+        color: $wf-text-muted;
+    }
+}

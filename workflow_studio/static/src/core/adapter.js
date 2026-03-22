@@ -74,6 +74,7 @@ export class WorkflowAdapter {
             id: node.id,
             type: node.type,
             title: node.label,
+            titleIsCustom: !!(node.meta && node.meta.ui && node.meta.ui.titleIsCustom),
             x: node.position.x,
             y: node.position.y,
             icon: node.icon,
@@ -236,6 +237,20 @@ export class WorkflowAdapter {
     }
 
     /**
+     * Rename a node (update its display label).
+     * @param {string} nodeId
+     * @param {string} label
+     * @returns {boolean}
+     */
+    setNodeLabel(nodeId, label) {
+        const result = this.editor.setNodeLabel(nodeId, label);
+        if (result) {
+            this._syncState();
+        }
+        return result;
+    }
+
+    /**
      * Set node configuration
      * UI calls this instead of accessing _node.setConfig()
      *
@@ -250,6 +265,10 @@ export class WorkflowAdapter {
             return false;
         }
         coreNode.setConfig(config);
+        // Node config mutations are not emitted by Core automatically.
+        // Refresh reactive UI state so config-driven rendering (e.g. dynamic icons)
+        // stays in sync immediately.
+        this._syncState();
         console.log(`[Adapter] Config set for ${nodeId}:`, coreNode.getConfig());
         return true;
     }
@@ -385,47 +404,5 @@ export class WorkflowAdapter {
      */
     fromJSON(data) {
         this.editor.fromJSON(data);
-    }
-
-    /**
-     * Load from legacy format (current localStorage format)
-     */
-    fromLegacyFormat(data) {
-        this.clear();
-
-        // Convert legacy nodes to new format
-        (data.nodes || []).forEach(legacyNode => {
-            const nodeId = this.addNode(legacyNode.type, {
-                x: legacyNode.x,
-                y: legacyNode.y,
-            });
-            if (nodeId) {
-                // Override auto-generated ID with legacy ID
-                const coreNode = this._getCoreNode(nodeId);
-                if (coreNode) {
-                    this.editor.nodes.delete(nodeId);
-                    coreNode.id = legacyNode.id;
-                    this.editor.nodes.set(legacyNode.id, coreNode);
-                }
-            }
-        });
-
-        // Restore connections
-        (data.connections || []).forEach(conn => {
-            this.editor.addConnection(
-                conn.source,
-                conn.sourceHandle,
-                conn.target,
-                conn.targetHandle
-            );
-        });
-
-        // Update ID counter
-        const maxId = Math.max(
-            ...Array.from(this.editor.nodes.keys())
-                .map(id => parseInt(id.replace(/\D/g, ''), 10) || 0),
-            0
-        );
-        this.editor._idCounter = maxId;
     }
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Webhook Trigger Form View -->
+    <record id="view_workflow_trigger_webhook_form" model="ir.ui.view">
+        <field name="name">workflow.trigger.webhook.form</field>
+        <field name="model">workflow.trigger</field>
+        <field name="arch" type="xml">
+            <form string="Webhook Trigger">
+                <sheet>
+                    <widget name="web_ribbon" title="Inactive" bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="workflow_id" readonly="1" options="{'no_open': True}"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Webhook Configuration">
+                            <field name="trigger_type" invisible="1"/>
+                            <field name="active" invisible="1"/>
+                            <label for="webhook_url" string="URL"/>
+                            <div>
+                                <field name="webhook_url" widget="CopyClipboardURL" placeholder="URL will be created once the trigger is activated."/>
+                                <div class="alert alert-warning mt-2" role="status">
+                                    <strong><i class="fa fa-lock"/> Keep it secret, keep it safe.</strong>
+                                    <p class="mb-1">Your webhook URL contains a secret. Don't share it online or carelessly.</p>
+                                    <button class="btn btn-secondary" type="object" name="action_rotate_webhook_uuid" string="Rotate Secret" icon="fa-refresh" help="Change the URL's secret if you think the URL is no longer secure. You will have to update any automated system that calls this webhook to the new URL."/>
+                                </div>
+                            </div>
+                            <field name="webhook_uuid" readonly="1" groups="base.group_no_one"/>
+                        </group>
+                        <group string="Status">
+                            <field name="last_triggered" readonly="1"/>
+                            <field name="trigger_count" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

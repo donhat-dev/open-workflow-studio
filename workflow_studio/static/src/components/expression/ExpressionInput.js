@@ -1,7 +1,16 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillUpdateProps } from "@odoo/owl";
-import { wrapExpression, evaluateExpression } from "@workflow_studio/utils/expression_utils";
+import { Component, useState, onWillUpdateProps, useRef } from "@odoo/owl";
+import {
+    wrapExpression,
+    evaluateExpression,
+    hasExpressions,
+    extractExpressions,
+    ensureExpressionPrefix,
+    inferExpressionModeFromValue,
+    stripExpressionPrefix,
+    isExpressionValue,
+} from "@workflow_studio/utils/expression_utils";
 import {
     buildContextExpressionSuggestions,
     filterSuggestions,
@@ -26,6 +35,8 @@ export class ExpressionInput extends Component {
         multiline: { type: Boolean, optional: true },  // Use textarea
         // Controlled mode: 'fixed' | 'expression'
         mode: { type: String, optional: true },
+        // Toggle UI placement: 'top' | 'side' | 'none'
+        toggleMode: { type: String, optional: true },
         onModeChange: { type: Function, optional: true },
         onChange: { type: Function },
         onDrop: { type: Function, optional: true },
@@ -40,32 +51,43 @@ export class ExpressionInput extends Component {
     };
 
     setup() {
-        const initialValue = typeof this.props.value === "string" ? this.props.value : "";
+        const initialStoredValue = typeof this.props.value === "string" ? this.props.value : "";
         const initialMode = this._normalizeMode(this.props.mode)
-            || this._inferModeFromValue(initialValue);
+            || this._inferModeFromValue(initialStoredValue);
+        const initialValue = this._toDisplayValue(initialStoredValue, initialMode);
+
+        this.fieldRef = useRef("fieldRef");
+        this._dragEnterCount = 0;
 
         this.state = useState({
             isFocused: false,
             isDragOver: false,
             showSuggestions: false,
             activeSuggestionIndex: -1,
+            scrollTop: 0,
+            scrollLeft: 0,
             // Local value for reactivity - syncs with props
             localValue: initialValue,
             // Fallback mode when parent does not control mode explicitly
             localMode: initialMode,
+            mode: initialMode, // "fixed" | "expression"
         });
 
         // Option 2: sync localValue when parent updates props (avoid stale state if component is reused)
         onWillUpdateProps((nextProps) => {
             const nextValue = nextProps && typeof nextProps.value === "string" ? nextProps.value : "";
             const nextMode = this._normalizeMode(nextProps && nextProps.mode);
-            const valueChanged = nextValue !== this.state.localValue;
+            const inferredNextMode = nextMode || this._inferModeFromValue(nextValue);
+            const nextDisplayValue = this._toDisplayValue(nextValue, inferredNextMode);
+            const valueChanged = nextDisplayValue !== this.state.localValue;
+            const modeChanged = inferredNextMode !== this.mode;
 
-            // Don't override while user is actively editing.
-            if (this.state.isFocused) return;
+            // While focused, keep typing responsive, but still sync when mode flips
+            // (e.g. user adds leading '=' in fixed mode and parent promotes to expression).
+            if (this.state.isFocused && !modeChanged) return;
 
-            if (valueChanged) {
-                this.state.localValue = nextValue;
+            if (valueChanged || modeChanged) {
+                this.state.localValue = nextDisplayValue;
             }
 
             // If mode is controlled by parent, keep local mode synchronized.
@@ -75,8 +97,8 @@ export class ExpressionInput extends Component {
             }
 
             // For uncontrolled mode, infer initial mode from incoming value.
-            if (valueChanged) {
-                this.state.localMode = this._inferModeFromValue(nextValue);
+            if (valueChanged || modeChanged) {
+                this.state.localMode = inferredNextMode;
             }
         });
     }
@@ -88,21 +110,112 @@ export class ExpressionInput extends Component {
         return "";
     }
 
+    _normalizeToggleMode(mode) {
+        if (mode === "top" || mode === "side" || mode === "none") {
+            return mode;
+        }
+        return "top";
+    }
+
     _inferModeFromValue(value) {
-        const text = String(value || "").trim();
-        if (text.startsWith("{{") && text.endsWith("}}")) {
+        if (inferExpressionModeFromValue(value)) {
             return "expression";
         }
         return "fixed";
+    }
+
+    _toDisplayValue(value, mode = this.mode) {
+        const text = typeof value === "string" ? value : "";
+        return mode === "expression" ? stripExpressionPrefix(text) : text;
+    }
+
+    _serializeValue(value, mode = this.mode) {
+        const text = typeof value === "string" ? value : value == null ? "" : String(value);
+        if (mode === "expression") {
+            return ensureExpressionPrefix(text);
+        }
+        return text;
     }
 
     get hasControlledMode() {
         return this._normalizeMode(this.props.mode) !== "";
     }
 
+    get toggleMode() {
+        return this._normalizeToggleMode(this.props.toggleMode);
+    }
+
+    get showTopToggle() {
+        return !this.props.readonly && this.toggleMode === "top";
+    }
+
+    get showSideToggle() {
+        return !this.props.readonly && this.toggleMode === "side";
+    }
+
+    get showHeader() {
+        return Boolean(this.props.label) || this.showTopToggle;
+    }
+
     get currentValue() {
         // Use local state value for reactivity
         return this.state.localValue;
+    }
+
+    get hasExpressionHighlights() {
+        return this.isExpression && extractExpressions(this.currentValue).length > 0;
+    }
+
+    get highlightSegments() {
+        const value = this.currentValue || "";
+        const expressions = extractExpressions(value);
+
+        if (!expressions.length) {
+            return [{ id: 0, text: value, isExpression: false }];
+        }
+
+        const segments = [];
+        let cursor = 0;
+
+        for (let index = 0; index < expressions.length; index++) {
+            const match = expressions[index];
+            if (match.start > cursor) {
+                segments.push({
+                    id: `${index}-plain-${cursor}`,
+                    text: value.slice(cursor, match.start),
+                    isExpression: false,
+                });
+            }
+
+            segments.push({
+                id: `${index}-expr-${match.start}`,
+                text: match.full,
+                isExpression: true,
+            });
+            cursor = match.end;
+        }
+
+        if (cursor < value.length) {
+            segments.push({
+                id: `tail-${cursor}`,
+                text: value.slice(cursor),
+                isExpression: false,
+            });
+        }
+
+        if (!segments.length) {
+            segments.push({ id: 0, text: value, isExpression: false });
+        }
+
+        return segments;
+    }
+
+    get highlightContentStyle() {
+        const { scrollLeft, scrollTop } = this.state;
+        if (!scrollLeft && !scrollTop) {
+            return "";
+        }
+        return `transform: translate(${-scrollLeft}px, ${-scrollTop}px);`;
     }
 
     get mode() {
@@ -138,7 +251,6 @@ export class ExpressionInput extends Component {
         return rawValue
             .replace(/\{\{/g, "")
             .replace(/\}\}/g, "")
-            .replace(/^=/, "")
             .trim();
     }
 
@@ -159,12 +271,19 @@ export class ExpressionInput extends Component {
         return this.filteredSuggestions.length > 0;
     }
 
+    get suggestionsStyle() {
+        const el = this.fieldRef.el;
+        if (!el) return "";
+        const rect = el.getBoundingClientRect();
+        return `position: fixed; top: ${rect.bottom + 4}px; left: ${rect.left}px; width: ${rect.width}px; z-index: 10000;`;
+    }
+
     get previewResult() {
         if (!this.isExpression || !this.props.context) {
             return null;
         }
 
-        const result = evaluateExpression(this.currentValue, this.props.context);
+        const result = evaluateExpression(this._serializeValue(this.currentValue, "expression"), this.props.context);
         return result;
     }
 
@@ -187,6 +306,12 @@ export class ExpressionInput extends Component {
         return String(result.value);
     }
 
+    get previewType() {
+        const result = this.previewResult;
+        if (!result || result.error || result.type === null) return '';
+        return result.type || '';
+    }
+
     _safeStringify(value) {
         try {
             return JSON.stringify(value, null, 2);
@@ -207,7 +332,7 @@ export class ExpressionInput extends Component {
         this.state.showSuggestions = true;
         this.state.activeSuggestionIndex = -1;
 
-        this.props.onChange(value);
+        this.props.onChange(this._serializeValue(value));
     }
 
     onFocus() {
@@ -221,14 +346,30 @@ export class ExpressionInput extends Component {
         this.state.activeSuggestionIndex = -1;
     }
 
+    onScroll(ev) {
+        this.state.scrollTop = ev.target.scrollTop || 0;
+        this.state.scrollLeft = ev.target.scrollLeft || 0;
+    }
+
     setMode(mode) {
         const normalized = this._normalizeMode(mode);
         if (!normalized) {
             return;
         }
 
+        const currentMode = this.mode;
+        const currentDisplayValue = this.currentValue;
+        const previousSerialized = this._serializeValue(currentDisplayValue, currentMode);
+        const nextSerialized = this._serializeValue(currentDisplayValue, normalized);
+
         if (!this.hasControlledMode) {
             this.state.localMode = normalized;
+        }
+
+        this.state.localValue = this._toDisplayValue(nextSerialized, normalized);
+
+        if (nextSerialized !== previousSerialized) {
+            this.props.onChange(nextSerialized);
         }
 
         if (this.props.onModeChange) {
@@ -246,18 +387,28 @@ export class ExpressionInput extends Component {
         this.setMode('expression');
     }
 
+    onClickSideToggle() {
+        const nextMode = this.isExpression ? "fixed" : "expression";
+        this.setMode(nextMode);
+    }
+
     // ============================================
     // DRAG-DROP HANDLERS
     // ============================================
 
     onDragEnter(ev) {
         ev.preventDefault();
+        this._dragEnterCount++;
         this.state.isDragOver = true;
     }
 
     onDragLeave(ev) {
         ev.preventDefault();
-        this.state.isDragOver = false;
+        this._dragEnterCount--;
+        if (this._dragEnterCount <= 0) {
+            this._dragEnterCount = 0;
+            this.state.isDragOver = false;
+        }
     }
 
     onDragOver(ev) {
@@ -266,13 +417,67 @@ export class ExpressionInput extends Component {
         ev.dataTransfer.dropEffect = 'copy';
     }
 
-    onDrop(ev) {
-        ev.preventDefault();
-        this.state.isDragOver = false;
-
-        // Get expression from dataTransfer
+    _getDropPayload(ev) {
         const expression = ev.dataTransfer.getData('application/x-expression');
         const path = ev.dataTransfer.getData('text/plain');
+        const keyName = ev.dataTransfer.getData('application/x-expression-key');
+        const rawMeta = ev.dataTransfer.getData('application/x-expression-meta');
+        let meta = null;
+
+        if (rawMeta) {
+            try {
+                meta = JSON.parse(rawMeta);
+            } catch {
+                meta = null;
+            }
+        }
+
+        return {
+            expression,
+            path,
+            keyName: keyName || (meta && typeof meta.keyName === 'string' ? meta.keyName : ''),
+            meta,
+        };
+    }
+
+    onDrop(ev) {
+        ev.preventDefault();
+        this._dragEnterCount = 0;
+        this.state.isDragOver = false;
+
+        const dropPayload = this._getDropPayload(ev);
+        const expression = dropPayload.expression;
+        const path = dropPayload.path;
+
+        const currentMode = this.mode;
+        const currentDisplayValue = this.currentValue;
+        const previousSerialized = this._serializeValue(currentDisplayValue, currentMode);
+
+        if (this.props.onDrop) {
+            const override = this.props.onDrop(dropPayload);
+            if (override && override.handled) {
+                const nextMode = this._normalizeMode(override.mode) || currentMode;
+                const nextSerialized = override.serializedValue !== undefined
+                    ? String(override.serializedValue ?? '')
+                    : this._serializeValue(override.value ?? '', nextMode);
+
+                if (!this.hasControlledMode) {
+                    this.state.localMode = nextMode;
+                }
+                this.state.localValue = this._toDisplayValue(nextSerialized, nextMode);
+
+                if (nextSerialized !== previousSerialized) {
+                    this.props.onChange(nextSerialized);
+                }
+                if (this.props.onModeChange && nextMode !== currentMode) {
+                    this.props.onModeChange(nextMode);
+                }
+
+                this.state.showSuggestions = false;
+                this.state.activeSuggestionIndex = -1;
+                return;
+            }
+        }
 
         const insertText = expression || (path ? wrapExpression(path) : '');
         if (!insertText) {
@@ -295,11 +500,7 @@ export class ExpressionInput extends Component {
         // Update local state for immediate UI update
         this.state.localValue = newValue;
 
-        // Notify parent of change (no mode switching)
-        this.props.onChange(newValue);
-        if (this.props.onDrop) {
-            this.props.onDrop(expression || path);
-        }
+        this.props.onChange(this._serializeValue(newValue));
         this.state.showSuggestions = false;
 
         // Restore cursor after DOM updates
@@ -376,6 +577,6 @@ export class ExpressionInput extends Component {
         this.state.localValue = nextValue;
         this.state.showSuggestions = false;
         this.state.activeSuggestionIndex = -1;
-        this.props.onChange(nextValue);
+        this.props.onChange(this._serializeValue(nextValue));
     }
 }

@@ -1,10 +1,11 @@
 /** @odoo-module **/
 
-import { Component, useRef, useState, useExternalListener, onMounted, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
+import { Component, useRef, useState, useExternalListener, onMounted, onPatched, onWillUnmount, onWillUpdateProps, useEnv } from "@odoo/owl";
+import { useBus, useService } from "@web/core/utils/hooks";
 import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
-import { NodeConfigPanel } from "./node_config_panel";
+import { ConfigPanelDialog } from "./config_panel_dialog";
 import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
 import {
     getBezierPath,
@@ -12,10 +13,15 @@ import {
     getVerticalStackPath,
     getConnectionPath as calculateConnectionPath
 } from "./editor_canvas/utils/connection_path";
-import { calculateFitView } from "./editor_canvas/utils/view_utils";
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import { LucideIcon } from "./common/lucide_icon";
+import {
+    getLatestNodeResultForNodeIds,
+    getLatestNodeResultsByNodeIds,
+    getStructuralParentIds,
+    getStructuralPredecessorIds,
+} from "@workflow_studio/utils/graph_utils";
 
 /**
  * EditorCanvas Component
@@ -26,7 +32,7 @@ import { LucideIcon } from "./common/lucide_icon";
  */
 export class EditorCanvas extends Component {
     static template = "workflow_studio.editor_canvas";
-    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, NodeConfigPanel, LucideIcon };
+    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, LucideIcon };
 
     static props = {
         // Graph data (required for standalone/widget mode, ignored in editor mode)
@@ -66,6 +72,9 @@ export class EditorCanvas extends Component {
         this._executedConnectionIdsCache = null;
         this._executedConnectionIdsLength = 0;
         this._lastExecutedOrderLength = 0;
+        this._lastFocusNodeRequest = null;
+        this._removeConfigPanelDialog = null;
+        this._configPanelDialogNodeId = null;
 
         // Determine operating mode FIRST (before any state/hooks)
         // Mode 1: Editor Mode - service exists, no graphData prop
@@ -82,8 +91,12 @@ export class EditorCanvas extends Component {
             if (!this.editor) {
                 throw new Error('[EditorCanvas] Editor mode requires workflowEditor service in env');
             }
+            this.actionService = useService("action");
+            this.dialogService = useService("dialog");
         } else {
             this.editor = this.env.workflowEditor || null;
+            this.actionService = null;
+            this.dialogService = null;
         }
 
         // Local state for widget mode (or fallback defaults if service state unavailable)
@@ -98,6 +111,7 @@ export class EditorCanvas extends Component {
                 selection: { nodeIds: [], connectionIds: [] },
                 hoveredConnection: { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null },
                 panels: { configOpen: false, configNodeId: null },
+                focusNodeRequest: null,
                 nodeMenu: { visible: false, x: 0, y: 0, canvasX: 0, canvasY: 0, variant: 'default', connectionContext: null },
                 history: { canUndo: false, canRedo: false },
             },
@@ -105,6 +119,10 @@ export class EditorCanvas extends Component {
             execution: this.props.executionData || null,
             // Dimension config (both modes)
             dimensionConfig: this.props.dimensionConfig || {},
+        });
+
+        this.localUi = useState({
+            fitMenuOpen: false,
         });
 
         // Bind to editor service state (editor mode) for reactivity
@@ -118,6 +136,9 @@ export class EditorCanvas extends Component {
             getControls: (nodeId) => this.editor.getNodeControls(nodeId),
             getNodeMeta: (nodeId) => this.editor.getNodeMeta(nodeId),
             setNodeMeta: (nodeId, meta) => this.editor.setNodeMeta(nodeId, meta),
+            renameNode: (nodeId, label) => this.editor.renameNode(nodeId, label),
+            openNodeConfig: (nodeId) => this.onNodeOpenConfig(nodeId),
+            getNodeConfig: (nodeId) => this.editor.getNodeConfig(nodeId),
             getExpressionContext: (options) => buildExecutionContext ? buildExecutionContext(options) : null,
             buildContextForNode: () => ({
                 _node: {}, _json: {}, _input: { item: null, json: null },
@@ -125,7 +146,33 @@ export class EditorCanvas extends Component {
             }),
             executeUntilNode: (nodeId, inputData = {}, configOverrides = null) =>
                 this.editor.executeUntilNode(nodeId, inputData, configOverrides),
+            executeFromNode: (nodeId, inputData = {}) => this.editor.executeFromNode(nodeId, inputData),
             setNodeConfig: (nodeId, values) => this.editor.setNodeConfig(nodeId, values),
+            pinNodeData: (nodeId, nodeRunId) => this.editor.actions.pinNodeData(nodeId, nodeRunId),
+            unpinNodeData: (nodeId) => this.editor.actions.unpinNodeData(nodeId),
+            isNodePinned: (nodeId) => this.editor.actions.isNodePinned(nodeId),
+            replaceExecutionNodeResult: (nodeResult) => this.editor.actions.replaceExecutionNodeResult(nodeResult),
+            saveWorkflow: () => this.editor.saveWorkflow(),
+            getNodeRunDetails: (nodeRunId) => this.editor.getNodeRunDetails(nodeRunId),
+            getTriggerPanelData: (nodeId) => this.editor.getTriggerPanelData(nodeId),
+            activateTriggerNode: (nodeId) => this.editor.activateTriggerNode(nodeId),
+            deactivateTriggerNode: (nodeId) => this.editor.deactivateTriggerNode(nodeId),
+            rotateTriggerWebhook: (nodeId) => this.editor.rotateTriggerWebhook(nodeId),
+            startTriggerWebhookTest: (nodeId) => this.editor.startTriggerWebhookTest(nodeId),
+            stopTriggerWebhookTest: (nodeId) => this.editor.stopTriggerWebhookTest(nodeId),
+            openTriggerNodeRecord: async (nodeId) => {
+                const action = await this.editor.getTriggerNodeAction(nodeId);
+                if (action) {
+                    this.actionService.doAction(action);
+                }
+            },
+            resolveRecordRefs: (...args) => {
+                // Proxy for record ref resolution
+                if (this.editor.resolveRecordRefs) {
+                    return this.editor.resolveRecordRefs(...args);
+                }
+                return null;
+            },
         } : null;
 
         if (this.isEditorMode) {
@@ -230,14 +277,21 @@ export class EditorCanvas extends Component {
         });
 
         // Resize observer to update viewport on window resize
-        this._resizeObserver = new ResizeObserver(() => this.viewportHook.updateViewRect());
+        this._resizeObserver = new ResizeObserver(() => {
+            this.viewportHook.updateViewRect();
+            this._dismissConnectionToolbar();
+        });
         onMounted(() => {
             if (this.rootRef.el) {
                 this._resizeObserver.observe(this.rootRef.el);
             }
+            // Debug handle for QA – accessible as window.canvas in browser console
+            window.canvas = this;
+            this._syncConfigPanelDialog();
         });
         onWillUnmount(() => {
             this._resizeObserver.disconnect();
+            this._removeActiveConfigDialog();
             if (this._mouseMoveFrame) {
                 cancelAnimationFrame(this._mouseMoveFrame);
                 this._mouseMoveFrame = null;
@@ -260,9 +314,28 @@ export class EditorCanvas extends Component {
             }
         });
 
+        onPatched(() => {
+            const request = this.uiState.focusNodeRequest;
+            if (!request || request === this._lastFocusNodeRequest) {
+                this._syncConfigPanelDialog();
+                return;
+            }
+            this._lastFocusNodeRequest = request;
+            this.viewportHook.panToNode(request.nodeId, this.nodes);
+            this._syncConfigPanelDialog();
+        });
+
+        useBus(this.env.bus, "execution-log:focus-node", (payload) => {
+            if (!payload || !payload.nodeId) {
+                return;
+            }
+            this.viewportHook.panToNode(payload.nodeId, this.nodes);
+        });
+
         // Global mouse listeners
         useExternalListener(document, "mousemove", this.onDocumentMouseMove.bind(this));
         useExternalListener(document, "mouseup", this.onDocumentMouseUp.bind(this));
+        useExternalListener(document, "mousedown", this.onDocumentMouseDown.bind(this));
 
         this.isDebug = typeof odoo !== "undefined" && odoo.debug;
         window.canvas = this.isDebug ? this : null;
@@ -395,43 +468,50 @@ export class EditorCanvas extends Component {
 
             const nodeResults = (options && options.nodeResults) || execution.nodeResults || [];
             const nodeId = (options && options.nodeId) || null;
-            const predecessorSet = nodeId ? buildPredecessorSet(nodeId) : null;
+            const workflow = this.workflowData;
+            const structuralPredecessorIds = nodeId
+                ? getStructuralPredecessorIds(workflow, nodeId)
+                : [];
+            const structuralPredecessorIdSet = new Set(structuralPredecessorIds);
+            const structuralParentIds = nodeId
+                ? getStructuralParentIds(workflow, nodeId)
+                : [];
 
             const wrappedNode = {};
             if (Array.isArray(nodeResults) && nodeResults.length) {
-                for (const result of nodeResults) {
-                    if (!result || result.node_id === undefined || result.node_id === null) {
-                        continue;
-                    }
-
-                    const resultNodeId = String(result.node_id);
-                    if (predecessorSet && !predecessorSet.has(resultNodeId)) {
-                        continue;
-                    }
-
-                    wrappedNode[resultNodeId] = buildNodeOutputView(result.output_data);
+                const sourceResults = nodeId
+                    ? getLatestNodeResultsByNodeIds(nodeResults, structuralPredecessorIds)
+                    : nodeResults;
+                for (const result of sourceResults) {
+                    wrappedNode[result.node_id] = buildNodeOutputView(result.output_data);
                 }
             } else {
                 const nodeEntries = snapshot.node || {};
                 for (const [entryId, output] of Object.entries(nodeEntries)) {
-                    const normalizedEntryId = String(entryId);
-                    if (predecessorSet && !predecessorSet.has(normalizedEntryId)) {
+                    if (nodeId && !structuralPredecessorIdSet.has(String(entryId))) {
                         continue;
                     }
-                    wrappedNode[normalizedEntryId] = buildNodeOutputView(output);
+                    wrappedNode[entryId] = buildNodeOutputView(output);
                 }
             }
 
             let json = snapshot.json || {};
-            if (predecessorSet) {
-                if (Array.isArray(nodeResults) && nodeResults.length) {
-                    json = getLastPredecessorJson(nodeResults, predecessorSet);
-                } else {
-                    json = {};
+            if (nodeId && Array.isArray(nodeResults) && nodeResults.length) {
+                const latestParentResult = getLatestNodeResultForNodeIds(nodeResults, structuralParentIds);
+                if (latestParentResult && latestParentResult.output_data !== undefined) {
+                    json = latestParentResult.output_data;
+                }
+            } else if (nodeId && structuralParentIds.length) {
+                const snapshotNodes = snapshot.node || {};
+                for (let index = structuralParentIds.length - 1; index >= 0; index--) {
+                    const parentId = structuralParentIds[index];
+                    if (Object.prototype.hasOwnProperty.call(snapshotNodes, parentId)) {
+                        json = snapshotNodes[parentId];
+                        break;
+                    }
                 }
             }
 
-            const inputItems = normalizeItems(json);
             return {
                 _vars: snapshot.vars || {},
                 _node: wrappedNode,
@@ -678,6 +758,32 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Active toolbar connection: hover takes priority, then single selected connection.
+     * Recomputes screen position from canvas midpoint on every access so that
+     * zoom/pan/resize automatically updates the toolbar position.
+     */
+    get toolbarConnection() {
+        const hovered = this.hoveredConnection;
+        if (hovered.id) return hovered;
+
+        // Show toolbar for a single selected connection
+        const selectedIds = this.selectedConnectionIds;
+        if (selectedIds.length !== 1) return { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null };
+
+        const connId = selectedIds[0];
+        const conn = this.renderedConnections.find(c => c.id === connId);
+        if (!conn) return { id: null, midpoint: { x: 0, y: 0 }, canvasMidpoint: null };
+
+        const midpoint = this.getConnectionMidpoint(conn);
+        const screenPos = this.getScreenPosition(midpoint.x, midpoint.y);
+        return {
+            id: connId,
+            midpoint: screenPos,
+            canvasMidpoint: midpoint,
+        };
+    }
+
+    /**
      * Get callback props for NodeMenu
      * @returns {Object} { onNodeSelected, onClose }
      */
@@ -707,7 +813,7 @@ export class EditorCanvas extends Component {
                     this.multiNodeDrag.onNodeDragStart({ nodeId, event });
                 },
                 onExecute: (nodeId) => {
-                    this.editor.actions.openPanel("config", { nodeId });
+                    this.onNodeOpenConfig(nodeId);
                 },
                 onSocketMouseDown: (data) => {
                     this.connectionDrawing.onSocketMouseDown(data);
@@ -717,6 +823,21 @@ export class EditorCanvas extends Component {
                 },
                 onSocketQuickAdd: (data) => {
                     this.onSocketQuickAdd(data);
+                },
+                onDelete: (nodeId) => {
+                    this.onNodeDelete(nodeId);
+                },
+                onToggleDisable: (nodeId) => {
+                    this.onNodeToggleDisable(nodeId);
+                },
+                onOpenConfig: (nodeId) => {
+                    this.onNodeOpenConfig(nodeId);
+                },
+                onNodeDoubleClick: (nodeId) => {
+                    this.onNodeDoubleClick(nodeId);
+                },
+                onExecuteFromNode: (nodeId) => {
+                    this.onExecuteFromNode(nodeId);
                 },
             };
         }
@@ -742,6 +863,11 @@ export class EditorCanvas extends Component {
             props.onSocketMouseDown = this._nodeActionCallbacksCache.onSocketMouseDown;
             props.onSocketMouseUp = this._nodeActionCallbacksCache.onSocketMouseUp;
             props.onSocketQuickAdd = this._nodeActionCallbacksCache.onSocketQuickAdd;
+            props.onDelete = this._nodeActionCallbacksCache.onDelete;
+            props.onToggleDisable = this._nodeActionCallbacksCache.onToggleDisable;
+            props.onOpenConfig = this._nodeActionCallbacksCache.onOpenConfig;
+            props.onNodeDoubleClick = this._nodeActionCallbacksCache.onNodeDoubleClick;
+            props.onExecuteFromNode = this._nodeActionCallbacksCache.onExecuteFromNode;
         }
 
         return props;
@@ -912,6 +1038,8 @@ export class EditorCanvas extends Component {
      */
     onWheel(ev) {
         this.viewportHook.onWheel(ev);
+        // Hide connection toolbar immediately — position would be stale after zoom
+        this._dismissConnectionToolbar();
     }
 
     /**
@@ -950,13 +1078,111 @@ export class EditorCanvas extends Component {
      * Fit all nodes into viewport with padding
      * Inspired by n8n/VueFlow fitView implementation
      */
+    getFitTopOffsetPx() {
+        const rootEl = this.rootRef.el;
+        if (!rootEl) {
+            return 0;
+        }
+        const controlsEl = rootEl.querySelector(".workflow-editor-canvas__controls");
+        if (!controlsEl) {
+            return 0;
+        }
+        const rootRect = rootEl.getBoundingClientRect();
+        const controlsRect = controlsEl.getBoundingClientRect();
+        // Leave a small visual gap below controls to avoid overlap.
+        return Math.max(0, (controlsRect.bottom - rootRect.top) + 12);
+    }
+
+    /**
+     * Adaptive rank separation for fit-height layout.
+     * Keeps current 1/2-gap behavior on small graphs, and compresses
+     * vertical spacing progressively for larger workflows.
+     * @returns {number}
+     */
+    getAdaptiveFitHeightRanksep() {
+        const nodeCount = this.nodes.length;
+        if (nodeCount <= 6) {
+            return 40;
+        }
+        if (nodeCount <= 12) {
+            return 32;
+        }
+        if (nodeCount <= 20) {
+            return 24;
+        }
+        return 20;
+    }
+
     /**
      * Fit all nodes into viewport with padding
      * Logic extracted to utils/view_utils.js
      * Works in both editor and viewer modes via viewportHook
      */
-    fitToView() {
-        this.viewportHook.fitToView(this.nodes);
+    fitToView(options = {}) {
+        this.closeFitMenu();
+        const fitOptions = {
+            ...options,
+            topOffsetPx: options.topOffsetPx !== undefined
+                ? options.topOffsetPx
+                : this.getFitTopOffsetPx(),
+        };
+        this.viewportHook.fitToView(this.nodes, fitOptions);
+    }
+
+    get isFitMenuOpen() {
+        return !!this.localUi.fitMenuOpen;
+    }
+
+    toggleFitMenu(ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+        if (this.isReadonly || this.nodes.length === 0) {
+            return;
+        }
+        this.localUi.fitMenuOpen = !this.localUi.fitMenuOpen;
+    }
+
+    closeFitMenu() {
+        if (this.localUi.fitMenuOpen) {
+            this.localUi.fitMenuOpen = false;
+        }
+    }
+
+    onFitMenuAction(mode, ev) {
+        if (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+        }
+
+        if (mode === "full-height") {
+            this.fitFullHeight();
+            return;
+        }
+        this.fitFullWidth();
+    }
+
+    fitFullWidth() {
+        if (!this.canEdit) return;
+        this.closeFitMenu();
+        this.tidyUp({
+            orientation: "horizontal",
+            label: "Auto layout (horizontal) + fit full width",
+        });
+        this.fitToView({ mode: "cover-width" });
+    }
+
+    fitFullHeight() {
+        if (!this.canEdit) return;
+        this.closeFitMenu();
+        const adaptiveRanksep = this.getAdaptiveFitHeightRanksep();
+        this.tidyUp({
+            orientation: "vertical",
+            ranksep: adaptiveRanksep,
+            label: "Auto layout (vertical) + fit full height",
+        });
+        this.fitToView({ mode: "cover-height" });
     }
 
     // =========================================
@@ -968,12 +1194,20 @@ export class EditorCanvas extends Component {
      * Uses pure util for position calculation, service actions for mutations.
      * Wrapped in batch for single undo/redo step.
      */
-    tidyUp() {
+    tidyUp(options = {}) {
         if (!this.canEdit) return;
         if (this.nodes.length === 0) return;
 
+        const orientation = options.orientation === "vertical" ? "vertical" : "horizontal";
+        const ranksep = typeof options.ranksep === "number" ? options.ranksep : undefined;
+        const label = options.label
+            || (orientation === "vertical" ? "Tidy up layout (vertical)" : "Tidy up layout");
+
         // Calculate new positions using pure utility (no side effects)
-        const positions = calculateTidyPositions(this.nodes, this.connections);
+        const positions = calculateTidyPositions(this.nodes, this.connections, {
+            orientation,
+            ranksep,
+        });
 
         // Apply positions via service actions (wrapped in batch for single undo)
         this.editor.actions.beginBatch();
@@ -983,7 +1217,7 @@ export class EditorCanvas extends Component {
                 this.editor.actions.moveNode(node.id, { x: pos.x, y: pos.y });
             }
         }
-        this.editor.actions.endBatch("Tidy up layout");
+        this.editor.actions.endBatch(label);
     }
 
     /**
@@ -1073,6 +1307,21 @@ export class EditorCanvas extends Component {
     // Connection drawing methods now handled by useConnectionDrawing hook
     // Keeping findNearestSocket for backward compatibility with hook dependency
     // (hook receives getSocketPositionForNode which uses this internally)
+
+    /**
+     * Close fit dropdown when clicking outside.
+     * @param {MouseEvent} ev
+     */
+    onDocumentMouseDown(ev) {
+        if (!this.isFitMenuOpen) {
+            return;
+        }
+        const target = ev.target;
+        if (target && target.closest && target.closest(".fit-view-dropdown")) {
+            return;
+        }
+        this.closeFitMenu();
+    }
 
     /**
      * @param {MouseEvent} ev
@@ -1192,6 +1441,24 @@ export class EditorCanvas extends Component {
         // Connection selection is cleared by select() action via service
     }
 
+    onNodeOpenConfig(nodeId) {
+        if (!this.canEdit && !this.isInExecutionView) return;
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        // Open config panel via service
+        this.editor.actions.openPanel("config", { nodeId });
+    }
+
+    /**
+     * Execute the workflow starting only from a specific manual trigger node.
+     */
+    async onExecuteFromNode(nodeId) {
+        if (this.isReadonly) return;
+        if (!this.isEditorMode) return;
+        await this.editor.executeFromNode(nodeId);
+    }
+
     onNodeExecute(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
@@ -1205,11 +1472,27 @@ export class EditorCanvas extends Component {
     onNodeDelete(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
+
+        // Capture connections before removal for auto-reconnect (A→B, B→C → A→C)
+        const incoming = this.connections.filter(c => c.target === nodeId);
+        const outgoing = this.connections.filter(c => c.source === nodeId);
+
         this.editor.actions.removeNode(nodeId);
+
         // Deselect if it was the only one or among selected
         const current = this.editorUiState.selection.nodeIds;
         if (current.includes(nodeId)) {
             this.editor.actions.select(current.filter(id => id !== nodeId));
+        }
+
+        // Auto-reconnect: bridge each incoming→outgoing pair
+        for (const inc of incoming) {
+            for (const out of outgoing) {
+                if (inc.source === out.target) continue; // skip self-loops
+                this.editor.actions.addConnection(
+                    inc.source, inc.sourceHandle, out.target, out.targetHandle
+                );
+            }
         }
     }
 
@@ -1286,6 +1569,8 @@ export class EditorCanvas extends Component {
      * @param {MouseEvent} ev
      */
     onCanvasMouseDown(ev) {
+        // Hide connection toolbar immediately when starting pan/selection
+        this._dismissConnectionToolbar();
         this.gestures.onCanvasMouseDown(ev);
     }
 
@@ -1429,6 +1714,21 @@ export class EditorCanvas extends Component {
     }
 
     /**
+     * Immediately dismiss connection toolbar (zoom / pan / resize invalidates position)
+     */
+    _dismissConnectionToolbar() {
+        if (this._connectionHoverTimeout) {
+            clearTimeout(this._connectionHoverTimeout);
+            this._connectionHoverTimeout = null;
+        }
+        this._isHoveringConnection = false;
+        this._isHoveringToolbar = false;
+        if (this.editor && this.hoveredConnection.id) {
+            this.editor.actions.setHoveredConnection();
+        }
+    }
+
+    /**
      * Handle connection hover end - schedule potential hide
      * Toolbar persists while user is in hover zone
      */
@@ -1495,9 +1795,9 @@ export class EditorCanvas extends Component {
      */
     onConnectionAddNode(connectionId, position) {
         if (!this.canEdit) return;
-        // position here is the screen-relative midpoint from state.ui.hoveredConnection.midpoint
+        // position here is the screen-relative midpoint from toolbarConnection
         // We use the stored canvasMidpoint for the actual node placement
-        let canvasPos = this.hoveredConnection.canvasMidpoint;
+        let canvasPos = this.toolbarConnection.canvasMidpoint;
         if (!canvasPos) {
             const rect = this.rootRef.el.getBoundingClientRect();
             canvasPos = this.viewportHook.getCanvasPosition({
@@ -1583,6 +1883,13 @@ export class EditorCanvas extends Component {
      * Calculate connection midpoint for toolbar positioning
      */
     getConnectionMidpoint(conn) {
+        // For multi-path connections (backedge, vertical stack), the join point
+        // is precomputed by getConnectionPath and stored on the conn object.
+        if (conn.midpoint) {
+            return conn.midpoint;
+        }
+
+        // Forward bezier: simple socket average is visually close enough.
         const sourceNode = this.nodes.find(n => n.id === conn.source);
         const targetNode = this.nodes.find(n => n.id === conn.target);
         if (!sourceNode || !targetNode) return { x: 0, y: 0 };
@@ -1662,6 +1969,58 @@ export class EditorCanvas extends Component {
         });
     };
 
+    _removeActiveConfigDialog() {
+        if (!this._removeConfigPanelDialog) {
+            return;
+        }
+        const removeDialog = this._removeConfigPanelDialog;
+        this._removeConfigPanelDialog = null;
+        this._configPanelDialogNodeId = null;
+        this._isProgrammaticDialogClose = true;
+        removeDialog();
+        this._isProgrammaticDialogClose = false;
+    }
+
+    _syncConfigPanelDialog() {
+        if (!this.isEditorMode || !this.dialogService) {
+            return;
+        }
+
+        const node = this.configPanelNode;
+        const shouldOpen = !!(this.isConfigPanelOpen && node);
+        if (!shouldOpen) {
+            this._removeActiveConfigDialog();
+            return;
+        }
+
+        if (this._removeConfigPanelDialog && this._configPanelDialogNodeId === node.id) {
+            return;
+        }
+
+        this._removeActiveConfigDialog();
+        this._configPanelDialogNodeId = node.id;
+        this._removeConfigPanelDialog = this.dialogService.add(
+            ConfigPanelDialog,
+            {
+                node,
+                workflow: this.workflowData,
+                actions: this.nodeConfigActions,
+                execution: this.executionProp,
+                viewMode: this.configPanelViewMode,
+                onSave: this.onConfigPanelSave,
+            },
+            {
+                onClose: () => {
+                    this._removeConfigPanelDialog = null;
+                    this._configPanelDialogNodeId = null;
+                    if (!this._isProgrammaticDialogClose && this.uiState.panels.configOpen) {
+                        this.editor.actions.closePanel("config");
+                    }
+                },
+            }
+        );
+    }
+
     // ============================================
     // CONFIG PANEL HANDLERS
     // ============================================
@@ -1672,7 +2031,7 @@ export class EditorCanvas extends Component {
      */
     onNodeDoubleClick = (nodeId) => {
         if (!this.canEdit && !this.isInExecutionView) return;
-        this.editor.actions.openPanel("config", { nodeId });
+        this.onNodeOpenConfig(nodeId);
     };
 
     /**
@@ -1712,6 +2071,7 @@ export class EditorCanvas extends Component {
     onConfigPanelClose = () => {
         if (!this.canEdit && !this.isInExecutionView) return;
         this.editor.actions.closePanel("config");
+        this._removeActiveConfigDialog();
     };
 
     /**
@@ -1759,6 +2119,23 @@ export class EditorCanvas extends Component {
         return this.isEditorMode ? this.editorState.ui.executing : false;
     }
 
+    get fitMenuItems() {
+        return [
+            {
+                key: "fit-full-width",
+                icon: "ArrowLeftRight",
+                label: "Fit Full Width",
+                callback: (ev) => this.onFitMenuAction("full-width", ev),
+            },
+            {
+                key: "fit-full-height",
+                icon: "ArrowUpDown",
+                label: "Fit Full Height",
+                callback: (ev) => this.onFitMenuAction("full-height", ev),
+            },
+        ];
+    }
+
     /**
      * Handle undo button click
      */
@@ -1773,6 +2150,11 @@ export class EditorCanvas extends Component {
     onRedo = () => {
         if (!this.canEdit) return;
         this.editor.actions.redo();
+    };
+
+    onCopyToEditor = () => {
+        if (!this.isEditorMode) return;
+        this.editor.copyExecutionToEditor();
     };
 
     /**
@@ -1813,6 +2195,17 @@ export class EditorCanvas extends Component {
                     classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
                 }
             );
+            if (this.isInExecutionView) {
+                buttons.push({
+                    name: 'copy-to-editor',
+                    label: 'Copy To Editor',
+                    icon: 'Copy',
+                    callback: () => this.onCopyToEditor(),
+                    visible: true,
+                    disabled: !this.executionState,
+                    classes: 'btn btn-warning btn-sm d-inline-flex align-items-center gap-1',
+                });
+            }
             buttons.push({ name: 'divider-1', divider: true });
         }
 
@@ -1826,7 +2219,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canUndo,
                     title: 'Undo (Ctrl+Z)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'redo',
@@ -1835,7 +2228,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canRedo,
                     title: 'Redo (Ctrl+Y)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 }
             );
             buttons.push({ name: 'divider-2', divider: true });
@@ -1849,7 +2242,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: this.nodes.length === 0,
                     title: 'Tidy Up',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'add-node',
@@ -1871,9 +2264,15 @@ export class EditorCanvas extends Component {
                 icon: 'Maximize',
                 callback: () => this.fitToView(),
                 visible: true,
-                disabled: false,
+                disabled: this.nodes.length === 0,
                 title: 'Fit to View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
+                menu: {
+                    open: this.isFitMenuOpen,
+                    disabled: this.isReadonly || this.nodes.length === 0,
+                    toggle: (ev) => this.toggleFitMenu(ev),
+                    items: this.fitMenuItems,
+                },
             },
             {
                 name: 'zoom-out',
@@ -1882,7 +2281,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom Out',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'zoom-in',
@@ -1891,7 +2290,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom In',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'reset-zoom',
@@ -1900,7 +2299,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Reset View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             }
         );
 
@@ -1944,6 +2343,15 @@ export class EditorCanvas extends Component {
                     disabled: this.isExecuting || this.isSaving || this.isReadonly,
                     classes: 'btn btn-success btn-sm d-inline-flex align-items-center gap-1',
                 },
+                ...(this.isInExecutionView ? [{
+                    name: 'copy-to-editor',
+                    label: 'Copy To Editor',
+                    icon: 'Copy',
+                    callback: () => this.onCopyToEditor(),
+                    visible: true,
+                    disabled: !this.executionState,
+                    classes: 'btn btn-warning btn-sm d-inline-flex align-items-center gap-1',
+                }] : []),
                 { name: 'divider-1', divider: true }
             );
         }
@@ -1958,7 +2366,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canUndo,
                     title: 'Undo (Ctrl+Z)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'redo',
@@ -1967,7 +2375,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: !this.canRedo,
                     title: 'Redo (Ctrl+Y)',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 { name: 'divider-2', divider: true },
                 {
@@ -1977,7 +2385,7 @@ export class EditorCanvas extends Component {
                     visible: true,
                     disabled: this.nodes.length === 0,
                     title: 'Tidy Up',
-                    classes: 'btn btn-light btn-sm',
+                    classes: 'btn btn-light d-inline-flex',
                 },
                 {
                     name: 'add-node',
@@ -1999,9 +2407,15 @@ export class EditorCanvas extends Component {
                 icon: 'Maximize',
                 callback: () => this.fitToView(),
                 visible: true,
-                disabled: false,
+                disabled: this.nodes.length === 0,
                 title: 'Fit to View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
+                menu: {
+                    open: this.isFitMenuOpen,
+                    disabled: this.isReadonly || this.nodes.length === 0,
+                    toggle: (ev) => this.toggleFitMenu(ev),
+                    items: this.fitMenuItems,
+                },
             },
             {
                 name: 'zoom-out',
@@ -2010,7 +2424,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom Out',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'zoom-in',
@@ -2019,7 +2433,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Zoom In',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             },
             {
                 name: 'reset-zoom',
@@ -2028,7 +2442,7 @@ export class EditorCanvas extends Component {
                 visible: true,
                 disabled: false,
                 title: 'Reset View',
-                classes: 'btn btn-light btn-sm',
+                classes: 'btn btn-light d-inline-flex',
             }
         );
 

@@ -10,7 +10,7 @@ Maintains state across iterations via nodeContext.
 import logging
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 _logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ _logger = logging.getLogger(__name__)
 class LoopNodeRunner(BaseNodeRunner):
     """Loop node - iterates over arrays.
     
-    Follows n8n SplitInBatches pattern):
+    Follows n8n SplitInBatches pattern:
     - Maintains state in nodeContext (currentIndex, items, processedItems)
     - Each iteration outputs to "loop" socket (index 1)
     - On completion outputs to "done" socket (index 0)
@@ -54,10 +54,10 @@ class LoopNodeRunner(BaseNodeRunner):
         eval_context = build_eval_context(payload, context, include_input_item=True)
         
         # Get items to iterate
-        items_expr = node_config.get('inputItems', '{{ _json }}')
+        items_expr = node_config.get('inputItems', '={{ _json }}')
         if items_expr:
             try:
-                items = ExpressionEvaluator.evaluate(items_expr, eval_context)
+                items = self.resolver.resolve(items_expr, eval_context)
             except Exception as e:
                 raise ValueError(f"Loop items expression failed when evaluating '{items_expr}': {e}")
         else:
@@ -95,25 +95,44 @@ class LoopNodeRunner(BaseNodeRunner):
         return self._emit_batch(loop_state)
     
     def _continue_loop(self, loop_state, input_data, context):
-        """Continue loop with result from previous iteration."""
-        # Store processed result
-        if input_data is not None:
-            loop_state['processedItems'].append(input_data)
-        
+        """Continue loop with result from previous iteration.
+
+        Appends the *original* batch item (from the input buffer) to
+        processedItems rather than the child-node output so that:
+          - processedItems reflects batches extracted from the original input
+          - input_data logged for the loop node is the original batch, not
+            whatever the back-edge child returned
+        The result includes '_log_input' so the executor can override the
+        persisted input_data for this iteration.
+        """
+        batch_size = loop_state['batchSize'] or 1
+
+        # Capture the original batch that was just processed (before advancing)
+        prev_index = loop_state['currentIndex']
+        prev_batch = loop_state['items'][prev_index:prev_index + batch_size]
+        prev_batch_data = prev_batch[0] if len(prev_batch) == 1 else list(prev_batch)
+
+        # Accumulate original batch (not child output) into processedItems
+        loop_state['processedItems'].append(prev_batch_data)
+
         # Advance index
-        loop_state['currentIndex'] += loop_state['batchSize']
-        
+        loop_state['currentIndex'] += batch_size
+
         # Check if done
         if loop_state['currentIndex'] >= len(loop_state['items']):
-            # Loop complete - output accumulated results
+            # Loop complete - output accumulated original batches
             results = loop_state['processedItems']
             return {
                 'outputs': [[results], []],  # Done socket gets results
                 'json': results,
+                # Executor replaces persisted input_data with the original batch
+                '_log_input': prev_batch_data,
             }
-        
+
         # Continue iteration
-        return self._emit_batch(loop_state)
+        result = self._emit_batch(loop_state)
+        result['_log_input'] = prev_batch_data
+        return result
     
     def _emit_batch(self, loop_state):
         """Emit next batch to loop output."""

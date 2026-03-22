@@ -55,11 +55,61 @@ export class WorkflowHistoryPanel extends Component {
         this._runDetailCache = new Map();
 
         onMounted(() => this.init());
-        useExternalListener(this.env.bus, "save", () => this.refreshHistory());
+        useExternalListener(this.env.bus, "refresh", () => this.backgroundRefresh());
     }
 
     async init() {
         await this.refreshHistory();
+    }
+
+    backgroundRefresh() {
+        // Softly loads the latest runs in the background.
+        if (this.state.loading) return; // Avoid overlapping refreshes
+        const self = this;
+        if (self.state.activeTab !== 'runs'){
+            return self.backgroundRefreshHistory();
+        }
+        self.orm.call(
+            "ir.workflow",
+            "get_recent_runs",
+            [[self.props.workflowId], 1]
+        ).then(
+            (runs) => {
+                for (const run of runs) {
+                    const idx = self.state.runs.findIndex(r => r.id === run.id);
+                    if (idx === -1) {
+                        self.state.runs.unshift(run);
+                    } else {
+                        Object.assign(self.state.runs[idx], run);
+                    }
+                }
+            }
+        );
+    }
+
+    backgroundRefreshHistory() {
+        // Softly loads the latest history in the background without replacing the whole list.
+        if (this.state.loading) return; // Avoid overlapping refreshes
+        this.orm.call(
+            "ir.workflow",
+            "get_version_history",
+            [[this.props.workflowId], this.props.fieldName]
+        ).then(
+            (raw) => {
+                const incoming = this.normalizeRevisionNotes(raw || []);
+                for (const rev of incoming) {
+                    const idx = this.state.revisions.findIndex(r => r.revision_id === rev.revision_id);
+                    if (idx === -1) {
+                        this.state.revisions.unshift(rev);
+                    } else {
+                        Object.assign(this.state.revisions[idx], rev);
+                    }
+                }
+                if (this.state.followLatest) {
+                    this.state.selectedRevisionId = this.getLatestRevisionId();
+                }
+            }
+        );
     }
 
     async refreshHistory() {
@@ -302,16 +352,19 @@ export class WorkflowHistoryPanel extends Component {
 
             if (this.props.executionViewRequested) {
                 const executionData = {
-                    runId: runData.id,
+                    runId: runData.run_id || runData.id,
                     status: runData.status,
                     executedOrder: runData.executed_order || [],
                     executedConnectionIds: runData.executed_connection_ids || [],
                     executedConnections: runData.executed_connections || [],
+                    executionEvents: runData.execution_events || [],
                     nodeResults: runData.node_results || [],
                     contextSnapshot: runData.context_snapshot || null,
                     error: runData.error || null,
                     errorNodeId: runData.error_node_id || null,
                     executionCount: runData.execution_count || null,
+                    durationSeconds: runData.duration_seconds || null,
+                    nodeCountExecuted: runData.node_count_executed || null,
                     inputData: runData.input_data || {},
                 };
                 this.props.executionViewRequested(runId, runData.executed_snapshot, executionData);

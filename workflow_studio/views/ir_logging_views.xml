@@ -85,6 +85,7 @@
         <field name="name">Workflow Audit Logs</field>
         <field name="res_model">ir.workflow.logging</field>
         <field name="view_mode">list,form</field>
+        <field name="path">workflow-logs</field>
     </record>
 
     <!-- Menu Item under Workflow Studio -->

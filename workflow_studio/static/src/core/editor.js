@@ -10,7 +10,6 @@ import { Connection } from './connection';
 
 /**
  * WorkflowEditor - Central state manager for workflow graph
- * Inspired by Rete.js NodeEditor and n8n's workflow store
  * 
  * Manages nodes and connections, handles validation,
  * and provides serialization/deserialization.
@@ -186,6 +185,20 @@ export class WorkflowEditor {
 
         // Notify listeners that state changed
         this._emit('onChange', { event: 'meta', data: { nodeId, meta: node.meta } });
+        return true;
+    }
+
+    /**
+     * Update a node's display label (user-visible title).
+     * @param {string} nodeId
+     * @param {string} label
+     * @returns {boolean}
+     */
+    setNodeLabel(nodeId, label) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return false;
+        node.label = label;
+        this._emit('onChange', { event: 'label', data: { nodeId, label } });
         return true;
     }
 

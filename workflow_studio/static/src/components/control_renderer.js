@@ -7,6 +7,10 @@ import { AuthControl } from "./controls/auth_control";
 import { BodyTypeControl } from "./controls/body_type_control";
 import { QueryParamsControl } from "./controls/query_params_control";
 import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
+import { DomainControl } from "./domain_control/domain_control";
+import { FieldValuesControl } from "./field_values_control/field_values_control";
+import { TriggerFieldsControl } from "./controls/trigger_fields_control";
+import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
  * ControlRenderer Component
@@ -37,7 +41,7 @@ import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_uti
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl };
+    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl, DomainControl, FieldValuesControl, TriggerFieldsControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -51,6 +55,8 @@ export class ControlRenderer extends Component {
         onPairModeChange: { type: Function, optional: true },
         // Readonly mode (execution view)
         readonly: { type: Boolean, optional: true },
+        // Sibling control values — needed by domain/field_values controls to read model
+        controlValues: { type: Object, optional: true },
     };
 
     setup() {
@@ -108,7 +114,7 @@ export class ControlRenderer extends Component {
     }
 
     _pairsSignature(pairs) {
-        const safe = Array.isArray(pairs) ? pairs : [];
+    const safe = Array.isArray(pairs) ? pairs : [];
         return safe
             .map((p) => `${p?.id || ''}:${p?.key || ''}=${p?.value || ''}`)
             .join('|');
@@ -120,7 +126,8 @@ export class ControlRenderer extends Component {
 
     // Phase 3: Read value directly from plain object
     get value() {
-        return this.props.control?.value ?? '';
+        const rawValue = this.props.control?.value ?? '';
+        return rawValue;
     }
 
     get label() {
@@ -157,6 +164,28 @@ export class ControlRenderer extends Component {
             return map;
         }
         return {};
+    }
+
+    /**
+     * Current selected model name — read from sibling controlValues.
+     * Used by domain and field_values controls to pass resModel prop.
+     */
+    get resModel() {
+        const vals = this.props.controlValues;
+        if (!vals || typeof vals !== "object") return "";
+        const model = vals.model;
+        return typeof model === "string" ? model.trim() : "";
+    }
+
+    /**
+     * Current selected operation — read from sibling controlValues.
+     * Used by field_values control to filter field suggestions (create vs write).
+     */
+    get operation() {
+        const vals = this.props.controlValues;
+        if (!vals || typeof vals !== "object") return "";
+        const op = vals.operation;
+        return typeof op === "string" ? op : "";
     }
 
     getPairValueSuggestions(pair) {
@@ -210,16 +239,32 @@ export class ControlRenderer extends Component {
     }
 
     getPairKeyMode(pairId) {
+        const pair = this.state.pairs.find((item) => item.id === pairId);
+        const currentValue = pair && typeof pair.key === "string" ? pair.key : "";
+        if (inferExpressionModeFromValue(currentValue)) {
+            return "expression";
+        }
+
         const modes = this.props.pairModes || {};
         const pairMode = modes[pairId];
+        if (!currentValue && typeof pairMode === "string") return "fixed"; // Legacy normalization
+        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.key || 'fixed';
         if (typeof pairMode === "string") return "fixed"; // Legacy normalization
         if (!pairMode || typeof pairMode !== 'object') return 'fixed';
         return pairMode.key || 'fixed';
     }
 
     getPairValueMode(pairId) {
+        const pair = this.state.pairs.find((item) => item.id === pairId);
+        const currentValue = pair && typeof pair.value === "string" ? pair.value : "";
+        if (inferExpressionModeFromValue(currentValue)) {
+            return "expression";
+        }
+
         const modes = this.props.pairModes || {};
         const pairMode = modes[pairId];
+        if (!currentValue && typeof pairMode === "string") return pairMode;
+        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.value || 'fixed';
         if (typeof pairMode === "string") return pairMode; // Legacy support
         if (!pairMode || typeof pairMode !== 'object') return 'fixed';
         return pairMode.value || 'fixed';
@@ -259,6 +304,13 @@ export class ControlRenderer extends Component {
      * Handle body type control change (composite value)
      */
     onBodyTypeChange = (value) => {
+        this.props.onChange(this.props.control.key, value);
+    };
+
+    /**
+     * Handle trigger fields control change (array value)
+     */
+    onTriggerFieldsChange = (value) => {
         this.props.onChange(this.props.control.key, value);
     };
 

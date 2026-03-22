@@ -2,7 +2,7 @@
 import { _t } from "@web/core/l10n/translation";
 
 import { Component, xml } from "@odoo/owl";
-import { useEditor } from "@workflow_studio/store/use_editor";
+import { useEditor } from "@workflow_studio/store/hooks";
 import { LucideIcon } from "./common/lucide_icon";
 
 export class NodePaletteItem extends Component {
@@ -13,7 +13,8 @@ export class NodePaletteItem extends Component {
             t-on-dragstart="onDragStart"
             draggable="true">
             <div class="node-palette__icon">
-                <i t-if="isFontAwesome(props.icon)" t-att-class="getFaClass(props.icon)"/>
+                <img t-if="isImageIcon(props.icon)" t-att-src="props.icon" class="node-palette__icon-image" alt=""/>
+                <i t-elif="isFontAwesome(props.icon)" t-att-class="getFaClass(props.icon)"/>
                 <LucideIcon t-else="" name="props.icon" size="18"/>
             </div>
             <div class="node-palette__label"><t t-esc="props.title || ('Node')"/></div>
@@ -36,6 +37,13 @@ export class NodePaletteItem extends Component {
 
     isFontAwesome(icon) {
         return typeof icon === "string" && icon.startsWith("fa-");
+    }
+
+    isImageIcon(icon) {
+        if (typeof icon !== "string") {
+            return false;
+        }
+        return icon.startsWith("/") || icon.startsWith("http://") || icon.startsWith("https://") || icon.startsWith("data:image/");
     }
 
     getFaClass(icon) {

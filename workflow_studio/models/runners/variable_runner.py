@@ -7,12 +7,9 @@ Implements workflow variable operations.
 """
 
 import json
-import re
-
-from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
-from .base import BaseNodeRunner, ExpressionEvaluator
+from .base import BaseNodeRunner
 
 
 class VariableNodeRunner(BaseNodeRunner):
@@ -32,7 +29,7 @@ class VariableNodeRunner(BaseNodeRunner):
         if not var_name:
             return self._error_result('Variable name is required')
 
-        value = self._resolve_value(raw_value, eval_context)
+        value = self.resolver.resolve(raw_value, eval_context)
         value = self._coerce_value(value)
 
         result = {
@@ -81,30 +78,6 @@ class VariableNodeRunner(BaseNodeRunner):
             'outputs': [[result]],
             'json': result,
         }
-
-    def _resolve_value(self, raw_value, eval_context):
-        if not isinstance(raw_value, str):
-            return raw_value
-
-        stripped = raw_value.strip()
-        if not stripped:
-            return raw_value
-
-        template_match = re.fullmatch(r'\{\{(.+)\}\}', stripped)
-        if template_match:
-            inner_expr = template_match.group(1).strip()
-            try:
-                return safe_eval(inner_expr, eval_context, mode='eval')
-            except Exception:
-                return raw_value
-
-        if '{{' in raw_value and '}}' in raw_value:
-            try:
-                return ExpressionEvaluator.evaluate(raw_value, eval_context)
-            except Exception:
-                return raw_value
-
-        return raw_value
 
     def _coerce_value(self, value):
         if isinstance(value, str):

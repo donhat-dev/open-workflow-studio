@@ -18,6 +18,16 @@
                 <div class="editor-actions" t-if="state.view === 'editor'">
                     <div class="editor-actions__group">
                         <button 
+                            class="btn btn-outline-secondary"
+                            t-att-class="{ active: isExecutionLogOpen }"
+                            t-on-click="toggleExecutionLog"
+                            title="Execution Logs">
+                            <span class="btn__icon">
+                                <i class="fa fa-list-ul"/>
+                            </span>
+                            Logs
+                        </button>
+                        <button 
                             class="btn btn-outline-secondary" 
                             t-on-click="openHistory"
                             title="Version History">
@@ -50,6 +60,7 @@
                                     t-if="isHistoryOpen"
                                     t-props="historyPanelProps"/>
                             </div>
+                            <ExecutionLogPanel t-if="isExecutionLogOpen"/>
                         </t>
                         <t t-else="">
                             <div class="workflow-form-container">

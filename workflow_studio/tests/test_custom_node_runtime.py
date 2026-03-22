@@ -150,6 +150,46 @@ class TestCustomNodeRuntime(common.TransactionCase):
             'HTTP headers control must expose suggestionsByKey map',
         )
 
+    def test_get_available_types_normalizes_string_backed_http_schema(self):
+        http_type = self.WorkflowType.search([('node_type', '=', 'http')], limit=1)
+        self.assertTrue(http_type, 'HTTP workflow.type record must exist')
+
+        original_config = http_type.config_schema
+        original_input = http_type.input_schema
+        original_output = http_type.output_schema
+
+        try:
+            self.env.cr.execute(
+                """
+                UPDATE workflow_type
+                   SET config_schema = %s,
+                       input_schema = %s,
+                       output_schema = %s
+                 WHERE id = %s
+                """,
+                [
+                    http_type.read(['config_schema'])[0]['config_schema'],
+                    http_type.read(['input_schema'])[0]['input_schema'],
+                    http_type.read(['output_schema'])[0]['output_schema'],
+                    http_type.id,
+                ],
+            )
+            self.WorkflowType.invalidate_model(['config_schema', 'input_schema', 'output_schema'])
+
+            available = self.WorkflowType.get_available_types()
+            http_available = next((item for item in available if item.get('node_type') == 'http'), None)
+
+            self.assertTrue(http_available, 'HTTP node type must still be available')
+            self.assertIn('url', http_available.get('config_schema') or {})
+            self.assertIn('data', http_available.get('input_schema') or {})
+            self.assertIn('response', http_available.get('output_schema') or {})
+        finally:
+            http_type.write({
+                'config_schema': original_config,
+                'input_schema': original_input,
+                'output_schema': original_output,
+            })
+
     def test_non_module_create_rejects_builtin_key(self):
         with self.assertRaises(ValidationError):
             self.WorkflowType.create({

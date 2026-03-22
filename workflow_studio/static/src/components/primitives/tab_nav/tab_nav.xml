@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!--
+        TabNav — tab navigation shell.
+
+        Props:
+          tabs       [{ id, label, icon? }]  list of tab descriptors
+          activeTab  string                  id of the currently active tab
+          onTabClick (id) => void            click handler
+
+        Default slot receives the tab body; callers use t-if to show the
+        correct content for the active tab.
+    -->
+    <t t-name="workflow_studio.tab_nav">
+        <div class="wf-tab-nav d-flex">
+            <t t-foreach="props.tabs" t-as="tab" t-key="tab.id">
+                <button
+                    type="button"
+                    class="wf-tab-btn d-flex align-items-center justify-content-center gap-1"
+                    t-att-class="{ active: props.activeTab === tab.id }"
+                    t-on-click="() => props.onTabClick(tab.id)"
+                >
+                    <i t-if="tab.icon" t-att-class="'fa ' + tab.icon"/>
+                    <t t-esc="tab.label"/>
+                </button>
+            </t>
+        </div>
+        <t t-slot="default"/>
+    </t>
+
+</templates>

@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, xml, useEnv, useRef, onMounted } from "@odoo/owl";
+import { Component, xml, useEnv, useRef, onMounted, onWillUnmount } from "@odoo/owl";
 
 /**
  * ConnectionToolbar Component
@@ -17,7 +17,7 @@ export class ConnectionToolbar extends Component {
              t-att-style="toolbarStyle"
              t-on-mouseenter="onMouseEnter"
              t-on-mouseleave="onMouseLeave"
-             t-on-wheel.stop=""
+             t-on-mousedown.stop=""
              t-on-contextmenu.stop.prevent="">
             <!-- Add Node Button -->
             <button class="connection-toolbar__btn connection-toolbar__btn--add" 
@@ -52,6 +52,16 @@ export class ConnectionToolbar extends Component {
         onMounted(() => {
             // Immediately signal that toolbar is active to prevent timeout from hiding it
             this.props.onHoverChange(true);
+            // Passive wheel listener: stopPropagation is allowed in passive listeners,
+            // preventing canvas zoom without triggering the non-passive warning.
+            this._wheelHandler = (ev) => ev.stopPropagation();
+            this.rootRef.el.addEventListener('wheel', this._wheelHandler, { passive: true });
+        });
+
+        onWillUnmount(() => {
+            if (this.rootRef.el && this._wheelHandler) {
+                this.rootRef.el.removeEventListener('wheel', this._wheelHandler, { passive: true });
+            }
         });
     }
 

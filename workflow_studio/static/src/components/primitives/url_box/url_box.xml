@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.url_box">
+        <div class="wf-url-box d-flex align-items-center gap-3" t-att-class="toneClass" t-att-title="props.value || ''">
+            <div class="wf-url-box__value flex-grow-1">
+                <code t-esc="displayValue"/>
+            </div>
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm wf-url-box__copy"
+                t-on-click="onCopyClick"
+                t-att-disabled="hasValue and !props.readonly ? undefined : 'disabled'"
+                t-att-title="props.label ? 'Copy ' + props.label : 'Copy URL'"
+            >
+                <i class="fa fa-copy"/>
+            </button>
+        </div>
+    </t>
+</templates>

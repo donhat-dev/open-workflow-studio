@@ -17,13 +17,13 @@
         'views/workflow_type_views.xml',
         'views/workflow_run_views.xml',
         'views/ir_logging_views.xml',
+        'views/workflow_trigger_views.xml',
     ],
     'assets': {
         # Core libs bundle - can be lazy-loaded or included separately
         'workflow_studio.assets_libs': [
-            'workflow_studio/static/lib/dagre.js/dagre.min.js',
-            'workflow_studio/static/lib/lucide/lucide.min.js',
-            'workflow_studio/static/lib/motion/**/*',
+            'workflow_studio/static/lib/dagre/dagre.min.js',
+            'workflow_studio/static/lib/lucide/lucide.min.js'
         ],
         'web.assets_backend': [
             # Include libs bundle first
@@ -40,8 +40,15 @@
             'workflow_studio/static/src/core/**/*',
             # Utilities
             'workflow_studio/static/src/utils/**/*',
+            # Shared SCSS layer (must load before component styles)
+            'workflow_studio/static/src/scss/primary_variables.scss',
+            'workflow_studio/static/src/scss/secondary_variables.scss',
+            'workflow_studio/static/src/scss/bootstrap_overridden.scss',
+            'workflow_studio/static/src/scss/shared_primitives.scss',
             # Components (use services)
             'workflow_studio/static/src/components/**/*',
+            # View extensions (list/kanban dashboard overlays)
+            'workflow_studio/static/src/views/**/*',
             # Entry points and styles
             'workflow_studio/static/src/*.js',
             'workflow_studio/static/src/*.css',

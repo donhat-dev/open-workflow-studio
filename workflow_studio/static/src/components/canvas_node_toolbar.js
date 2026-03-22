@@ -95,4 +95,5 @@ export class CanvasNodeToolbar extends Component {
     get toggleIcon() {
         return this.props.isDisabled ? "fa-toggle-off" : "fa-toggle-on";
     }
+
 }

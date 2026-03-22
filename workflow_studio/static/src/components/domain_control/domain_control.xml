@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.domain_control">
+        <div class="o_workflow_domain_control">
+            <t t-if="isValidModel">
+                <WorkflowDomainBuilder
+                    resModel="props.resModel"
+                    domain="domain"
+                    readonly="!!props.readonly"
+                    update.bind="onDomainUpdate"
+                    isDebugMode="!!env.debug"
+                    allowExpressions="true"
+                    inputContext="props.inputContext"
+                />
+            </t>
+            <t t-else="">
+                <div class="o_workflow_domain_placeholder text-muted small py-2">
+                    <i class="fa fa-info-circle me-1"/>
+                    Select a model first to configure the domain
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

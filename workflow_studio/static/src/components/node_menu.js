@@ -17,7 +17,7 @@
  */
 
 import { Component, xml, useState, useRef, onMounted, useExternalListener } from "@odoo/owl";
-import { useEditor } from "@workflow_studio/store/use_editor";
+import { useEditor } from "@workflow_studio/store/hooks";
 import { MotionHelpers } from "@workflow_studio/utils/motion_helpers";
 import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 
