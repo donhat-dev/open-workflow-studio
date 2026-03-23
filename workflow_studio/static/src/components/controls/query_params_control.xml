@@ -7,16 +7,14 @@
                     <div class="kv-row__meta d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center gap-2">
                             <input type="checkbox" class="qp-toggle" t-att-checked="param.enabled" t-on-change="() => this.onToggleEnabled(param_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
-                            <span class="kv-field-label">Name</span>
                         </div>
-                        <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly">×</button>
+                        <button class="kv-remove" t-on-click="() => this.removeParam(param_index)" t-att-disabled="state.params.length &lt;= 1 or props.readonly"><i class="fa fa-trash"/></button>
                     </div>
                     <div class="kv-key-cell">
-                        <ExpressionInput value="param.key" placeholder="'Key'" context="props.inputContext" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" onChange="(v) => this.onKeyChange(param_index, v)" readonly="props.readonly"/>
+                        <ExpressionInput label="'Name'" value="param.key" placeholder="'Key'" context="props.inputContext" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" onChange="(v) => this.onKeyChange(param_index, v)" readonly="props.readonly"/>
                     </div>
-                    <span class="kv-field-label">Value</span>
                     <div class="kv-value-cell">
-                        <ExpressionInput value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
+                        <ExpressionInput label="'Value'" value="param.value" placeholder="placeholders.value" context="props.inputContext" suggestions="getValueSuggestions(param.key)" valueSuggestions="getValueSuggestions(param.key)" onChange="(v) => this.onValueChange(param_index, v)" readonly="props.readonly"/>
                     </div>
                 </div>
             </t>

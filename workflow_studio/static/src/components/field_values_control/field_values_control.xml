@@ -5,15 +5,15 @@
             <t t-foreach="state.rows" t-as="row" t-key="row.id">
                 <div class="fv-row">
                     <div class="fv-row-header">
-                        <span class="fv-label">Field</span>
                         <button
                             t-if="!props.readonly"
                             class="fv-remove"
                             t-on-click="() => this.removeRow(row_index)"
-                        >×</button>
+                        ><i class="fa fa-trash"/></button>
                     </div>
                     <div class="fv-field-cell">
                         <ExpressionInput
+                            label="'Field'"
                             value="row.field"
                             placeholder="field_name"
                             mode="getFieldMode(row.id)"
@@ -24,9 +24,9 @@
                             readonly="props.readonly"
                         />
                     </div>
-                    <span class="fv-label">Value</span>
                     <div class="fv-value-cell">
                         <ExpressionInput
+                            label="'Value'"
                             value="row.value"
                             placeholder="'value or {{ expression }}'"
                             context="props.inputContext"

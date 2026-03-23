@@ -1950,7 +1950,7 @@ export class EditorCanvas extends Component {
                     if (!this._isProgrammaticDialogClose && this.uiState.panels.configOpen) {
                         this.editor.actions.closePanel("config");
                     }
-                },
+                }
             }
         );
     }

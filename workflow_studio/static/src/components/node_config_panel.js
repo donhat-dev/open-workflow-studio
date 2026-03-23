@@ -205,6 +205,7 @@ export class NodeConfigPanel extends Component {
             triggerPanelData: null,
             triggerFieldSuggestions: [],
             triggerErrorMessage: "",
+            execution: this.props.execution || null,
         });
 
         this._saveDebounceTimer = null;
@@ -721,7 +722,7 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionStatus() {
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         if (execution && execution.status === 'failed') return 'error';
         const runResult = this.executionNodeResult;
         if (!runResult) return 'idle';
@@ -730,7 +731,7 @@ export class NodeConfigPanel extends Component {
     }
 
     get executionStatusLabel() {
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         if (execution && execution.status === 'failed') {
             return `Error: ${execution.error || 'Execution failed'}`;
         }
@@ -752,7 +753,7 @@ export class NodeConfigPanel extends Component {
      * Uses executionEvents (non-deduplicated) when available, falls back to nodeResults.
      */
     get nodeExecutionEvents() {
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         if (!execution) return [];
         const nodeId = this.props.node.id;
         const events = Array.isArray(execution.executionEvents) && execution.executionEvents.length
@@ -892,7 +893,7 @@ export class NodeConfigPanel extends Component {
      */
     get leftPanelData() {
         const currentNodeId = this.props.node.id;
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
             // Filter to show only structural predecessors (ignore loop back-edges).
@@ -1301,7 +1302,7 @@ export class NodeConfigPanel extends Component {
         if (selectedEvent && selectedEvent.input_data !== undefined) {
             return selectedEvent.input_data;
         }
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         if (execution && this.actions.getExpressionContext) {
             const context = this.actions.getExpressionContext({
                 execution,
@@ -1334,7 +1335,7 @@ export class NodeConfigPanel extends Component {
      * - _vars/_loop: from workflowVariable service via adapterService.getExpressionContext()
      */
     get expressionPreviewContext() {
-        const execution = this.props.execution;
+        const execution = this.state.execution;
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
             if (!this.actions.getExpressionContext) {
                 throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
@@ -1633,6 +1634,7 @@ export class NodeConfigPanel extends Component {
         } catch (err) {
             console.error('[NodeConfigPanel] Execute error:', err);
         }
+        this.state.execution = this.workflowEditor.getExecutionResults();
     }
 
     // ============================================

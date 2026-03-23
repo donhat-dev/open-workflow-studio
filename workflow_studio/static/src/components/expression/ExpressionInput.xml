@@ -33,7 +33,7 @@
 					<div t-if="hasExpressionHighlights" class="expression-input__highlights">
 						<div class="expression-input__highlights-content" t-att-style="highlightContentStyle">
 							<t t-foreach="highlightSegments" t-as="segment" t-key="segment.id">
-								<span class="expression-input__highlight-fragment" t-att-class="{ 'expression-input__highlight': segment.isExpression }" t-esc="segment.text" />
+								<span class="expression-input__highlight-fragment" t-att-class="{ 'expression-input__highlight': segment.isExpression, 'text-100': !segment.isExpression }" t-esc="segment.text" />
 							</t>
 						</div>
 					</div>
