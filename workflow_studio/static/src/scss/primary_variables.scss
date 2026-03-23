@@ -1,18 +1,30 @@
 $wf-white: $o-white !default;
 
+// ── Odoo brand (purple) — for co-branding / "for Odoo" accent ──
+$wf-o-primary: $o-brand-primary !default; // #71639e — Odoo community purple
+
+// ── Font stacks ──
+$wf-font-display: "Space Grotesk", system-ui, sans-serif !default;
+$wf-font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace !default;
+
+// ── Surfaces ──
 $wf-surface-base: $o-view-background-color !default;
 $wf-surface-subtle: $o-gray-100 !default;
 $wf-surface-emphasis: $o-gray-200 !default;
 $wf-surface-app: $o-webclient-background-color !default;
 
+// ── Borders ──
 $wf-border-base: $o-gray-300 !default;
 $wf-border-strong: $o-gray-400 !default;
+$wf-border-line: rgba($o-main-text-color, 0.18) !default;
 
+// ── Text ──
 $wf-text-base: $o-main-text-color !default;
 $wf-text-muted: $o-gray-600 !default;
 $wf-text-muted-strong: $o-gray-700 !default;
 $wf-text-faint: $o-gray-500 !default;
 
+// ── Semantic Colors ──
 $wf-action-color: $o-action !default;
 $wf-success-color: $o-success !default;
 $wf-danger-color: $o-danger !default;
@@ -20,12 +32,15 @@ $wf-warning-color: $o-warning !default;
 $wf-info-color: $o-info !default;
 $wf-pin-color: $o-warning !default;
 
+// ── Radius ──
 $wf-radius-sm: 4px !default;
 $wf-radius-md: 6px !default;
 $wf-radius-lg: 8px !default;
 
+// ── Shadows ──
 $wf-shadow-sm: 0 2px 8px rgba($o-black, 0.08) !default;
 $wf-shadow-md: 0 4px 16px rgba($o-black, 0.12) !default;
+$wf-shadow-soft: 0 18px 40px rgba($o-black, 0.04) !default;
 $wf-shadow-panel: -6px 0 18px rgba($o-black, 0.12) !default;
 
 .o_web_client {
@@ -66,4 +81,7 @@ $wf-shadow-panel: -6px 0 18px rgba($o-black, 0.12) !default;
 	--color--mint-700: hsl(147, 83%, 30%);
 	--color--mint-800: hsl(147, 83%, 20%);
 	--color--mint-900: hsl(147, 83%, 10%);
+
+	// Odoo brand co-branding token
+	--wf-o-primary: #{$wf-o-primary};
 }

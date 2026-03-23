@@ -24,14 +24,7 @@
 			</div>
 			<!-- Input field -->
 			<div class="expression-input__field" t-ref="fieldRef" t-on-dragenter="onDragEnter" t-on-dragleave="onDragLeave" t-on-dragover="onDragOver" t-on-drop="onDrop">
-				<button
-					t-if="showSideToggle"
-					type="button"
-					class="expression-input__side-toggle"
-					t-att-class="{ active: isExpression }"
-					t-att-title="isExpression ? 'Switch to fixed value' : 'Switch to dynamic expression'"
-					t-on-click="onClickSideToggle"
-				>
+				<button t-if="showSideToggle" type="button" class="expression-input__side-toggle" t-att-class="{ active: isExpression }" t-att-title="isExpression ? 'Switch to fixed value' : 'Switch to dynamic expression'" t-on-click="onClickSideToggle">
 					<span class="fw-bold">fx</span>
 				</button>
 				<!-- Expression mode prefix -->
@@ -40,15 +33,11 @@
 					<div t-if="hasExpressionHighlights" class="expression-input__highlights">
 						<div class="expression-input__highlights-content" t-att-style="highlightContentStyle">
 							<t t-foreach="highlightSegments" t-as="segment" t-key="segment.id">
-								<span
-									class="expression-input__highlight-fragment"
-									t-att-class="{ 'expression-input__highlight': segment.isExpression }"
-									t-esc="segment.text"
-								/>
+								<span class="expression-input__highlight-fragment" t-att-class="{ 'expression-input__highlight': segment.isExpression }" t-esc="segment.text" />
 							</t>
 						</div>
 					</div>
-					<textarea class="expression-input__textarea" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" t-on-scroll="onScroll" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+					<textarea class="expression-input__textarea" t-att-class="{ 'text-100': isExpression }" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" t-on-scroll="onScroll" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 				</div>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
@@ -68,13 +57,14 @@
 			<div t-if="isExpression" class="expression-input__result">
 				<div class="result-header">
 					<span class="result-label">Result</span>
-					
+
 					<span class="result-tip">Tip: Drag fields from INPUT panel</span>
 				</div>
 				<div class="result-value">
 					<span t-if="previewType" class="result-type-badge badge text-bg-info me-1" t-esc="previewType"/>
 					<t t-if="previewResult and !previewResult.error">
-						<t t-esc="previewDisplay"/></t>
+						<t t-esc="previewDisplay"/>
+					</t>
 					<t t-elif="previewResult and previewResult.error">
 						<span class="error">
 							<t t-esc="previewDisplay"/>

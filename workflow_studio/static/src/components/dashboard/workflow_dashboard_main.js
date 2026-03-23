@@ -8,7 +8,6 @@ import { DashboardBlock } from "./base/dashboard_block";
 import { DashboardNotebook } from "./base/dashboard_notebook";
 import { WorkflowDashboardSummary } from "./workflow_dashboard_summary";
 import { WorkflowDashboardStats } from "./workflow_dashboard_stats";
-import { WorkflowDashboardTopWorkflows } from "./workflow_dashboard_top_workflows";
 import { WorkflowList } from "./base/workflow_list";
 
 // TODO Phase 1: Replace with orm.call('ir.workflow', 'retrieve_dashboard')
@@ -73,7 +72,6 @@ export class WorkflowDashboardMain extends Component {
         DashboardNotebook,
         WorkflowDashboardSummary,
         WorkflowDashboardStats,
-        WorkflowDashboardTopWorkflows,
         WorkflowList,
     };
     static props = { action: { type: Object, optional: true }, "*": true };
@@ -89,6 +87,16 @@ export class WorkflowDashboardMain extends Component {
             this.dashboardData = getMockDashboardData();
             this.state.loading = false;
         });
+    }
+
+    /** Navigation actions for the hero tag-row */
+    get navActions() {
+        return [
+            { label: "Workflows", xmlId: "workflow_studio.action_ir_workflow" },
+            { label: "Execution Logs", xmlId: "workflow_studio.action_workflow_run" },
+            { label: "Node Types", xmlId: "workflow_studio.action_workflow_type" },
+            { label: "System Logs", xmlId: "workflow_studio.action_ir_workflow_logging" },
+        ];
     }
 
     /** Toggle options for the execution runs chart (7d/14d/30d) */

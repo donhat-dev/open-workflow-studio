@@ -2,8 +2,58 @@
 .o_workflow_dashboard_main {
     background-color: $wf-surface-base;
 
-    // Card slots fill their flex container
+    // ─── Hero summary (Editorial Carbon POC) ───
+    .wf-dashboard-hero {
+        padding: 28px 0 24px;
+
+        .wf-eyebrow {
+            margin-bottom: 12px;
+        }
+
+        .wf-detail-title {
+            // Override base to fit dashboard density
+            font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+            line-height: 1.1;
+            margin-bottom: 14px;
+        }
+
+        // "for" conjunction — plain foreground text
+        &__conjunction {
+            color: $wf-text-base;
+            font-family: $wf-font-display;
+            font-weight: 700;
+        }
+
+        // "Odoo" — Odoo brand purple
+        &__odoo {
+            color: $wf-o-primary;
+            font-family: $wf-font-display;
+            font-weight: 700;
+        }
+
+        .wf-lead {
+            margin-bottom: 12px;
+        }
+
+        // Tighter framed-text for dashboard context
+        .wf-framed-text {
+            padding: 0.15em 0.32em;
+        }
+
+        .wf-corner {
+            width: 18px;
+            height: 18px;
+
+            &--tl { top: -9px; left: -9px; }
+            &--tr { top: -9px; right: -9px; }
+            &--bl { bottom: -9px; left: -9px; }
+            &--br { bottom: -9px; right: -9px; }
+        }
+    }
+
+    // Card slots fill their flex container equally (50% each if 2 items)
     .o_wf_card_slot {
+        flex: 1 1 0px;
         min-height: 0; // allow flex shrink
         display: flex;
         flex-direction: column;

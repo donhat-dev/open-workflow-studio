@@ -5,7 +5,7 @@
             size="'fs'"
             modalRef="modalRef"
             footer="true"
-            header="true"
+            header="false"
             withBodyPadding="true"
             contentClass="'wf-config-panel-dialog__content'"
             bodyClass="'wf-config-panel-dialog__body p-0'"

@@ -98,3 +98,141 @@ $wf-url-box-bg-live:     rgba($o-success, 0.05) !default;
 .wf-url-box__copy {
     flex: 0 0 auto;
 }
+
+
+// =============================================================================
+// Eyebrow (.wf-eyebrow)
+// -----------------------------------------------------------------------------
+// Uppercase kicker label — used above section titles, hero areas.
+.wf-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.38em;
+    text-transform: uppercase;
+    color: $wf-action-color;
+}
+
+
+// =============================================================================
+// Framed Text + Corner (.wf-framed-text / .wf-corner)
+// -----------------------------------------------------------------------------
+// Headline effect: text inside a thin border with detached corner squares.
+// Use for editorial display headlines. All 4 corners are optional (add as needed).
+.wf-framed-text {
+    position: relative;
+    display: inline-block;
+    padding: 0.2em 0.42em;
+    color: $wf-action-color;
+    background: $wf-surface-base;
+    isolation: isolate;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 2px solid $wf-border-line;
+        z-index: -1;
+    }
+}
+
+.wf-corner {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border: 2px solid $wf-border-line;
+    background: $wf-surface-base;
+    z-index: 1;
+
+    &--tl { top: -12px; left: -12px; }
+    &--tr { top: -12px; right: -12px; }
+    &--bl { bottom: -12px; left: -12px; }
+    &--br { bottom: -12px; right: -12px; }
+}
+
+
+// =============================================================================
+// Detail Title (.wf-detail-title)
+// -----------------------------------------------------------------------------
+// Large display heading for section intros.
+.wf-detail-title {
+    margin: 0 0 18px;
+    font-family: $wf-font-display;
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    font-weight: 700;
+    color: $wf-text-base;
+}
+
+
+// =============================================================================
+// Lead (.wf-lead)
+// -----------------------------------------------------------------------------
+// Short CTA-style line below a headline.
+.wf-lead {
+    margin: 0 0 20px;
+    font-size: clamp(1.1rem, 2vw, 1.42rem);
+    line-height: 1.4;
+    color: $wf-text-base;
+}
+
+
+// =============================================================================
+// Detail Copy (.wf-detail-copy)
+// -----------------------------------------------------------------------------
+// Body paragraph for detailed description text.
+.wf-detail-copy {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.62;
+    color: $wf-text-muted;
+    max-width: 860px;
+}
+
+
+// =============================================================================
+// Tag Row + Tag (.wf-tag-row / .wf-tag)
+// -----------------------------------------------------------------------------
+// Row of interactive label-buttons (menu links, category filters).
+.wf-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.wf-tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 0 16px;
+    border: 1px solid $wf-border-base;
+    background: rgba($wf-white, 0.75);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: $wf-text-muted;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+    text-decoration: none;
+
+    &:hover {
+        border-color: $wf-action-color;
+        color: $wf-action-color;
+        background: rgba($wf-action-color, 0.06);
+    }
+
+    &:focus-visible {
+        outline: 2px solid $wf-action-color;
+        outline-offset: 2px;
+    }
+
+    &--featured {
+        border-color: rgba($wf-action-color, 0.32);
+        background: rgba($wf-action-color, 0.05);
+        color: $wf-action-color;
+    }
+}

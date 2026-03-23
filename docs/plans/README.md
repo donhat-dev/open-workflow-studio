@@ -11,7 +11,6 @@
 | [Sprint Plans](./sprint/) | Current sprint board & history |
 | [ROADMAP.md](./ROADMAP.md) | Quarterly milestones & release plan |
 | [VELOCITY_TRACKER.md](./VELOCITY_TRACKER.md) | Burndown charts & metrics |
-| [EDITORIAL_CARBON_DESIGN_CONTRACT.md](./EDITORIAL_CARBON_DESIGN_CONTRACT.md) | Visual system contract + dashboard rollout plan |
 | [ADR/](./ADR/) | Architecture Decision Records |
 | [PRODUCT_BACKLOG.md](./backlog/PRODUCT_BACKLOG.md) | Master backlog (source of truth) |
 
