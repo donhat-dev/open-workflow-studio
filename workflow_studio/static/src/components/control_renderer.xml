@@ -2,11 +2,11 @@
 <templates xml:space="preserve">
 	<t t-name="workflow_studio.control_renderer">
 		<div class="control-renderer" t-att-class="'control-type-' + controlType + (props.readonly ? ' control-readonly' : '')">
-			<!-- LABEL -->
-			<label t-if="label" class="control-label" t-esc="label"/>
+			<!-- LABEL (non-expression controls only; expression controls delegate label into ExpressionInput header) -->
+			<label t-if="label and controlType !== 'text' and controlType !== 'expression'" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text' or controlType === 'expression'">
-				<ExpressionInput value="value" placeholder="placeholder" context="props.inputContext" multiline="isMultiline" mode="props.mode" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
+				<ExpressionInput value="value" placeholder="placeholder" label="label" context="props.inputContext" multiline="isMultiline" mode="props.mode" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
@@ -29,16 +29,14 @@
 				<div class="control-keyvalue">
 					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
 						<div class="kv-row kv-row--stack">
-							<div class="kv-row__meta d-flex align-items-center justify-content-between">
-								<span class="kv-field-label">Name</span>
+							<div class="kv-row__meta d-flex align-items-center justify-content-end">
 								<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1 or props.readonly">×</button>
 							</div>
 							<div class="kv-key-cell">
-								<ExpressionInput value="pair.key" placeholder="props.control.keyPlaceholder" context="props.inputContext" mode="this.getPairKeyMode(pair.id)" suggestions="suggestions" valueSuggestions="suggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairKeyModeChange(pair.id, m)" onChange="(v) => this.onKeyChange(pair_index, v)" readonly="props.readonly"/>
+								<ExpressionInput value="pair.key" label="'Name'" placeholder="props.control.keyPlaceholder" context="props.inputContext" mode="this.getPairKeyMode(pair.id)" suggestions="suggestions" valueSuggestions="suggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairKeyModeChange(pair.id, m)" onChange="(v) => this.onKeyChange(pair_index, v)" readonly="props.readonly"/>
 							</div>
-							<span class="kv-field-label">Value</span>
 							<div class="kv-value-cell">
-								<ExpressionInput value="pair.value" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairValueMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
+								<ExpressionInput value="pair.value" label="'Value'" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairValueMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
 							</div>
 						</div>
 					</t>
