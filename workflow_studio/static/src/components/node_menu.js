@@ -19,7 +19,6 @@
 import { Component, xml, useState, useRef, onMounted, useExternalListener } from "@odoo/owl";
 import { useEditor } from "@workflow_studio/store/hooks";
 import { MotionHelpers } from "@workflow_studio/utils/motion_helpers";
-import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 
 export class NodeMenu extends Component {
     static template = xml`
@@ -47,7 +46,7 @@ export class NodeMenu extends Component {
                         <div class="node-menu__category-title">
                             <t t-if="category.icon">
                                 <i t-if="isFontAwesome(category.icon)" t-att-class="getFaClass(category.icon, 'node-menu__category-icon')"/>
-                                <LucideIcon t-else="" name="category.icon" size="14" class="'node-menu__category-icon'"/>
+                                <i t-else="" t-att-class="category.icon + ' node-menu__category-icon'" style="font-size: 14px;"/>
                             </t>
                             <t t-esc="category.name"/>
                         </div>
@@ -57,7 +56,7 @@ export class NodeMenu extends Component {
                                  t-on-click="onItemClick">
                                 <div class="node-menu__item-icon">
                                     <i t-if="isFontAwesome(item.icon)" t-att-class="getFaClass(item.icon, 'node-menu__item-fa')"/>
-                                    <LucideIcon t-else="" name="item.icon" size="18"/>
+                                    <i t-else="" t-att-class="item.icon" style="font-size: 18px;"/>
                                 </div>
                                 <div class="node-menu__item-info">
                                     <div class="node-menu__item-title">
@@ -80,7 +79,7 @@ export class NodeMenu extends Component {
         </div>
     `;
 
-    static components = { LucideIcon };
+    static components = {};
 
     static props = {
         position: { type: Object },  // { x, y } - screen coordinates

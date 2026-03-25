@@ -229,6 +229,13 @@
   stroke-width: 3;
 }
 
+/* Z-index raise: bring connection layer above nodes when a connection is selected/hovered */
+.workflow-connections:has(.workflow-connection-group.selected),
+.workflow-connections:has(.workflow-connection-group.hovered),
+.workflow-connections:has(.workflow-connection-group:hover) {
+  z-index: 15; /* Above nodes (10), below controls (100) and overlays (500) */
+}
+
 /* Executed Connection Highlighting */
 .workflow-connection--executed {
   stroke: $o-success;
@@ -288,28 +295,37 @@
 }
 
 /* Colored left border indicator */
-.workflow-node::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: $o-gray-500;
-  border-radius: 8px 0 0 8px;
-  opacity: 1;
-  z-index: 1;
-}
+// .workflow-node::before {
+//   content: "";
+//   position: absolute;
+//   left: 0;
+//   top: 0;
+//   bottom: 0;
+//   width: 4px;
+//   background: $o-gray-500;
+//   border-radius: 8px 0 0 8px;
+//   opacity: 1;
+//   z-index: 1;
+// }
 
 /* --- Left Column: Icon --- */
 .workflow-node__icon-col {
-  width: 60px; /* Slightly wider for larger icon */
+  width: 60px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-left: 8px;
 }
 
 .workflow-node__icon-box {
   width: 44px;
   height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
   background: $o-gray-200;
 }
 
@@ -327,22 +343,40 @@
   border-radius: 3px;
 }
 
-.workflow-node__icon-box .lucide {
+.workflow-node__icon-box [class^="icon-"],
+.workflow-node__icon-box [class*=" icon-"] {
   color: inherit;
-  stroke-width: 1.5;
 }
 
 /* --- Right Column: Content --- */
 .workflow-node__content-col {
   flex: 1;
-}
-
-.workflow-node__header-row {
-  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px 8px 8px 0;
+  min-width: 0;
 }
 
 .workflow-node__title {
   font-size: 0.95rem;
+  font-weight: 600;
+  color: $o-main-text-color;
+  display: block;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.workflow-node__subtitle {
+  display: block;
+  font-size: 0.75rem;
+  font-family: var(--bs-font-monospace);
+  color: $o-gray-600;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-top: 2px;
 }
 
 .workflow-node__menu-btn {
@@ -354,10 +388,6 @@
 .workflow-node__menu-btn:hover {
   background: rgba($o-black, 0.1);
   color: $o-gray-900;
-}
-
-.workflow-node__subtitle {
-  color: $o-danger; /* Override any dynamic color for subtitle */
 }
 
 /* --- Footer Actions --- */
@@ -417,10 +447,18 @@
 }
 
 .workflow-node.selected {
-  border-color: $o-action;
-  box-shadow:
-    0 0 0 1px $o-action,
-    0 2px 8px rgba($o-black, 0.12);
+  border-color: $wf-node-selected-border;
+  box-shadow: $wf-node-selected-shadow;
+  z-index: 15; /* Raise above other nodes (10) when selected */
+}
+
+.workflow-node:focus-visible {
+  outline: none;
+  box-shadow: $wf-node-selected-focus-ring;
+}
+
+.workflow-node.selected:focus-visible {
+  box-shadow: $wf-node-selected-shadow, $wf-node-selected-focus-ring;
 }
 
 .workflow-node.dragging {
@@ -453,9 +491,9 @@
   box-shadow: 0 0 0 1px $o-success, 0 2px 8px rgba($o-success, 0.15);
 }
 
-.workflow-node.execution-success::before {
-  background: $o-success;
-}
+// .workflow-node.execution-success::before {
+//   background: $o-success;
+// }
 
 .workflow-node.execution-error {
   border-color: $o-danger;
@@ -486,9 +524,9 @@ $wf-pin-color: #7c3aed;
   box-shadow: 0 0 0 1px $wf-pin-color, 0 2px 8px rgba($wf-pin-color, 0.15);
 }
 
-.workflow-node.wf-node--pinned::before {
-  background: $wf-pin-color;
-}
+// .workflow-node.wf-node--pinned::before {
+//   background: $wf-pin-color;
+// }
 
 .workflow-node.wf-node--pinned.selected {
   border-color: $wf-pin-color;
@@ -561,9 +599,9 @@ $wf-pin-color: #7c3aed;
   box-shadow: 0 0 0 1px $o-info, 0 2px 8px rgba($o-info, 0.15);
 }
 
-.workflow-node.execution-running::before {
-  background: $o-info;
-}
+// .workflow-node.execution-running::before {
+//   background: $o-info;
+// }
 
 .workflow-node.execution-running.selected {
   border-color: $o-info;
@@ -632,7 +670,10 @@ $wf-pin-color: #7c3aed;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 80px;
+  width: 100%; /* Auto-ellipse when label overflows available space */
+  font-size: 0.8rem;
+  color: $o-gray-600;
+  user-select: none;
 
   /* Output styling for overlap */
   position: relative;
@@ -640,6 +681,10 @@ $wf-pin-color: #7c3aed;
   background: $o-view-background-color; /* Match node bg to mask line */
   padding: 0 4px;
   border-radius: 4px;
+
+  &.is-connected {
+    max-width: 80px; /* Constrain when connected */
+  }
 }
 
 .workflow-node__socket--output .workflow-node__socket-label {
@@ -696,6 +741,14 @@ $wf-pin-color: #7c3aed;
   top: 16px;
   left: 16px;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: $wf-toolbar-gap;
+  padding: $wf-toolbar-padding;
+  background: $wf-toolbar-bg;
+  border: 1px solid $wf-toolbar-border;
+  border-radius: $wf-toolbar-radius;
+  box-shadow: $wf-toolbar-shadow;
 }
 
 .fit-view-dropdown__main {
@@ -726,9 +779,9 @@ $wf-pin-color: #7c3aed;
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  background: $wf-surface-base;
-  border: 1px solid $o-gray-300;
-  border-radius: 8px;
+  background: $wf-toolbar-bg;
+  border: 1px solid $wf-toolbar-border;
+  border-radius: $wf-toolbar-radius;
   box-shadow: $wf-shadow-md;
   z-index: 20;
 }
@@ -803,10 +856,10 @@ $wf-pin-color: #7c3aed;
   z-index: 1000;
   width: 280px;
   max-height: 400px;
-  background: $o-gray-100;
-  border: 1px solid $o-gray-300;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba($o-black, 0.08);
+  background: $wf-toolbar-bg;
+  border: 1px solid $wf-toolbar-border;
+  border-radius: $wf-toolbar-radius;
+  box-shadow: $wf-shadow-md;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -852,7 +905,7 @@ $wf-pin-color: #7c3aed;
 /* Search Bar */
 .node-menu__search {
   padding: 12px;
-  border-bottom: 1px solid $o-gray-300;
+  border-bottom: 1px solid $wf-border-base;
 }
 
 .node-menu__search-input {
@@ -868,7 +921,7 @@ $wf-pin-color: #7c3aed;
 }
 
 .node-menu__search-input:focus {
-  border-color: $o-action;
+  border-color: $wf-action-focus-border;
   box-shadow: 0 0 0 2px rgba($o-action, 0.2);
 }
 
@@ -908,7 +961,7 @@ $wf-pin-color: #7c3aed;
 }
 
 .node-menu__item:hover {
-  background: rgba($o-action, 0.08);
+  background: $wf-action-active-bg;
 }
 
 .node-menu__item-icon {
@@ -959,10 +1012,10 @@ $wf-pin-color: #7c3aed;
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: $o-gray-100;
-  border: 1px solid $o-gray-300;
+  background: $wf-toolbar-bg;
+  border: 1px solid $wf-toolbar-border;
   border-radius: 6px;
-  box-shadow: 0 2px 8px rgba($o-black, 0.08);
+  box-shadow: $wf-toolbar-shadow;
   transform-origin: center center;
 }
 

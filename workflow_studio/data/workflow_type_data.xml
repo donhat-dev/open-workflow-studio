@@ -17,7 +17,7 @@
             <field name="name">HTTP Request</field>
             <field name="node_type">http</field>
             <field name="category">integration</field>
-            <field name="icon">fa-globe</field>
+            <field name="icon">icon-globe</field>
             <field name="description">Make HTTP API calls to external services</field>
             <field name="config_schema">{
     "method": {"type": "select", "options": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"], "default": "GET", "section": "request"},
@@ -31,11 +31,11 @@
     "raw_response": {"type": "boolean", "default": false, "label": "Raw Response", "section": "settings", "help": "If enabled, the output will include the full HTTP response object with status code, headers, and body. Otherwise, only the response body will be output."}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "response": {"type": "DataSocket", "label": "Response"},
-    "error": {"type": "ErrorSocket", "label": "Error"}
+    "response": {"type": "DataSocket", "label": "response"},
+    "error": {"type": "ErrorSocket", "label": "error"}
 }</field>
         </record>
 
@@ -44,7 +44,7 @@
             <field name="name">Loop Over Items</field>
             <field name="node_type">loop</field>
             <field name="category">flow</field>
-            <field name="icon">fa-repeat</field>
+            <field name="icon">icon-repeat</field>
             <field name="description">Iterate over array items in batches</field>
             <field name="config_schema">{
     "inputItems": {"type": "expression", "label": "Input Items"},
@@ -52,11 +52,11 @@
     "reset": {"type": "boolean", "default": false}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "done": {"type": "DataSocket", "label": "Done"},
-    "loop": {"type": "DataSocket", "label": "Loop"}
+    "done": {"type": "DataSocket", "label": "done"},
+    "loop": {"type": "DataSocket", "label": "loop"}
 }</field>
         </record>
 
@@ -64,7 +64,7 @@
             <field name="name">If</field>
             <field name="node_type">if</field>
             <field name="category">flow</field>
-            <field name="icon">split</field>
+            <field name="icon">icon-split</field>
             <field name="description">Route data based on condition</field>
             <field name="config_schema">{
     "leftOperand": {"type": "expression", "label": "Left Operand"},
@@ -72,11 +72,11 @@
     "rightOperand": {"type": "expression", "label": "Right Operand"}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "true": {"type": "DataSocket", "label": "True"},
-    "false": {"type": "DataSocket", "label": "False"}
+    "true": {"type": "DataSocket", "label": "true"},
+    "false": {"type": "DataSocket", "label": "false"}
 }</field>
         </record>
 
@@ -84,7 +84,7 @@
             <field name="name">Switch</field>
             <field name="node_type">switch</field>
             <field name="category">flow</field>
-            <field name="icon">fa-random</field>
+            <field name="icon">icon-shuffle</field>
             <field name="description">Route data based on matching cases</field>
             <field name="config_schema">{
     "switchValue": {"type": "expression", "label": "Switch Value"},
@@ -93,13 +93,13 @@
     "case3": {"type": "expression", "label": "Case 3"}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "case_1": {"type": "DataSocket", "label": "Case 1"},
-    "case_2": {"type": "DataSocket", "label": "Case 2"},
-    "case_3": {"type": "DataSocket", "label": "Case 3"},
-    "default": {"type": "DataSocket", "label": "Default"}
+    "case_1": {"type": "DataSocket", "label": "1"},
+    "case_2": {"type": "DataSocket", "label": "2"},
+    "case_3": {"type": "DataSocket", "label": "3"},
+    "default": {"type": "DataSocket", "label": "default"}
 }</field>
         </record>
 
@@ -107,14 +107,14 @@
             <field name="name">Replace Me</field>
             <field name="node_type">noop</field>
             <field name="category">flow</field>
-            <field name="icon">fa-circle-o</field>
+            <field name="icon">icon-circle-dashed</field>
             <field name="description">Placeholder node</field>
             <field name="config_schema">{}</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "result": {"type": "DataSocket", "label": "Result"}
+    "result": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -123,12 +123,12 @@
             <field name="name">Manual Trigger</field>
             <field name="node_type">manual_trigger</field>
             <field name="category">trigger</field>
-            <field name="icon">fa-play</field>
+            <field name="icon">icon-play</field>
             <field name="description">Manually start a workflow execution</field>
             <field name="config_schema">{}</field>
             <field name="input_schema">{}</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Output"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -137,16 +137,16 @@
             <field name="name">Code</field>
             <field name="node_type">code</field>
             <field name="category">transform</field>
-            <field name="icon">fa-code</field>
+            <field name="icon">icon-code</field>
             <field name="description">Execute Python code (set result for output)</field>
             <field name="config_schema">{
     "code": {"type": "code", "language": "python", "label": "Python Code"}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Output"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -154,7 +154,7 @@
             <field name="name">Data Validation</field>
             <field name="node_type">validation</field>
             <field name="category">transform</field>
-            <field name="icon">fa-check-circle</field>
+            <field name="icon">icon-circle-check</field>
             <field name="description">Validate data against rules</field>
             <field name="config_schema">{
     "requiredFields": {"type": "string", "label": "Required Fields"},
@@ -162,11 +162,11 @@
     "customRules": {"type": "keyvalue", "label": "Custom Rules"}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "valid": {"type": "DataSocket", "label": "Valid Data"},
-    "invalid": {"type": "ErrorSocket", "label": "Validation Errors"}
+    "valid": {"type": "DataSocket", "label": "valid"},
+    "invalid": {"type": "ErrorSocket", "label": "invalid"}
 }</field>
         </record>
 
@@ -174,17 +174,17 @@
             <field name="name">Set Data</field>
             <field name="node_type">set_data</field>
             <field name="category">transform</field>
-            <field name="icon">fa-pencil</field>
+            <field name="icon">icon-pencil</field>
             <field name="description">Set or transform data fields</field>
             <field name="config_schema">{
     "fields": {"type": "keyvalue", "label": "Fields to Set"},
     "keepOnlySet": {"type": "select", "options": ["merge", "replace"], "default": "merge"}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Output Data"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -193,7 +193,7 @@
             <field name="name">Set Variable</field>
             <field name="node_type">variable</field>
             <field name="category">data</field>
-            <field name="icon">fa-cube</field>
+            <field name="icon">icon-variable</field>
             <field name="description">Set or get workflow variables</field>
             <field name="config_schema">{
     "operation": {"type": "select", "options": ["set", "get", "append", "merge", "increment", "delete"], "default": "set"},
@@ -201,10 +201,10 @@
     "value": {"type": "expression", "label": "Value"}
 }</field>
             <field name="input_schema">{
-    "trigger": {"type": "DataSocket", "label": "Trigger"}
+    "trigger": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Output"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -212,7 +212,7 @@
             <field name="name">Record Operation</field>
             <field name="node_type">record_operation</field>
             <field name="category">data</field>
-            <field name="icon">fa-database</field>
+            <field name="icon">icon-database</field>
             <field name="description">Search, create, write, or delete Odoo records</field>
             <field name="config_schema">{
     "operation": {"type": "select", "label": "Operation", "options": ["search", "create", "write", "delete"], "default": "search", "section": "operation"},
@@ -225,10 +225,10 @@
     "vals_expr": {"type": "field_values", "label": "Values", "default": "{}", "section": "values", "visibleWhen": {"operation": ["create", "write"]}}
 }</field>
             <field name="input_schema">{
-    "data": {"type": "DataSocket", "label": "Input Data"}
+    "data": {"type": "DataSocket"}
 }</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Output"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -240,7 +240,7 @@
             <field name="name">Schedule Trigger</field>
             <field name="node_type">schedule_trigger</field>
             <field name="category">trigger</field>
-            <field name="icon">fa-clock-o</field>
+            <field name="icon">icon-clock</field>
             <field name="description">Execute workflow on a recurring schedule (cron)</field>
             <field name="config_schema">{
     "interval_number": {"type": "number", "label": "Every", "default": 1, "min": 1},
@@ -248,7 +248,7 @@
 }</field>
             <field name="input_schema">{}</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Trigger Output"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -256,7 +256,7 @@
             <field name="name">Webhook Trigger</field>
             <field name="node_type">webhook_trigger</field>
             <field name="category">trigger</field>
-            <field name="icon">fa-globe</field>
+            <field name="icon">icon-webhook</field>
             <field name="description">Execute workflow when a webhook URL is called</field>
             <field name="config_schema">{
     "http_method": {"type": "select", "label": "HTTP Method", "options": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "POST", "section": "webhook"},
@@ -264,7 +264,7 @@
 }</field>
             <field name="input_schema">{}</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Webhook Data"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 
@@ -272,7 +272,7 @@
             <field name="name">Record Event Trigger</field>
             <field name="node_type">record_event_trigger</field>
             <field name="category">trigger</field>
-            <field name="icon">fa-pencil-square-o</field>
+            <field name="icon">icon-square-pen</field>
             <field name="description">Execute workflow when Odoo records are created, updated, or deleted</field>
             <field name="config_schema">{
     "model_name": {"type": "model_select", "label": "Model", "placeholder": "res.partner"},
@@ -281,7 +281,7 @@
 }</field>
             <field name="input_schema">{}</field>
             <field name="output_schema">{
-    "output": {"type": "DataSocket", "label": "Record Data"}
+    "output": {"type": "DataSocket"}
 }</field>
         </record>
 

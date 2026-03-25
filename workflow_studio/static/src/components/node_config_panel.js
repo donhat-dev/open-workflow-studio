@@ -794,7 +794,7 @@ export class NodeConfigPanel extends Component {
             const socketDef = socketKey !== '_default' ? nodeOutputs[socketKey] : null;
             const label = socketDef
                 ? (socketDef.label || socketKey)
-                : (socketKey === '_default' ? 'Output' : socketKey);
+                : (socketKey === '_default' ? '' : socketKey);
             tabs.push({
                 id: socketKey,
                 label: `${label} (${events.length})`,

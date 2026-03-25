@@ -15,7 +15,6 @@ import {
 } from "./editor_canvas/utils/connection_path";
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
-import { LucideIcon } from "./common/lucide_icon";
 import {
     getLatestNodeResultForNodeIds,
     getLatestNodeResultsByNodeIds,
@@ -32,7 +31,7 @@ import {
  */
 export class EditorCanvas extends Component {
     static template = "workflow_studio.editor_canvas";
-    static components = { WorkflowNode, NodeMenu, ConnectionToolbar, LucideIcon };
+    static components = { WorkflowNode, NodeMenu, ConnectionToolbar };
 
     static props = {
         // Graph data (required for standalone/widget mode, ignored in editor mode)
@@ -2057,13 +2056,13 @@ export class EditorCanvas extends Component {
         return [
             {
                 key: "fit-full-width",
-                icon: "ArrowLeftRight",
+                icon: "icon-arrow-left-right",
                 label: "Fit Full Width",
                 callback: (ev) => this.onFitMenuAction("full-width", ev),
             },
             {
                 key: "fit-full-height",
-                icon: "ArrowUpDown",
+                icon: "icon-arrow-up-down",
                 label: "Fit Full Height",
                 callback: (ev) => this.onFitMenuAction("full-height", ev),
             },
@@ -2096,7 +2095,7 @@ export class EditorCanvas extends Component {
      * Returns array of button config objects with properties:
      * - name: unique identifier
      * - label: display text
-     * - icon: lucide icon name
+     * - icon: lucide font class name (e.g., 'icon-save')
      * - callback: handler function
      * - visible: boolean or getter function
      * - disabled: boolean or getter function
@@ -2113,7 +2112,7 @@ export class EditorCanvas extends Component {
                 {
                     name: 'save',
                     label: 'Save',
-                    icon: 'Save',
+                    icon: 'icon-save',
                     callback: () => this.onSave(),
                     visible: true,
                     disabled: this.isSaving || this.isExecuting || this.isReadonly,
@@ -2122,7 +2121,7 @@ export class EditorCanvas extends Component {
                 {
                     name: 'run',
                     label: 'Run',
-                    icon: 'Play',
+                    icon: 'icon-play',
                     callback: () => this.onRun(),
                     visible: true,
                     disabled: this.isExecuting || this.isSaving || this.isReadonly,
@@ -2133,7 +2132,7 @@ export class EditorCanvas extends Component {
                 buttons.push({
                     name: 'copy-to-editor',
                     label: 'Copy To Editor',
-                    icon: 'Copy',
+                    icon: 'icon-copy',
                     callback: () => this.onCopyToEditor(),
                     visible: true,
                     disabled: !this.executionState,
@@ -2148,7 +2147,7 @@ export class EditorCanvas extends Component {
             buttons.push(
                 {
                     name: 'undo',
-                    icon: 'Undo2',
+                    icon: 'icon-undo-2',
                     callback: () => this.onUndo(),
                     visible: true,
                     disabled: !this.canUndo,
@@ -2157,7 +2156,7 @@ export class EditorCanvas extends Component {
                 },
                 {
                     name: 'redo',
-                    icon: 'Redo2',
+                    icon: 'icon-redo-2',
                     callback: () => this.onRedo(),
                     visible: true,
                     disabled: !this.canRedo,
@@ -2171,7 +2170,7 @@ export class EditorCanvas extends Component {
             buttons.push(
                 {
                     name: 'tidyup',
-                    icon: 'Sparkles',
+                    icon: 'icon-sparkles',
                     callback: () => this.tidyUp(),
                     visible: true,
                     disabled: this.nodes.length === 0,
@@ -2180,7 +2179,8 @@ export class EditorCanvas extends Component {
                 },
                 {
                     name: 'add-node',
-                    label: '+ Node',
+                    icon: 'icon-plus',
+                    label: 'Node',
                     callback: (ev) => this.onAddNodeClick(ev),
                     visible: true,
                     disabled: false,
@@ -2195,7 +2195,7 @@ export class EditorCanvas extends Component {
         buttons.push(
             {
                 name: 'fit-view',
-                icon: 'Maximize',
+                icon: 'icon-maximize',
                 callback: () => this.fitToView(),
                 visible: true,
                 disabled: this.nodes.length === 0,
@@ -2210,7 +2210,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'zoom-out',
-                icon: 'Minus',
+                icon: 'icon-minus',
                 callback: () => this.zoomOut(),
                 visible: true,
                 disabled: false,
@@ -2219,7 +2219,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'zoom-in',
-                icon: 'Plus',
+                icon: 'icon-plus',
                 callback: () => this.zoomIn(),
                 visible: true,
                 disabled: false,
@@ -2228,7 +2228,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'reset-zoom',
-                icon: 'RefreshCw',
+                icon: 'icon-refresh-cw',
                 callback: () => this.resetZoom(),
                 visible: true,
                 disabled: false,
@@ -2262,7 +2262,7 @@ export class EditorCanvas extends Component {
                 {
                     name: 'save',
                     label: 'Save',
-                    icon: 'Save',
+                    icon: 'icon-save',
                     callback: () => this.onSave(),
                     visible: true,
                     disabled: this.isSaving || this.isExecuting || this.isReadonly,
@@ -2271,7 +2271,7 @@ export class EditorCanvas extends Component {
                 {
                     name: 'run',
                     label: 'Run',
-                    icon: 'Play',
+                    icon: 'icon-play',
                     callback: () => this.onRun(),
                     visible: true,
                     disabled: this.isExecuting || this.isSaving || this.isReadonly,
@@ -2280,7 +2280,7 @@ export class EditorCanvas extends Component {
                 ...(this.isInExecutionView ? [{
                     name: 'copy-to-editor',
                     label: 'Copy To Editor',
-                    icon: 'Copy',
+                    icon: 'icon-copy',
                     callback: () => this.onCopyToEditor(),
                     visible: true,
                     disabled: !this.executionState,
@@ -2295,7 +2295,7 @@ export class EditorCanvas extends Component {
             buttons.push(
                 {
                     name: 'undo',
-                    icon: 'Undo2',
+                    icon: 'icon-undo-2',
                     callback: () => this.onUndo(),
                     visible: true,
                     disabled: !this.canUndo,
@@ -2304,7 +2304,7 @@ export class EditorCanvas extends Component {
                 },
                 {
                     name: 'redo',
-                    icon: 'Redo2',
+                    icon: 'icon-redo-2',
                     callback: () => this.onRedo(),
                     visible: true,
                     disabled: !this.canRedo,
@@ -2314,7 +2314,7 @@ export class EditorCanvas extends Component {
                 { name: 'divider-2', divider: true },
                 {
                     name: 'tidyup',
-                    icon: 'Sparkles',
+                    icon: 'icon-sparkles',
                     callback: () => this.tidyUp(),
                     visible: true,
                     disabled: this.nodes.length === 0,
@@ -2323,7 +2323,8 @@ export class EditorCanvas extends Component {
                 },
                 {
                     name: 'add-node',
-                    label: '+ Node',
+                    icon: 'icon-plus',
+                    label: 'Node',
                     callback: (ev) => this.onAddNodeClick(ev),
                     visible: true,
                     disabled: false,
@@ -2338,7 +2339,7 @@ export class EditorCanvas extends Component {
         buttons.push(
             {
                 name: 'fit-view',
-                icon: 'Maximize',
+                icon: 'icon-maximize',
                 callback: () => this.fitToView(),
                 visible: true,
                 disabled: this.nodes.length === 0,
@@ -2353,7 +2354,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'zoom-out',
-                icon: 'Minus',
+                icon: 'icon-minus',
                 callback: () => this.zoomOut(),
                 visible: true,
                 disabled: false,
@@ -2362,7 +2363,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'zoom-in',
-                icon: 'Plus',
+                icon: 'icon-plus',
                 callback: () => this.zoomIn(),
                 visible: true,
                 disabled: false,
@@ -2371,7 +2372,7 @@ export class EditorCanvas extends Component {
             },
             {
                 name: 'reset-zoom',
-                icon: 'RefreshCw',
+                icon: 'icon-refresh-cw',
                 callback: () => this.resetZoom(),
                 visible: true,
                 disabled: false,

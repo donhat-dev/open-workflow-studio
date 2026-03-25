@@ -4,7 +4,6 @@ import { useBus, useService } from "@web/core/utils/hooks";
 import { AlertDialog, ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { useEditor } from "@workflow_studio/store/hooks";
 import { EditorCanvas } from "@workflow_studio/components/editor_canvas";
-import { LucideIcon } from "@workflow_studio/components/common/lucide_icon";
 import { View } from "@web/views/view";
 import { Chatter } from "@mail/chatter/web_portal/chatter";
 import { WorkflowHistoryPanel } from "@workflow_studio/components/workflow_history_panel/workflow_history_panel";
@@ -17,7 +16,7 @@ import { ExecutionLogPanel } from "@workflow_studio/components/execution_log_pan
  */
 export class WorkflowEditorApp extends Component {
     static template = "workflow_studio.workflow_editor_app";
-    static components = { EditorCanvas, LucideIcon, View, Chatter, WorkflowHistoryPanel, ExecutionLogPanel };
+    static components = { EditorCanvas, View, Chatter, WorkflowHistoryPanel, ExecutionLogPanel };
     
     setup() {
         this.editorService = useEditor();

@@ -8,6 +8,18 @@ $wf-node-border-color: $wf-border-strong !default;
 $wf-node-shadow: $wf-shadow-sm !default;
 $wf-node-hover-shadow: 0 2px 8px rgba($o-black, 0.12) !default;
 $wf-node-drag-shadow: 0 6px 16px rgba($o-black, 0.2) !default;
+$wf-node-selected-border: $wf-action-color !default;
+$wf-node-selected-shadow: 0 0 0 1px $wf-action-color, 0 2px 8px rgba($o-black, 0.12) !default;
+$wf-node-selected-focus-ring: 0 0 0 0.25rem rgba(113, 75, 103, 0.25) !default;
+$wf-action-active-bg: mix($wf-action-color, $wf-white, 10%) !default;
+$wf-action-focus-border: mix($wf-action-color, $wf-surface-emphasis) !default;
+
+$wf-toolbar-bg: $wf-surface-base !default;
+$wf-toolbar-border: $wf-border-base !default;
+$wf-toolbar-shadow: $wf-shadow-sm !default;
+$wf-toolbar-radius: 8px !default;
+$wf-toolbar-padding: 8px !default;
+$wf-toolbar-gap: 4px !default;
 
 $wf-action-soft-bg: rgba($wf-action-color, 0.08) !default;
 $wf-action-soft-bg-strong: rgba($wf-action-color, 0.12) !default;

@@ -3,7 +3,6 @@
 import { Component, useRef } from "@odoo/owl";
 import { WorkflowSocket } from "./workflow_socket";
 import { CanvasNodeToolbar } from "./canvas_node_toolbar";
-import { LucideIcon } from "./common/lucide_icon";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 
 /**
@@ -15,7 +14,7 @@ import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 export class WorkflowNode extends Component {
     static template = "workflow_studio.workflow_node";
 
-    static components = { WorkflowSocket, CanvasNodeToolbar, LucideIcon };
+    static components = { WorkflowSocket, CanvasNodeToolbar };
     static props = {
         node: Object,
         zoom: { type: Number, optional: true },
@@ -87,6 +86,7 @@ export class WorkflowNode extends Component {
                 onOpenConfig(this.props.node.id);
             }
         };
+        this.isDebug = odoo.debug;
     }
 
     _getRecordOperationModelName() {
@@ -308,6 +308,10 @@ export class WorkflowNode extends Component {
 
     get nodeTypeClass() {
         return `workflow-node--${this.props.node.type || "default"}`;
+    }
+
+    get displaySubtitle() {
+        return this.isDebug ? this.props.node.type : '';
     }
 
     get displayTitle() {

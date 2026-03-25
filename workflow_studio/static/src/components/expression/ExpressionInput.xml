@@ -37,7 +37,7 @@
 							</t>
 						</div>
 					</div>
-					<textarea class="expression-input__textarea" t-att-class="{ 'text-100': isExpression }" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" t-on-scroll="onScroll" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+					<textarea class="expression-input__textarea" t-att-class="{ 'text-dark': isExpression }" t-att-value="currentValue" t-att-rows="textAreaRows" t-att-placeholder="isExpression ? '{{ _json.field }}' : (props.placeholder || 'Enter value...')" t-on-input="onInput" t-on-focus="onFocus" t-on-blur="onBlur" t-on-keydown="onKeyDown" t-on-scroll="onScroll" spellcheck="false" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
 				</div>
 				<!-- Drop indicator -->
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">

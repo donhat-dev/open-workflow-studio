@@ -3,7 +3,6 @@ import { _t } from "@web/core/l10n/translation";
 
 import { Component, xml } from "@odoo/owl";
 import { useEditor } from "@workflow_studio/store/hooks";
-import { LucideIcon } from "./common/lucide_icon";
 
 export class NodePaletteItem extends Component {
     static template = xml`
@@ -15,13 +14,13 @@ export class NodePaletteItem extends Component {
             <div class="node-palette__icon">
                 <img t-if="isImageIcon(props.icon)" t-att-src="props.icon" class="node-palette__icon-image" alt=""/>
                 <i t-elif="isFontAwesome(props.icon)" t-att-class="getFaClass(props.icon)"/>
-                <LucideIcon t-else="" name="props.icon" size="18"/>
+                <i t-else="" t-att-class="props.icon" style="font-size: 18px;"/>
             </div>
             <div class="node-palette__label"><t t-esc="props.title || ('Node')"/></div>
         </div>
     `;
 
-    static components = { LucideIcon };
+    static components = {};
 
     static props = {
         name: String,

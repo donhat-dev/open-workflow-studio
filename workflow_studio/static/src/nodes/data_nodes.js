@@ -61,7 +61,7 @@ export class SetDataNode extends BaseNode {
         this.addInput('data', DataSocket, 'Input Data');
 
         // Outputs
-        this.addOutput('output', DataSocket, 'Output Data');
+        this.addOutput('output', DataSocket);
 
         // Controls - Key/Value pairs for field assignment
         this.addControl('fields', new KeyValueControl('fields', {
@@ -108,7 +108,7 @@ export class VariableNode extends BaseNode {
         this.addInput('trigger', DataSocket, 'Trigger');
 
         // Outputs
-        this.addOutput('output', DataSocket, 'Output');
+        this.addOutput('output', DataSocket);
 
         // Controls
         this.addControl('operation', new SelectControl('operation', {
@@ -162,7 +162,7 @@ export class CodeNode extends BaseNode {
         this.addInput('data', DataSocket, '');
 
         // Outputs
-        this.addOutput('output', DataSocket, '');
+        this.addOutput('output', DataSocket);
 
         // Code editor control
         this.addControl('code', new CodeControl('code', {

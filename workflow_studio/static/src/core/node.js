@@ -57,7 +57,7 @@ export class BaseNode {
         this.inputs[key] = {
             key,
             socket,
-            label: label || key,
+            label: label,
             multiple: options.multiple || false,  // Allow multiple connections
         };
         return this;
@@ -73,7 +73,7 @@ export class BaseNode {
         this.outputs[key] = {
             key,
             socket,
-            label: label || key,
+            label: label,
         };
         return this;
     }

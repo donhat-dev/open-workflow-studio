@@ -468,6 +468,13 @@ function createDynamicNodeClass(typeDef) {
     const inputSchema = normalizeSchema(typeDef.input_schema);
     const outputSchema = normalizeSchema(typeDef.output_schema);
 
+
+    function socketDefToLabel(socketDef) {
+        const label = socketDef && typeof socketDef === "object" && !Array.isArray(socketDef) ? socketDef.label : undefined;
+        return label || "";
+    }
+
+
     class DynamicNode extends BaseNode {
         constructor() {
             super();
@@ -476,10 +483,7 @@ function createDynamicNodeClass(typeDef) {
                 if (!socketKey) {
                     continue;
                 }
-                const label =
-                    socketDef && typeof socketDef === "object" && !Array.isArray(socketDef)
-                        ? socketDef.label || humanizeKey(socketKey)
-                        : humanizeKey(socketKey);
+                const label = socketDefToLabel(socketDef);
                 const multiple =
                     Boolean(
                         socketDef
@@ -494,10 +498,7 @@ function createDynamicNodeClass(typeDef) {
                 if (!socketKey) {
                     continue;
                 }
-                const label =
-                    socketDef && typeof socketDef === "object" && !Array.isArray(socketDef)
-                        ? socketDef.label || humanizeKey(socketKey)
-                        : humanizeKey(socketKey);
+                const label = socketDefToLabel(socketDef);
                 this.addOutput(socketKey, resolveSocket(socketDef), label);
             }
 

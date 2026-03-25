@@ -28,7 +28,7 @@ import { useService } from "@web/core/utils/hooks";
 export const ODOO_MODELS_FALLBACK = [
     {
         model: "res.partner",
-        description: "Contacts & Partners",
+        description: "Contacts",
         moduleName: "base",
         iconUrl: "/base/static/description/icon.png",
     },

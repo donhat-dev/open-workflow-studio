@@ -179,7 +179,7 @@ export class NoOpNode extends BaseNode {
         super();
 
         this.addInput('data', DataSocket, 'Data');
-        this.addOutput('result', DataSocket, 'Result');
+        this.addOutput('result', DataSocket);
     }
 
 }

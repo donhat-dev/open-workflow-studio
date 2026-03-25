@@ -22,7 +22,7 @@ export class ManualTriggerNode extends BaseNode {
         // No inputs - this is a start node
 
         // Outputs
-        this.addOutput('output', DataSocket, 'Output');
+        this.addOutput('output', DataSocket);
 
         // No controls - no configuration needed
     }

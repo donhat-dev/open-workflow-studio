@@ -3,7 +3,7 @@
 	<t t-name="workflow_studio.editor_canvas">
 		<div class="workflow-editor-canvas" t-ref="root" tabindex="0" t-att-style="canvasBackgroundStyle" t-on-dragover="onDragOver" t-on-drop="onDrop" t-on-click="onCanvasClick" t-on-mousedown="onCanvasMouseDown" t-on-wheel="onWheel" t-on-contextmenu="onCanvasContextMenu">
 			<!-- Controls Bar (Top-Left) -->
-			<div class="workflow-editor-canvas__controls d-flex align-items-center gap-1 p-2 rounded border shadow-sm bg-white" t-on-wheel.stop="">
+			<div class="workflow-editor-canvas__controls" t-on-wheel.stop="">
 				<t t-foreach="getButtonsWithDividers()" t-as="btn" t-key="btn.name">
 					<t t-if="btn.divider">
 						<div class="controls-divider"/>
@@ -13,17 +13,17 @@
 							<div class="fit-view-dropdown position-relative d-inline-flex align-items-center" t-att-class="btn.menu.open ? 'is-open' : ''" t-on-click.stop="" t-on-mousedown.stop="" t-on-wheel.stop="">
 								<button t-att-class="btn.classes + ' fit-view-dropdown__main'" t-on-click="btn.callback" t-att-disabled="btn.disabled ? 'disabled' : undefined" t-att-title="btn.title or ''">
 									<t t-if="btn.icon">
-										<LucideIcon t-props="{ name: btn.icon, size: btn.label ? 14 : 16 }"/>
+										<i t-att-class="btn.icon" style="font-size: 14px;"/>
 									</t>
 									<t t-if="btn.label"><span t-esc="btn.label"/></t>
 								</button>
 								<button class="btn btn-light d-inline-flex fit-view-dropdown__toggle" t-on-click="btn.menu.toggle" t-att-disabled="btn.menu.disabled ? 'disabled' : undefined" title="More fit options">
-									<LucideIcon t-props="{ name: 'ChevronDown', size: 16 }"/>
+									<i class="icon-chevron-down" style="font-size: 14px;"/>
 								</button>
 								<div class="fit-view-dropdown__menu" t-if="btn.menu.open" t-on-click.stop="" t-on-mousedown.stop="" t-on-wheel.stop="">
 									<t t-foreach="btn.menu.items" t-as="item" t-key="item.key">
 										<button class="fit-view-dropdown__item" t-on-click="item.callback" type="button">
-											<LucideIcon t-props="{ name: item.icon, size: 14 }"/>
+											<i t-att-class="item.icon" style="font-size: 14px;"/>
 											<span t-esc="item.label"/>
 										</button>
 									</t>
@@ -33,7 +33,7 @@
 						<t t-else="">
 							<button t-att-class="btn.classes" t-on-click="btn.callback" t-att-disabled="btn.disabled ? 'disabled' : undefined" t-att-title="btn.title or ''">
 								<t t-if="btn.icon">
-									<LucideIcon t-props="{ name: btn.icon, size: btn.label ? 14 : 16 }"/>
+									<i t-att-class="btn.icon" style="font-size: 14px;"/>
 								</t>
 								<t t-if="btn.label"><span t-esc="btn.label"/></t>
 							</button>
