@@ -14,6 +14,10 @@
  * @returns {number} Estimated height
  */
 export function estimateNodeHeight(node, dims) {
+    if (dims && typeof dims.estimateNodeHeight === "function") {
+        return dims.estimateNodeHeight(node);
+    }
+
     const inputCount = Object.keys(node.inputs || {}).length;
     const outputCount = Object.keys(node.outputs || {}).length;
     const rows = Math.max(inputCount, outputCount, 1);

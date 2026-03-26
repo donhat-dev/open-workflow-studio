@@ -262,18 +262,9 @@ export function useViewport({ editor, rootRef, getDimensions, readonly = false, 
         const nodeWidth = dimensions && typeof dimensions.nodeWidth === "number"
             ? dimensions.nodeWidth
             : 240;
-        const bodyPadding = dimensions && typeof dimensions.nodeBodyPadding === "number"
-            ? dimensions.nodeBodyPadding
-            : 10;
-        const socketSpacing = dimensions && typeof dimensions.socketSpacing === "number"
-            ? dimensions.socketSpacing
-            : 24;
-        const socketCount = Math.max(
-            Object.keys(node.inputs || {}).length,
-            Object.keys(node.outputs || {}).length,
-            1,
-        );
-        const nodeHeight = Math.max(72, (bodyPadding * 2) + (socketCount * socketSpacing));
+        const nodeHeight = dimensions && typeof dimensions.estimateNodeHeight === "function"
+            ? dimensions.estimateNodeHeight(node)
+            : 72;
         const rect = rootRef.el.getBoundingClientRect();
         const panX = -((node.x + (nodeWidth / 2)) * viewport.zoom) + (rect.width / 2);
         const panY = -((node.y + (nodeHeight / 2)) * viewport.zoom) + (rect.height / 2);

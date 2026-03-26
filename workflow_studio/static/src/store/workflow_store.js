@@ -8,9 +8,10 @@
  * - Bridges to HistoryManager for undo/redo batching
  */
 
-import { reactive, EventBus } from "@odoo/owl";
+import { reactive, EventBus, markRaw } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
+import { DimensionConfig } from "../core/dimensions";
 import {
     HistoryManager,
     createAddNodeAction,
@@ -67,6 +68,14 @@ const DEFAULT_UI_STATE = () => ({
         connectionContext: null, // { connectionId, position } for inserting node
     },
 });
+
+function createDimensionState(config = {}) {
+    const nextConfig = config && typeof config === "object" ? { ...config } : {};
+    return {
+        config: nextConfig,
+        current: markRaw(new DimensionConfig(nextConfig)),
+    };
+}
 
 export const workflowEditorService = {
     dependencies: ["notification"],
@@ -126,12 +135,20 @@ export const workflowEditorService = {
              */
             pinData: {},
             workflowMetadata: {},
+            dimensions: createDimensionState(),
         });
 
         // Keep reactive history flags in sync for future toolbar bindings.
         history.onChange((info) => {
             state.ui.history = { ...info };
         });
+
+        function bootstrapDimensions(config = {}) {
+            state.dimensions = createDimensionState(config);
+            return state.dimensions.current;
+        }
+
+        bootstrapDimensions();
 
         // ===============
         // Execution helpers
@@ -366,6 +383,15 @@ export const workflowEditorService = {
             },
             setNodeTypes(types) {
                 state.nodeTypes = Array.isArray(types) ? types : [];
+            },
+            bootstrapDimensions(config = {}) {
+                return bootstrapDimensions(config);
+            },
+            updateDimensionConfig(configPatch = {}) {
+                return bootstrapDimensions({
+                    ...(state.dimensions.config || {}),
+                    ...(configPatch || {}),
+                });
             },
             addNode(type, position) {
                 const nodeId = adapter.addNode(type, position);
@@ -1427,6 +1453,9 @@ export const workflowEditorService = {
             },
             getWorkflowId() {
                 return workflowId;
+            },
+            getDimensions() {
+                return state.dimensions.current;
             },
             copyExecutionToEditor() {
                 return actions.copyExecutionToEditor();

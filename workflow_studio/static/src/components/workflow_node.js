@@ -455,12 +455,16 @@ export class WorkflowNode extends Component {
     }
 
     get nodeStyle() {
+        const dimensionConfig = this.props.dimensionConfig;
+        if (dimensionConfig && typeof dimensionConfig.getNodeStyle === "function") {
+            return dimensionConfig.getNodeStyle(this.props.node);
+        }
+
         const x = this.props.node.x || 0;
         const y = this.props.node.y || 0;
 
         let styles = `left:${x}px;top:${y}px;`;
 
-        const dimensionConfig = this.props.dimensionConfig;
         if (dimensionConfig && typeof dimensionConfig.getCSSProperties === "function") {
             const cssProps = dimensionConfig.getCSSProperties();
             for (const [key, value] of Object.entries(cssProps)) {
@@ -472,10 +476,11 @@ export class WorkflowNode extends Component {
         const maxSockets = Math.max(this.inputEntries.length, this.outputEntries.length);
         if (maxSockets > 0) {
             const dc = dimensionConfig || {};
-            const bodyPad = dc.nodeBodyPadding || 6;
-            const sockOffY = dc.socketOffsetY || 10;
+            const sockets = maxSockets - 1 == 0 ? 1 : maxSockets - 1; // Avoid zero spacing if only 1 socket
+            const bodyPad = dc.nodeBodyPadding || 10;
+            const sockOffY = dc.socketOffsetY || 12;
             const sockSpacing = dc.socketSpacing || 24;
-            const minH = bodyPad + sockOffY + ((maxSockets - 1) * sockSpacing) + sockOffY + bodyPad;
+            const minH = bodyPad + sockOffY + (sockets * sockSpacing) + sockOffY + bodyPad;
             styles += `min-height:${minH}px;`;
         }
 

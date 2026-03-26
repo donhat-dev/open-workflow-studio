@@ -6,13 +6,8 @@ import { WorkflowNode } from "./workflow_node";
 import { NodeMenu } from "./node_menu";
 import { ConnectionToolbar } from "./connection_toolbar";
 import { ConfigPanelDialog } from "./config_panel_dialog";
-import { DimensionConfig, CONNECTION, detectConnectionType } from "../core/dimensions";
-import {
-    getBezierPath,
-    getBackEdgePath,
-    getVerticalStackPath,
-    getConnectionPath as calculateConnectionPath
-} from "./editor_canvas/utils/connection_path";
+import { DimensionConfig, detectConnectionType } from "../core/dimensions";
+import { getConnectionPath as calculateConnectionPath } from "./editor_canvas/utils/connection_path";
 import { calculateTidyPositions } from "./editor_canvas/utils/layout";
 import { useCanvasGestures, useConnectionDrawing, useMultiNodeDrag, useWorkflowCommands, useConnectionCulling, useClipboard, useViewport } from "./editor_canvas/hooks";
 import {
@@ -99,7 +94,6 @@ export class EditorCanvas extends Component {
         }
 
         // Local state for widget mode (or fallback defaults if service state unavailable)
-        // In editor mode, this.state is used for dimensionConfig only
         this.state = useState({
             readonly: initialReadonly,
             // Graph data (widget mode only - editor mode reads from service)
@@ -116,8 +110,6 @@ export class EditorCanvas extends Component {
             },
             // Execution data (widget mode)
             execution: this.props.executionData || null,
-            // Dimension config (both modes)
-            dimensionConfig: this.props.dimensionConfig || {},
         });
 
         this.localUi = useState({
@@ -807,24 +799,25 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Get DimensionConfig instance (reactive - recalculates when state.dimensionConfig changes)
+    * Get DimensionConfig instance from the service (editor mode)
+    * or a local widget-only cache (viewer mode).
      * @returns {DimensionConfig}
      */
     get dimensions() {
-        const currentConfig = this.state.dimensionConfig;
+        if (this.isEditorMode) {
+            const dimensionsState = this.editorState.dimensions;
+            if (!dimensionsState || !dimensionsState.current) {
+                throw new Error('[EditorCanvas] editor.state.dimensions.current is undefined');
+            }
+            return dimensionsState.current;
+        }
+
+        const currentConfig = this.props.dimensionConfig || {};
         if (this._dimensionsConfigSource !== currentConfig || !this._dimensionsCache) {
             this._dimensionsConfigSource = currentConfig;
-            this._dimensionsCache = new DimensionConfig(this.state.dimensionConfig);
+            this._dimensionsCache = new DimensionConfig(currentConfig);
         }
         return this._dimensionsCache;
-    }
-
-    /**
-     * Update dimension configuration at runtime
-     * @param {Object} newConfig - Partial config to merge
-     */
-    updateDimensionConfig(newConfig) {
-        this.state.dimensionConfig = { ...this.state.dimensionConfig, ...newConfig };
     }
 
     /**

@@ -14,7 +14,7 @@ package.json
 # Distribution files
 
 tmp/
-*.md
+memory-bank/
 opencode.json
 stock_barcode/
 lf_web_studio/

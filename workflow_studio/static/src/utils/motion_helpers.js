@@ -223,3 +223,4 @@ export const MotionHelpers = {
         });
     }
 };
+window.MotionHelpers = MotionHelpers; // Expose globally for debugging/testing

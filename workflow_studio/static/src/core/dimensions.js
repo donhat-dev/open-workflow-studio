@@ -79,6 +79,17 @@ export class DimensionConfig {
     }
 
     /**
+     * Get the paired socket row count used for layout and height calculations.
+     * @param {Object} node
+     * @returns {number}
+     */
+    getSocketRowCount(node) {
+        const inputCount = Object.keys((node && node.inputs) || {}).length;
+        const outputCount = Object.keys((node && node.outputs) || {}).length;
+        return Math.max(inputCount, outputCount, 0);
+    }
+
+    /**
      * Calculate socket position based on node position and socket index
      * @param {Object} node - Node object with x, y, inputs, outputs
      * @param {string} socketKey - Socket key name
@@ -90,10 +101,6 @@ export class DimensionConfig {
         const sockets = socketType === 'input' ? node.inputs : node.outputs;
         const socketKeys = Object.keys(sockets || {});
         const index = socketKeys.indexOf(socketKey);
-
-        // For row-paired layout, we need max of inputs/outputs for row count
-        const inputCount = Object.keys(node.inputs || {}).length;
-        const outputCount = Object.keys(node.outputs || {}).length;
 
         // If row-paired, use the same row index for matching input/output
         // This ensures connections align properly
@@ -115,6 +122,39 @@ export class DimensionConfig {
     }
 
     /**
+     * Get the minimum height required so node body fully covers all socket rows.
+     * @param {Object} node
+     * @returns {number}
+     */
+    getNodeMinHeight(node) {
+        const rowCount = this.getSocketRowCount(node);
+        if (!rowCount) {
+            return 0;
+        }
+        const spacedRows = Math.max(rowCount - 1, 1);
+        return this.nodeBodyPadding
+            + this.socketOffsetY
+            + (spacedRows * this.socketSpacing)
+            + this.socketOffsetY
+            + this.nodeBodyPadding;
+    }
+
+    /**
+     * Conservative node height estimate for fitting and hit-testing.
+     * @param {Object} node
+     * @returns {number}
+     */
+    estimateNodeHeight(node) {
+        const rowCount = Math.max(this.getSocketRowCount(node), 1);
+        const conservativeHeight = this.nodeHeaderHeight
+            + (this.nodeBodyPadding * 2)
+            + this.socketOffsetY
+            + (Math.max(0, rowCount - 1) * this.socketSpacing)
+            + (this.socketRadius * 2);
+        return Math.max(this.getNodeMinHeight(node), conservativeHeight);
+    }
+
+    /**
      * Get CSS custom properties for current config
      * @returns {Object} - CSS custom properties object
      */
@@ -128,6 +168,29 @@ export class DimensionConfig {
             '--socket-offset-y': `${this.socketOffsetY}px`,
             '--grid-size': `${this.gridSize}px`,
         };
+    }
+
+    /**
+     * Build inline node style from node position + current dimension variables.
+     * @param {Object} node
+     * @returns {string}
+     */
+    getNodeStyle(node) {
+        const x = (node && node.x) || 0;
+        const y = (node && node.y) || 0;
+
+        let styles = `left:${x}px;top:${y}px;`;
+        const cssProps = this.getCSSProperties();
+        for (const [key, value] of Object.entries(cssProps)) {
+            styles += `${key}:${value};`;
+        }
+
+        const minHeight = this.getNodeMinHeight(node);
+        if (minHeight > 0) {
+            styles += `min-height:${minHeight}px;`;
+        }
+
+        return styles;
     }
 
     /**
