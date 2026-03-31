@@ -31,17 +31,20 @@ $wf-danger-color: $o-danger !default;
 $wf-warning-color: $o-warning !default;
 $wf-info-color: $o-info !default;
 $wf-pin-color: $o-warning !default;
+$wf-odoo-plum: #714b67 !default;
 
 // ── Radius ──
 $wf-radius-sm: 4px !default;
 $wf-radius-md: 6px !default;
 $wf-radius-lg: 8px !default;
+$wf-radius-pill: 999px !default;
 
 // ── Shadows ──
 $wf-shadow-sm: 0 2px 8px rgba($o-black, 0.08) !default;
 $wf-shadow-md: 0 4px 16px rgba($o-black, 0.12) !default;
 $wf-shadow-soft: 0 18px 40px rgba($o-black, 0.04) !default;
 $wf-shadow-panel: -6px 0 18px rgba($o-black, 0.12) !default;
+$wf-shadow-focus: 0 0 0 2px rgba($o-action, 0.15) !default;
 
 .o_web_client {
 	--color--purple-50: hsl(247, 49%, 98%);

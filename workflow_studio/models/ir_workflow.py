@@ -4,6 +4,7 @@ import hashlib
 import json
 import copy
 import logging
+from datetime import datetime, timedelta
 from .workflow_executor import WorkflowExecutor
 
 from odoo import api, fields, models, _
@@ -1298,3 +1299,149 @@ class Workflow(models.Model):
             except (TypeError, ValueError):
                 continue
         return safe
+
+    @api.model
+    def retrieve_list_dashboard(self):
+        """Return summary stats for the workflow list header dashboard widget."""
+        uid = self.env.uid
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        seven_days_ago = now - timedelta(days=7)
+
+        all_workflows = self.search([])
+        my_workflows = self.search([('create_uid', '=', uid)])
+
+        all_published = sum(1 for w in all_workflows if w.is_published)
+        all_draft = len(all_workflows) - all_published
+        my_published = sum(1 for w in my_workflows if w.is_published)
+        my_draft = len(my_workflows) - my_published
+
+        Run = self.env['workflow.run']
+        all_runs_today = Run.search_count([('started_at', '>=', today_start)])
+        all_failed_today = Run.search_count([
+            ('started_at', '>=', today_start),
+            ('status', '=', 'failed'),
+        ])
+
+        runs_7d = Run.search([('started_at', '>=', seven_days_ago)])
+        total_7d = len(runs_7d)
+        failed_7d = sum(1 for r in runs_7d if r.status == 'failed')
+        failure_rate_7d = round(failed_7d / total_7d * 100) if total_7d else 0
+
+        completed_runs = Run.search([
+            ('status', '=', 'completed'),
+            ('duration_seconds', '>', 0),
+        ], limit=100)
+        if completed_runs:
+            avg_dur = sum(r.duration_seconds for r in completed_runs) / len(completed_runs)
+            avg_duration_str = f"{avg_dur / 60:.1f}m" if avg_dur >= 60 else f"{avg_dur:.1f}s"
+        else:
+            avg_duration_str = "0s"
+
+        return {
+            'all_published': all_published,
+            'all_draft': all_draft,
+            'all_total': all_published + all_draft,
+            'my_published': my_published,
+            'my_draft': my_draft,
+            'my_total': my_published + my_draft,
+            'all_runs_today': all_runs_today,
+            'all_failed_today': all_failed_today,
+            'failure_rate_7d': failure_rate_7d,
+            'all_avg_duration': avg_duration_str,
+        }
+
+    @api.model
+    def retrieve_dashboard(self):
+        """Return full stats for the workflow dashboard view."""
+        uid = self.env.uid
+        now = datetime.now()
+        Run = self.env['workflow.run']
+
+        # --- Summary ---
+        all_workflows = self.search([])
+        my_workflows = self.search([('create_uid', '=', uid)])
+        published_count = sum(1 for w in all_workflows if w.is_published)
+        draft_count = len(all_workflows) - published_count
+        running_now = Run.search_count([('status', '=', 'running')])
+
+        summary = {
+            'total_workflows': len(all_workflows),
+            'published_workflows': published_count,
+            'draft_workflows': draft_count,
+            'running_now': running_now,
+            'my_workflows': len(my_workflows),
+        }
+
+        # --- Runs by day ---
+        def _day_label(dt):
+            return dt.strftime('%b') + ' ' + str(dt.day)
+
+        def _build_run_data(days):
+            cutoff = now - timedelta(days=days)
+            runs = Run.search([('started_at', '>=', cutoff)])
+
+            keys = [_day_label(now - timedelta(days=days - 1 - i)) for i in range(days)]
+            completed_by_day = {k: 0 for k in keys}
+            failed_by_day = {k: 0 for k in keys}
+            cancelled_by_day = {k: 0 for k in keys}
+
+            for run in runs:
+                if not run.started_at:
+                    continue
+                lbl = _day_label(run.started_at)
+                if run.status == 'completed' and lbl in completed_by_day:
+                    completed_by_day[lbl] += 1
+                elif run.status == 'failed' and lbl in failed_by_day:
+                    failed_by_day[lbl] += 1
+                elif run.status == 'cancelled' and lbl in cancelled_by_day:
+                    cancelled_by_day[lbl] += 1
+
+            return {
+                'Completed': [{'label': k, 'value': completed_by_day[k]} for k in keys],
+                'Failed': [{'label': k, 'value': failed_by_day[k]} for k in keys],
+                'Cancelled': [{'label': k, 'value': cancelled_by_day[k]} for k in keys],
+            }
+
+        runs_data = {
+            '7d': _build_run_data(7),
+            '14d': _build_run_data(14),
+            '30d': _build_run_data(30),
+        }
+
+        # --- Performance: top failing ---
+        fail_counts = {}
+        for run in Run.search([('status', '=', 'failed')]):
+            name = run.workflow_id.name or 'Unknown'
+            fail_counts[name] = fail_counts.get(name, 0) + 1
+        top_failing = sorted(
+            [{'workflow_name': k, 'fail_count': v} for k, v in fail_counts.items()],
+            key=lambda x: x['fail_count'],
+            reverse=True,
+        )[:5]
+
+        # --- Performance: top slow ---
+        dur_total = {}
+        dur_count = {}
+        for run in Run.search([('status', '=', 'completed'), ('duration_seconds', '>', 0)], limit=200):
+            name = run.workflow_id.name or 'Unknown'
+            dur_total[name] = dur_total.get(name, 0.0) + run.duration_seconds
+            dur_count[name] = dur_count.get(name, 0) + 1
+
+        slow_list = []
+        for name in dur_total:
+            avg_s = dur_total[name] / dur_count[name]
+            avg_str = f"{avg_s / 60:.1f}m" if avg_s >= 60 else f"{avg_s:.1f}s"
+            slow_list.append({'workflow_name': name, 'avg_duration': avg_str, '_sort': avg_s})
+        top_slow = sorted(slow_list, key=lambda x: x['_sort'], reverse=True)[:5]
+        for item in top_slow:
+            del item['_sort']
+
+        return {
+            'summary': summary,
+            'runs': runs_data,
+            'performance': {
+                'top_failing': top_failing,
+                'top_slow': top_slow,
+            },
+        }

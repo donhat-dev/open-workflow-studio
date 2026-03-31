@@ -151,7 +151,7 @@
 			<field name="name">Dashboard</field>
 			<field name="tag">workflow_studio.dashboard</field>
 		</record>
-		<menuitem id="menu_workflow_pilot_root" name="Workflow Studio"/>
+		<menuitem id="menu_workflow_pilot_root" name="Workflow Studio" web_icon="workflow_studio,static/description/icon.png"/>
 		<menuitem id="menu_workflow_dashboard" name="Dashboard" parent="menu_workflow_pilot_root" action="action_workflow_dashboard" sequence="5"/>
 		<menuitem id="menu_ir_workflow" name="Workflows" parent="menu_workflow_pilot_root" action="action_ir_workflow" sequence="10"/>
 	</data>

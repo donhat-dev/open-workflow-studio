@@ -15,6 +15,8 @@
 | [ADR-004](./004-editor-state-architecture.md) | Editor State Architecture (Studio-like Patterns) | **Proposed 🟡** | 2026-01-13 |
 | [ADR-005](./005-zero-trust-polp.md)     | Zero Trust + PoLP for Execution & Access | **Accepted ✅** | 2026-02-02 |
 | [ADR-006](./006-version-history.md)     | Workflow Version History (Parent-Object Patch) | **Accepted ✅** | 2026-02-04 |
+| [ADR-008](./008-hybrid-trigger-architecture.md) | Hybrid Realtime Trigger Architecture | **Accepted ✅** | 2026-02-07 |
+| [ADR-009](./009-content-addressed-storage.md) | Content-Addressed Storage for Workflow Data Deduplication | **Accepted ✅** | 2026-03-30 |
 
 ---
 

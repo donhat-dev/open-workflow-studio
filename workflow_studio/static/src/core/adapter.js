@@ -81,6 +81,7 @@ export class WorkflowAdapter {
             category: node.category,
             inputs: this._socketsToUI(node.inputs),
             outputs: this._socketsToUI(node.outputs),
+            disabled: !!(node.meta && node.meta.disabled === true),
         }));
     }
 

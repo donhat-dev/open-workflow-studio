@@ -436,7 +436,7 @@ export class WorkflowNode extends Component {
     get toolbarProps() {
         if (this.isReadonly) return null;
         const nodeId = this.props.node.id;
-        const isDisabled = this.props.node.disabled;
+        const isDisabled = this.isDisabled;
 
         if (!this._toolbarPropsCache || this._toolbarPropsNodeId !== nodeId || this._toolbarPropsDisabled !== isDisabled) {
             this._toolbarPropsNodeId = nodeId;

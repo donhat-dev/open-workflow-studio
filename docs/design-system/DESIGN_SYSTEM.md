@@ -2,7 +2,7 @@
 
 **Codename:** Editorial Carbon  
 **Date:** 2026-03-23  
-**Aesthetic:** Swiss editorial hierarchy × Carbon system utility
+**Aesthetic:** Swiss editorial hierarchy × Carbon system utility × NAAI-style hard-edged blue refinement
 
 ---
 
@@ -60,6 +60,17 @@
 | Canvas / graph | Hybrid | Editorial alignment + system state feedback |
 | Dashboard / landing / narrative | Editorial dominant | Bento tiles, metrics, storytelling blocks |
 
+**Future direction — extracted from `naai.studio`:**
+
+- **Typography:** Space Grotesk is not only display type; it also drives the body/UI rhythm.
+- **Metadata voice:** JetBrains Mono is used deliberately for payload labels, technical metadata, and small operational tags.
+- **Primary hue:** saturated cobalt blue (`hsl(225 100% 50%)`) does the main navigational work.
+- **Secondary accent:** restrained orange (`hsl(24 100% 50%)`) is available for editorial kickers or small highlights, not as a competing CTA color.
+- **Contextual accent:** Odoo plum (`#714B67`) can appear only where the content is specifically about Odoo brand/context; it is not a general-purpose UI action color.
+- **Structure:** hard borders and low/zero radius carry more of the system than soft cards or plush shadows.
+- **Depth:** keep shadows restrained; borders and spacing should lead before elevation does.
+- **Surface grammar:** future shells can use a subtle lattice or dot-grid backdrop plus framed-corner motifs to signal “system/product canvas” rather than generic SaaS cards.
+
 ---
 
 ## 2. Design Tokens
@@ -93,6 +104,14 @@
 | `--wf-action-soft-bg` | `hsla(225 100% 50% / 0.08)` | Light tint fills (selected rows, badges) |
 | `--wf-action-soft-bg-strong` | `hsla(225 100% 50% / 0.12)` | Hover state on soft-bg surfaces |
 
+#### Accent — Secondary Support
+
+| Token | Value | Role |
+|-------|-------|------|
+| `--wf-accent-color` | `hsl(24 100% 50%)` | Editorial kicker, small highlight, sparing contrast cue |
+| `--wf-accent-soft-bg` | `hsla(24 100% 50% / 0.08)` | Soft orange tint for meta blocks, not primary CTA |
+| `--wf-odoo-brand` | `#714B67` | Contextual Odoo emphasis only (brand wordmarks, product-specific highlights) |
+
 #### Accent — Semantic
 
 | Token | Value | Role |
@@ -119,6 +138,8 @@
 | Token | Value | Role |
 |-------|-------|------|
 | `--wf-canvas-grid-dot` | `rgba($o-gray-500, 0.3)` | Canvas dot-grid pattern |
+| `--wf-shell-grid-line` | `hsla(222 47% 11% / 0.035)` | Editorial lattice lines for future shells and demos |
+| `--wf-frame-line` | `hsla(222 47% 11% / 0.18)` | Framed-corner motif, sockets, and construction outlines |
 | `--wf-panel-backdrop` | `rgba($o-black, 0.2)` | Overlay/dialog backdrop |
 
 ---
@@ -130,7 +151,7 @@
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--wf-font-display` | `"Space Grotesk", system-ui, sans-serif` | Hero titles, section headings, editorial display |
-| `--wf-font-ui` | Odoo default sans-serif stack | Controls, labels, body copy, form elements |
+| `--wf-font-ui` | `"Space Grotesk", system-ui, sans-serif` | Controls, labels, body copy, form elements in the future token set |
 | `--wf-font-mono` | `"JetBrains Mono", "SF Mono", Consolas, monospace` | Code, expressions, metadata, payload values |
 
 #### Type Scale
@@ -179,12 +200,12 @@ The system defaults to **sharp** (0px) for editorial surfaces and uses small rad
 | Token | Current | Target | Usage |
 |-------|---------|--------|-------|
 | `--wf-radius-none` | — | `0px` | Cards, tiles, panels, modals, sockets (editorial sharp) |
-| `--wf-radius-sm` | `4px` | `4px` | Badges, chips, small interactive elements |
+| `--wf-radius-sm` | `4px` | `2px` | Badges, chips, small interactive elements |
 | `--wf-radius-md` | `6px` | `4px` | Controls (inputs, selects, buttons) |
 | `--wf-radius-lg` | `8px` | `6px` | Popovers, dropdowns, code blocks |
 | `--wf-radius-pill` | — | `999px` | Pill-shaped badges, toggles |
 
-**Direction:** migrate most card/panel surfaces toward 0 or 2px. Controls stay at 4px for Carbon-like tactile clarity.
+**Direction:** migrate most card/panel surfaces toward `0px`, and small controls toward `2px`. Use pill radius only where the control logic truly benefits from it (toggle chips, status pills), not as a default softness blanket.
 
 ---
 
@@ -193,15 +214,15 @@ The system defaults to **sharp** (0px) for editorial surfaces and uses small rad
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--wf-shadow-none` | `none` | Flat surfaces (default) |
-| `--wf-shadow-soft` | `0 18px 40px rgba(17,24,39, 0.04)` | Cards, tiles — barely-there lift |
-| `--wf-shadow-sm` | `0 2px 8px rgba(0,0,0, 0.08)` | Node cards, chips — subtle grounding |
-| `--wf-shadow-md` | `0 4px 16px rgba(0,0,0, 0.12)` | Floating popovers, dropdowns |
+| `--wf-shadow-soft` | `0 1px 0 rgba(17,24,39, 0.05)` | Structural grounding without visible softness |
+| `--wf-shadow-sm` | `0 2px 0 rgba(17,24,39, 0.10)` | Crisp micro-lift for active controls |
+| `--wf-shadow-md` | `0 10px 24px rgba(17,24,39, 0.08)` | Floating popovers, dropdowns |
 | `--wf-shadow-panel` | `-6px 0 18px rgba(0,0,0, 0.12)` | Side panels (asymmetric) |
 | `--wf-shadow-drag` | `0 6px 16px rgba(0,0,0, 0.2)` | Drag state (temporary) |
 | `--wf-shadow-focus` | `0 0 0 2px rgba($action, 0.15)` | Focus ring (keyboard nav) |
 | `--wf-shadow-focus-strong` | `0 0 0 2px rgba($action, 0.2)` | Focus ring (strong emphasis) |
 
-**Rule:** shadows are environmental, not decorative. If a surface doesn't float above another, `--wf-shadow-none`.
+**Rule:** shadows are environmental, not decorative. In the future set, borders should do the first 80% of the separation work; if a surface doesn't truly float above another, use `--wf-shadow-none`.
 
 ---
 
@@ -214,6 +235,8 @@ The system defaults to **sharp** (0px) for editorial surfaces and uses small rad
 | `--wf-canvas-grid` | `72px` | Canvas stage background grid |
 | `--wf-bento-gap` | `18px` | Gap between bento tiles |
 | `--wf-panel-gap` | `18px` | Gap between stacked panels |
+
+**Future shell rule:** when presenting `wf-*` in editorial or marketing contexts, prefer a white base with either a subtle lattice grid (`--wf-shell-grid-line`) or a dot-grid canvas. Use framed-corner ornaments sparingly to create identity, not clutter.
 
 ---
 
@@ -314,6 +337,16 @@ Metadata markers — categories, keywords, status qualifiers.
 </span>
 ```
 
+#### Usage Examples
+
+- Dashboard taxonomy row beneath hero or summary copy
+- Workflow type filters like `Webhook`, `Manual Trigger`, `Validation`
+- Quick-jump action labels inside editorial tiles or panel footers
+
+#### Implementation Note
+
+Use `Tag / Label` for taxonomy and metadata voice; keep semantic execution state on badges. In `wf-*`, tags should feel border-led and editorial, but still lighter than tiles and less semantic than status badges.
+
 ---
 
 ### 3.3 Input / Control `.wf-control`
@@ -325,7 +358,7 @@ All interactive form controls share a common treatment for consistency.
 | Property | Value |
 |----------|-------|
 | Border radius | `--wf-radius-md` (4px) |
-| Border | `1px solid --wf-border-base` |
+| Border | `1.5px solid --wf-border-base` |
 | Background | `--wf-surface-base` |
 | Font size | `0.875rem` (Body S) |
 | Min-height | Follows size tier |
@@ -400,6 +433,16 @@ Peer navigation between related views.
 | Active | Text → `--wf-action-color`, `font-weight: 600`, 2px accent bottom-border |
 | Disabled | `opacity: 0.4`, `pointer-events: none` |
 
+#### Usage Examples
+
+- `Parameters | Settings` switch in config dialogs
+- `List | Detail | Raw JSON` switch in execution/result panes
+- Peer navigation between dashboard subviews or inspector states
+
+#### Implementation Note
+
+Keep `Tab Nav` in the utility lane even for `wf-*`: the tab strip carries state and orientation, while the surrounding tile or panel shell carries the stronger editorial identity.
+
 ---
 
 ### 3.5 Card / Tile `.wf-tile`
@@ -420,10 +463,11 @@ Content modules for bento grids, legend explanations, and informational blocks.
 | Property | Value |
 |----------|-------|
 | Border | `1px solid --wf-border-base` |
-| Background | `rgba(--wf-surface-base, 0.88)` |
-| Shadow | `--wf-shadow-soft` |
+| Background | `linear-gradient(180deg, rgba($action, 0.045) 0%, rgba($action, 0) 56px), rgba(255,255,255,0.94)` |
+| Shadow | `--wf-shadow-sm` |
 | Radius | `0px` (sharp editorial) |
-| Padding | `24px` |
+| Padding | `22px` |
+| Accent rail | `3px` cobalt top rule |
 
 #### Child Elements
 
@@ -441,7 +485,18 @@ Content modules for bento grids, legend explanations, and informational blocks.
 |-------|-----------|
 | Default | As base |
 | Hover | `translateY(-3px)`, border color → `rgba($action, 0.28)` |
-| Selected | Border → `--wf-action-color`, soft bg tint |
+| Selected | Border → `--wf-action-color`, soft bg tint, preserve hard edge |
+
+#### Usage Examples
+
+- Dashboard metric tile
+- Execution summary / narrative tile
+- Canvas-adjacent legend or detail block
+- Selected module tile in a bento grid
+
+#### Implementation Note
+
+In the playground, `Tile / Card` is the first post-foundation expansion because it establishes the missing surface grammar needed before tabs, tags, URL boxes, or canvas primitives can feel coherent.
 
 ---
 
@@ -574,6 +629,16 @@ Displays a webhook or endpoint URL with copy action.
 | Live/Active | Green variant — `.wf-url-box--success` |
 | Focus (copy button) | Standard focus ring on button child |
 
+#### Usage Examples
+
+- Webhook trigger endpoint with copy action
+- Published callback URL in share or activation flows
+- Integration detail row inside a tile or config panel footer
+
+#### Implementation Note
+
+Treat `URL Box` as a technical payload surface, not a generic text field. The code value should stay mono and truncated safely, while the copy action remains visually secondary but immediately reachable.
+
 ---
 
 ### 3.10 Pill / Chip `.wf-chip`
@@ -623,6 +688,16 @@ Connection points on canvas nodes.
 | Drawing | Pulsing border animation |
 | Error | Border → `--wf-danger-color` |
 
+#### Usage Examples
+
+- Input/output ports on workflow nodes
+- Visual state for connected, drawing, or errored edges
+- Canvas legends or connection demos showing flow direction
+
+#### Implementation Note
+
+For `wf-*`, sockets should remain square and framed. They are part of the shell grammar, not generic rounded UI affordances, so keep them compact and structural.
+
 ---
 
 ### 3.12 Connection Path `.wf-connection`
@@ -646,6 +721,16 @@ Orthogonal paths between sockets.
 | Active / data flowing | Accent color on final segment + arrow |
 | Selected | Full path → accent color |
 | Error | Segments → `--wf-danger-color` |
+
+#### Usage Examples
+
+- Fan-in from multiple triggers into one action node
+- Labeled edge segments such as `payload` or `manual run`
+- Active-flow emphasis using a restrained accent segment near the destination
+
+#### Implementation Note
+
+Keep routing orthogonal and crisp. The path should read like construction lines on a technical diagram, with labels and accent segments used sparingly so the node surfaces stay primary.
 
 ---
 
@@ -907,11 +992,13 @@ Full-screen config panel for node editing.
 
 | Current (`$wf-*` Sass var) | → Target (also expose as CSS custom prop) | Change needed |
 |----------------------------|-------------------------------------------|---------------|
-| `$wf-radius-sm: 4px` | Keep 4px | none |
+| `$wf-radius-sm: 4px` | → `2px` | harden |
 | `$wf-radius-md: 6px` | → `4px` | tighten |
 | `$wf-radius-lg: 8px` | → `6px` | tighten |
-| `$wf-shadow-sm` | Keep | none |
-| `$wf-shadow-md` | Keep | none |
+| `$wf-shadow-sm` | → crisp 2px grounding shadow | sharpen |
+| `$wf-shadow-md` | → restrained 24px floating shadow | reduce softness |
+| Odoo default sans on `--wf-font-ui` | → Space Grotesk | align with future brand voice |
+| No `--wf-accent-color` | Add restrained orange support accent | **new** |
 | No `--wf-font-display` | Add Space Grotesk | **new** |
 | No spacing scale | Add `--wf-space-*` | **new** |
 | No `--wf-radius-none` | Add `0px` | **new** |

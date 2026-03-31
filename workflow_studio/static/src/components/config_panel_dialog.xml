@@ -17,7 +17,7 @@
                 execution="props.execution"
                 viewMode="props.viewMode"
                 onClose="props.close"
-                onSave="props.onSave"
+                onSave="safeOnSave"
             />
             <t t-set-slot="footer">
                 <t t-set="previousNav" t-value="previousNavigation"/>
