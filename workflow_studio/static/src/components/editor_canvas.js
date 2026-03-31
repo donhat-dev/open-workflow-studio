@@ -232,6 +232,8 @@ export class EditorCanvas extends Component {
                 editor: this.editor,
                 getNodes: () => this.nodes,
                 getReadonly: () => this.isReadonly,
+                getCanUndo: () => this.canUndo,
+                getCanRedo: () => this.canRedo,
                 onSave: this.onSave,
                 onRun: this.onRun,
                 getRootEl: () => this.rootRef.el,
@@ -1429,17 +1431,7 @@ export class EditorCanvas extends Component {
     onNodeToggleDisable(nodeId) {
         if (this.isReadonly) return;
         if (!this.canEdit) return;
-        // Find node and toggle disabled state
-        const node = this.nodes.find(n => n.id === nodeId);
-        if (!node) return;
-
-        // Toggle the disabled flag (will be handled by updateNode prop if available)
-        // For now, just log - actual implementation depends on parent component
-        console.log(`[EditorCanvas] Toggle disable for node: ${nodeId}, was disabled: ${node.disabled}`);
-
-        // This would typically be handled via props.updateNode callback
-        // For now, we emit a change via the standard position change mechanism
-        // or implement a dedicated onNodeUpdate prop
+        this.editor.actions.toggleDisable(nodeId);
     }
 
 

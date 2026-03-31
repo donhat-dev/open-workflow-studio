@@ -25,7 +25,7 @@ import { useHotkey } from "@web/core/hotkeys/hotkey_hook";
  * @param {Function} [options.onRun] - () => void - run/execute handler (triggers bus event)
  * @param {Function} options.getRootEl - () => HTMLElement - canvas root element for area scoping
  */
-export function useWorkflowCommands({ editor, getNodes, getReadonly, onSave, onRun, getRootEl }) {
+export function useWorkflowCommands({ editor, getNodes, getReadonly, getCanUndo, getCanRedo, onSave, onRun, getRootEl }) {
 
     function isReadonlyActive() {
         return getReadonly ? !!getReadonly() : false;
@@ -64,6 +64,7 @@ export function useWorkflowCommands({ editor, getNodes, getReadonly, onSave, onR
     }, {
         hotkey: "control+z",
         category: "Workflow",
+        isEnabled: () => !isReadonlyActive() && (getCanUndo ? getCanUndo() : true),
     });
 
     // Redo (Ctrl+Shift+Z or Ctrl+Y)
@@ -73,6 +74,7 @@ export function useWorkflowCommands({ editor, getNodes, getReadonly, onSave, onR
     }, {
         hotkey: "control+shift+z",
         category: "Workflow",
+        isEnabled: () => !isReadonlyActive() && (getCanRedo ? getCanRedo() : true),
     });
 
     // Redo alternative (Ctrl+Y) - not shown in palette, just a binding

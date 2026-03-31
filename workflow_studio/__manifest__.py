@@ -44,6 +44,7 @@
             'workflow_studio/static/src/scss/primary_variables.scss',
             'workflow_studio/static/src/scss/secondary_variables.scss',
             'workflow_studio/static/src/scss/bootstrap_overridden.scss',
+            'workflow_studio/static/src/scss/_typography.scss',
             'workflow_studio/static/src/scss/shared_primitives.scss',
             # Components (use services)
             'workflow_studio/static/src/components/**/*',

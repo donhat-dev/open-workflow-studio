@@ -1,0 +1,35 @@
+services:
+  odoo:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+    container_name: odoo-workflow-dev
+    restart: unless-stopped
+    ports:
+      - "${ODOO_PORT:-8069}:8069"
+      - "${DEBUGPY_PORT:-5678}:5678"
+    volumes:
+      # Odoo 18 EE source (read-only)
+      - ${ODOO_SOURCE_PATH:-C:/Users/ODOO/Documents/GitHub/18EE-NS}:/opt/odoo/source:ro
+      # Odoo addons (read-write for live editing)
+      - C:/Users/ODOO/Documents/GitHub/18EE-NS/odoo/addons:/opt/odoo/odoo/addons:rw
+      # Custom addons (read-write for live editing)
+      - ./workflow_studio:/opt/odoo/custom/workflow_studio:rw
+      - ./flight_json_widget:/opt/odoo/custom/flight_json_widget:rw
+      - ./lf_web_studio:/opt/odoo/custom/lf_web_studio:rw
+      - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\hrm:/opt/odoo/hrm_addons:rw
+      - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\third_party:/opt/odoo/third_party_addons:rw
+      - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\core:/opt/odoo/core_addons:rw
+      # Config (live-mounted, no rebuild needed)
+      - ./docker/odoo.conf:/etc/odoo/odoo.conf:ro
+      # Persistent data
+      - C:/var/lib/odoo:/opt/odoo/data
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ODOO_DEBUG=${ODOO_DEBUG:-1}
+      - DEBUGPY_PORT=${DEBUGPY_PORT:-5678}
+
+volumes: {}

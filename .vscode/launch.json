@@ -2,6 +2,35 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Docker: Odoo debug",
+      "type": "debugpy",
+      "request": "attach",
+      "preLaunchTask": "docker-compose-restart",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/workflow_studio",
+          "remoteRoot": "/opt/odoo/custom/workflow_studio"
+        },
+        {
+          "localRoot": "${workspaceFolder}/flight_json_widget",
+          "remoteRoot": "/opt/odoo/custom/flight_json_widget"
+        },
+        {
+          "localRoot": "${workspaceFolder}/lf_web_studio",
+          "remoteRoot": "/opt/odoo/custom/lf_web_studio"
+        },
+        {
+          "localRoot": "C:/Users/ODOO/Documents/GitHub/18EE-NS",
+          "remoteRoot": "/opt/odoo/source"
+        }
+      ],
+      "justMyCode": true
+    },
+    {
       "name": "hrm",
       "type": "debugpy",
       "request": "launch",
@@ -21,7 +50,7 @@
       },
       "justMyCode": true
     },
-      {
+    {
       "name": "hrm (on demand restart)",
       "type": "debugpy",
       "request": "launch",
@@ -41,6 +70,6 @@
         "JWT_EXPIRE_TIME": "999999"
       },
       "justMyCode": true
-    },
+    }
   ]
 }

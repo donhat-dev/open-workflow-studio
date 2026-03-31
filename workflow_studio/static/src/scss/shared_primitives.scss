@@ -236,3 +236,1415 @@ $wf-url-box-bg-live:     rgba($o-success, 0.05) !default;
         color: $wf-action-color;
     }
 }
+
+
+// =============================================================================
+// Workflow Container Scope
+// -----------------------------------------------------------------------------
+// All shared primitives below are scoped to .wf-container to avoid
+// collisions with Odoo / Bootstrap core classes.
+//
+// Naming: flat single-dash for variants/sizes/children.
+//   base:    wf-btn
+//   variant: wf-btn-primary
+//   size:    wf-btn-sm
+//   child:   wf-badge-dot
+//   state:   .disabled  .loading  .error  .readonly  .active
+// =============================================================================
+
+.wf-container {
+
+// ─── Button (.wf-btn) ───────────────────────────────────────────────────────
+
+.wf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 20px;
+    border: 1px solid transparent;
+    border-radius: $wf-radius-sm;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: $wf-text-base;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: color 0.15s ease,
+                background-color 0.15s ease,
+                border-color 0.15s ease,
+                box-shadow 0.15s ease,
+                transform 0.1s ease;
+
+    &:focus-visible {
+        outline: none;
+        box-shadow: $wf-shadow-focus;
+    }
+
+    &.disabled,
+    &:disabled {
+        opacity: 0.45;
+        pointer-events: none;
+    }
+
+    &.loading {
+        position: relative;
+        color: transparent !important;
+
+        &::after {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: wf-btn-spin 0.6s linear infinite;
+            color: inherit;
+            opacity: 0.7;
+        }
+    }
+
+    // ── Sizes ──
+
+    &-sm {
+        min-height: 32px;
+        padding: 4px 12px;
+        font-size: 0.8125rem;
+    }
+
+    &-lg {
+        min-height: 52px;
+        padding: 12px 28px;
+        font-size: 1rem;
+    }
+
+    // ── Icon-only modifier ──
+
+    &-icon {
+        width: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: $wf-radius-sm;
+        font-size: 14px;
+
+        &.wf-btn-sm {
+            width: 24px;
+            min-height: 24px;
+            font-size: 12px;
+        }
+
+        &.wf-btn-lg {
+            width: 36px;
+            min-height: 36px;
+            font-size: 16px;
+        }
+    }
+
+    // ── Variants ──
+
+    &-primary {
+        background: $wf-action-color;
+        border-color: $wf-action-color;
+        color: $wf-white;
+
+        &:hover:not(:disabled):not(.disabled) {
+            background: lighten($wf-action-color, 4%);
+            transform: translateY(-1px);
+        }
+
+        &:active:not(:disabled):not(.disabled) {
+            background: darken($wf-action-color, 8%);
+            transform: none;
+        }
+
+        &.loading::after { color: $wf-white; }
+    }
+
+    &-secondary {
+        background: $wf-surface-base;
+        border-color: $wf-border-base;
+        color: $wf-text-base;
+
+        &:hover:not(:disabled):not(.disabled) {
+            border-color: $wf-border-strong;
+            transform: translateY(-1px);
+        }
+
+        &:active:not(:disabled):not(.disabled) {
+            background: $wf-surface-subtle;
+            transform: none;
+        }
+    }
+
+    &-ghost {
+        background: transparent;
+        border-color: transparent;
+        color: $wf-text-muted;
+
+        &:hover:not(:disabled):not(.disabled) {
+            color: $wf-text-base;
+            background: $wf-surface-subtle;
+        }
+
+        &:active:not(:disabled):not(.disabled) {
+            background: $wf-surface-emphasis;
+        }
+    }
+
+    &-danger {
+        background: $wf-danger-color;
+        border-color: $wf-danger-color;
+        color: $wf-white;
+
+        &:hover:not(:disabled):not(.disabled) {
+            background: darken($wf-danger-color, 6%);
+            transform: translateY(-1px);
+        }
+
+        &:active:not(:disabled):not(.disabled) {
+            background: darken($wf-danger-color, 12%);
+            transform: none;
+        }
+
+        &.loading::after { color: $wf-white; }
+    }
+
+    &-danger-ghost {
+        background: transparent;
+        border-color: transparent;
+        color: $wf-danger-color;
+
+        &:hover:not(:disabled):not(.disabled) {
+            background: $wf-danger-soft-bg;
+        }
+
+        &:active:not(:disabled):not(.disabled) {
+            background: rgba($wf-danger-color, 0.18);
+        }
+    }
+}
+
+// ─── Badge (.wf-badge) ─────────────────────────────────────────────────────
+
+.wf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: $wf-radius-sm;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1;
+
+    &-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    // ── Sizes ──
+
+    &-sm {
+        height: 20px;
+        padding: 0 6px;
+        font-size: 0.6875rem;
+
+        .wf-badge-dot {
+            width: 5px;
+            height: 5px;
+        }
+    }
+
+    // ── Variants ──
+
+    &-neutral {
+        background: $wf-surface-subtle;
+        color: $wf-text-muted;
+
+        .wf-badge-dot { background: $wf-text-faint; }
+    }
+
+    &-success {
+        background: $wf-success-soft-bg;
+        color: darken($wf-success-color, 10%);
+
+        .wf-badge-dot { background: $wf-success-color; }
+    }
+
+    &-danger {
+        background: $wf-danger-soft-bg;
+        color: darken($wf-danger-color, 10%);
+
+        .wf-badge-dot { background: $wf-danger-color; }
+    }
+
+    &-warning {
+        background: $wf-warning-soft-bg;
+        color: darken($wf-warning-color, 10%);
+
+        .wf-badge-dot { background: $wf-warning-color; }
+    }
+
+    &-info {
+        background: $wf-info-soft-bg;
+        color: darken($wf-info-color, 10%);
+
+        .wf-badge-dot { background: $wf-info-color; }
+    }
+
+    &-active {
+        background: $wf-action-soft-bg;
+        color: $wf-action-color;
+
+        .wf-badge-dot { background: $wf-action-color; }
+    }
+
+    // ── Disabled ──
+
+    &.disabled {
+        opacity: 0.45;
+    }
+}
+
+// ─── Form Control (.wf-control) ────────────────────────────────────────────
+
+.wf-control {
+    display: block;
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-base;
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: $wf-text-base;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &::placeholder {
+        color: $wf-text-faint;
+    }
+
+    &:hover:not(:disabled):not(:focus):not(.readonly) {
+        border-color: $wf-border-strong;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: $wf-control-focus-border-color;
+        box-shadow: $wf-control-focus-ring;
+    }
+
+    &.error {
+        border-color: $wf-danger-color;
+        box-shadow: 0 0 0 2px rgba($wf-danger-color, 0.15);
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        background: $wf-surface-subtle;
+        cursor: not-allowed;
+    }
+
+    &.readonly {
+        background: $wf-surface-subtle;
+        cursor: default;
+    }
+
+    // ── Sizes ──
+
+    &-sm {
+        min-height: 32px;
+        padding: 6px 10px;
+        font-size: 0.8125rem;
+    }
+
+    &-lg {
+        min-height: 44px;
+        padding: 10px 14px;
+        font-size: 1rem;
+    }
+
+    // ── Select variant ──
+
+    &-select {
+        appearance: none;
+        padding-right: 32px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236c757d' d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 12px;
+        cursor: pointer;
+    }
+
+    // ── Textarea variant ──
+
+    &-textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    // ── Expression variant ──
+
+    &-expression {
+        border-color: $wf-expression-border-color;
+        background: $wf-expression-mode-bg;
+        font-family: $wf-font-mono;
+        font-size: 0.84rem;
+        color: $wf-expression-mode-fg;
+
+        &:focus {
+            border-color: $wf-expression-border-color;
+            box-shadow: $wf-expression-focus-ring;
+        }
+    }
+}
+
+// ─── Banner (.wf-banner) ───────────────────────────────────────────────────
+
+.wf-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-height: 40px;
+    padding: 10px 14px;
+    border-left: 3px solid $wf-border-strong;
+    border-radius: 0;
+    background: $wf-surface-subtle;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: $wf-text-base;
+
+    &-icon {
+        flex-shrink: 0;
+        margin-top: 2px;
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    &-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &-title {
+        font-weight: 600;
+    }
+
+    &-text {
+        margin: 0;
+        color: $wf-text-muted;
+    }
+
+    &-dismiss {
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    // ── Variants ──
+
+    &-info {
+        border-left-color: $wf-info-color;
+        background: $wf-info-soft-bg;
+
+        .wf-banner-icon { color: $wf-info-color; }
+    }
+
+    &-success {
+        border-left-color: $wf-success-color;
+        background: $wf-success-soft-bg;
+
+        .wf-banner-icon { color: $wf-success-color; }
+    }
+
+    &-warning {
+        border-left-color: $wf-warning-color;
+        background: $wf-warning-soft-bg;
+
+        .wf-banner-icon { color: $wf-warning-color; }
+    }
+
+    &-danger {
+        border-left-color: $wf-danger-color;
+        background: $wf-danger-soft-bg;
+
+        .wf-banner-icon { color: $wf-danger-color; }
+    }
+
+    &-neutral {
+        border-left-color: $wf-border-strong;
+        background: $wf-surface-subtle;
+
+        .wf-banner-icon { color: $wf-text-muted; }
+    }
+}
+
+// ─── Toggle (.wf-toggle) ───────────────────────────────────────────────────
+
+.wf-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-subtle;
+
+    &-item {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        height: 28px;
+        padding: 0 10px;
+        border: none;
+        border-radius: calc(#{$wf-radius-sm} - 1px);
+        background: transparent;
+        font-family: inherit;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: $wf-text-muted;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+
+        &:hover:not(.active):not(:disabled) {
+            color: $wf-text-base;
+        }
+
+        &.active {
+            background: $wf-surface-base;
+            color: $wf-text-base;
+            box-shadow: $wf-shadow-sm;
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        i {
+            font-size: 11px;
+        }
+    }
+
+    // ── Sizes ──
+
+    &-sm {
+        padding: 2px;
+
+        .wf-toggle-item {
+            height: 24px;
+            padding: 0 8px;
+            font-size: 0.75rem;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Tile / Card
+// ═══════════════════════════════════════════════════════════════
+
+.wf-tile {
+    position: relative;
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 230px;
+    padding: 22px;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background:
+        linear-gradient(
+            180deg,
+            rgba($wf-action-color, 0.045) 0%,
+            rgba($wf-action-color, 0) 56px
+        ),
+        rgba($wf-white, 0.94);
+    box-shadow: $wf-shadow-sm;
+    overflow: hidden;
+    transition:
+        transform 0.14s ease,
+        border-color 0.14s ease,
+        box-shadow 0.14s ease,
+        background-color 0.14s ease;
+
+    &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: $wf-action-color;
+    }
+
+    &:hover {
+        transform: translateY(-3px);
+        border-color: rgba($wf-action-color, 0.3);
+        box-shadow: $wf-shadow-md;
+    }
+
+    &--tall {
+        grid-column: span 5;
+        min-height: 272px;
+    }
+
+    &--wide {
+        grid-column: span 7;
+    }
+
+    &--full {
+        grid-column: span 12;
+        min-height: 0;
+    }
+
+    &--compact {
+        min-height: 176px;
+        padding: 18px;
+        gap: 12px;
+    }
+
+    &--selected {
+        border-color: $wf-action-color;
+        background:
+            linear-gradient(
+                180deg,
+                rgba($wf-action-color, 0.07) 0%,
+                rgba($wf-action-color, 0.02) 56px
+            ),
+            rgba($wf-white, 0.96);
+    }
+
+    &__kicker {
+        margin-bottom: 10px;
+        letter-spacing: 0.18em;
+        color: $wf-action-color;
+    }
+
+    &__header {
+        display: grid;
+        gap: 10px;
+    }
+
+    &__badges {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    &__title {
+        letter-spacing: -0.03em;
+        color: $wf-text-base;
+    }
+
+    &__copy {
+        color: $wf-text-muted;
+    }
+
+    &__metric {
+        font-size: 2.65rem;
+        line-height: 0.95;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+        color: $wf-action-color;
+    }
+
+    &__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-family: $wf-font-mono;
+        font-size: 0.6875rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: $wf-text-muted;
+    }
+
+    &__list {
+        display: grid;
+        gap: 8px;
+        padding-left: 18px;
+        color: $wf-text-muted;
+        font-size: 0.9rem;
+        line-height: 1.55;
+    }
+
+    &__footer {
+        margin-top: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid rgba($wf-text-base, 0.09);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Canvas Kit
+// ═══════════════════════════════════════════════════════════════
+
+.wf-canvas-stage {
+    position: relative;
+    min-height: 430px;
+    border: 1px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background:
+        linear-gradient(to right, rgba($wf-text-base, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba($wf-text-base, 0.05) 1px, transparent 1px),
+        $wf-white;
+    background-size: 56px 56px, 56px 56px, auto;
+    overflow: hidden;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+            circle at 1px 1px,
+            rgba($wf-text-muted, 0.18) 1px,
+            transparent 1px
+        );
+        background-size: 24px 24px;
+        opacity: 0.24;
+        pointer-events: none;
+    }
+}
+
+.wf-canvas-node {
+    position: absolute;
+    width: 198px;
+    padding: 18px;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: rgba($wf-white, 0.95);
+    box-shadow: $wf-shadow-sm;
+    z-index: 2;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: $wf-action-color;
+    }
+
+    &__kicker {
+        margin-bottom: 8px;
+        letter-spacing: 0.18em;
+        color: $wf-action-color;
+    }
+
+    &__title {
+        letter-spacing: -0.02em;
+        color: $wf-text-base;
+    }
+
+    &__copy {
+        margin-top: 8px;
+        color: $wf-text-muted;
+    }
+}
+
+.wf-node-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 236px;
+    min-height: 92px;
+    padding: 16px 18px;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: rgba($wf-white, 0.96);
+    box-shadow: $wf-shadow-sm;
+    overflow: hidden;
+
+    &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: $wf-action-color;
+    }
+
+    &--selected {
+        border-color: rgba($wf-action-color, 0.28);
+        background: linear-gradient(
+            180deg,
+            rgba($wf-action-color, 0.05) 0%,
+            rgba($wf-white, 0.96) 56px
+        );
+    }
+
+    &__icon-box {
+        position: relative;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1.5px solid $wf-border-base;
+        background: rgba($wf-surface-subtle, 0.92);
+        font-size: 18px;
+        color: $wf-action-color;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 4px;
+            border: 1px solid rgba($wf-text-base, 0.08);
+        }
+    }
+
+    &__content {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    &__kicker {
+        letter-spacing: 0.14em;
+        color: $wf-action-color;
+    }
+
+    &__title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: $wf-text-base;
+    }
+
+    &__subtitle {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: $wf-text-muted;
+    }
+}
+
+.wf-socket {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba($wf-text-base, 0.18);
+    background: $wf-surface-base;
+    z-index: 3;
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba($wf-text-base, 0.12);
+    }
+
+    &-connected::after {
+        content: "";
+        position: absolute;
+        inset: 5px;
+        background: $wf-action-color;
+    }
+
+    &-error {
+        border-color: $wf-danger-color;
+    }
+
+    &.out {
+        top: 50%;
+        right: -9px;
+        transform: translateY(-50%);
+    }
+
+    &.in {
+        left: -9px;
+    }
+}
+
+.wf-connection {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.wf-conn-seg {
+    position: absolute;
+    background: rgba($wf-text-base, 0.16);
+
+    &.h { height: 2px; }
+    &.v { width: 2px; }
+}
+
+.wf-conn-accent {
+    background: rgba($wf-action-color, 0.34);
+}
+
+.wf-conn-label {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    min-height: 26px;
+    padding: 0 10px;
+    border: 1px solid $wf-border-base;
+    background: rgba($wf-white, 0.92);
+    font-family: $wf-font-mono;
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: $wf-text-muted;
+}
+
+.wf-conn-arrow {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-top: 2px solid rgba($wf-action-color, 0.34);
+    border-right: 2px solid rgba($wf-action-color, 0.34);
+    transform: rotate(45deg);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Toolbar
+// ═══════════════════════════════════════════════════════════════
+
+.wf-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-base;
+    box-shadow: $wf-shadow-sm;
+
+    &--vertical {
+        flex-direction: column;
+    }
+
+    &__btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid transparent;
+        border-radius: $wf-radius-sm;
+        background: transparent;
+        font-size: 13px;
+        color: $wf-text-muted;
+        cursor: pointer;
+        transition:
+            color 0.12s,
+            background-color 0.12s,
+            border-color 0.12s;
+
+        &:hover:not(:disabled) {
+            color: $wf-text-base;
+            background: $wf-surface-subtle;
+            border-color: $wf-border-base;
+        }
+
+        &:active:not(:disabled) {
+            background: $wf-surface-emphasis;
+        }
+
+        &:focus-visible {
+            outline: none;
+            box-shadow: $wf-shadow-focus;
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        &--danger {
+            &:hover:not(:disabled) {
+                color: $wf-danger-color;
+                background: $wf-danger-soft-bg;
+                border-color: rgba($wf-danger-color, 0.22);
+            }
+
+            &:active:not(:disabled) {
+                background: rgba($wf-danger-color, 0.18);
+            }
+        }
+    }
+
+    &-sm .wf-toolbar__btn {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+    }
+
+    &__sep {
+        width: 1px;
+        height: 16px;
+        margin: 0 2px;
+        background: $wf-border-base;
+    }
+
+    &--vertical &__sep {
+        width: 16px;
+        height: 1px;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Dropdown
+// ═══════════════════════════════════════════════════════════════
+
+.wf-dropdown {
+    position: relative;
+    display: inline-flex;
+
+    &__trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 6px 10px;
+        border: 1.5px solid $wf-border-base;
+        border-radius: $wf-radius-sm;
+        background: $wf-surface-base;
+        color: $wf-text-base;
+        cursor: pointer;
+        transition:
+            border-color 0.12s,
+            background-color 0.12s;
+
+        &:hover {
+            border-color: $wf-border-strong;
+        }
+
+        .fa-caret-down {
+            font-size: 10px;
+            opacity: 0.6;
+        }
+    }
+
+    &__menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 20;
+        min-width: 170px;
+        padding: 6px;
+        border: 1.5px solid $wf-border-base;
+        border-radius: $wf-radius-sm;
+        background: $wf-surface-base;
+        box-shadow: $wf-shadow-md;
+
+        &--right {
+            left: auto;
+            right: 0;
+        }
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 6px 8px;
+        border: none;
+        border-radius: $wf-radius-sm;
+        background: transparent;
+        color: $wf-text-base;
+        cursor: pointer;
+        transition: background-color 0.1s;
+
+        &:hover {
+            background: $wf-action-soft-bg;
+        }
+
+        &--active {
+            background: $wf-action-soft-bg;
+            color: $wf-action-color;
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        i {
+            width: 14px;
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    }
+
+    &__divider {
+        height: 1px;
+        margin: 4px 0;
+        background: $wf-border-base;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Menu List
+// ═══════════════════════════════════════════════════════════════
+
+.wf-menu-list {
+    width: 280px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px 0;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-base;
+    box-shadow: $wf-shadow-md;
+
+    &--lg {
+        width: 500px;
+        max-height: 600px;
+    }
+
+    &__group {
+        padding: 4px 0;
+    }
+
+    &__group-title {
+        padding: 6px 14px 4px;
+        letter-spacing: 0.14em;
+        color: $wf-text-muted;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 14px;
+        border: none;
+        background: transparent;
+        width: 100%;
+        font-family: inherit;
+        font-size: 0.875rem;
+        color: $wf-text-base;
+        cursor: pointer;
+        transition: background-color 0.1s;
+
+        &:hover {
+            background: $wf-action-soft-bg;
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+    }
+
+    &__item-icon {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1.5px solid $wf-border-base;
+        background: $wf-surface-subtle;
+        font-size: 14px;
+        color: $wf-text-muted;
+    }
+
+    &--lg &__item-icon {
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        font-size: 18px;
+    }
+
+    &__item-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__item-desc {
+        margin-top: 2px;
+        color: $wf-text-muted;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Hint Icon + Tooltip
+// ═══════════════════════════════════════════════════════════════
+
+.wf-hint-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: $wf-radius-sm;
+    border: 1.5px solid $wf-border-base;
+    background: $wf-surface-subtle;
+    font-size: 10px;
+    font-weight: 600;
+    color: $wf-text-muted;
+    cursor: help;
+    transition:
+        border-color 0.12s,
+        color 0.12s;
+    vertical-align: middle;
+
+    &:hover {
+        border-color: $wf-action-color;
+        color: $wf-action-color;
+    }
+
+    &--sm {
+        width: 16px;
+        height: 16px;
+        font-size: 9px;
+    }
+
+    &--lg {
+        width: 22px;
+        height: 22px;
+        font-size: 12px;
+    }
+
+    &--info {
+        border-color: rgba($wf-action-color, 0.3);
+        color: $wf-action-color;
+    }
+
+    &--warning {
+        border-color: rgba($wf-warning-color, 0.4);
+        color: #bc6c00;
+    }
+}
+
+.wf-tooltip {
+    position: absolute;
+    z-index: 50;
+    max-width: 260px;
+    padding: 8px 12px;
+    border: 1.5px solid rgba($wf-text-base, 0.12);
+    border-radius: $wf-radius-sm;
+    background: $wf-text-base;
+    color: $wf-white;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    box-shadow: $wf-shadow-md;
+    pointer-events: none;
+
+    &__arrow {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        background: $wf-text-base;
+        border: 1.5px solid rgba($wf-text-base, 0.12);
+        transform: rotate(45deg);
+    }
+
+    &--top &__arrow {
+        bottom: -5px;
+        left: 50%;
+        margin-left: -4px;
+        border-top: none;
+        border-left: none;
+    }
+
+    &--bottom &__arrow {
+        top: -5px;
+        left: 50%;
+        margin-left: -4px;
+        border-bottom: none;
+        border-right: none;
+    }
+
+    &--left &__arrow {
+        right: -5px;
+        top: 50%;
+        margin-top: -4px;
+        border-left: none;
+        border-bottom: none;
+    }
+
+    &--right &__arrow {
+        left: -5px;
+        top: 50%;
+        margin-top: -4px;
+        border-right: none;
+        border-top: none;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Data Table
+// ═══════════════════════════════════════════════════════════════
+
+.wf-data-table {
+    width: 100%;
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-base;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+    overflow: hidden;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1.5px solid $wf-border-base;
+        background: $wf-surface-subtle;
+    }
+
+    th {
+        padding: 8px 14px;
+        text-align: left;
+        letter-spacing: 0.1em;
+        color: $wf-text-muted;
+        background: $wf-surface-subtle;
+        border-bottom: 1.5px solid $wf-border-base;
+
+        &.sortable {
+            cursor: pointer;
+
+            &:hover {
+                color: $wf-text-base;
+            }
+        }
+    }
+
+    td {
+        padding: 8px 14px;
+        border-bottom: 1px solid $wf-border-base;
+        color: $wf-text-base;
+        vertical-align: middle;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tbody tr:hover {
+        background: rgba($wf-action-color, 0.04);
+    }
+
+    &--zebra tbody tr:nth-child(even) {
+        background: $wf-surface-subtle;
+
+        &:hover {
+            background: rgba($wf-action-color, 0.06);
+        }
+    }
+
+    &--compact {
+        th, td {
+            padding: 5px 10px;
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Contained List
+// ═══════════════════════════════════════════════════════════════
+
+.wf-contained-list {
+    border: 1.5px solid $wf-border-base;
+    border-radius: $wf-radius-sm;
+    background: $wf-surface-base;
+    overflow: hidden;
+
+    &__header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1.5px solid $wf-border-base;
+        background: $wf-surface-subtle;
+    }
+
+    &__count {
+        margin-left: auto;
+        letter-spacing: 0.08em;
+        color: $wf-text-muted;
+    }
+
+    &__item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border-bottom: 1px solid $wf-border-base;
+        font-size: 0.8125rem;
+        color: $wf-text-base;
+        transition: background-color 0.1s;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &--clickable {
+            cursor: pointer;
+
+            &:hover {
+                background: $wf-action-soft-bg;
+            }
+        }
+    }
+
+    &__item-icon {
+        flex: 0 0 24px;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: $wf-text-muted;
+    }
+
+    &__item-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__item-meta {
+        color: $wf-text-muted;
+    }
+
+    &__item-action {
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+
+    &--disclosed &__item {
+        padding-left: 28px;
+    }
+}
+
+} // .wf-container
+
+@keyframes wf-btn-spin {
+    to { transform: rotate(360deg); }
+}

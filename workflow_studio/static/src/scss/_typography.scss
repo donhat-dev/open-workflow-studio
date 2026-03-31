@@ -1,0 +1,38 @@
+// ═══════════════════════════════════════════════════════════════
+//  Typography Utility Classes
+//  Scoped under .wf-container to avoid global CSS pollution.
+//  Matches playground.html <style id="typography"> spec.
+// ═══════════════════════════════════════════════════════════════
+
+.wf-container {
+	// ── Font Family ──
+	.font-display { font-family: $wf-font-display; }
+	.font-mono    { font-family: $wf-font-mono; }
+
+	// ── Font Size + Line Height ──
+	.text-xs   { font-size: 0.75rem;  line-height: 1rem; }
+	.text-sm   { font-size: 0.875rem; line-height: 1.25rem; }
+	.text-base { font-size: 1rem;     line-height: 1.5rem; }
+	.text-lg   { font-size: 1.125rem; line-height: 1.75rem; }
+	.text-xl   { font-size: 1.25rem;  line-height: 1.75rem; }
+	.text-2xl  { font-size: 1.5rem;   line-height: 2rem; }
+	.text-3xl  { font-size: 1.875rem; line-height: 2.25rem; }
+	.text-4xl  { font-size: 2.25rem;  line-height: 2.5rem; }
+	.text-5xl  { font-size: 3rem;     line-height: 1; }
+
+	// ── Pixel / Custom Sizes ──
+	.text-\[10px\]    { font-size: 10px; }
+	.text-\[11px\]    { font-size: 11px; }
+	.text-\[0\.8rem\] { font-size: 0.8rem; }
+
+	// ── Font Weight ──
+	.font-normal   { font-weight: 400; }
+	.font-medium   { font-weight: 500; }
+	.font-semibold { font-weight: 600; }
+	.font-bold     { font-weight: 700; }
+
+	// ── Text Transform & Style ──
+	.uppercase  { text-transform: uppercase; }
+	.capitalize { text-transform: capitalize; }
+	.italic     { font-style: italic; }
+}

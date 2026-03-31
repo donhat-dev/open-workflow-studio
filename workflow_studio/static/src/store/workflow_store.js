@@ -1034,11 +1034,19 @@ export const workflowEditorService = {
             },
 
             undo() {
-                return history.undo();
+                const result = history.undo();
+                if (result === false) {
+                    notification.add("Nothing to undo.", { type: "warning" });
+                }
+                return result;
             },
 
             redo() {
-                return history.redo();
+                const result = history.redo();
+                if (result === false) {
+                    notification.add("Nothing to redo.", { type: "warning" });
+                }
+                return result;
             },
         };
 

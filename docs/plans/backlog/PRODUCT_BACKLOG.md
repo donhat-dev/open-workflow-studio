@@ -1,7 +1,7 @@
 # WORKFLOW PILOT - PRODUCT BACKLOG
 
-> **Version**: 1.3.0
-> **Last Updated**: 2026-03-19
+> **Version**: 1.3.1
+> **Last Updated**: 2026-03-27
 > **Target**: SMB Retail/E-commerce (Shopee/TikTok + carriers), >15k orders/day
 
 ---
@@ -14,21 +14,27 @@
 | **E9: Variable System**         | P0       | 19           | 100%    | ✅ Done        |
 | **E2: Node Execution Engine**   | P0       | 55           | 68%     | In Progress   |
 | **E10: Python Runtime Engine**  | P0       | 40           | 80%     | In Progress   |
-| **E3: Node Library**            | P0       | 45           | 72%     | In Progress   |
-| **E4: UI/UX Editor**            | P1       | 48           | 92%     | In Progress   |
-| **E4.6: Editor State Refactor** | P1       | 32           | 79%     | 🔄 In Progress |
+| **E3: Node Library**            | P0       | 45           | 74%     | In Progress   |
+| **E4: UI/UX Editor**            | P1       | 48           | 95%     | In Progress   |
+| **E4.6: Editor State Refactor** | P1       | 32           | 86%     | 🔄 In Progress |
 | **E5: Expression System**       | P1       | 24           | 75%     | In Progress   |
-| **E6: Persistence & Storage**   | P1       | 26           | 59%     | In Progress   |
+| **E6: Persistence & Storage**   | P1       | 26           | 61%     | In Progress   |
 | **E7: Production Features**     | P2       | 34           | 40%     | In Progress   |
 | **E8: Integrations**            | P2       | 40           | 0%      | Planned       |
-| **TOTAL**                       |          | **357**      | **72%** |               |
+| **TOTAL**                       |          | **357**      | **74%** |               |
 
 > Note (2026-01): E2 (JS StackExecutor) remains a *prototype track* for UX/learning.
 > The production direction is E10: backend-owned execution in Python with a hybrid/feature-flagged integration.
-> Update basis (2026-03-19): incremental commit evidence from `2026-03-18..2026-03-19`, layered on the prior baseline.
+> Update basis (2026-03-27): incremental commit evidence from `2026-03-20..2026-03-26`, layered on the prior baseline.
 
 ### Recent Commit Highlights
 
+- **2026-03-26** `776f28e` — Extracted canvas viewport hook (`use_viewport.js`) and view utils; docs/knowledge updates; README refresh.
+- **2026-03-25** `29db6a8` — Refactored icon system to `LucideIcon` component; updated node type definitions and dynamic node factory; workflow editor app and palette polished.
+- **2026-03-23** `367905c` — Added accessibility labels to ExpressionInput; polished control_renderer, body_type_control, and field_values_control XML.
+- **2026-03-23** `49294c9` — Added Space Grotesk font; expanded SCSS shared-variable layer and dashboard styles.
+- **2026-03-23** `96d2f59` — Created `.clineignore`/`.clinerules`; styled control_renderer and ExpressionInput.
+- **2026-03-22** `715b785` — Added UrlBox component; extended TriggerConfigPanel with URL copy flow; expanded `workflow_trigger.py`, `ir_workflow.py`, and workflow store RPC surface; added `config_panel_dialog` and `trigger_fields_control` components.
 - **2026-03-19** `3a40d56` — Hardened pin-data execution flow, execution-state reset, and copy-to-editor UX across store/canvas/config panel.
 - **2026-03-19** `f16c5b7` — Added hybrid trigger foundation (bridge model + runners + views) and scaffolded workflow dashboard/search integrations.
 - **2026-03-17** `d7a4549` — Refactored editor canvas connection handling, node registry, graph utils, and adapter layer.
@@ -46,6 +52,12 @@
 
 | Date | Commit | Primary Epics | Key Evidence (files) | Impact Summary |
 | --- | --- | --- | --- | --- |
+| 2026-03-26 | `776f28e` | E4, E4.6 | `editor_canvas/hooks/use_viewport.js` (new), `editor_canvas/utils/view_utils.js` (new), `dimensions.js`, `motion_helpers.js`, `workflow_store.js`, `editor_canvas.js`, `workflow_node.js` | Canvas viewport extracted to a dedicated hook; view/motion utilities refactored; knowledge docs updated |
+| 2026-03-25 | `29db6a8` | E3, E4, E4.6 | `common/lucide_icon.*` (new), `dynamic_node_factory.js`, `workflow_editor_app.*`, `editor_canvas.*`, `workflow_node.*`, `data_nodes.js`, `flow_nodes.js`, `manual_trigger.js`, `node_palette.js`, `node_menu.js`, `secondary_variables.scss` | Icon system unified via LucideIcon component; node type definitions and factory updated; editor app and canvas refactored |
+| 2026-03-23 | `367905c` | E4, E5 | `control_renderer.xml`, `body_type_control.xml`, `auth_control.xml`, `query_params_control.xml`, `ExpressionInput.xml`, `field_values_control.xml`, `node_config_panel.js`, `workflow_store.js`, `editor_canvas.js` | Accessibility labels added to ExpressionInput; control_renderer and config panel UI consistency pass |
+| 2026-03-23 | `49294c9` | E4 | `primary_variables.scss`, `shared_primitives.scss`, `workflow_editor.scss`, `ExpressionInput.xml`, `node_config_panel.xml`, `workflow_dashboard.scss`, `workflow_dashboard_main.*`, `config_panel_dialog.xml` | Space Grotesk font integrated; SCSS variable layer and dashboard styles expanded |
+| 2026-03-23 | `96d2f59` | E4, E5 | `control_renderer.xml`, `ExpressionInput.*`, `.clineignore`, `.clinerules`, `README.md` | Control renderer and ExpressionInput styling; project memory tooling scaffolded |
+| 2026-03-22 | `715b785` | E3, E4, E4.6, E6, E10 | `config_panel_dialog.*` (new), `controls/trigger_fields_control.*` (new), `workflow_trigger.py`, `ir_workflow.py`, `workflow_store.js`, `controllers/main.py`, `workflow_type_data.xml`, `http_runner.py`, `record_operation_runner.py` | UrlBox + TriggerConfigPanel with clipboard copy; config_panel_dialog introduced; trigger_fields_control added; trigger model, ir_workflow, and RPC surface expanded |
 | 2026-03-19 | `3a40d56` | E4, E4.6, E6, E10 | `workflow_store.js`, `node_config_panel.*`, `editor_canvas.js`, `workflow_editor_app.js`, `workflow_executor.py`, `schemas/execution.py` | Pin-data execution flow hardened, history/execution-state isolation fixed, and copy-to-editor + config-panel pin UX refined |
 | 2026-03-19 | `f16c5b7` | E3, E6, E7, E10 | `workflow_trigger.py`, `models/runners/*trigger_runner.py`, `controllers/main.py`, `workflow_dashboard_*`, `workflow_*view*.xml/js`, `ir.model.access.csv` | Hybrid trigger architecture landed, workflow dashboard/list/kanban integrations added, and storage/search surfaces expanded |
 | 2026-03-17 | `d7a4549` | E4, E4.6, E10 | `editor_canvas.js`, `connection.js`, `adapter.js`, `graph_utils.js`, `node_type_registry.js`, `record_operation_runner.py` | Editor canvas/connection refactor + adapter/registry cleanup + runner fixes |
@@ -213,8 +225,8 @@
 | E3.2.3   | Switch (Multi-branch)                                 |      3 | P1       |      20% | 🔄             | Switch runner scaffold exists; branch semantics need further QA        |
 | E3.2.4   | NoOp (Placeholder)                                    |      1 | P0       |     100% | ✅             | Passthrough                                                            |
 |          |                                                       |        |          |          |               |                                                                        |
-| **E3.3** | **Trigger Nodes**                                     | **10** | P1       |  **75%** | 🔄 In Progress | Hybrid trigger architecture landed: `workflow.trigger` bridge, backend runners, and node-specific open/execute flows (`f16c5b7`) |
-| E3.3.1   | Webhook Trigger                                       |      5 | P1       |      70% | 🔄             | Webhook route, backend model/view, and runner are in place; richer frontend config UX remains pending (`f16c5b7`) |
+| **E3.3** | **Trigger Nodes**                                     | **10** | P1       |  **80%** | 🔄 In Progress | Hybrid trigger architecture live; UrlBox + TriggerConfigPanel + trigger_fields_control add richer frontend config UX (`715b785`, `f16c5b7`) |
+| E3.3.1   | Webhook Trigger                                       |      5 | P1       |      80% | 🔄             | Webhook route, model/view, runner; UrlBox for URL display/copy; trigger_fields_control; richer config UX added (`715b785`, `f16c5b7`) |
 | E3.3.2   | Schedule Trigger                                      |      3 | P1       |      75% | 🔄             | Cron-backed activation path and runner added; editor opens linked backend record for configuration (`f16c5b7`) |
 | E3.3.3   | Manual Trigger                                        |      2 | P1       |     100% | ✅             | Manual trigger remains the editor-native start node; execute-from-node flow refined in canvas/node UI (`f16c5b7`) |
 |          |                                                       |        |          |          |               |                                                                        |
@@ -247,7 +259,7 @@
 | E4.2.3   | Quick-add button                                            |      1 | P0       |     100% | ✅             | + on unconnected                         |
 | E4.2.4   | Selection highlight                                         |      2 | P0       |     100% | ✅             | Border + shadow                          |
 |          |                                                             |        |          |          |               |                                          |
-| **E4.3** | **Config Panel**                                            |  **8** | P0       | **100%** | ✅ Done        | Three-column inspector is live; pin/unpin, socket output selection, and trigger-aware open behavior were refined further (`f16c5b7`, `3a40d56`) |
+| **E4.3** | **Config Panel**                                      |  **8** | P0       | **100%** | ✅ Done        | Three-column inspector live; UrlBox and TriggerConfigPanel extend trigger-aware open behavior; config_panel_dialog introduced (`715b785`, `f16c5b7`, `3a40d56`) |
 | E4.3.1   | Parameters tab                                              |      3 | P0       |     100% | ✅             | Control rendering                        |
 | E4.3.2   | Output tab                                                  |      2 | P0       |     100% | ✅             | Execution result                         |
 | E4.3.3   | Input data panel                                            |      2 | P0       |     100% | ✅             | Previous node output                     |
@@ -261,12 +273,12 @@
 | E4.4.5   | Subgraph grouping                                           |      5 | P3       |       0% | ❌             | Collapsible groups                       |
 |          |                                                             |        |          |          |               |                                          |
 | **E4.5** | **Expression Builder UX (Major)**                           | **10** | P0       | **100%** | ✅ Done        |                                          |
-| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **79%** | 🔄 In Progress | Service-driven migration advanced via trigger actions, execution replacement, and pin-data state handling (`f16c5b7`, `3a40d56`) |
+| **E4.6** | **Editor State Architecture Refactor (Studio-like)**        | **32** | P0       |  **86%** | 🔄 In Progress | LucideIcon component + canvas viewport hook extraction complete; trigger/pin/execution service flows further hardened (`776f28e`, `29db6a8`, `715b785`, `f16c5b7`, `3a40d56`) |
 | E4.6.1   | workflowEditor service (reactive state + actions + history) |      8 | P0       |     100% | ✅             | Canonical graph/ui state                 |
 | E4.6.2   | Per-editor useSubEnv + scoped editorBus                     |      6 | P0       |      20% | 🔄             | Scoped runtime patterns introduced, full multi-editor isolation pending |
-| E4.6.3   | Refactor EditorCanvas to service-driven                     |      6 | P0       |      85% | 🔄             | Canvas now orchestrates trigger open/execute, socket interactions, and copy-to-editor through service-backed flows (`f16c5b7`, `3a40d56`) |
+| E4.6.3   | Refactor EditorCanvas to service-driven                     |      6 | P0       |      92% | 🔄             | Viewport hook (`use_viewport.js`) and view utils extracted; canvas orchestrates trigger/execute/copy-to-editor through service-backed flows (`776f28e`, `f16c5b7`, `3a40d56`) |
 | E4.6.4   | Refactor panels/menu/toolbar to service-driven              |      6 | P0       |      98% | 🔄             | Pinning moved into the config-panel/service flow and execution cleanup now happens on editor teardown (`3a40d56`) |
-| E4.6.5   | Extract Studio-like hooks + pure utils                      |      4 | P0       |      70% | 🔄             | Hooks/util extraction completed for major canvas behaviors              |
+| E4.6.5   | Extract Studio-like hooks + pure utils                      |      4 | P0       |      82% | 🔄             | `use_viewport.js` hook + `view_utils.js`/`motion_helpers.js` extracted from canvas; prior hook work remains (`776f28e`)              |
 | E4.6.6   | Undo/redo batching + UI feedback                            |      2 | P0       |      60% | 🔄             | Batching and user feedback improved, final polish pending               |
 
 ---
@@ -310,8 +322,8 @@
 |          |                     |        |          |          |               |                     |
 | **E6.2** | **Backend Storage** | **13** | P1       |  **52%** | 🔄 In Progress | Workflow/run persistence now includes trigger records, expanded search views, and supporting access rules (`f16c5b7`) |
 | E6.2.1   | Odoo model          |      3 | P1       |     100% | ✅             | Models for workflow, run, node output are in active use |
-| E6.2.2   | CRUD endpoints      |      3 | P1       |      85% | 🔄             | Load/save/run details endpoints are integrated into UI, and trigger/open-execute routes expanded the surface (`f16c5b7`) |
-| E6.2.3   | User permissions    |      2 | P1       |      75% | 🔄             | Access rules now include `workflow.trigger` model coverage (`f16c5b7`) |
+| E6.2.2   | CRUD endpoints      |      3 | P1       |      88% | 🔄             | Load/save/run details endpoints integrated; trigger/open-execute and UrlBox clipboard RPC routes expanded (`715b785`, `f16c5b7`) |
+| E6.2.3   | User permissions    |      2 | P1       |      75% | 🔄             | Access rules cover `workflow.trigger` + trigger_fields_control surface (`715b785`, `f16c5b7`) |
 | E6.2.4   | Folder organization |      2 | P1       |       0% | ❌             | Workflow categories |
 | E6.2.5   | Search & filter     |      3 | P1       |      70% | 🔄             | Workflow list/kanban/search views gained published/draft/user filters and dashboard entry points (`f16c5b7`) |
 | E6.2.6   | Workflow run sequence|      1 | P1       |     100% | ✅ Done        | Added `workflow.run` sequence data + manifest entry |

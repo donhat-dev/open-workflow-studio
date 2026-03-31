@@ -37,6 +37,10 @@ export class ConfigPanelDialog extends ConfirmationDialog {
         onSave: { type: Function, optional: true },
     };
 
+    get safeOnSave() {
+        return this.props.onSave || (() => {});
+    }
+
     get previousNavigation() {
         return this._getNavigationModel("previous");
     }

@@ -1,0 +1,8 @@
+# Project-specific dependencies
+# Source: workflow_automation_builder/requirements.txt
+pycryptodome
+PyJWT==2.7.0
+packaging==25.0
+firebase_admin==6.1.0
+qifparse==0.5
+pandas==2.3.3
