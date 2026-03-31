@@ -26,6 +26,8 @@ Workflow Studio is an Odoo module (`workflow_studio`) that brings a visual, node
 
 No external tools. No context-switching. No sync headaches.
 
+## DISCLAIMER: This module is in active development and not yet production-ready. Expect breaking changes, incomplete features, and rough edges. Contributions and feedback are welcome!
+
 ## Architecture
 
 ```
