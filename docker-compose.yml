@@ -11,6 +11,8 @@ services:
     volumes:
       # Odoo 18 EE source (read-only)
       - ${ODOO_SOURCE_PATH:-C:/Users/ODOO/Documents/GitHub/18EE-NS}:/opt/odoo/source:ro
+      # Odoo addons (read-write for live editing)
+      - C:/Users/ODOO/Documents/GitHub/18EE-NS/odoo/addons:/opt/odoo/odoo/addons:rw
       # Custom addons (read-write for live editing)
       - ./workflow_studio:/opt/odoo/custom/workflow_studio:rw
       - ./flight_json_widget:/opt/odoo/custom/flight_json_widget:rw
