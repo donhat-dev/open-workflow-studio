@@ -28,6 +28,20 @@ No external tools. No context-switching. No sync headaches.
 
 ## DISCLAIMER: This module is in active development and not yet production-ready. Expect breaking changes, incomplete features, and rough edges. Contributions and feedback are welcome!
 
+## Screenshots
+<p align="center">
+  <img src="docs\description\dashboard.png" alt="Workflow Editor Screenshot" width="800" />
+</p>
+<p align="center">
+  <img src="docs\description\demo-flow-design.png" alt="Execution Log Screenshot" width="800" />
+</p>
+<p align="center">
+  <img src="docs\description\execution-results.png" alt="Execution Log Screenshot" width="800" />
+</p>
+<p align="center">
+  <img src="docs\description\kanban-view-with-summary.png" alt="Execution Log Screenshot" width="800" />
+</p>
+
 ## Architecture
 
 ```
