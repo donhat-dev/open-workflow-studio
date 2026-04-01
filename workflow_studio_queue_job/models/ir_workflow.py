@@ -2,6 +2,8 @@
 
 from odoo import models
 
+from odoo.addons.workflow_studio.workflow import workflow
+
 
 class WorkflowQueueJob(models.Model):
     _inherit = 'ir.workflow'
@@ -14,14 +16,17 @@ class WorkflowQueueJob(models.Model):
             and event.get('execution_mode') in self._QUEUE_AUTOMATED_MODES
         )
 
-    def _launch_requested(self, event):
-        event = super()._launch_requested(event)
-        self.ensure_one()
-        if event.get('handled') or not self._should_queue_launch_event(event):
+    @workflow.execution('pre_execution', priority=15)
+    def _queue_intercept(self, event):
+        """Intercept automated launches and route to queue_job."""
+        if event.get('handled') or event.get('_from_queue'):
+            return event
+        workflow_rec = event.get('workflow')
+        if not workflow_rec or not workflow_rec._should_queue_launch_event(event):
             return event
 
-        run = event.get('run')
         run_vals = dict(event.get('run_vals') or {})
+        run = event.get('run')
         if not run:
             run = self.env['workflow.run'].create(run_vals)
         else:
@@ -48,7 +53,7 @@ class WorkflowQueueJob(models.Model):
 
         event['run'] = run
         event['handled'] = True
-        event['response'] = self._build_launch_response(
+        event['response'] = workflow_rec._build_launch_response(
             run,
             {
                 'status': run.status,

@@ -307,7 +307,7 @@ class TestWorkflowExtensionApi(common.TransactionCase):
             trigger_node_type='manual_trigger',
             node_id='n_manual',
         )
-        result = wf._launch_workflow(
+        result = wf.launch(
             execution_mode='manual',
             start_node_ids=['n_manual'],
         )
@@ -317,8 +317,8 @@ class TestWorkflowExtensionApi(common.TransactionCase):
         # post observer sees success
         self.assertIn(('post', True), observed_events)
 
-    def test_manage_run_lifecycle_false_skips_persist(self):
-        """Executor with manage_run_lifecycle=False does not persist."""
+    def test_executor_lean_mode(self):
+        """Executor runs lean (no internal lifecycle management)."""
         snapshot = {
             'nodes': [
                 {
@@ -350,7 +350,6 @@ class TestWorkflowExtensionApi(common.TransactionCase):
             workflow_run=None,
             snapshot=copy.deepcopy(snapshot),
             persist=False,
-            manage_run_lifecycle=False,
         )
         output = executor.execute({'test': 1})
         self.assertIsNotNone(executor.execution_result)

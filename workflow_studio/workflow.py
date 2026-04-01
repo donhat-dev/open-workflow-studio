@@ -25,9 +25,18 @@ class WorkflowExecutionRegistry:
 
     Each entry is a tuple ``(priority, qualname, func)`` kept sorted
     by ``(priority DESC, qualname DESC)`` so dispatch order is deterministic.
+
+    The execution pipeline runs three phases in order::
+
+        pre_execution  →  execution  →  post_execution
+
+    Call ``run_pipeline(event)`` to execute all three phases.  If any
+    handler sets ``event['handled'] = True`` the pipeline stops early
+    (used by the queue module to defer execution).
     """
 
     _handlers = {}  # {event_name: [(priority, qualname, func), ...]}
+    _PHASES = ('pre_execution', 'execution', 'post_execution')
 
     @classmethod
     def register(cls, event_name, func, priority=_DEFAULT_EXECUTION_PRIORITY):
@@ -52,6 +61,21 @@ class WorkflowExecutionRegistry:
             returned = handler(event)
             if returned is not None:
                 event = returned
+        return event
+
+    @classmethod
+    def run_pipeline(cls, event):
+        """Execute the full pre → execution → post pipeline.
+
+        Dispatches each phase in order.  If a handler sets
+        ``event['handled'] = True`` (e.g. queue intercept), the
+        remaining phases are skipped and the event is returned as-is.
+        """
+        for phase in cls._PHASES:
+            event['_current_phase'] = phase
+            event = cls.dispatch(phase, event)
+            if event.get('handled'):
+                break
         return event
 
     @classmethod

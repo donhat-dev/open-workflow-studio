@@ -83,11 +83,14 @@ class WorkflowRunQueueJob(models.Model):
             raise UserError(_("Workflow run '%s' has no workflow.") % run.display_name)
 
         try:
-            return workflow._execute_run_with_executor(
-                run,
+            return workflow.launch(
+                run=run,
                 input_data=run.input_data or {},
+                execution_mode=run.execution_mode or 'manual',
+                start_node_ids=run.start_node_ids or [],
                 notify_user=False,
                 raise_on_error=True,
+                _from_queue=True,
             )
         except Exception:
             if run.status not in ('failed', 'completed', 'cancelled'):

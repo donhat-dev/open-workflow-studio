@@ -168,16 +168,8 @@ class WorkflowRun(models.Model):
         payload.update(extra)
         return payload
 
-    def _run_local_workflow_event_hooks(self, event_name, payload):
-        hook_name = '_%s' % event_name
-        hook = getattr(self, hook_name, None)
-        if callable(hook):
-            returned = hook(payload)
-            if returned is not None:
-                payload = returned
-        return payload
-
     def _emit_workflow_event(self, event_name, event=None, **extra):
+        """Dispatch a workflow event — delegates to ir.workflow or registry."""
         self.ensure_one()
         payload = self._prepare_workflow_event_payload(event_name, event=event, **extra)
         if self.workflow_id:
@@ -185,31 +177,16 @@ class WorkflowRun(models.Model):
                 event_name,
                 event=payload,
             )
-        payload = self._run_local_workflow_event_hooks(event_name, payload)
         return WorkflowExecutionRegistry.dispatch(event_name, payload)
 
-    # Queue-neutral lifecycle hooks for child addons / inheritance.
+    # Cancel hook — overridden by queue module for bidirectional cancel
     def _cancel_requested(self, event):
-        return event
-
-    def _pre_execution(self, event):
-        return event
-
-    def _post_execution(self, event):
-        return event
-
-    def _node_started(self, event):
-        return event
-
-    def _node_completed(self, event):
-        return event
-
-    def _node_failed(self, event):
         return event
 
     def action_cancel(self):
         for run in self:
-            event = run._emit_workflow_event('cancel_requested')
+            payload = run._prepare_workflow_event_payload('cancel_requested')
+            event = run._cancel_requested(payload)
             if event and event.get('handled'):
                 continue
             raise UserError(_("Cancellation is not available for this workflow run."))

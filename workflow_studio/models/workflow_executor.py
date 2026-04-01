@@ -99,7 +99,7 @@ class WorkflowExecutor:
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
                  notify_channel=None, rollback_on_failure=False,
-                 manage_run_lifecycle=True):
+                 manage_run_lifecycle=False):
         """Initialize executor.
 
         Args:
@@ -113,18 +113,14 @@ class WorkflowExecutor:
                                  (ORM writes from code nodes, etc.) when
                                  execution fails.  Run/node records are
                                  re-persisted from in-memory state.
-            manage_run_lifecycle: If True (default), executor manages run
-                                  status writes, node-run persistence, and
-                                  event emission internally.  Set to False
-                                  when lifecycle is managed externally by
-                                  ``@workflow.execution`` event handlers.
+            manage_run_lifecycle: Deprecated, ignored.  Lifecycle is managed
+                                  by ``@workflow.execution`` handlers.
         """
         self.env = env
         self.run = workflow_run
         self.persist = bool(persist)
         self._notify_channel = notify_channel
         self._rollback_on_failure = bool(rollback_on_failure)
-        self._manage_run_lifecycle = bool(manage_run_lifecycle)
 
         if self.persist:
             if not self.run:
@@ -444,16 +440,12 @@ class WorkflowExecutor:
         self.env.cr.commit()
 
     def execute(self, input_data=None, start_node_ids=None):
-        """Execute workflow from start to completion.
+        """Execute workflow from start to completion (stack loop only).
 
-        When ``_manage_run_lifecycle`` is True (default), the executor
-        manages run status writes, node-run persistence, event
-        emission, and progress commits internally.
-
-        When ``_manage_run_lifecycle`` is False, the executor only runs
-        the stack loop, bus notifications, and savepoint management.
-        The caller (typically ``@workflow.execution`` event handlers on
-        ``ir.workflow``) is responsible for run lifecycle management.
+        The executor runs the node execution loop, bus notifications,
+        savepoint management, and node-level events.  Run lifecycle
+        (status writes, node-run persistence, commits) is managed by
+        ``@workflow.execution`` handlers on ``ir.workflow``.
 
         Args:
             input_data: Initial input data
@@ -471,20 +463,6 @@ class WorkflowExecutor:
         launch_input_data = input_data or {}
 
         try:
-            # -- Lifecycle: mark run as running ---
-            if self._manage_run_lifecycle and self.persist:
-                self.run.write({
-                    'status': 'running',
-                    'started_at': fields.Datetime.now(),
-                })
-                self._invalidate_context_cache()
-                self._commit_progress()
-                self._emit_run_event(
-                    'pre_execution',
-                    input_data=launch_input_data,
-                    start_node_ids=list(start_node_ids or self.run.start_node_ids or []),
-                )
-
             # Find start nodes (explicit or auto-discover)
             if start_node_ids:
                 start_nodes = start_node_ids
@@ -576,29 +554,6 @@ class WorkflowExecutor:
                 'duration_seconds': duration,
             }
 
-            # -- Lifecycle: persist node runs + complete run ---
-            if self._manage_run_lifecycle and self.persist:
-                self._persist_all_node_runs()
-                self.run.write({
-                    'status': 'completed',
-                    'completed_at': fields.Datetime.now(),
-                    'output_data': output_data_display,
-                    'executed_connections': list(self.executed_connections),
-                    'node_count_executed': len(self.node_outputs),
-                    'execution_count': iteration,
-                    'duration_seconds': duration,
-                })
-                self._invalidate_context_cache()
-                self._emit_run_event(
-                    'post_execution',
-                    input_data=launch_input_data,
-                    output_data=output_data_display,
-                    execution_count=iteration,
-                    node_count_executed=len(self.node_outputs),
-                    executed_connections=list(self.executed_connections),
-                    duration_seconds=duration,
-                )
-
             # Final flush: remaining batch + done status
             self._bus_flush(final_status='completed')
 
@@ -624,31 +579,6 @@ class WorkflowExecutor:
                 'duration_seconds': failed_duration,
             }
 
-            # -- Lifecycle: persist for debugging + mark failed ---
-            if self._manage_run_lifecycle and self.persist:
-                self._persist_all_node_runs()
-                values = {
-                    'status': 'failed',
-                    'completed_at': fields.Datetime.now(),
-                    'duration_seconds': failed_duration,
-                    'error_message': str(e),
-                    'executed_connections': list(self.executed_connections),
-                }
-                if self._last_error_node_id:
-                    values['error_node_id'] = self._last_error_node_id
-                self.run.write(values)
-                self._invalidate_context_cache()
-                self._emit_run_event(
-                    'post_execution',
-                    input_data=launch_input_data,
-                    error=str(e),
-                    error_node_id=self._last_error_node_id,
-                    execution_count=len(self.executed_order),
-                    node_count_executed=len(self.node_outputs),
-                    executed_connections=list(self.executed_connections),
-                    duration_seconds=failed_duration,
-                )
-                self._commit_progress()
             # Final flush: remaining batch + failed status
             self._bus_flush(final_status='failed', error=str(e))
             raise
