@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_workflow_run_list_queue_job" model="ir.ui.view">
+        <field name="name">workflow.run.list.queue.job</field>
+        <field name="model">workflow.run</field>
+        <field name="inherit_id" ref="workflow_studio.view_workflow_run_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/field[@name='execution_mode']" position="after">
+                <field name="queue_job_state" optional="hide"/>
+                <field name="queue_job_id" optional="hide" groups="queue_job.group_queue_job_manager"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_workflow_run_form_queue_job" model="ir.ui.view">
+        <field name="name">workflow.run.form.queue.job</field>
+        <field name="model">workflow.run</field>
+        <field name="inherit_id" ref="workflow_studio.view_workflow_run_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form/header" position="inside">
+                <button
+                    name="action_cancel"
+                    string="Cancel Queue"
+                    type="object"
+                    class="btn-secondary"
+                    invisible="not queue_can_cancel"
+                />
+            </xpath>
+            <xpath expr="//form//field[@name='executed_version']" position="before">
+                <field name="queue_job_id" readonly="1" groups="queue_job.group_queue_job_manager"/>
+                <field name="queue_job_state" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_workflow_run_search_queue_job" model="ir.ui.view">
+        <field name="name">workflow.run.search.queue.job</field>
+        <field name="model">workflow.run</field>
+        <field name="inherit_id" ref="workflow_studio.view_workflow_run_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search/field[@name='execution_mode']" position="after">
+                <field name="queue_job_state"/>
+            </xpath>
+            <xpath expr="//search/filter[@name='automated']" position="after">
+                <filter
+                    name="queued"
+                    string="Queued"
+                    domain="[('queue_job_state', 'in', ['pending', 'enqueued', 'wait_dependencies', 'started'])]"
+                />
+            </xpath>
+            <xpath expr="//search/group" position="inside">
+                <filter
+                    name="group_queue_job_state"
+                    string="Queue State"
+                    context="{'group_by': 'queue_job_state'}"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>

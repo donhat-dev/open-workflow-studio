@@ -20,6 +20,7 @@ services:
       - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\hrm:/opt/odoo/hrm_addons:rw
       - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\third_party:/opt/odoo/third_party_addons:rw
       - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\core:/opt/odoo/core_addons:rw
+      - C:\Users\ODOO\Documents\GitHub\queue:/opt/odoo/queue:rw
       # Config (live-mounted, no rebuild needed)
       - ./docker/odoo.conf:/etc/odoo/odoo.conf:ro
       # Persistent data
