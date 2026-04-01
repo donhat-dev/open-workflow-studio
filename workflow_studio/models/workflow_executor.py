@@ -16,12 +16,14 @@ Expression Evaluation:
 """
 
 import logging
+import inspect
 import re
 import time
 from datetime import datetime, date, timedelta
 import json
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import config
 
 from .runners import (
     BaseNodeRunner,
@@ -42,6 +44,7 @@ from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
 from .security.safe_model_proxy import SafeModelProxy
 from .security.secret_broker import SecretBrokerFactory
+from ..workflow import WorkflowNodeRegistry
 
 _logger = logging.getLogger(__name__)
 
@@ -95,7 +98,8 @@ class WorkflowExecutor:
     }
     
     def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
-                 notify_channel=None, rollback_on_failure=False):
+                 notify_channel=None, rollback_on_failure=False,
+                 manage_run_lifecycle=True):
         """Initialize executor.
 
         Args:
@@ -109,12 +113,18 @@ class WorkflowExecutor:
                                  (ORM writes from code nodes, etc.) when
                                  execution fails.  Run/node records are
                                  re-persisted from in-memory state.
+            manage_run_lifecycle: If True (default), executor manages run
+                                  status writes, node-run persistence, and
+                                  event emission internally.  Set to False
+                                  when lifecycle is managed externally by
+                                  ``@workflow.execution`` event handlers.
         """
         self.env = env
         self.run = workflow_run
         self.persist = bool(persist)
         self._notify_channel = notify_channel
         self._rollback_on_failure = bool(rollback_on_failure)
+        self._manage_run_lifecycle = bool(manage_run_lifecycle)
 
         if self.persist:
             if not self.run:
@@ -136,6 +146,7 @@ class WorkflowExecutor:
         self._node_run_buffer = []   # in-memory node run data for batch persist
         self._cached_execution_context = None
         self._cached_workflow_context = None
+        self.execution_result = None  # populated by execute() for external lifecycle handlers
 
         # Bus notification batching (time-based)
         self._pending_batch = []        # [{node_id, status, node_type, node_label}]
@@ -427,32 +438,53 @@ class WorkflowExecutor:
         if output_vals:
             self.env['workflow.node.output'].create(output_vals)
 
+    def _commit_progress(self):
+        if not self.persist or config['test_enable']:
+            return
+        self.env.cr.commit()
+
     def execute(self, input_data=None, start_node_ids=None):
         """Execute workflow from start to completion.
-        
+
+        When ``_manage_run_lifecycle`` is True (default), the executor
+        manages run status writes, node-run persistence, event
+        emission, and progress commits internally.
+
+        When ``_manage_run_lifecycle`` is False, the executor only runs
+        the stack loop, bus notifications, and savepoint management.
+        The caller (typically ``@workflow.execution`` event handlers on
+        ``ir.workflow``) is responsible for run lifecycle management.
+
         Args:
             input_data: Initial input data
             start_node_ids: Optional list of specific node IDs to start from.
                             If None, auto-discovers start nodes (no incoming).
-            
+
         Returns:
-            Final output data
-            
+            Final output data (display-safe, masked)
+
         Raises:
             UserError: On execution failure
         """
         start = time.monotonic()
         savepoint = None
+        launch_input_data = input_data or {}
 
         try:
-            # Update run status
-            if self.persist:
+            # -- Lifecycle: mark run as running ---
+            if self._manage_run_lifecycle and self.persist:
                 self.run.write({
                     'status': 'running',
                     'started_at': fields.Datetime.now(),
                 })
-                self.env.cr.commit()
-            
+                self._invalidate_context_cache()
+                self._commit_progress()
+                self._emit_run_event(
+                    'pre_execution',
+                    input_data=launch_input_data,
+                    start_node_ids=list(start_node_ids or self.run.start_node_ids or []),
+                )
+
             # Find start nodes (explicit or auto-discover)
             if start_node_ids:
                 start_nodes = start_node_ids
@@ -460,26 +492,26 @@ class WorkflowExecutor:
                 start_nodes = self._find_start_nodes()
             if not start_nodes:
                 raise UserError(_("Workflow has no start nodes"))
-            
+
             # Push start nodes to stack
             for node_id in start_nodes:
                 self.stack.append({
                     'nodeId': node_id,
-                    'inputData': input_data or {},
+                    'inputData': launch_input_data,
                 })
-            
+
             # Savepoint: when rollback_on_failure is enabled, wrap
             # the execution loop so all ORM side effects can be undone
             # on failure while run/node records are re-persisted from
             # in-memory state for debugging.
             if self._rollback_on_failure:
                 savepoint = self.env.cr.savepoint(flush=True)
-            
+
             # Execute until stack empty
             iteration = 0
             max_iterations = 1000
             self._last_flush_time = time.monotonic()
-            
+
             while self.stack and iteration < max_iterations:
                 iteration += 1
                 entry = self.stack.pop()
@@ -519,19 +551,33 @@ class WorkflowExecutor:
                 if self._bus_should_flush():
                     next_id = self.stack[-1]['nodeId'] if self.stack else None
                     self._bus_flush(next_node_id=next_id)
-            
+
             if iteration >= max_iterations:
                 raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
-            
+
             # Success: release savepoint (keep all changes)
             savepoint = self._release_savepoint(savepoint)
-            
-            # Complete run
+
+            # Collect and normalise output
             output_data_raw = self._collect_final_output()
             output_data_raw = self._normalize_output_value(output_data_raw)
             output_data_display = self._mask_sensitive_data(output_data_raw)
             output_data_display = self._normalize_output_value(output_data_display)
-            if self.persist:
+            end = time.monotonic()
+            duration = end - start
+
+            # Expose execution result metadata for external handlers
+            self.execution_result = {
+                'success': True,
+                'output_data': output_data_display,
+                'execution_count': iteration,
+                'node_count_executed': len(self.node_outputs),
+                'executed_connections': list(self.executed_connections),
+                'duration_seconds': duration,
+            }
+
+            # -- Lifecycle: persist node runs + complete run ---
+            if self._manage_run_lifecycle and self.persist:
                 self._persist_all_node_runs()
                 self.run.write({
                     'status': 'completed',
@@ -540,31 +586,47 @@ class WorkflowExecutor:
                     'executed_connections': list(self.executed_connections),
                     'node_count_executed': len(self.node_outputs),
                     'execution_count': iteration,
+                    'duration_seconds': duration,
                 })
+                self._invalidate_context_cache()
+                self._emit_run_event(
+                    'post_execution',
+                    input_data=launch_input_data,
+                    output_data=output_data_display,
+                    execution_count=iteration,
+                    node_count_executed=len(self.node_outputs),
+                    executed_connections=list(self.executed_connections),
+                    duration_seconds=duration,
+                )
 
             # Final flush: remaining batch + done status
             self._bus_flush(final_status='completed')
 
-            end = time.monotonic()
-            duration = end - start
-            if self.persist:
-                self.run.write({'duration_seconds': duration})
             _logger.info("Workflow execution completed in %.4f seconds", duration)
 
             return output_data_display
-            
+
         except Exception as e:
             failed_duration = time.monotonic() - start
             # Rollback DB side effects when enabled
             if savepoint:
                 self._release_savepoint(savepoint, rollback=True)
                 savepoint = None
-            # Persist node runs for debugging (works after rollback too
-            # since _node_run_buffer is plain Python, not ORM records)
-            if self.persist:
+
+            # Expose failure metadata for external handlers
+            self.execution_result = {
+                'success': False,
+                'error': str(e),
+                'error_node_id': self._last_error_node_id,
+                'execution_count': len(self.executed_order),
+                'node_count_executed': len(self.node_outputs),
+                'executed_connections': list(self.executed_connections),
+                'duration_seconds': failed_duration,
+            }
+
+            # -- Lifecycle: persist for debugging + mark failed ---
+            if self._manage_run_lifecycle and self.persist:
                 self._persist_all_node_runs()
-            # Mark run as failed
-            if self.persist:
                 values = {
                     'status': 'failed',
                     'completed_at': fields.Datetime.now(),
@@ -575,7 +637,18 @@ class WorkflowExecutor:
                 if self._last_error_node_id:
                     values['error_node_id'] = self._last_error_node_id
                 self.run.write(values)
-                self.env.cr.commit()
+                self._invalidate_context_cache()
+                self._emit_run_event(
+                    'post_execution',
+                    input_data=launch_input_data,
+                    error=str(e),
+                    error_node_id=self._last_error_node_id,
+                    execution_count=len(self.executed_order),
+                    node_count_executed=len(self.node_outputs),
+                    executed_connections=list(self.executed_connections),
+                    duration_seconds=failed_duration,
+                )
+                self._commit_progress()
             # Final flush: remaining batch + failed status
             self._bus_flush(final_status='failed', error=str(e))
             raise
@@ -826,13 +899,28 @@ class WorkflowExecutor:
 
     def _validate_custom_node_runtime(self, node_type, runtime_meta):
         """Validate runtime contract for custom node type."""
+        runtime_backend = (runtime_meta or {}).get('runtime_backend') or 'python_code'
         code = (runtime_meta or {}).get('code')
+        callable_key = (runtime_meta or {}).get('callable_key')
         required_group_id = (runtime_meta or {}).get('group_id')
 
-        if not isinstance(code, str) or not code.strip():
+        if runtime_backend == 'python_code':
+            if not isinstance(code, str) or not code.strip():
+                raise ValidationError(_(
+                    "Custom node type '%(key)s' has empty runtime code.",
+                    key=node_type,
+                ))
+        elif runtime_backend == 'python_callable':
+            if not isinstance(callable_key, str) or not callable_key.strip():
+                raise ValidationError(_(
+                    "Custom node type '%(key)s' has empty Callable Key.",
+                    key=node_type,
+                ))
+        else:
             raise ValidationError(_(
-                "Custom node type '%(key)s' has empty runtime code.",
+                "Custom node type '%(key)s' uses unsupported runtime backend '%(backend)s'.",
                 key=node_type,
+                backend=runtime_backend,
             ))
 
         if not required_group_id:
@@ -865,9 +953,19 @@ class WorkflowExecutor:
         ))
 
     def _execute_custom_node_runtime(self, node_type, node_config, input_data, context, runtime_meta):
-        """Execute custom node runtime code via CodeNodeRunner + safe_eval."""
+        """Execute custom node runtime code or callable backend."""
         self._validate_custom_node_runtime(node_type, runtime_meta)
         self._check_custom_node_permission(node_type, runtime_meta)
+
+        runtime_backend = (runtime_meta or {}).get('runtime_backend') or 'python_code'
+        if runtime_backend == 'python_callable':
+            return self._execute_callable_node_runtime(
+                node_type=node_type,
+                node_config=node_config,
+                input_data=input_data,
+                context=context,
+                runtime_meta=runtime_meta,
+            )
 
         secure_context = context.get('secure_eval_context')
         if isinstance(secure_context, dict):
@@ -883,6 +981,136 @@ class WorkflowExecutor:
             'code': (runtime_meta.get('code') or '').strip(),
         }
         return code_runner.execute(runtime_config, input_data, context)
+
+    def _resolve_workflow_callable(self, node_type, runtime_meta):
+        callable_key = (runtime_meta or {}).get('callable_key') or ''
+        entry = None
+        if callable_key:
+            entry = WorkflowNodeRegistry.get_by_callable_key(callable_key)
+        if not entry:
+            entry = WorkflowNodeRegistry.get_node(node_type)
+        if not entry or not callable(entry.get('func')):
+            raise ValidationError(_(
+                "Custom node type '%(key)s' refers to an unavailable Python callable.",
+                key=node_type,
+            ))
+        return entry
+
+    def _normalize_runtime_outputs(self, outputs):
+        if not isinstance(outputs, list):
+            return [[self._normalize_output_value(outputs)]]
+        normalized = []
+        for output in outputs:
+            if output is None:
+                normalized.append([None])
+                continue
+            if isinstance(output, list):
+                normalized.append([
+                    self._normalize_output_value(item)
+                    for item in output
+                ])
+                continue
+            normalized.append([self._normalize_output_value(output)])
+        return normalized
+
+    def _normalize_callable_node_result(self, result):
+        plain_result = to_plain(result)
+        if isinstance(plain_result, dict) and (
+            'outputs' in plain_result or 'json' in plain_result or 'error' in plain_result
+        ):
+            payload = dict(plain_result)
+            outputs = payload.get('outputs')
+            json_value = payload.get('json')
+            if outputs is not None:
+                outputs = self._normalize_runtime_outputs(outputs)
+                payload['outputs'] = outputs
+                if 'json' not in payload:
+                    if outputs:
+                        first_output = outputs[0] if len(outputs) >= 1 else []
+                        if isinstance(first_output, list):
+                            json_value = first_output[0] if len(first_output) == 1 else first_output
+                        else:
+                            json_value = first_output
+                        payload['json'] = json_value
+                    else:
+                        payload['json'] = None
+            else:
+                normalized_json = self._normalize_output_value(json_value)
+                payload['json'] = normalized_json
+                payload['outputs'] = [[normalized_json]]
+            return payload
+
+        normalized = self._normalize_output_value(plain_result)
+        return {
+            'outputs': [[normalized]],
+            'json': normalized,
+        }
+
+    def _call_workflow_node_function(self, func, context, input_data, node_config):
+        try:
+            signature = inspect.signature(func)
+        except (TypeError, ValueError):
+            signature = None
+
+        if signature:
+            positional_params = [
+                param for param in signature.parameters.values()
+                if param.kind in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                )
+            ]
+            required_count = len([
+                param for param in positional_params
+                if param.default is inspect._empty
+            ])
+            if required_count <= 1 and len(positional_params) <= 1:
+                return func(context)
+            if required_count <= 2 and len(positional_params) <= 2:
+                return func(context, input_data)
+        return func(context, input_data, node_config or {})
+
+    def _execute_callable_node_runtime(self, node_type, node_config, input_data, context, runtime_meta):
+        entry = self._resolve_workflow_callable(node_type, runtime_meta)
+        func = entry['func']
+
+        secure_context = context.get('secure_eval_context')
+        if isinstance(secure_context, dict):
+            secure_context['_config'] = node_config or {}
+            secure_context['_node_config'] = node_config or {}
+            secure_context['_node_type'] = node_type
+
+        try:
+            result = self._call_workflow_node_function(
+                func,
+                context,
+                input_data,
+                node_config,
+            )
+        except TypeError as exc:
+            raise ValidationError(_(
+                "Workflow node callable for '%(key)s' could not be invoked: %(error)s",
+                key=node_type,
+                error=str(exc),
+            )) from exc
+
+        return self._normalize_callable_node_result(result)
+
+    def _emit_run_event(self, event_name, **extra):
+        if not self.run:
+            return None
+        payload = {
+            'workflow': self._get_execution_workflow(),
+            'run': self.run,
+            'execution_mode': self.run.execution_mode,
+            'status': self.run.status,
+            'input_data': self.run.input_data or {},
+            'start_node_ids': list(self.run.start_node_ids or []),
+            'start_node_id': (self.run.start_node_ids or [None])[0] if self.run.start_node_ids else None,
+            'trigger_type': self.run.execution_mode,
+        }
+        payload.update(extra)
+        return self.run._emit_workflow_event(event_name, payload)
 
     def _get_execution_context(self):
         if self._cached_execution_context is not None:
@@ -1217,6 +1445,11 @@ class WorkflowExecutor:
             pin_store = metadata.get('pinData') or {}
         return pin_store.get(node_id)
 
+    def _should_apply_pin_data(self):
+        if not self.run:
+            return True
+        return self.run.execution_mode == 'manual'
+
     def _build_pinned_result(self, node, node_run):
         """Convert a persisted workflow.run.node to a NodeOutput payload."""
         if node_run.error_message:
@@ -1354,11 +1587,19 @@ class WorkflowExecutor:
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
 
+        if self.run:
+            self._emit_run_event(
+                'node_started',
+                node=node,
+                node_id=node_id,
+                input_data=input_data,
+            )
+
         # --- Pin data gate ---------------------------------------------------
         # Honour pinned data for all executor invocations *except* production
         # triggers (those create their own run with execution_mode != manual).
         node_type = node.get('type', '')
-        if node_type not in self._PIN_DATA_DENY_TYPES:
+        if self._should_apply_pin_data() and node_type not in self._PIN_DATA_DENY_TYPES:
             pin_data = self._get_pin_data(node_id)
             if pin_data is not None:
                 result = dict(pin_data)  # shallow copy to avoid mutating snapshot
@@ -1375,10 +1616,27 @@ class WorkflowExecutor:
                         '_raw_json': result.get('json'),
                         '_input_data': input_data,
                     })
+                if self.run:
+                    self._emit_run_event(
+                        'node_completed',
+                        node=node,
+                        node_id=node_id,
+                        input_data=input_data,
+                        result=result,
+                    )
                 return result
 
         if not persist:
-            return self._execute_node_core(node_id, input_data, node=node)
+            result = self._execute_node_core(node_id, input_data, node=node)
+            if self.run:
+                self._emit_run_event(
+                    'node_completed',
+                    node=node,
+                    node_id=node_id,
+                    input_data=input_data,
+                    result=result,
+                )
+            return result
 
         started_at = datetime.now()
         t0 = time.monotonic()
@@ -1406,6 +1664,14 @@ class WorkflowExecutor:
                 '_raw_json': result.get('json'),
                 '_input_data': log_input if log_input is not None else input_data,
             })
+            if self.run:
+                self._emit_run_event(
+                    'node_completed',
+                    node=node,
+                    node_id=node_id,
+                    input_data=input_data,
+                    result=result,
+                )
 
             return result
 
@@ -1423,6 +1689,14 @@ class WorkflowExecutor:
                 'sequence': len(self.executed_order),
                 '_input_data': input_data,
             })
+            if self.run:
+                self._emit_run_event(
+                    'node_failed',
+                    node=node,
+                    node_id=node_id,
+                    input_data=input_data,
+                    error=str(e),
+                )
             raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
     
     def _route_outputs(self, node_id, result):

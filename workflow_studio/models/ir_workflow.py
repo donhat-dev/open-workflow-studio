@@ -9,9 +9,12 @@ from .workflow_executor import WorkflowExecutor
 
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError, UserError
-from odoo.tools import safe_eval
+from odoo.tools import safe_eval, config
 from odoo.tools import safe_eval as safe_eval_module
 from odoo.tools.safe_eval import wrap_module
+
+from ..workflow import WorkflowExecutionRegistry
+from .. import workflow
 
 _logger = logging.getLogger(__name__)
 
@@ -426,6 +429,414 @@ class Workflow(models.Model):
         'schedule_trigger', 'webhook_trigger', 'record_event_trigger',
     }
 
+    def _prepare_execution_snapshot(self, include_pin_data=False):
+        self.ensure_one()
+        if not self.is_published or not self.published_snapshot:
+            raise UserError(_("Workflow must be published before execution."))
+        if not self.published_snapshot.get('nodes'):
+            raise UserError(_("Published workflow has no nodes."))
+
+        execution_snapshot = copy.deepcopy(self.published_snapshot)
+        if include_pin_data:
+            draft_metadata = (self.draft_snapshot or {}).get('metadata') or {}
+            pin_data = draft_metadata.get('pin_data') or draft_metadata.get('pinData')
+            if pin_data:
+                metadata = execution_snapshot.get('metadata')
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                metadata['pin_data'] = copy.deepcopy(pin_data)
+                metadata.pop('pinData', None)
+                execution_snapshot['metadata'] = metadata
+        return execution_snapshot
+
+    @classmethod
+    def _collect_workflow_execution_methods(cls):
+        """Scan model class for @workflow.execution-decorated methods.
+
+        Follows the @http.route pattern: decorators mark methods at
+        definition time, this method collects them at module-load time.
+        Returns list of (event_name, priority, attr_name).
+        """
+        collected = []
+        for attr_name in dir(cls):
+            try:
+                method = getattr(cls, attr_name, None)
+            except Exception:
+                continue
+            if not callable(method):
+                continue
+            event_name = getattr(method, '_workflow_execution_event', None)
+            if not event_name:
+                continue
+            priority = getattr(method, '_workflow_execution_priority', 5)
+            collected.append((event_name, priority, attr_name))
+        return collected
+
+    def _register_hook(self):
+        result = super()._register_hook()
+        model_name = self._name
+        # Remove any previously registered model-method wrappers for
+        # this model (handles module reload / upgrade cleanly).
+        WorkflowExecutionRegistry.unregister_model(model_name)
+        for event_name, priority, attr_name in self._collect_workflow_execution_methods():
+            def _make_model_wrapper(mname, attr):
+                def wrapper(event):
+                    model = event.get('workflow')
+                    if model and hasattr(model, attr):
+                        returned = getattr(model, attr)(event)
+                        return returned if returned is not None else event
+                    return event
+                wrapper.__qualname__ = '%s.%s' % (mname, attr)
+                wrapper.__name__ = attr
+                wrapper._is_model_method_wrapper = True
+                wrapper._model_name = mname
+                return wrapper
+            wrapper = _make_model_wrapper(model_name, attr_name)
+            WorkflowExecutionRegistry.register(event_name, wrapper, priority=priority)
+        return result
+
+    def _prepare_workflow_event_payload(self, event_name, event=None, **extra):
+        payload = dict(event or {})
+        payload.setdefault('event_name', event_name)
+        payload.setdefault('workflow', self if self else self.env['ir.workflow'])
+        payload.update(extra)
+        return payload
+
+    def _run_local_workflow_event_hooks(self, event_name, payload):
+        run = payload.get('run')
+        if run and hasattr(run, '_run_local_workflow_event_hooks'):
+            payload = run._run_local_workflow_event_hooks(event_name, payload)
+
+        hook_name = '_%s' % event_name
+        hook = getattr(self, hook_name, None)
+        # Skip methods decorated with @workflow.execution — they are
+        # dispatched through the registry in priority order instead.
+        if callable(hook) and not getattr(hook, '_workflow_execution_event', None):
+            returned = hook(payload)
+            if returned is not None:
+                payload = returned
+        return payload
+
+    def _emit_workflow_event(self, event_name, event=None, **extra):
+        self.ensure_one()
+        payload = self._prepare_workflow_event_payload(event_name, event=event, **extra)
+        payload = self._run_local_workflow_event_hooks(event_name, payload)
+        return WorkflowExecutionRegistry.dispatch(event_name, payload)
+
+    # Queue-neutral lifecycle hooks for extension modules.
+    def _launch_requested(self, event):
+        return event
+
+    def _launch_completed(self, event):
+        return event
+
+    def _pre_execution(self, event):
+        return event
+
+    def _post_execution(self, event):
+        return event
+
+    # -- Decorated lifecycle handlers (dispatched by registry) ------------
+
+    @workflow.execution('pre_execution', priority=10)
+    def _init_execution_context(self, event):
+        """Create WorkflowExecutor and mark run as running.
+
+        This handler owns the executor initialization that was previously
+        inlined in ``_execute_run_with_executor``.  The executor is stored
+        in ``event['executor']`` for downstream use.
+        """
+        run = event.get('run')
+        if not run:
+            return event
+        run.write({
+            'status': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        if not config['test_enable']:
+            self.env.cr.commit()  # make 'running' visible immediately
+        executor = WorkflowExecutor(
+            self.env,
+            run,
+            notify_channel=event.get('notify_channel'),
+            rollback_on_failure=self.rollback_on_failure,
+            manage_run_lifecycle=False,
+        )
+        event['executor'] = executor
+        return event
+
+    @workflow.execution('post_execution', priority=5)
+    def _persist_execution_results(self, event):
+        """Persist node runs and finalise run status.
+
+        Handles both success and failure paths based on
+        ``event.get('error')``.  This replaces the inline persist/status
+        management that was previously inside ``WorkflowExecutor.execute``.
+        """
+        executor = event.get('executor')
+        run = event.get('run')
+        if not executor or not run:
+            return event
+        result = executor.execution_result or {}
+
+        # Always persist node runs (even on failure, for debugging)
+        executor._persist_all_node_runs()
+
+        if result.get('success', True) and not event.get('error'):
+            run.write({
+                'status': 'completed',
+                'completed_at': fields.Datetime.now(),
+                'output_data': result.get('output_data'),
+                'executed_connections': result.get('executed_connections', []),
+                'node_count_executed': result.get('node_count_executed', 0),
+                'execution_count': result.get('execution_count', 0),
+                'duration_seconds': result.get('duration_seconds', 0),
+            })
+        else:
+            values = {
+                'status': 'failed',
+                'completed_at': fields.Datetime.now(),
+                'duration_seconds': result.get('duration_seconds', 0),
+                'error_message': event.get('error') or result.get('error', ''),
+                'executed_connections': result.get('executed_connections', []),
+            }
+            error_node = result.get('error_node_id')
+            if error_node:
+                values['error_node_id'] = error_node
+            run.write(values)
+
+        run.invalidate_recordset()
+        if not config['test_enable']:
+            self.env.cr.commit()
+        return event
+
+    def _node_started(self, event):
+        return event
+
+    def _node_completed(self, event):
+        return event
+
+    def _node_failed(self, event):
+        return event
+
+    def _validate_start_node_ids(self, snapshot, start_node_ids):
+        node_ids = {n.get('id') for n in snapshot.get('nodes', [])}
+        missing = [node_id for node_id in (start_node_ids or []) if node_id not in node_ids]
+        if missing:
+            raise UserError(_(
+                "Node '%(node_id)s' not found in the published workflow.",
+                node_id=missing[0],
+            ))
+        return list(start_node_ids or [])
+
+    def _build_launch_response(self, run, result=None):
+        result = dict(result or {})
+        response = {
+            'run_id': run.id,
+            'run_name': run.name,
+            'status': run.status,
+            'execution_mode': run.execution_mode,
+            'node_count_executed': run.node_count_executed,
+            'execution_count': run.execution_count,
+            'duration_seconds': run.duration_seconds,
+        }
+        response.update(result)
+        return response
+
+    def _build_launch_run_vals(self, execution_snapshot, input_data=None, execution_mode='manual', start_node_ids=None):
+        self.ensure_one()
+        return {
+            'workflow_id': self.id,
+            'status': 'pending',
+            'input_data': input_data or {},
+            'execution_mode': execution_mode,
+            'executed_version': self.published_version,
+            'executed_snapshot': execution_snapshot,
+            'start_node_ids': list(start_node_ids or []),
+        }
+
+    def _build_launch_event(self, *, execution_snapshot, input_data=None, execution_mode='manual',
+                             start_node_ids=None, notify_user=False, trigger_type=None, trigger_data=None,
+                             launch_intent='sync', include_pin_data=False):
+        return {
+            'handled': False,
+            'response': None,
+            'workflow': self,
+            'run': False,
+            'input_data': input_data or {},
+            'execution_mode': execution_mode,
+            'start_node_ids': list(start_node_ids or []),
+            'start_node_id': (start_node_ids or [None])[0] if start_node_ids else None,
+            'notify_user': bool(notify_user),
+            'trigger_type': trigger_type or execution_mode,
+            'trigger_data': copy.deepcopy(trigger_data or {}),
+            'launch_intent': launch_intent,
+            'include_pin_data': bool(include_pin_data),
+            'snapshot': execution_snapshot,
+            'run_vals': self._build_launch_run_vals(
+                execution_snapshot=execution_snapshot,
+                input_data=input_data,
+                execution_mode=execution_mode,
+                start_node_ids=start_node_ids,
+            ),
+        }
+
+    def _run_launch_event(self, event):
+        self.ensure_one()
+        return self._emit_workflow_event('launch_requested', event=event)
+
+    def _execute_run_with_executor(self, run, *, input_data=None, notify_user=False, raise_on_error=False):
+        """Orchestrate execution via the pre/post_execution event chain.
+
+        1. Emit ``pre_execution``  →  ``_init_execution_context`` creates
+           the executor, marks run as running.
+        2. Call ``executor.execute()`` (lean stack loop, lifecycle off).
+        3. Emit ``post_execution`` →  ``_persist_execution_results``
+           persists node runs and writes final run status.
+        """
+        self.ensure_one()
+        run.ensure_one()
+        notify_channel = self.env.user.partner_id if notify_user else None
+        launch_input_data = input_data or {}
+
+        # Build event payload consumed by the lifecycle handlers
+        event = {
+            'workflow': self,
+            'run': run,
+            'input_data': launch_input_data,
+            'start_node_ids': list(run.start_node_ids or []),
+            'notify_channel': notify_channel,
+            'executor': None,
+        }
+
+        try:
+            # Phase 1: pre_execution handlers (create executor, mark running)
+            event = self._emit_workflow_event('pre_execution', event=event)
+            executor = event.get('executor')
+            if not executor:
+                # Fallback: no handler provided an executor — create inline
+                # (backward compat for modules that override _pre_execution
+                # without calling super or without the decorator)
+                executor = WorkflowExecutor(
+                    self.env,
+                    run,
+                    notify_channel=notify_channel,
+                    rollback_on_failure=self.rollback_on_failure,
+                )
+                event['executor'] = executor
+
+            # Phase 2: stack loop (lifecycle management off)
+            output_data = executor.execute(
+                input_data=launch_input_data,
+                start_node_ids=run.start_node_ids or None,
+            )
+
+            # Phase 3: post_execution handlers (persist + complete)
+            event['output_data'] = output_data
+            event = self._emit_workflow_event('post_execution', event=event)
+
+            # Build response
+            last_node_id = executor.executed_order[-1] if executor.executed_order else None
+            last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
+            context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
+            payload = self._build_launch_response(
+                run,
+                {
+                    'status': run.status,
+                    'output_data': output_data,
+                    'context_snapshot': context_snapshot,
+                },
+            )
+            self._emit_workflow_event(
+                'launch_completed',
+                run=run,
+                input_data=launch_input_data,
+                result=payload,
+            )
+            return payload
+        except Exception as e:
+            # On failure: emit post_execution with error so handlers
+            # can persist node runs and mark run as failed.
+            event['error'] = str(e)
+            try:
+                self._emit_workflow_event('post_execution', event=event)
+            except Exception:
+                _logger.warning("Error in post_execution handler during failure path", exc_info=True)
+            payload = self._build_launch_response(
+                run,
+                {
+                    'status': 'failed',
+                    'error': str(e),
+                },
+            )
+            self._emit_workflow_event(
+                'launch_completed',
+                run=run,
+                input_data=launch_input_data,
+                result=payload,
+                error=str(e),
+            )
+            if raise_on_error:
+                raise
+            return payload
+
+    def _execute_run_synchronously(self, run, *, input_data=None, notify_user=False):
+        return self._execute_run_with_executor(
+            run,
+            input_data=input_data,
+            notify_user=notify_user,
+            raise_on_error=False,
+        )
+
+    def _launch_workflow(self, *, input_data=None, execution_mode='manual', start_node_ids=None,
+                         notify_user=False, trigger_type=None, trigger_data=None,
+                         launch_intent='sync', include_pin_data=False):
+        self.ensure_one()
+        execution_snapshot = self._prepare_execution_snapshot(include_pin_data=include_pin_data)
+
+        resolved_start_nodes = list(start_node_ids or [])
+        if not resolved_start_nodes:
+            if execution_mode == 'manual':
+                resolved_start_nodes = self._find_manual_start_nodes(execution_snapshot)
+            else:
+                raise UserError(_("Start node is required for non-manual workflow launch."))
+        resolved_start_nodes = self._validate_start_node_ids(execution_snapshot, resolved_start_nodes)
+
+        event = self._build_launch_event(
+            execution_snapshot=execution_snapshot,
+            input_data=input_data,
+            execution_mode=execution_mode,
+            start_node_ids=resolved_start_nodes,
+            notify_user=notify_user,
+            trigger_type=trigger_type,
+            trigger_data=trigger_data,
+            launch_intent=launch_intent,
+            include_pin_data=include_pin_data,
+        )
+        event = self._run_launch_event(event)
+        if event.get('handled'):
+            response = event.get('response') or {}
+            if event.get('run'):
+                return self._build_launch_response(event['run'], response)
+            return response
+
+        run_vals = dict(event.get('run_vals') or {})
+        run = event.get('run')
+        if not run:
+            run = self.env['workflow.run'].create(run_vals)
+        else:
+            pending_updates = {
+                key: value for key, value in run_vals.items()
+                if run._fields.get(key) and run[key] != value
+            }
+            if pending_updates:
+                run.write(pending_updates)
+        return self._execute_run_synchronously(
+            run,
+            input_data=event.get('input_data') or {},
+            notify_user=bool(event.get('notify_user')),
+        )
+
     def _find_manual_start_nodes(self, snapshot):
         """Return node IDs suitable for the Run-button execution.
 
@@ -486,72 +897,13 @@ class Workflow(models.Model):
             UserError if workflow not published or execution fails
         """
         self.ensure_one()
-        
-        # Validate workflow is published
-        if not self.is_published or not self.published_snapshot:
-            raise UserError(_("Workflow must be published before execution."))
-        
-        if not self.published_snapshot.get('nodes'):
-            raise UserError(_("Published workflow has no nodes."))
-
-        execution_snapshot = copy.deepcopy(self.published_snapshot)
-        draft_metadata = (self.draft_snapshot or {}).get('metadata') or {}
-        pin_data = draft_metadata.get('pin_data') or draft_metadata.get('pinData')
-        if pin_data:
-            metadata = execution_snapshot.get('metadata')
-            if not isinstance(metadata, dict):
-                metadata = {}
-            metadata['pin_data'] = copy.deepcopy(pin_data)
-            metadata.pop('pinData', None)
-            execution_snapshot['metadata'] = metadata
-
-        # Determine which start nodes to push (manual triggers only)
-        start_node_ids = self._find_manual_start_nodes(execution_snapshot)
-        
-        # Create run record with snapshot copy
-        run = self.env['workflow.run'].create({
-            'workflow_id': self.id,
-            'status': 'pending',
-            'input_data': input_data or {},
-            'executed_version': self.published_version,
-            'executed_snapshot': execution_snapshot,
-        })
-        
-        # Execute using WorkflowExecutor
-        notify_channel = self.env.user.partner_id if notify_user else None
-        executor = WorkflowExecutor(
-            self.env, run,
-            notify_channel=notify_channel,
-            rollback_on_failure=self.rollback_on_failure,
+        return self._launch_workflow(
+            input_data=input_data,
+            execution_mode='manual',
+            notify_user=notify_user,
+            launch_intent='sync',
+            include_pin_data=True,
         )
-        try:
-            output_data = executor.execute(
-                input_data,
-                start_node_ids=start_node_ids or None,
-            )
-            last_node_id = executor.executed_order[-1] if executor.executed_order else None
-            last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
-            context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
-            return {
-                'run_id': run.id,
-                'run_name': run.name,
-                'status': run.status,
-                'output_data': output_data,
-                'context_snapshot': context_snapshot,
-                'node_count_executed': run.node_count_executed,
-                'execution_count': run.execution_count,
-                'duration_seconds': run.duration_seconds,
-            }
-        except Exception as e:
-            return {
-                'run_id': run.id,
-                'run_name': run.name,
-                'status': 'failed',
-                'error': str(e),
-                'node_count_executed': run.node_count_executed,
-                'execution_count': run.execution_count,
-                'duration_seconds': run.duration_seconds,
-            }
 
     def execute_preview(self, target_node_id=None, input_data=None, config_overrides=None, snapshot=None, max_iterations=None):
         """Execute draft workflow until target node is reached (preview mode).
@@ -809,6 +1161,7 @@ class Workflow(models.Model):
                 'id': run.id,
                 'name': run.name,
                 'status': run.status,
+                'execution_mode': run.execution_mode,
                 'started_at': run.started_at.isoformat() if run.started_at else None,
                 'completed_at': run.completed_at.isoformat() if run.completed_at else None,
                 'duration_seconds': run.duration_seconds,
@@ -933,7 +1286,6 @@ class Workflow(models.Model):
         if not self.is_published or not self.published_snapshot:
             return
 
-        # Update audit fields on the trigger record
         trigger_rec = self.env['workflow.trigger'].with_context(active_test=False).search([
             ('workflow_id', '=', self.id),
             ('node_id', '=', node_id),
@@ -941,23 +1293,29 @@ class Workflow(models.Model):
         if trigger_rec:
             trigger_rec._record_triggered()
 
-        # Build input_data: merge env.context + trigger metadata
         input_data = {
             '_trigger': {
                 'type': trigger_type,
                 'node_id': node_id,
                 'context': self._sanitize_context(self.env.context),
-                **trigger_data,
+                **(trigger_data or {}),
             },
         }
 
-        self.execute_from_node(
-            start_node_id=node_id,
+        return self._launch_workflow(
             input_data=input_data,
+            execution_mode=trigger_type,
+            start_node_ids=[node_id],
             notify_user=False,
+            trigger_type=trigger_type,
+            trigger_data=trigger_data or {},
+            launch_intent='trigger',
+            include_pin_data=False,
         )
 
-    def execute_from_node(self, start_node_id, input_data=None, notify_user=False):
+    def execute_from_node(self, start_node_id, input_data=None, notify_user=False,
+                          execution_mode='manual', trigger_type=None, trigger_data=None,
+                          launch_intent='sync', include_pin_data=None):
         """Execute published workflow starting from a specific trigger node.
 
         Unlike ``execute_workflow`` which pushes ALL start nodes, this
@@ -969,79 +1327,30 @@ class Workflow(models.Model):
             start_node_id: The single trigger node to start from
             input_data: Optional input data
             notify_user: Whether to send bus notifications
+            execution_mode: Launch classification for the created run
+            trigger_type: Trigger label used in workflow events
+            trigger_data: Trigger payload forwarded into launch events
+            launch_intent: High-level launch intent (e.g. sync / trigger)
+            include_pin_data: Whether draft pin-data should be merged into the
+                execution snapshot. Defaults to manual-only behavior.
 
         Returns:
             dict with run_id, status, output_data, etc.
         """
         self.ensure_one()
-
-        if not self.is_published or not self.published_snapshot:
-            raise UserError(_("Workflow must be published before execution."))
-
-        snapshot = copy.deepcopy(self.published_snapshot)
-        draft_metadata = (self.draft_snapshot or {}).get('metadata') or {}
-        pin_data = draft_metadata.get('pin_data') or draft_metadata.get('pinData')
-        if pin_data:
-            metadata = snapshot.get('metadata')
-            if not isinstance(metadata, dict):
-                metadata = {}
-            metadata['pin_data'] = copy.deepcopy(pin_data)
-            metadata.pop('pinData', None)
-            snapshot['metadata'] = metadata
-        if not snapshot.get('nodes'):
-            raise UserError(_("Published workflow has no nodes."))
-
-        # Validate the node exists in snapshot
-        node_ids = {n.get('id') for n in snapshot.get('nodes', [])}
-        if start_node_id not in node_ids:
-            raise UserError(_(
-                "Node '%(node_id)s' not found in the published workflow.",
-                node_id=start_node_id,
-            ))
-
-        run = self.env['workflow.run'].create({
-            'workflow_id': self.id,
-            'status': 'pending',
-            'input_data': input_data or {},
-            'execution_mode': 'manual',
-            'executed_version': self.published_version,
-            'executed_snapshot': snapshot.copy(),
-        })
-
-        notify_channel = self.env.user.partner_id if notify_user else None
-        executor = WorkflowExecutor(
-            self.env, run,
-            notify_channel=notify_channel,
-            rollback_on_failure=self.rollback_on_failure,
+        trigger_type = trigger_type or execution_mode or 'manual'
+        if include_pin_data is None:
+            include_pin_data = execution_mode == 'manual'
+        return self._launch_workflow(
+            input_data=input_data,
+            execution_mode=execution_mode,
+            start_node_ids=[start_node_id],
+            notify_user=notify_user,
+            trigger_type=trigger_type,
+            trigger_data=trigger_data or {},
+            launch_intent=launch_intent,
+            include_pin_data=include_pin_data,
         )
-        try:
-            output_data = executor.execute(
-                input_data=input_data,
-                start_node_ids=[start_node_id],
-            )
-            last_node_id = executor.executed_order[-1] if executor.executed_order else None
-            last_result = executor.node_outputs.get(last_node_id) if last_node_id else None
-            context_snapshot = executor._build_context_snapshot(last_node_id, last_result)
-            return {
-                'run_id': run.id,
-                'run_name': run.name,
-                'status': run.status,
-                'output_data': output_data,
-                'context_snapshot': context_snapshot,
-                'node_count_executed': run.node_count_executed,
-                'execution_count': run.execution_count,
-                'duration_seconds': run.duration_seconds,
-            }
-        except Exception as e:
-            return {
-                'run_id': run.id,
-                'run_name': run.name,
-                'status': 'failed',
-                'error': str(e),
-                'node_count_executed': run.node_count_executed,
-                'execution_count': run.execution_count,
-                'duration_seconds': run.duration_seconds,
-            }
 
     def get_trigger_node_action(self, node_id):
         """Return an ir.actions dict to open the linked backend record.
