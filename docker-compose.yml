@@ -15,6 +15,7 @@ services:
       - C:/Users/ODOO/Documents/GitHub/18EE-NS/odoo/addons:/opt/odoo/odoo/addons:rw
       # Custom addons (read-write for live editing)
       - ./workflow_studio:/opt/odoo/custom/workflow_studio:rw
+      - ./workflow_studio_queue_job:/opt/odoo/custom/workflow_studio_queue_job:rw
       - ./flight_json_widget:/opt/odoo/custom/flight_json_widget:rw
       - ./lf_web_studio:/opt/odoo/custom/lf_web_studio:rw
       - C:\Users\ODOO\Documents\GitHub\hrm-odoo\addons\hrm:/opt/odoo/hrm_addons:rw

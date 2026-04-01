@@ -8,6 +8,7 @@
     'category': '',
     'depends': ['workflow_studio', 'queue_job'],
     'data': [
+        'views/ir_workflow_views.xml',
         'views/workflow_run_views.xml',
     ],
     'installable': True,

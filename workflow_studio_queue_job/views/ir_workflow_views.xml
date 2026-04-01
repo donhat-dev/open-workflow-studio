@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_ir_workflow_form_queue_job" model="ir.ui.view">
+        <field name="name">ir.workflow.form.queue.job</field>
+        <field name="model">ir.workflow</field>
+        <field name="inherit_id" ref="workflow_studio.view_ir_workflow_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='rollback_on_failure']" position="after">
+                <field name="run_in_queue"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

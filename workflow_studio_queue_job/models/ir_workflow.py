@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models
+from odoo import fields, models
 
 from odoo.addons.workflow_studio.workflow import workflow
 
@@ -8,13 +8,24 @@ from odoo.addons.workflow_studio.workflow import workflow
 class WorkflowQueueJob(models.Model):
     _inherit = 'ir.workflow'
 
-    _QUEUE_AUTOMATED_MODES = ('schedule', 'webhook', 'record_event')
+    run_in_queue = fields.Boolean(
+        string='Run in Queue',
+        default=False,
+        help="When enabled, automated trigger executions are routed "
+             "through queue_job for asynchronous processing. "
+             "Manual runs from the UI and webhook test calls are always synchronous.",
+    )
 
     def _should_queue_launch_event(self, event):
-        return bool(
-            event.get('launch_intent') == 'trigger'
-            and event.get('execution_mode') in self._QUEUE_AUTOMATED_MODES
-        )
+        wf = event.get('workflow')
+        if not wf or not wf.run_in_queue:
+            return False
+        if event.get('launch_intent') == 'sync':
+            return False
+        trigger_data = event.get('trigger_data') or {}
+        if trigger_data.get('test_mode'):
+            return False
+        return True
 
     @workflow.execution('pre_execution', priority=15)
     def _queue_intercept(self, event):
