@@ -155,6 +155,14 @@
                                         <i t-att-class="getRunStatusIcon(selectedRun.status)"/>
                                         <t t-esc="selectedRun.status"/>
                                     </span>
+                                    <span t-attf-class="history-toolbar__tag run-mode-badge {{ getRunModeClass(selectedRun.execution_mode) }}">
+                                        <t t-esc="getRunModeLabel(selectedRun.execution_mode)"/>
+                                    </span>
+                                    <t t-if="selectedRun.queue_job_state">
+                                        <span t-attf-class="history-toolbar__tag run-queue-badge {{ getQueueStateClass(selectedRun.queue_job_state) }}">
+                                            <t t-esc="getQueueStateLabel(selectedRun.queue_job_state)"/>
+                                        </span>
+                                    </t>
                                 </t>
                             </div>
                         </t>
@@ -164,9 +172,18 @@
                         </t>
                     </div>
                     <t t-if="isRunSelected">
-                        <button class="btn btn-outline-secondary btn-sm" t-on-click="exitRunView" type="button">
-                            <i class="fa fa-arrow-left me-1"/>Back
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button
+                                t-if="canCancelSelectedRun"
+                                class="btn btn-outline-danger btn-sm"
+                                t-on-click="onCancelRun"
+                                type="button">
+                                <i class="fa fa-ban me-1"/>Cancel
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" t-on-click="exitRunView" type="button">
+                                <i class="fa fa-arrow-left me-1"/>Back
+                            </button>
+                        </div>
                     </t>
                     <t t-else="">
                         <button class="btn btn-outline-secondary btn-sm" t-on-click="loadRuns" t-att-disabled="state.loadingRuns ? 'disabled' : undefined" type="button">
@@ -199,6 +216,16 @@
                                     </div>
                                     <div class="run-item__meta">
                                         <span class="run-item__time" t-esc="formatDate(run.started_at)"/>
+                                    </div>
+                                    <div class="run-item__badges">
+                                        <span t-attf-class="run-mode-badge {{ getRunModeClass(run.execution_mode) }}">
+                                            <t t-esc="getRunModeLabel(run.execution_mode)"/>
+                                        </span>
+                                        <t t-if="run.queue_job_state">
+                                            <span t-attf-class="run-queue-badge {{ getQueueStateClass(run.queue_job_state) }}">
+                                                <t t-esc="getQueueStateLabel(run.queue_job_state)"/>
+                                            </span>
+                                        </t>
                                     </div>
                                     <div class="run-item__details">
                                         <span class="run-item__duration">

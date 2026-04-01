@@ -253,7 +253,7 @@ class WorkflowPilotController(http.Controller):
         try:
             result = workflow.execute_workflow(input_data or {}, notify_user=True)
             run_id = result.get('run_id')
-            
+
             # Fetch node results from run record (single iteration for performance)
             node_results = []
             execution_events = []
@@ -261,6 +261,9 @@ class WorkflowPilotController(http.Controller):
             executed_order = []
             executed_connections = []
             context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
+            queue_job_uuid = result.get('queue_job_uuid')
+            queue_job_state = result.get('queue_job_state')
+            queue_can_cancel = result.get('queue_can_cancel')
             if run_id:
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
@@ -270,6 +273,10 @@ class WorkflowPilotController(http.Controller):
                     execution_events = run_result_data['execution_events']
                     node_outputs_map = run_result_data['node_outputs_map']
                     executed_order = run_result_data['executed_order']
+                    if hasattr(run, 'queue_job_uuid'):
+                        queue_job_uuid = run.queue_job_uuid or False
+                        queue_job_state = getattr(run, 'queue_job_state', False) or False
+                        queue_can_cancel = bool(getattr(run, 'queue_can_cancel', False))
                     
                     if not context_snapshot:
                         # Build context snapshot using pre-built map (fallback)
@@ -295,6 +302,10 @@ class WorkflowPilotController(http.Controller):
                 run_name=result.get('run_name'),
                 status=result.get('status', 'completed'),
                 error=result.get('error'),
+                execution_mode=result.get('execution_mode'),
+                queue_job_uuid=queue_job_uuid,
+                queue_job_state=queue_job_state,
+                queue_can_cancel=queue_can_cancel,
                 execution_count=result.get('execution_count'),
                 node_count_executed=result.get('node_count_executed'),
                 duration_seconds=result.get('duration_seconds'),
@@ -363,6 +374,9 @@ class WorkflowPilotController(http.Controller):
             executed_order = []
             executed_connections = []
             context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
+            queue_job_uuid = result.get('queue_job_uuid')
+            queue_job_state = result.get('queue_job_state')
+            queue_can_cancel = result.get('queue_can_cancel')
             if run_id:
                 run = request.env['workflow.run'].browse(run_id)
                 if run.exists():
@@ -372,6 +386,10 @@ class WorkflowPilotController(http.Controller):
                     execution_events = run_result_data['execution_events']
                     node_outputs_map = run_result_data['node_outputs_map']
                     executed_order = run_result_data['executed_order']
+                    if hasattr(run, 'queue_job_uuid'):
+                        queue_job_uuid = run.queue_job_uuid or False
+                        queue_job_state = getattr(run, 'queue_job_state', False) or False
+                        queue_can_cancel = bool(getattr(run, 'queue_can_cancel', False))
 
                     if not context_snapshot:
                         context_snapshot = ContextSnapshotSchema(
@@ -396,6 +414,10 @@ class WorkflowPilotController(http.Controller):
                 run_name=result.get('run_name'),
                 status=result.get('status', 'completed'),
                 error=result.get('error'),
+                execution_mode=result.get('execution_mode'),
+                queue_job_uuid=queue_job_uuid,
+                queue_job_state=queue_job_state,
+                queue_can_cancel=queue_can_cancel,
                 execution_count=result.get('execution_count'),
                 node_count_executed=result.get('node_count_executed'),
                 duration_seconds=result.get('duration_seconds'),
@@ -462,6 +484,10 @@ class WorkflowPilotController(http.Controller):
             status=run.status,
             error=run.error_message,
             error_node_id=run.error_node_id,
+            execution_mode=run.execution_mode,
+            queue_job_uuid=run.queue_job_uuid if hasattr(run, 'queue_job_uuid') else False,
+            queue_job_state=getattr(run, 'queue_job_state', False) if hasattr(run, 'queue_job_state') else False,
+            queue_can_cancel=bool(getattr(run, 'queue_can_cancel', False)) if hasattr(run, 'queue_can_cancel') else False,
             execution_count=run.execution_count,
             node_count_executed=run.node_count_executed,
             duration_seconds=run.duration_seconds,
@@ -691,6 +717,11 @@ class WorkflowPilotController(http.Controller):
                     start_node_id=trigger.node_id,
                     input_data=input_data,
                     notify_user=False,
+                    execution_mode='webhook',
+                    trigger_type='webhook',
+                    trigger_data=trigger_payload,
+                    launch_intent='sync',
+                    include_pin_data=False,
                 )
                 if result.get('status') == 'failed':
                     return request.make_json_response(

@@ -354,12 +354,14 @@ export class WorkflowHistoryPanel extends Component {
                 const executionData = {
                     runId: runData.run_id || runData.id,
                     status: runData.status,
+                    executionMode: runData.execution_mode || null,
                     executedOrder: runData.executed_order || [],
                     executedConnectionIds: runData.executed_connection_ids || [],
                     executedConnections: runData.executed_connections || [],
                     executionEvents: runData.execution_events || [],
                     nodeResults: runData.node_results || [],
                     contextSnapshot: runData.context_snapshot || null,
+                    queueJobState: runData.queue_job_state || null,
                     error: runData.error || null,
                     errorNodeId: runData.error_node_id || null,
                     executionCount: runData.execution_count || null,
@@ -401,6 +403,8 @@ export class WorkflowHistoryPanel extends Component {
             completed: 'run-status--success',
             failed: 'run-status--error',
             running: 'run-status--running',
+            pending: 'run-status--pending',
+            cancelled: 'run-status--cancelled',
         };
         return map[status] || 'run-status--default';
     }
@@ -410,8 +414,91 @@ export class WorkflowHistoryPanel extends Component {
             completed: 'fa fa-check-circle',
             failed: 'fa fa-exclamation-circle',
             running: 'fa fa-spinner fa-spin',
+            pending: 'fa fa-clock-o',
+            cancelled: 'fa fa-ban',
         };
         return map[status] || 'fa fa-circle-o';
+    }
+
+    getRunModeClass(mode) {
+        const map = {
+            manual: 'run-mode--manual',
+            schedule: 'run-mode--schedule',
+            webhook: 'run-mode--webhook',
+            record_event: 'run-mode--record-event',
+        };
+        return map[mode] || 'run-mode--default';
+    }
+
+    getRunModeLabel(mode) {
+        const map = {
+            manual: _t('Manual'),
+            schedule: _t('Schedule'),
+            webhook: _t('Webhook'),
+            record_event: _t('Record Event'),
+        };
+        return map[mode] || _t('Unknown');
+    }
+
+    getQueueStateClass(state) {
+        const map = {
+            wait_dependencies: 'run-queue--waiting',
+            pending: 'run-queue--pending',
+            enqueued: 'run-queue--enqueued',
+            started: 'run-queue--started',
+            done: 'run-queue--done',
+            cancelled: 'run-queue--cancelled',
+            failed: 'run-queue--failed',
+        };
+        return map[state] || 'run-queue--default';
+    }
+
+    getQueueStateLabel(state) {
+        const map = {
+            wait_dependencies: _t('Waiting'),
+            pending: _t('Pending'),
+            enqueued: _t('Enqueued'),
+            started: _t('Started'),
+            done: _t('Done'),
+            cancelled: _t('Cancelled'),
+            failed: _t('Failed'),
+        };
+        return map[state] || _t('Queued');
+    }
+
+    get canCancelSelectedRun() {
+        const selectedRun = this.getSelectedRun();
+        return Boolean(selectedRun && selectedRun.queue_can_cancel);
+    }
+
+    onCancelRun() {
+        const selectedRun = this.getSelectedRun();
+        if (!selectedRun || !selectedRun.queue_can_cancel) {
+            return;
+        }
+
+        this.dialog.add(ConfirmationDialog, {
+            title: _t("Cancel queued run"),
+            body: _t("Cancel run %s before it starts?", selectedRun.name),
+            confirmLabel: _t("Cancel run"),
+            confirmClass: "btn-danger",
+            confirm: async () => {
+                try {
+                    this.ui.block();
+                    await this.orm.call("workflow.run", "action_cancel", [[selectedRun.id]]);
+                    this.notification.add(_t("Queued run cancelled."), { type: "success" });
+                    this.exitRunView();
+                    await this.loadRuns();
+                } catch (error) {
+                    this.notification.add(
+                        _t("Failed to cancel queued run: %s", error.message),
+                        { type: "danger" }
+                    );
+                } finally {
+                    this.ui.unblock();
+                }
+            },
+        });
     }
 
     formatDuration(seconds) {

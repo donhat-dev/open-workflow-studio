@@ -431,12 +431,27 @@
   color: $o-warning;
 }
 
+.run-status--pending {
+  color: $o-info;
+}
+
+.run-status--cancelled {
+  color: $o-danger;
+}
+
 .run-status--default {
   color: $o-gray-500;
 }
 
 .run-item__meta {
   margin-bottom: 4px;
+}
+
+.run-item__badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
 }
 
 .run-item__time {
@@ -497,4 +512,86 @@
     color: $o-warning;
     border: 1px solid rgba($o-warning, 0.2);
   }
+
+  &.run-status--pending {
+    background: rgba($o-info, 0.1);
+    color: $o-info;
+    border: 1px solid rgba($o-info, 0.2);
+  }
+
+  &.run-status--cancelled {
+    background: rgba($o-danger, 0.1);
+    color: $o-danger;
+    border: 1px solid rgba($o-danger, 0.2);
+  }
+}
+
+.run-mode-badge,
+.run-queue-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+
+.run-mode--manual {
+  background: rgba($o-info, 0.1);
+  color: $o-info;
+  border-color: rgba($o-info, 0.2);
+}
+
+.run-mode--schedule,
+.run-mode--record-event {
+  background: rgba($o-warning, 0.1);
+  color: $o-warning;
+  border-color: rgba($o-warning, 0.2);
+}
+
+.run-mode--webhook {
+  background: rgba($o-action, 0.1);
+  color: $o-action;
+  border-color: rgba($o-action, 0.2);
+}
+
+.run-mode--default {
+  background: $o-gray-300;
+  color: $o-gray-700;
+  border-color: $o-gray-400;
+}
+
+.run-queue--waiting,
+.run-queue--pending,
+.run-queue--enqueued {
+  background: rgba($o-warning, 0.1);
+  color: $o-warning;
+  border-color: rgba($o-warning, 0.2);
+}
+
+.run-queue--started {
+  background: rgba($o-action, 0.1);
+  color: $o-action;
+  border-color: rgba($o-action, 0.2);
+}
+
+.run-queue--done {
+  background: rgba($o-success, 0.1);
+  color: $o-success;
+  border-color: rgba($o-success, 0.2);
+}
+
+.run-queue--cancelled,
+.run-queue--failed {
+  background: rgba($o-danger, 0.1);
+  color: $o-danger;
+  border-color: rgba($o-danger, 0.2);
+}
+
+.run-queue--default {
+  background: $o-gray-300;
+  color: $o-gray-700;
+  border-color: $o-gray-400;
 }

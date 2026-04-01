@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from odoo import fields, models, _
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
+
+from ..workflow import WorkflowExecutionRegistry
 
 
 class WorkflowRun(models.Model):
@@ -99,6 +102,11 @@ class WorkflowRun(models.Model):
         default=lambda self: {},
         help='Copy of published_snapshot at execution time'
     )
+    start_node_ids = fields.Json(
+        string='Start Node IDs',
+        default=lambda self: [],
+        help='Ordered start nodes used to launch this run.',
+    )
 
     # === Input/Output ===
     input_data = fields.Json(
@@ -146,6 +154,66 @@ class WorkflowRun(models.Model):
         string='Node Results',
         help='Per-node execution results'
     )
+
+    @api.model
+    def _prepare_workflow_event_payload(self, event_name, event=None, **extra):
+        payload = dict(event or {})
+        payload.setdefault('event_name', event_name)
+        payload.setdefault('run', self if self else self.env['workflow.run'])
+        if self:
+            payload.setdefault('workflow', self.workflow_id)
+            payload.setdefault('execution_mode', self.execution_mode)
+            payload.setdefault('status', self.status)
+            payload.setdefault('input_data', self.input_data or {})
+        payload.update(extra)
+        return payload
+
+    def _run_local_workflow_event_hooks(self, event_name, payload):
+        hook_name = '_%s' % event_name
+        hook = getattr(self, hook_name, None)
+        if callable(hook):
+            returned = hook(payload)
+            if returned is not None:
+                payload = returned
+        return payload
+
+    def _emit_workflow_event(self, event_name, event=None, **extra):
+        self.ensure_one()
+        payload = self._prepare_workflow_event_payload(event_name, event=event, **extra)
+        if self.workflow_id:
+            return self.workflow_id._emit_workflow_event(
+                event_name,
+                event=payload,
+            )
+        payload = self._run_local_workflow_event_hooks(event_name, payload)
+        return WorkflowExecutionRegistry.dispatch(event_name, payload)
+
+    # Queue-neutral lifecycle hooks for child addons / inheritance.
+    def _cancel_requested(self, event):
+        return event
+
+    def _pre_execution(self, event):
+        return event
+
+    def _post_execution(self, event):
+        return event
+
+    def _node_started(self, event):
+        return event
+
+    def _node_completed(self, event):
+        return event
+
+    def _node_failed(self, event):
+        return event
+
+    def action_cancel(self):
+        for run in self:
+            event = run._emit_workflow_event('cancel_requested')
+            if event and event.get('handled'):
+                continue
+            raise UserError(_("Cancellation is not available for this workflow run."))
+        return True
 
     # === Display ===
     def name_get(self):

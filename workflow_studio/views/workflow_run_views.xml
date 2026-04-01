@@ -14,6 +14,7 @@
 				<field name="name"/>
 				<field name="workflow_id"/>
 				<field name="status" widget="badge" decoration-success="status == 'completed'" decoration-danger="status == 'failed'" decoration-warning="status == 'running'" decoration-info="status == 'pending'" decoration-muted="status == 'cancelled'"/>
+				<field name="execution_mode"/>
 				<field name="started_at"/>
 				<field name="completed_at"/>
 				<field name="duration_seconds" string="Duration"/>
@@ -31,7 +32,7 @@
 		<field name="arch" type="xml">
 			<form string="Workflow Run" create="false">
 				<header>
-					<field name="status" widget="statusbar" statusbar_visible="pending,running,completed,failed"/>
+					<field name="status" widget="statusbar" statusbar_visible="pending,running,completed,failed,cancelled"/>
 				</header>
 				<sheet>
 					<div class="oe_title">
@@ -42,6 +43,7 @@
 					<group>
 						<group string="Execution Info">
 							<field name="workflow_id"/>
+							<field name="execution_mode"/>
 							<field name="executed_version"/>
 							<field name="company_id" groups="base.group_multi_company"/>
 						</group>
@@ -99,6 +101,7 @@
 				<field name="name"/>
 				<field name="workflow_id"/>
 				<field name="status"/>
+				<field name="execution_mode"/>
 				<field name="error_node_id"/>
 				<separator/>
 				<filter name="pending" string="Pending" domain="[('status', '=', 'pending')]"/>
@@ -106,6 +109,8 @@
 				<filter name="completed" string="Completed" domain="[('status', '=', 'completed')]"/>
 				<filter name="failed" string="Failed" domain="[('status', '=', 'failed')]"/>
 				<filter name="cancelled" string="Cancelled" domain="[('status', '=', 'cancelled')]"/>
+				<filter name="manual" string="Manual" domain="[('execution_mode', '=', 'manual')]"/>
+				<filter name="automated" string="Automated" domain="[('execution_mode', '!=', 'manual')]"/>
 				<separator/>
 				<filter name="today" string="Today" domain="[('started_at', '&gt;=', (context_today()).strftime('%Y-%m-%d'))]"/>
 				<filter name="last_7_days" string="Last 7 Days" domain="[('started_at', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]"/>
@@ -113,6 +118,7 @@
 				<group expand="0" string="Group By">
 					<filter name="group_workflow" string="Workflow" context="{'group_by': 'workflow_id'}"/>
 					<filter name="group_status" string="Status" context="{'group_by': 'status'}"/>
+					<filter name="group_execution_mode" string="Execution Mode" context="{'group_by': 'execution_mode'}"/>
 					<filter name="group_date" string="Start Date" context="{'group_by': 'started_at:day'}"/>
 				</group>
 			</search>

@@ -89,6 +89,10 @@ class ExecutionResultSchema:
     run_name: Optional[str] = None
     
     # Execution metadata
+    execution_mode: Optional[str] = None
+    queue_job_uuid: Optional[str] = None
+    queue_job_state: Optional[str] = None
+    queue_can_cancel: Optional[bool] = None
     target_node_id: Optional[str] = None
     execution_count: Optional[int] = None
     node_count_executed: Optional[int] = None
@@ -126,6 +130,10 @@ class ExecutionResultSchema:
             'run_id': self.run_id,
             'run_name': self.run_name,
             'target_node_id': self.target_node_id,
+            'execution_mode': self.execution_mode,
+            'queue_job_uuid': self.queue_job_uuid,
+            'queue_job_state': self.queue_job_state,
+            'queue_can_cancel': self.queue_can_cancel,
             'execution_count': self.execution_count,
             'node_count_executed': self.node_count_executed,
             'duration_seconds': self.duration_seconds,

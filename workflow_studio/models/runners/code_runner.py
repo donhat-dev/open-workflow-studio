@@ -13,7 +13,7 @@ from datetime import datetime, date
 
 from odoo.tools.safe_eval import safe_eval
 
-from ..context_objects import build_eval_context
+from ..context_objects import build_eval_context, to_plain
 from .base import BaseNodeRunner
 
 
@@ -66,6 +66,7 @@ class CodeNodeRunner(BaseNodeRunner):
         result = locals_dict.get('result', _RESULT_UNSET)
         if result is _RESULT_UNSET:
             result = input_data
+        result = to_plain(result)
         return {
             'outputs': [[result]],
             'json': result,
