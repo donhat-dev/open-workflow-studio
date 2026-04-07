@@ -8,3 +8,4 @@ Main capabilities include:
 - execution history and run inspection
 - manual, schedule, webhook, and record-event triggers
 - node-based logic such as HTTP requests, branching, loops, and variable handling
+- extensible execution hooks for advanced automation customization like `queue_job` integration

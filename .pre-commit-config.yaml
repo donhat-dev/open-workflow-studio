@@ -70,6 +70,7 @@ repos:
       - id: check-symlinks
       - id: check-xml
       - id: mixed-line-ending
+        exclude: /README\.rst$
         args: ["--fix=lf"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.8

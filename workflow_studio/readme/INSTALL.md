@@ -5,3 +5,5 @@ Install the `workflow_studio` addon like any standard Odoo addon:
 3. Install **Workflow Studio** from the Apps menu.
 
 The module depends on core Odoo modules `base`, `web`, `mail`, and `bus`.
+
+For local development, upgrade the addon after pulling changes so regenerated assets and metadata stay in sync with the codebase.
