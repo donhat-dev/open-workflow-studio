@@ -214,13 +214,13 @@ workflow_studio/
 
 ## Roadmap
 
-### Phase 1 — MVP *(in progress, ~85%)*
+### Phase 1 — MVP *(in progress, ~100%)*
 - [x] Stack-based execution engine
 - [x] Visual node editor (OWL canvas)
 - [x] Manual + Schedule + Webhook triggers
 - [x] HTTP Request, IF/Switch, Loop nodes
 - [x] Expression system (`{{ $json.field }}`)
-- [ ] Execution run history & step inspector
+- [x] Execution run history & step inspector
 
 ### Phase 2 — Beta
 - Patch-based version control (ADR-006)
