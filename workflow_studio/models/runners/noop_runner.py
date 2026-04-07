@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 NoOp Node Runner
 
@@ -12,10 +10,10 @@ from .base import BaseNodeRunner
 class NoOpNodeRunner(BaseNodeRunner):
     """No-op node runner that forwards input unchanged."""
 
-    node_type = 'noop'
+    node_type = "noop"
 
     def execute(self, node_config, input_data, context):
         return {
-            'outputs': [[input_data]],
-            'json': input_data,
+            "outputs": [[input_data]],
+            "json": input_data,
         }

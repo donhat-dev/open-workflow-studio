@@ -2,7 +2,7 @@
 
 /**
  * HistoryManager - Undo/Redo functionality using Command pattern
- * 
+ *
  * Uses simple action objects instead of class hierarchy for simplicity.
  */
 export class HistoryManager {
@@ -24,7 +24,7 @@ export class HistoryManager {
 
     /**
      * Commit the current batch as a single action
-     * @param {string} description 
+     * @param {string} description
      */
     commitBatch(description) {
         if (!this._currentBatch || this._currentBatch.length === 0) {

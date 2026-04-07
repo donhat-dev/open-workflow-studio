@@ -128,7 +128,7 @@ class ReadonlyDotDict(ReadonlyDict):
         return object.__getattribute__(self, attrib)
 
     def __getattr__(self, attrib):
-        if attrib.startswith('__') or attrib.startswith('_ReadonlyDict'):
+        if attrib.startswith("__") or attrib.startswith("_ReadonlyDict"):
             raise AttributeError(attrib)
         try:
             val = self[attrib]
@@ -139,7 +139,7 @@ class ReadonlyDotDict(ReadonlyDict):
     def get(self, key, default=None):
         try:
             return self[key]
-        except KeyError as e:
+        except KeyError:
             return default
 
     def keys(self):
@@ -218,7 +218,9 @@ def build_input_context(payload, include_input_item=False):
     if not include_input_item:
         return payload
 
-    items_value = payload if isinstance(payload, list) else ([] if payload is None else [payload])
+    items_value = (
+        payload if isinstance(payload, list) else ([] if payload is None else [payload])
+    )
     input_context = {
         "json": payload,
         "item": items_value[0] if items_value else None,
@@ -317,7 +319,9 @@ class NodeOutputsProxy:
         return (self._build_view(out) for out in self._outputs.values())
 
     def items(self):
-        return ((node_id, self._build_view(out)) for node_id, out in self._outputs.items())
+        return (
+            (node_id, self._build_view(out)) for node_id, out in self._outputs.items()
+        )
 
     def __iter__(self):
         return iter(self._outputs)
@@ -332,7 +336,9 @@ class ExecutionContext:
     Keeps a single in-memory context and updates per node execution.
     """
 
-    def __init__(self, *, node_outputs, vars_store, node_context, execution=None, workflow=None):
+    def __init__(
+        self, *, node_outputs, vars_store, node_context, execution=None, workflow=None
+    ):
         self.node_outputs = node_outputs
         self.vars = vars_store
         self.node_context = node_context
@@ -397,7 +403,9 @@ class ExecutionContext:
 
     def get_eval_context(self, input_data, include_input_item=False, node_id=None):
         payload = input_data if input_data is not None else {}
-        input_context = build_input_context(payload, include_input_item=include_input_item)
+        input_context = build_input_context(
+            payload, include_input_item=include_input_item
+        )
 
         loop_context = {}
         if node_id:
@@ -433,8 +441,7 @@ class ExecutionContext:
             target_json = target_result.get("json")
 
         node_json_snapshot = {
-            node_id: output.get("json")
-            for node_id, output in self.node_outputs.items()
+            node_id: output.get("json") for node_id, output in self.node_outputs.items()
         }
 
         node_context_snapshot = {
@@ -464,23 +471,29 @@ def build_eval_context(payload, context, include_input_item=False):
     if isinstance(base_context, dict):
         exec_context = base_context.get("exec_context")
     if isinstance(exec_context, ExecutionContext):
-        node_id = base_context.get("current_node_id") if isinstance(base_context, dict) else None
-        return exec_context.get_eval_context(payload, include_input_item=include_input_item, node_id=node_id)
+        node_id = (
+            base_context.get("current_node_id")
+            if isinstance(base_context, dict)
+            else None
+        )
+        return exec_context.get_eval_context(
+            payload, include_input_item=include_input_item, node_id=node_id
+        )
 
     input_context = build_input_context(payload, include_input_item=include_input_item)
 
     eval_context = {
-        '_json': wrap_readonly(payload),
-        '_input': wrap_readonly(input_context),
-        '_node': wrap_readonly(base_context.get('node') or {}),
-        '_vars': wrap_mutable(base_context.get('vars') or {}),
+        "_json": wrap_readonly(payload),
+        "_input": wrap_readonly(input_context),
+        "_node": wrap_readonly(base_context.get("node") or {}),
+        "_vars": wrap_mutable(base_context.get("vars") or {}),
     }
 
-    if base_context.get('execution') is not None:
-        eval_context['_execution'] = wrap_readonly(base_context.get('execution'))
-    if base_context.get('workflow') is not None:
-        eval_context['_workflow'] = wrap_readonly(base_context.get('workflow'))
-    if base_context.get('loop') is not None:
-        eval_context['_loop'] = wrap_readonly(base_context.get('loop'))
+    if base_context.get("execution") is not None:
+        eval_context["_execution"] = wrap_readonly(base_context.get("execution"))
+    if base_context.get("workflow") is not None:
+        eval_context["_workflow"] = wrap_readonly(base_context.get("workflow"))
+    if base_context.get("loop") is not None:
+        eval_context["_loop"] = wrap_readonly(base_context.get("loop"))
 
     return eval_context

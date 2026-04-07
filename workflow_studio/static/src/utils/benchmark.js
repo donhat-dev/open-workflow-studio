@@ -2,12 +2,12 @@
 
 /**
  * Runs a stress test by generating a grid of nodes and connections.
- * Can be run from the browser console via: 
+ * Can be run from the browser console via:
  * odoo.loader.modules.get('workflow_studio.benchmark').runStressTest(window.canvas.props.nodes, window.canvas.props.connections)
  * (Note: requires access to the adapter instance or mimicking addNode calls if interacting with UI directly)
- * 
+ *
  * Ideally used within DevDemoApp.
- * 
+ *
  * @param {Object} adapter - The WorkflowAdapter instance
  * @param {number} count - Number of nodes to generate (default 200)
  */

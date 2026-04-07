@@ -6,10 +6,10 @@ import { calculateFitView } from "../utils/view_utils";
 
 /**
  * useViewport Hook
- * 
+ *
  * Manages viewport state (zoom, pan) and provides viewport-related methods.
  * Supports both editor mode (via service) and viewer mode (via local state).
- * 
+ *
  * @param {{
  *   editor?: Object,              // Editor service (optional for viewer mode)
  *   rootRef: { el: HTMLElement },

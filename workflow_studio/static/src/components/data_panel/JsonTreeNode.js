@@ -6,7 +6,7 @@ import { RecordBadge } from "@workflow_studio/components/data_panel/RecordBadge"
 
 /**
  * JsonTreeNode Component
- * 
+ *
  * Recursive component for rendering JSON tree nodes.
  * Each node is draggable and generates the appropriate expression path.
  */

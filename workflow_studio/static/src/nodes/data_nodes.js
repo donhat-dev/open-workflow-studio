@@ -85,7 +85,7 @@ export class SetDataNode extends BaseNode {
 
 /**
  * VariableNode - Set/Get workflow variables (_vars)
- * 
+ *
  * Operations:
  * - set: Set a variable value (with expression support)
  * - get: Read a variable value
@@ -174,4 +174,3 @@ export class CodeNode extends BaseNode {
     }
 
 }
-

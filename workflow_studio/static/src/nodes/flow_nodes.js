@@ -62,9 +62,9 @@ export class LoopNode extends BaseNode {
 
 /**
  * IfNode - Conditional branching
- * 
+ *
  * Routes data to "true" or "false" output based on condition.
- * 
+ *
  * Inputs: data
  * Outputs: true, false
  */
@@ -183,5 +183,3 @@ export class NoOpNode extends BaseNode {
     }
 
 }
-
-

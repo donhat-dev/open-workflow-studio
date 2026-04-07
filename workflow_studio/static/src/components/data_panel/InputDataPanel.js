@@ -5,7 +5,7 @@ import { JsonTreeNode } from "./JsonTreeNode";
 
 /**
  * InputDataPanel Component
- * 
+ *
  * Panel displaying output data from previous node.
  * Shows a tree view of JSON data with draggable items.
  */

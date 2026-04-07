@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Record Event Trigger Runner
 
@@ -28,20 +26,20 @@ class RecordEventTriggerNodeRunner(BaseNodeRunner):
     - ``event_type``: 'on_create' | 'on_write' | 'on_unlink' | etc.
     """
 
-    node_type = 'record_event_trigger'
+    node_type = "record_event_trigger"
 
     def execute(self, node_config, input_data, context):
-        trigger_payload = input_data.get('_trigger', {})
+        trigger_payload = input_data.get("_trigger", {})
 
         output = {
-            'trigger_type': 'record_event',
-            'context': trigger_payload.get('context', {}),
-            'model': trigger_payload.get('model', ''),
-            'record_ids': trigger_payload.get('record_ids', []),
-            'event_type': trigger_payload.get('event_type', ''),
+            "trigger_type": "record_event",
+            "context": trigger_payload.get("context", {}),
+            "model": trigger_payload.get("model", ""),
+            "record_ids": trigger_payload.get("record_ids", []),
+            "event_type": trigger_payload.get("event_type", ""),
         }
 
         return {
-            'outputs': [[output]],
-            'json': output,
+            "outputs": [[output]],
+            "json": output,
         }

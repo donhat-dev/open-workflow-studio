@@ -11,13 +11,13 @@
 				<span t-else="" class="json-tree-node__spacer"/>
 				<!-- Key Badge (draggable) -->
 				<t t-if="props.keyName !== undefined">
-					<span class="json-tree-node__key-badge" 
-					t-att-draggable="isDraggable ? 'true' : 'false'" 
-					t-att-data-path="expressionPath" 
-					t-att-data-expression="expressionTemplate" 
-					t-on-dragstart="onDragStart" 
+					<span class="json-tree-node__key-badge"
+					t-att-draggable="isDraggable ? 'true' : 'false'"
+					t-att-data-path="expressionPath"
+					t-att-data-expression="expressionTemplate"
+					t-on-dragstart="onDragStart"
 					t-on-dragend="onDragEnd"
-					t-on-click="toggleExpand" 
+					t-on-click="toggleExpand"
 					t-att-title="title">
 						<span class="type-icon" t-esc="typeIcon"/>
 						<t t-esc="props.keyName"/>

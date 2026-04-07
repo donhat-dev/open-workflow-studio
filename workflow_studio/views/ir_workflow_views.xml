@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-	<data>
+
 		<record id="action_workflow_editor_app" model="ir.actions.client">
 			<field name="name">Workflow Editor</field>
 			<field name="tag">workflow_studio.editor_app</field>
@@ -154,5 +154,4 @@
 		<menuitem id="menu_workflow_pilot_root" name="Workflow Studio" web_icon="workflow_studio,static/description/icon.png"/>
 		<menuitem id="menu_workflow_dashboard" name="Dashboard" parent="menu_workflow_pilot_root" action="action_workflow_dashboard" sequence="5"/>
 		<menuitem id="menu_ir_workflow" name="Workflows" parent="menu_workflow_pilot_root" action="action_ir_workflow" sequence="10"/>
-	</data>
 </odoo>

@@ -17,7 +17,7 @@
                 </div>
                 <div class="editor-actions" t-if="state.view === 'editor'">
                     <div class="editor-actions__group">
-                        <button 
+                        <button
                             class="btn btn-outline-secondary"
                             t-att-class="{ active: isExecutionLogOpen }"
                             t-on-click="toggleExecutionLog"
@@ -27,8 +27,8 @@
                             </span>
                             Logs
                         </button>
-                        <button 
-                            class="btn btn-outline-secondary" 
+                        <button
+                            class="btn btn-outline-secondary"
                             t-on-click="openHistory"
                             title="Version History">
                             <span class="btn__icon">

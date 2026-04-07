@@ -7,7 +7,7 @@ import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 
 /**
  * WorkflowNode Component
- * 
+ *
  * Renders an individual node on the workflow canvas.
  * Accesses workflowEditor service via env for actions and state.
  */
@@ -43,7 +43,7 @@ export class WorkflowNode extends Component {
         this.editor = this.env.workflowEditor || null;
         this._odooModels = useOdooModels();
         this._toolbarPropsCache = null;
-        this._toolbarPropsNodeId = null; 
+        this._toolbarPropsNodeId = null;
         this._toolbarPropsDisabled = null;
 
         this._onInputSocketMouseDown = (data) => {

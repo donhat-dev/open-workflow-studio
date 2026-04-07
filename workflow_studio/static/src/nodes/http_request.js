@@ -5,7 +5,7 @@ import { TextInputControl, SelectControl, KeyValueControl } from '../core/contro
 
 /**
  * HttpRequestNode - Configures HTTP API calls
- * 
+ *
  * Inputs: data (optional trigger)
  * Outputs: response, error
  * Config: method, url, headers, body

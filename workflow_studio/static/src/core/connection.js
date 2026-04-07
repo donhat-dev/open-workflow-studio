@@ -7,7 +7,7 @@
 
 /**
  * Connection - Represents a link between two nodes
- * 
+ *
  * Connections are directional: source (output) -> target (input)
  * Each connection references node IDs and socket keys.
  */

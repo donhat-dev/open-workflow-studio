@@ -1,7 +1,0 @@
-# Keep Cline's startup context focused on source and docs.
-.git/
-node_modules/
-dist/
-tmp/
-__pycache__/
-*.pyc

@@ -1,7 +1,7 @@
 # Workflow Studio — Design System Specification
 
-**Codename:** Editorial Carbon  
-**Date:** 2026-03-23  
+**Codename:** Editorial Carbon
+**Date:** 2026-03-23
 **Aesthetic:** Swiss editorial hierarchy × Carbon system utility × NAAI-style hard-edged blue refinement
 
 ---

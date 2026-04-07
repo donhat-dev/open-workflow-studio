@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Workflow Studio Schemas
 
@@ -14,8 +13,8 @@ from .execution import (
 )
 
 __all__ = [
-    'NodeResultSchema',
-    'ContextSnapshotSchema',
-    'ExecutionResultSchema',
-    'ExecutionErrorSchema',
+    "NodeResultSchema",
+    "ContextSnapshotSchema",
+    "ExecutionResultSchema",
+    "ExecutionErrorSchema",
 ]

@@ -130,4 +130,3 @@
 - 🚌 **Bus is intent-only**: Default to calling actions directly for commands; use bus for intents/events (fan-out / extension points); listeners translate to service actions
 - 🧮 **Pure utils**: Geometry, selection, drag logic in separate utils/ files; no component coupling
 - 🪝 **Behavior hooks**: useNodeDrag, useConnection etc. handle DOM setup/cleanup; no inline listeners
-

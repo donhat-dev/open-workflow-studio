@@ -77,9 +77,9 @@ Workflow Graph:
                     │                                   │
                     ▼                                   │
 Input → [Loop Node] ── loop ──► [Process] ── [Merge] ──┘
-              │                                  
+              │
               └── done ──► [Output]
-              
+
 
 Execution Sequence (5 items, batch=1):
 
@@ -126,17 +126,17 @@ Step 10: Output Node
 async executeLoopNode(node, inputData, context) {
     const config = node.config || {};
     const batchSize = config.batchSize || 1;
-    
+
     // Get persistent context for this node
     let nodeContext = this.state.nodeContext.get(node.id);
-    
+
     // ══════════════════════════════════════════════════════════════
     // PHASE A: First Run - Initialize State
     // ══════════════════════════════════════════════════════════════
     if (nodeContext === undefined || config.reset === true) {
         // Resolve collection from input or expression
         const items = this._resolveCollection(inputData, config);
-        
+
         nodeContext = {
             items: [...items],              // Copy of all items
             processedItems: [],             // Results accumulator
@@ -150,19 +150,19 @@ async executeLoopNode(node, inputData, context) {
     // ══════════════════════════════════════════════════════════════
     else {
         nodeContext.currentRunIndex += 1;
-        
+
         // Accumulate processed items from previous iteration
         if (inputData && inputData.length > 0) {
             nodeContext.processedItems.push(...inputData);
         }
     }
-    
+
     // Splice next batch from remaining items
     const batchItems = nodeContext.items.splice(0, batchSize);
-    
+
     // Save updated context
     this.state.nodeContext.set(node.id, nodeContext);
-    
+
     // ══════════════════════════════════════════════════════════════
     // PHASE C: Routing Decision
     // ══════════════════════════════════════════════════════════════
@@ -170,7 +170,7 @@ async executeLoopNode(node, inputData, context) {
         // All items processed → exit via "done" output
         nodeContext.done = true;
         this.state.nodeContext.delete(node.id);  // Clean up
-        
+
         return {
             outputs: [
                 nodeContext.processedItems,  // Output 0: "done" - all results
@@ -179,18 +179,18 @@ async executeLoopNode(node, inputData, context) {
             meta: { completed: true, iterations: nodeContext.maxRunIndex }
         };
     }
-    
+
     // More items remain → continue via "loop" output
     nodeContext.done = false;
-    
+
     return {
         outputs: [
             [],           // Output 0: "done" - empty
             batchItems    // Output 1: "loop" - current batch
         ],
-        meta: { 
+        meta: {
             iteration: nodeContext.currentRunIndex + 1,
-            remaining: nodeContext.items.length 
+            remaining: nodeContext.items.length
         }
     };
 }
@@ -304,7 +304,7 @@ async _executeLoopNode(node, inputData, expressionContext, startTime) {
     if (!loopCtx) {
         // First execution: resolve collection
         let collection = resolveCollection(inputData, config);
-        
+
         loopCtx = {
             currentIndex: 0,
             items: collection,

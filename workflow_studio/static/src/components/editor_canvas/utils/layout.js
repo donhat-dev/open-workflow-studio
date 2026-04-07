@@ -9,7 +9,7 @@ import { WorkflowGraph } from "../../../utils/graph_utils";
 
 /**
  * Calculate tidy (auto-layout) positions for all nodes using Dagre.js
- * 
+ *
  * @param {Array} nodes - Array of node objects with id, x, y
  * @param {Array} connections - Array of connection objects with source, target
  * @param {{ orientation?: "horizontal"|"vertical", ranksep?: number }} [options] - Layout options

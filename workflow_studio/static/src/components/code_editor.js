@@ -2,7 +2,7 @@
 
 /**
  * CodeEditor Component
- * 
+ *
  * OWL wrapper for Monaco Editor with workflow context autocomplete.
  * Loads Monaco from CDN and provides suggestions for Python workflow context.
  */

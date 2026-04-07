@@ -2,11 +2,11 @@
 
 /**
  * Library Registry
- * 
+ *
  * Registry for external libraries used by workflow components.
  * Provides abstraction layer over window globals while maintaining
  * backward compatibility.
- * 
+ *
  * @odoo-dependency - Uses Odoo registry
  */
 

@@ -2,9 +2,9 @@
 
 /**
  * Core Module - Workflow Studio Library
- * 
+ *
  * This module exports all core classes for building workflow editors.
- * 
+ *
  * Usage:
  *   import { WorkflowEditor, BaseNode, DataSocket } from './core';
  */

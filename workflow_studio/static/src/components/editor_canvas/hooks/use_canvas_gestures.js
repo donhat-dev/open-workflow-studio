@@ -6,12 +6,12 @@ import { getNodeBounds } from "../utils/view_utils";
 
 /**
  * useCanvasGestures Hook
- * 
+ *
  * Manages canvas gestures: panning (middle mouse) and box selection (left click on empty area).
  * Follows pattern: hook returns state + handlers.
  * Supports readonly mode for viewer use case.
- * 
- * @param {{ 
+ *
+ * @param {{
  *   editor?: Object,                   // Optional - not needed in readonly mode
  *   rootRef: { el: HTMLElement },
  *   getViewport: () => { panX: number, panY: number, zoom: number },

@@ -85,10 +85,10 @@ export function useStudioServiceAsReactive() {
         Object.assign(state, studio);  // Sync khi UPDATE
         if (detail.reset) state.requestId++;
     }
-    
+
     studio.bus.addEventListener("UPDATE", onUpdate);
     onWillUnmount(() => studio.bus.removeEventListener("UPDATE", onUpdate));
-    
+
     return state;
 }
 ```
@@ -111,26 +111,26 @@ export function useStudioServiceAsReactive() {
 ```javascript
 export function useViewEditorModel(viewRef, { initialState }) {
     const env = useEnv();
-    
+
     // Thu thập services
     const services = {
         orm: useService("orm"),
         ui: useService("ui"),
         dialog: { add: useOwnedDialogs() },
     };
-    
+
     // Tạo Model instance
     const viewEditorModel = new ViewEditorModel({
         env, services, viewRef, initialState,
     });
-    
+
     // Inject để children access được
     useSubEnv({ viewEditorModel });
-    
+
     // Lifecycle bindings
     onWillStart(() => viewEditorModel.load());
     onWillDestroy(() => viewEditorModel.isInEdition = false);
-    
+
     return useState(viewEditorModel);  // Reactive
 }
 ```
@@ -162,17 +162,17 @@ services.dialog = { add: useOwnedDialogs() };
 export function useApproval({ getRecord, method, action }) {
     const protectedOrm = useService("orm");      // Protected version
     const unprotectedOrm = useEnv().services.orm; // Direct access
-    
+
     const approval = reactive(
         Object.assign(Object.create(baseApproval), {
             orm: unprotectedOrm,  // Dùng unprotected lúc đầu
         })
     );
-    
+
     onMounted(() => {
         approval.orm = protectedOrm;  // Chuyển sang protected sau mount
     });
-    
+
     return approval;
 }
 ```
@@ -281,7 +281,7 @@ class StudioApproval {
     constructor({ getApprovalSpecBatched, model }) {
         this._data = reactive({});
         this.model = model;
-        
+
         // Lazy - sẽ được set bởi useApproval()
         this.orm = null;
         this.studio = null;

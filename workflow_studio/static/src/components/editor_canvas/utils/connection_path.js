@@ -2,17 +2,17 @@
 
 /**
  * Connection Path Utilities
- * 
+ *
  * Pure functions for calculating SVG paths between connection points.
  * No OWL dependencies - framework agnostic.
  */
 
 /**
  * Calculate normal forward bezier curve between two points
- * @param {number} sourceX 
- * @param {number} sourceY 
- * @param {number} targetX 
- * @param {number} targetY 
+ * @param {number} sourceX
+ * @param {number} sourceY
+ * @param {number} targetX
+ * @param {number} targetY
  * @returns {string} SVG path d attribute
  */
 export function getBezierPath(sourceX, sourceY, targetX, targetY) {
@@ -25,10 +25,10 @@ export function getBezierPath(sourceX, sourceY, targetX, targetY) {
  * Calculate path for back-edges (connections going right-to-left)
  * Routes around the bottom of both nodes to avoid overlapping
  * Uses rounded corners at all 4 corners (like a rounded rectangle)
- * @param {number} sourceX 
- * @param {number} sourceY 
- * @param {number} targetX 
- * @param {number} targetY 
+ * @param {number} sourceX
+ * @param {number} sourceY
+ * @param {number} targetX
+ * @param {number} targetY
  * @returns {string} SVG path d attribute
  */
 export function getBackEdgePath(sourceX, sourceY, targetX, targetY) {
@@ -60,10 +60,10 @@ export function getBackEdgePath(sourceX, sourceY, targetX, targetY) {
 /**
  * Calculate paths for vertically stacked nodes (S-curve bracket routing)
  * Creates two bracket segments: "_]" and "[_" that form an S-shape
- * @param {number} sourceX 
- * @param {number} sourceY 
- * @param {number} targetX 
- * @param {number} targetY 
+ * @param {number} sourceX
+ * @param {number} sourceY
+ * @param {number} targetX
+ * @param {number} targetY
  * @returns {{ path1: string, path2: string }}
  */
 export function getVerticalStackPath(sourceX, sourceY, targetX, targetY) {

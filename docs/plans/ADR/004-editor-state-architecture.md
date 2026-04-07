@@ -45,10 +45,10 @@ export class WorkflowEditorService extends Service {
         ui: {
             selection: { nodeIds: [], connectionIds: [] },
             viewport: { pan: { x, y }, zoom },
-            panels: { 
-                configOpen: false, 
-                menuOpen: false, 
-                configNodeId: null 
+            panels: {
+                configOpen: false,
+                menuOpen: false,
+                configNodeId: null
             },
             hoveredConnection: null
         }
@@ -61,18 +61,18 @@ export class WorkflowEditorService extends Service {
         removeNode(nodeId) { /* batch-safe */ },
         addConnection(source, target, ...) { /* batch-safe */ },
         removeConnection(connId) { /* batch-safe */ },
-        
+
         // UI mutations
         select(nodeIds, connectionIds) { /* batch-safe */ },
         setViewport(pan, zoom) { /* batch-safe */ },
         openPanel(panelType, context) { /* batch-safe */ },
         closePanel(panelType) { /* batch-safe */ },
         setHoveredConnection(connId) { /* batch-safe */ },
-        
+
         // Batch operations
         beginBatch() { /* defer history */ },
         endBatch() { /* commit to history */ },
-        
+
         // History
         undo() { /* replay from history */ },
         redo() { /* replay from history */ }
@@ -96,7 +96,7 @@ export class EditorApp extends Component {
         // Create service instance for this editor
         const workflowEditor = new WorkflowEditorService();
         const editorBus = EventBus();
-        
+
         // Inject into sub-environment
         useSubEnv({
             workflowEditor,
@@ -143,12 +143,12 @@ export class EditorCanvas extends Component {
     // Read from service state
     get nodes() { return this.workflowEditor.state.graph.nodes; }
     get selection() { return this.workflowEditor.state.ui.selection; }
-    
+
     // Emit intent → listener converts to action
     onNodeMouseDown(nodeId, event) {
         this.editorBus.trigger('node:drag:start', { nodeId });
     }
-    
+
     // Or call action directly for simple mutations
     onNodeSelect(nodeId) {
         this.workflowEditor.actions.select([nodeId], []);
@@ -168,23 +168,23 @@ Reusable hooks handle DOM setup/cleanup with OWL patterns:
 // hooks/use_node_drag.js
 export function useNodeDrag(nodeId, editorBus) {
     const ref = useRef('nodeElement');
-    
+
     onMounted(() => {
         const el = ref.el;
         let startPos = null;
-        
+
         el.addEventListener('mousedown', (e) => {
             startPos = { x: e.clientX, y: e.clientY };
             editorBus.trigger('node:drag:start', { nodeId });
         });
-        
+
         document.addEventListener('mousemove', (e) => {
             if (startPos) {
                 const delta = { x: e.clientX - startPos.x, y: e.clientY - startPos.y };
                 editorBus.trigger('node:drag:move', { nodeId, delta });
             }
         });
-        
+
         document.addEventListener('mouseup', () => {
             if (startPos) {
                 editorBus.trigger('node:drag:end', { nodeId });
@@ -325,4 +325,3 @@ Use RxJS observables for state streams.
 | **Related ADRs** | ADR-001 (StackExecutor), ADR-002 (Node Output) |
 | **Related Tasks** | E4.6.1, E4.6.2, E4.6.3, E4.6.4, E4.6.5, E4.6.6 |
 | **Epic** | E4.6: Editor State Architecture Refactor |
-

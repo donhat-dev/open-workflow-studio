@@ -51,19 +51,19 @@ export function makeDraggableHook(params) {
 ```javascript
 export function makeDraggableHook(hookParams) {
     const { setupHooks } = hookParams;  // Nhận primitives từ wrapper
-    
+
     return {
         [hookParams.name](params) {
             const state = setupHooks.wrapState({ dragging: false });
-            
+
             setupHooks.setup(() => {
                 // Setup logic
                 return () => { /* cleanup */ };
             });
-            
+
             setupHooks.addListener(window, "pointermove", onPointerMove);
             setupHooks.teardown(() => cleanup());
-            
+
             return state;
         }
     };
@@ -99,7 +99,7 @@ Mỗi side effect đăng ký cleanup function ngay khi được tạo.
 ```javascript
 function makeCleanupManager(defaultCleanupFn) {
     const cleanups = [];
-    
+
     return {
         add(cleanupFn) {
             if (typeof cleanupFn === "function") {
@@ -160,19 +160,19 @@ function makeDOMHelpers(cleanup) {
             cleanup.add(() => el.classList.remove(...classNames));
             el.classList.add(...classNames);
         },
-        
+
         addStyle(el, style) {
             cleanup.add(saveAttribute(el, "style"));  // Save cũ trước
             for (const key in style) {
                 el.style.setProperty(key, style[key]);
             }
         },
-        
+
         addListener(el, event, callback, options) {
             el.addEventListener(event, callback, options);
             cleanup.add(() => el.removeEventListener(event, callback, options));
         },
-        
+
         setAttribute(el, attr, value) {
             cleanup.add(saveAttribute(el, attr));
             el.setAttribute(attr, value);
@@ -186,7 +186,7 @@ function makeDOMHelpers(cleanup) {
 function saveAttribute(el, attribute) {
     const hasAttribute = el.hasAttribute(attribute);
     const originalValue = el.getAttribute(attribute);
-    
+
     return () => {
         if (hasAttribute) {
             el.setAttribute(attribute, originalValue);
@@ -230,19 +230,19 @@ cleanup.cleanup();
 export class ViewEditor extends Component {
     static template = "lf_web_studio.ViewEditor";
     static components = { StudioView, InteractiveEditor, ViewXmlEditor };
-    
+
     setup() {
         // Services
         this.studio = useService("studio");
-        
+
         // Refs
         this.rootRef = useRef("root");
         this.rendererRef = useRef("viewRenderer");
-        
+
         // Model từ hook - TẤT CẢ logic ở đây
         this.viewEditorModel = useViewEditorModel(this.rendererRef, { initialState });
     }
-    
+
     // Thin delegation methods
     onSaveXml({ resourceId, oldCode, newCode }) {
         this.viewEditorModel.doOperation({
@@ -290,12 +290,12 @@ class EditorOperations extends Reactive {
     _prepare(mode) {
         const raw = this.raw();  // Đọc không subscribe
         const lock = raw._lock;
-        
+
         if (lock && lock !== mode) {
             // Check internal state
             return false;
         }
-        
+
         this._lock = mode;  // Write vẫn qua reactive
         return true;
     }
@@ -317,20 +317,20 @@ export class EditorOperations extends Reactive {
         this.pendingUndone = null;
         this._lock = "";           // "do" | "undo" | "redo"
         this._keepLast = markRaw(new KeepLast());  // Concurrency
-        
+
         this._callbacks = {
             do: params.do,
             onError: params.onError,
             onDone: params.onDone,
         };
     }
-    
-    get canUndo() { 
-        return this.operations.length > 0 || this.pending?.length > 0; 
+
+    get canUndo() {
+        return this.operations.length > 0 || this.pending?.length > 0;
     }
-    
-    get canRedo() { 
-        return this.undone.length > 0 || this.pendingUndone?.length > 0; 
+
+    get canRedo() {
+        return this.undone.length > 0 || this.pendingUndone?.length > 0;
     }
 }
 ```
@@ -342,17 +342,17 @@ async do(op, silent = false) {
         this._close();
         return;
     }
-    
+
     this.pending.push(op);
     this.pendingUndone = [];  // Clear redo stack
-    
+
     let done = {};
     if (!silent) {
         done = await this._do("do", this.pending, op);
     } else {
         done = { result: true };
     }
-    
+
     this._close(done);
 }
 ```
@@ -364,18 +364,18 @@ async undo(canRedo = true) {
         this._close();
         return;
     }
-    
+
     const ops = this.raw().pending;
     if (!ops?.length) {
         this._close();
         return;
     }
-    
+
     const op = ops.pop();  // Lấy op cuối
     if (canRedo) {
         this.pendingUndone.push(op);  // Push vào redo stack
     }
-    
+
     const done = await this._do("undo", this.pending, op);
     this._close(done);
 }
@@ -397,18 +397,18 @@ export class SnackbarIndicator extends Reactive {
         this.pending = null;
         this.keepLast = markRaw(new KeepLast());
     }
-    
+
     add(prom) {
         this.state = "loading";
-        
+
         const raw = this.raw();
         this.pending = Promise.all([raw.pending, prom]);
-        
+
         this.keepLast.add(raw.pending)
             .then(() => this.state = "loaded")
             .catch(() => this.state = "error")
             .finally(() => this.pending = null);
-        
+
         return prom;  // Pass through để caller await
     }
 }
@@ -442,26 +442,26 @@ Dropdown menu phải stay positioned relative to button, ngay cả khi:
 export function usePosition(refName, getTarget, options = {}) {
     const ref = useRef(refName);
     let lock = false;
-    
+
     const update = () => {
         const targetEl = getTarget();
         if (!ref.el || !targetEl?.isConnected || lock) return;
-        
+
         const solution = reposition(ref.el, targetEl, options);
         options.onPositioned?.(ref.el, solution);
     };
-    
+
     // Batched updates via shared bus
     const component = useComponent();
     const bus = component.env[POSITION_BUS] || new EventBus();
-    
+
     bus.addEventListener("update", batchedUpdate);
     onWillDestroy(() => bus.removeEventListener("update", batchedUpdate));
-    
+
     // Topmost hook attaches scroll/resize listeners
     if (!(POSITION_BUS in component.env)) {
         useChildSubEnv({ [POSITION_BUS]: bus });
-        
+
         useEffect(() => {
             document.addEventListener("scroll", throttledUpdate, { capture: true });
             window.addEventListener("resize", throttledUpdate);
@@ -471,7 +471,7 @@ export function usePosition(refName, getTarget, options = {}) {
             };
         });
     }
-    
+
     return {
         lock: () => lock = true,
         unlock: () => { lock = false; bus.trigger("update"); },
@@ -496,17 +496,17 @@ Component cần local version của service với custom behavior.
 ```javascript
 export function useServicesOverrides(overrides) {
     let env = useEnv();
-    
+
     // Create new services object inheriting from parent
     const services = Object.create(env.services);
     useSubEnv({ services });
-    
+
     env = useEnv();  // Re-get với new services
-    
+
     // Topological sort để respect dependencies
     const getDeps = (name) => overrides[name]?.dependencies || [];
     const topoSorted = topologicalSort(Object.keys(overrides), getDeps);
-    
+
     for (const servName of topoSorted) {
         services[servName] = overrides[servName].start(env, services);
     }

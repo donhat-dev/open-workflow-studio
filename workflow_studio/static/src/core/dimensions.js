@@ -2,7 +2,7 @@
 
 /**
  * Workflow Studio - Unified Dimension Constants
- * 
+ *
  * Centralized configuration for all node/component dimensions.
  * These values are used for:
  * - CSS sizing (via custom properties)
@@ -58,7 +58,7 @@ export const FIT_VIEW_PADDING = 50;
 
 /**
  * DimensionConfig Class
- * 
+ *
  * Holds the current dimension configuration for an editor instance.
  * Can be initialized with custom values or defaults.
  */
@@ -212,7 +212,7 @@ export const defaultDimensions = new DimensionConfig();
 /**
  * Detect connection type based on source/target positions
  * Centralizes the detection logic used by both renderedConnections and tempConnectionPath
- * 
+ *
  * @param {{ x: number, y: number }} sourcePos - Source socket position
  * @param {{ x: number, y: number }} targetPos - Target socket position
  * @returns {{ isVerticalStack: boolean, isBackEdge: boolean }}

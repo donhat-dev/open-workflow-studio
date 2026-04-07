@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Workflow Studio Controllers
 
@@ -15,10 +13,10 @@ from odoo.http import request
 
 from ..models.context_objects import to_plain
 from ..schemas import (
-    ExecutionResultSchema,
-    ExecutionErrorSchema,
-    NodeResultSchema,
     ContextSnapshotSchema,
+    ExecutionErrorSchema,
+    ExecutionResultSchema,
+    NodeResultSchema,
 )
 
 _logger = logging.getLogger(__name__)
@@ -27,20 +25,20 @@ _logger = logging.getLogger(__name__)
 class WorkflowPilotController(http.Controller):
     """Controller for workflow execution endpoints."""
 
-    _RECORD_REFS_KEY = '__wf_record_refs__'
+    _RECORD_REFS_KEY = "__wf_record_refs__"
     _MAX_RECORD_REF_RESOLVE = 200
     _MINIMAL_FIELD_CANDIDATES = [
-        'display_name',
-        'name',
-        'state',
-        'status',
-        'code',
-        'email',
-        'phone',
-        'mobile',
-        'active',
-        'create_date',
-        'write_date',
+        "display_name",
+        "name",
+        "state",
+        "status",
+        "code",
+        "email",
+        "phone",
+        "mobile",
+        "active",
+        "create_date",
+        "write_date",
     ]
 
     def _build_node_result_schema(self, node_run):
@@ -54,7 +52,9 @@ class WorkflowPilotController(http.Controller):
             status=node_run.status,
             duration_ms=node_run.duration_ms,
             started_at=node_run.started_at.isoformat() if node_run.started_at else None,
-            completed_at=node_run.completed_at.isoformat() if node_run.completed_at else None,
+            completed_at=node_run.completed_at.isoformat()
+            if node_run.completed_at
+            else None,
             input_data=node_run.input_data,
             output_data=node_run.output_data,
             output_socket=node_run.output_socket,
@@ -68,7 +68,7 @@ class WorkflowPilotController(http.Controller):
         node_outputs_map = {}
         node_index_by_id = {}
 
-        for node_run in run.node_run_ids.sorted('sequence'):
+        for node_run in run.node_run_ids.sorted("sequence"):
             node_result = self._build_node_result_schema(node_run)
             execution_events.append(node_result)
 
@@ -83,23 +83,23 @@ class WorkflowPilotController(http.Controller):
             executed_order.append(nid)
 
         return {
-            'node_results': node_results,
-            'execution_events': execution_events,
-            'executed_order': executed_order,
-            'node_outputs_map': node_outputs_map,
+            "node_results": node_results,
+            "execution_events": execution_events,
+            "executed_order": executed_order,
+            "node_outputs_map": node_outputs_map,
         }
 
     def _get_minimal_read_fields(self, model):
         """Pick a bounded, lightweight field set for live expansion."""
-        field_names = ['display_name']
+        field_names = ["display_name"]
         fields_map = model.fields_get()
         for candidate in self._MINIMAL_FIELD_CANDIDATES:
-            if candidate == 'display_name':
+            if candidate == "display_name":
                 continue
             if candidate not in fields_map:
                 continue
-            field_type = fields_map[candidate].get('type')
-            if field_type in ('binary', 'one2many', 'many2many'):
+            field_type = fields_map[candidate].get("type")
+            if field_type in ("binary", "one2many", "many2many"):
                 continue
             field_names.append(candidate)
         # Keep payload minimal and deterministic.
@@ -110,11 +110,11 @@ class WorkflowPilotController(http.Controller):
         if not isinstance(refs, list):
             return normalized
 
-        for ref in refs[:self._MAX_RECORD_REF_RESOLVE]:
+        for ref in refs[: self._MAX_RECORD_REF_RESOLVE]:
             if not isinstance(ref, dict):
                 continue
-            model_name = ref.get('model')
-            record_id = ref.get('id')
+            model_name = ref.get("model")
+            record_id = ref.get("id")
             if not isinstance(model_name, str) or not model_name:
                 continue
             try:
@@ -123,29 +123,36 @@ class WorkflowPilotController(http.Controller):
                 continue
             if record_id <= 0:
                 continue
-            normalized.append({
-                'model': model_name,
-                'id': record_id,
-            })
+            normalized.append(
+                {
+                    "model": model_name,
+                    "id": record_id,
+                }
+            )
         return normalized
 
-    @http.route('/workflow_studio/resolve_record_refs', type='json', auth='user', methods=['POST'])
+    @http.route(
+        "/workflow_studio/resolve_record_refs",
+        type="json",
+        auth="user",
+        methods=["POST"],
+    )
     def resolve_record_refs(self, refs=None, **kwargs):
         """Resolve record references to minimal live data (ACL-aware)."""
         payload = request.httprequest.json or {}
         if refs is None:
-            refs = payload.get('refs')
+            refs = payload.get("refs")
 
         normalized_refs = self._normalize_record_refs(refs)
         if not normalized_refs:
-            return {'items': []}
+            return {"items": []}
 
         grouped_ids = {}
         for ref in normalized_refs:
-            model_name = ref['model']
+            model_name = ref["model"]
             if model_name not in grouped_ids:
                 grouped_ids[model_name] = set()
-            grouped_ids[model_name].add(ref['id'])
+            grouped_ids[model_name].add(ref["id"])
 
         resolved_map = {}
 
@@ -155,23 +162,23 @@ class WorkflowPilotController(http.Controller):
             except Exception:
                 for rid in id_set:
                     resolved_map[(model_name, rid)] = {
-                        'status': 'model_not_found',
-                        'error': 'Model not found',
-                        'data': None,
+                        "status": "model_not_found",
+                        "error": "Model not found",
+                        "data": None,
                     }
                 continue
 
-            if not model.check_access_rights('read', raise_exception=False):
+            if not model.check_access_rights("read", raise_exception=False):
                 for rid in id_set:
                     resolved_map[(model_name, rid)] = {
-                        'status': 'access_denied',
-                        'error': 'Read access denied',
-                        'data': None,
+                        "status": "access_denied",
+                        "error": "Read access denied",
+                        "data": None,
                     }
                 continue
 
             ids_list = list(id_set)
-            accessible_ids = model.search([('id', 'in', ids_list)]).ids
+            accessible_ids = model.search([("id", "in", ids_list)]).ids
             accessible_set = set(accessible_ids)
             missing_or_denied = set(ids_list) - accessible_set
 
@@ -180,7 +187,7 @@ class WorkflowPilotController(http.Controller):
             if accessible_ids:
                 rows = model.browse(accessible_ids).read(fields_to_read)
                 for row in rows:
-                    row_id = row.get('id')
+                    row_id = row.get("id")
                     if row_id:
                         rows_by_id[row_id] = row
 
@@ -188,71 +195,76 @@ class WorkflowPilotController(http.Controller):
                 key = (model_name, rid)
                 if rid in rows_by_id:
                     resolved_map[key] = {
-                        'status': 'ok',
-                        'error': None,
-                        'data': rows_by_id[rid],
+                        "status": "ok",
+                        "error": None,
+                        "data": rows_by_id[rid],
                     }
                     continue
                 if rid in missing_or_denied:
                     resolved_map[key] = {
-                        'status': 'missing_or_denied',
-                        'error': 'Record not found or no access',
-                        'data': None,
+                        "status": "missing_or_denied",
+                        "error": "Record not found or no access",
+                        "data": None,
                     }
                     continue
                 resolved_map[key] = {
-                    'status': 'unresolved',
-                    'error': 'Unable to resolve record',
-                    'data': None,
+                    "status": "unresolved",
+                    "error": "Unable to resolve record",
+                    "data": None,
                 }
 
         items = []
         for ref in normalized_refs:
-            model_name = ref['model']
-            rid = ref['id']
-            resolved = resolved_map.get((model_name, rid), {
-                'status': 'unresolved',
-                'error': 'Unable to resolve record',
-                'data': None,
-            })
-            items.append({
-                'model': model_name,
-                'id': rid,
-                'status': resolved['status'],
-                'error': resolved['error'],
-                'data': resolved['data'],
-            })
+            model_name = ref["model"]
+            rid = ref["id"]
+            resolved = resolved_map.get(
+                (model_name, rid),
+                {
+                    "status": "unresolved",
+                    "error": "Unable to resolve record",
+                    "data": None,
+                },
+            )
+            items.append(
+                {
+                    "model": model_name,
+                    "id": rid,
+                    "status": resolved["status"],
+                    "error": resolved["error"],
+                    "data": resolved["data"],
+                }
+            )
 
-        return {'items': items}
-    
-    @http.route('/workflow_studio/execute', type='json', auth='user', methods=['POST'])
+        return {"items": items}
+
+    @http.route("/workflow_studio/execute", type="json", auth="user", methods=["POST"])
     def execute_workflow(self, workflow_id=None, input_data=None, **kwargs):
         """Execute a published workflow.
-        
+
         Args:
             workflow_id: Database ID of workflow to execute
             input_data: Optional input data for workflow
-            
+
         Returns:
             ExecutionResultSchema dict
         """
         payload = request.httprequest.json or {}
         if workflow_id is None:
-            workflow_id = payload.get('workflow_id')
+            workflow_id = payload.get("workflow_id")
         if input_data is None:
-            input_data = payload.get('input_data', {})
+            input_data = payload.get("input_data", {})
 
         if workflow_id is None:
-            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
+            return ExecutionErrorSchema(error="Workflow ID is required").model_dump()
 
         workflow_id = int(workflow_id)
-        workflow = request.env['ir.workflow'].browse(workflow_id)
+        workflow = request.env["ir.workflow"].browse(workflow_id)
         if not workflow.exists():
-            return ExecutionErrorSchema(error='Workflow not found').model_dump()
-        
+            return ExecutionErrorSchema(error="Workflow not found").model_dump()
+
         try:
             result = workflow.execute_workflow(input_data or {}, notify_user=True)
-            run_id = result.get('run_id')
+            run_id = result.get("run_id")
 
             # Fetch node results from run record (single iteration for performance)
             node_results = []
@@ -260,75 +272,83 @@ class WorkflowPilotController(http.Controller):
             node_outputs_map = {}
             executed_order = []
             executed_connections = []
-            context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
-            queue_job_uuid = result.get('queue_job_uuid')
-            queue_job_state = result.get('queue_job_state')
-            queue_can_cancel = result.get('queue_can_cancel')
+            context_snapshot = (
+                result.get("context_snapshot") if isinstance(result, dict) else None
+            )
+            queue_job_uuid = result.get("queue_job_uuid")
+            queue_job_state = result.get("queue_job_state")
+            queue_can_cancel = result.get("queue_can_cancel")
             if run_id:
-                run = request.env['workflow.run'].browse(run_id)
+                run = request.env["workflow.run"].browse(run_id)
                 if run.exists():
                     executed_connections = run.executed_connections or []
                     run_result_data = self._collect_run_node_results(run)
-                    node_results = run_result_data['node_results']
-                    execution_events = run_result_data['execution_events']
-                    node_outputs_map = run_result_data['node_outputs_map']
-                    executed_order = run_result_data['executed_order']
-                    if hasattr(run, 'queue_job_uuid'):
+                    node_results = run_result_data["node_results"]
+                    execution_events = run_result_data["execution_events"]
+                    node_outputs_map = run_result_data["node_outputs_map"]
+                    executed_order = run_result_data["executed_order"]
+                    if hasattr(run, "queue_job_uuid"):
                         queue_job_uuid = run.queue_job_uuid or False
-                        queue_job_state = getattr(run, 'queue_job_state', False) or False
-                        queue_can_cancel = bool(getattr(run, 'queue_can_cancel', False))
-                    
+                        queue_job_state = (
+                            getattr(run, "queue_job_state", False) or False
+                        )
+                        queue_can_cancel = bool(getattr(run, "queue_can_cancel", False))
+
                     if not context_snapshot:
                         # Build context snapshot using pre-built map (fallback)
                         context_snapshot = ContextSnapshotSchema(
                             json=run.output_data,
                             node=node_outputs_map,
                             execution={
-                                'id': run.id,
-                                'name': run.name,
-                                'status': run.status,
+                                "id": run.id,
+                                "name": run.name,
+                                "status": run.status,
                             },
                             workflow={
-                                'id': workflow.id,
-                                'name': workflow.name,
-                                'active': workflow.active,
+                                "id": workflow.id,
+                                "name": workflow.name,
+                                "active": workflow.active,
                             },
                             now=datetime.now().isoformat(),
                             today=datetime.now().date().isoformat(),
                         )
-            
+
             return ExecutionResultSchema(
                 run_id=run_id,
-                run_name=result.get('run_name'),
-                status=result.get('status', 'completed'),
-                error=result.get('error'),
-                execution_mode=result.get('execution_mode'),
+                run_name=result.get("run_name"),
+                status=result.get("status", "completed"),
+                error=result.get("error"),
+                execution_mode=result.get("execution_mode"),
                 queue_job_uuid=queue_job_uuid,
                 queue_job_state=queue_job_state,
                 queue_can_cancel=queue_can_cancel,
-                execution_count=result.get('execution_count'),
-                node_count_executed=result.get('node_count_executed'),
-                duration_seconds=result.get('duration_seconds'),
+                execution_count=result.get("execution_count"),
+                node_count_executed=result.get("node_count_executed"),
+                duration_seconds=result.get("duration_seconds"),
                 executed_order=executed_order,
                 executed_connection_ids=[
-                    entry.get('connection_id')
+                    entry.get("connection_id")
                     for entry in executed_connections
-                    if isinstance(entry, dict) and entry.get('connection_id')
+                    if isinstance(entry, dict) and entry.get("connection_id")
                 ],
                 executed_connections=executed_connections,
                 input_data=input_data or {},
-                output_data=result.get('output_data'),
+                output_data=result.get("output_data"),
                 node_results=node_results,
                 execution_events=execution_events,
                 context_snapshot=context_snapshot,
             ).model_dump()
-            
+
         except Exception as e:
             _logger.exception(f"Workflow execution failed: {workflow_id}")
             return ExecutionErrorSchema(error=str(e)).model_dump()
 
-    @http.route('/workflow_studio/execute_from', type='json', auth='user', methods=['POST'])
-    def execute_from_node(self, workflow_id=None, node_id=None, input_data=None, **kwargs):
+    @http.route(
+        "/workflow_studio/execute_from", type="json", auth="user", methods=["POST"]
+    )
+    def execute_from_node(
+        self, workflow_id=None, node_id=None, input_data=None, **kwargs
+    ):
         """Execute a published workflow starting from a specific trigger node.
 
         Only the given node is pushed onto the execution stack, so sibling
@@ -344,21 +364,21 @@ class WorkflowPilotController(http.Controller):
         """
         payload = request.httprequest.json or {}
         if workflow_id is None:
-            workflow_id = payload.get('workflow_id')
+            workflow_id = payload.get("workflow_id")
         if node_id is None:
-            node_id = payload.get('node_id')
+            node_id = payload.get("node_id")
         if input_data is None:
-            input_data = payload.get('input_data', {})
+            input_data = payload.get("input_data", {})
 
         if workflow_id is None:
-            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
+            return ExecutionErrorSchema(error="Workflow ID is required").model_dump()
         if node_id is None:
-            return ExecutionErrorSchema(error='Node ID is required').model_dump()
+            return ExecutionErrorSchema(error="Node ID is required").model_dump()
 
         workflow_id = int(workflow_id)
-        workflow = request.env['ir.workflow'].browse(workflow_id)
+        workflow = request.env["ir.workflow"].browse(workflow_id)
         if not workflow.exists():
-            return ExecutionErrorSchema(error='Workflow not found').model_dump()
+            return ExecutionErrorSchema(error="Workflow not found").model_dump()
 
         try:
             result = workflow.execute_from_node(
@@ -366,44 +386,48 @@ class WorkflowPilotController(http.Controller):
                 input_data=input_data or {},
                 notify_user=True,
             )
-            run_id = result.get('run_id')
+            run_id = result.get("run_id")
 
             node_results = []
             execution_events = []
             node_outputs_map = {}
             executed_order = []
             executed_connections = []
-            context_snapshot = result.get('context_snapshot') if isinstance(result, dict) else None
-            queue_job_uuid = result.get('queue_job_uuid')
-            queue_job_state = result.get('queue_job_state')
-            queue_can_cancel = result.get('queue_can_cancel')
+            context_snapshot = (
+                result.get("context_snapshot") if isinstance(result, dict) else None
+            )
+            queue_job_uuid = result.get("queue_job_uuid")
+            queue_job_state = result.get("queue_job_state")
+            queue_can_cancel = result.get("queue_can_cancel")
             if run_id:
-                run = request.env['workflow.run'].browse(run_id)
+                run = request.env["workflow.run"].browse(run_id)
                 if run.exists():
                     executed_connections = run.executed_connections or []
                     run_result_data = self._collect_run_node_results(run)
-                    node_results = run_result_data['node_results']
-                    execution_events = run_result_data['execution_events']
-                    node_outputs_map = run_result_data['node_outputs_map']
-                    executed_order = run_result_data['executed_order']
-                    if hasattr(run, 'queue_job_uuid'):
+                    node_results = run_result_data["node_results"]
+                    execution_events = run_result_data["execution_events"]
+                    node_outputs_map = run_result_data["node_outputs_map"]
+                    executed_order = run_result_data["executed_order"]
+                    if hasattr(run, "queue_job_uuid"):
                         queue_job_uuid = run.queue_job_uuid or False
-                        queue_job_state = getattr(run, 'queue_job_state', False) or False
-                        queue_can_cancel = bool(getattr(run, 'queue_can_cancel', False))
+                        queue_job_state = (
+                            getattr(run, "queue_job_state", False) or False
+                        )
+                        queue_can_cancel = bool(getattr(run, "queue_can_cancel", False))
 
                     if not context_snapshot:
                         context_snapshot = ContextSnapshotSchema(
                             json=run.output_data,
                             node=node_outputs_map,
                             execution={
-                                'id': run.id,
-                                'name': run.name,
-                                'status': run.status,
+                                "id": run.id,
+                                "name": run.name,
+                                "status": run.status,
                             },
                             workflow={
-                                'id': workflow.id,
-                                'name': workflow.name,
-                                'active': workflow.active,
+                                "id": workflow.id,
+                                "name": workflow.name,
+                                "active": workflow.active,
                             },
                             now=datetime.now().isoformat(),
                             today=datetime.now().date().isoformat(),
@@ -411,73 +435,82 @@ class WorkflowPilotController(http.Controller):
 
             return ExecutionResultSchema(
                 run_id=run_id,
-                run_name=result.get('run_name'),
-                status=result.get('status', 'completed'),
-                error=result.get('error'),
-                execution_mode=result.get('execution_mode'),
+                run_name=result.get("run_name"),
+                status=result.get("status", "completed"),
+                error=result.get("error"),
+                execution_mode=result.get("execution_mode"),
                 queue_job_uuid=queue_job_uuid,
                 queue_job_state=queue_job_state,
                 queue_can_cancel=queue_can_cancel,
-                execution_count=result.get('execution_count'),
-                node_count_executed=result.get('node_count_executed'),
-                duration_seconds=result.get('duration_seconds'),
+                execution_count=result.get("execution_count"),
+                node_count_executed=result.get("node_count_executed"),
+                duration_seconds=result.get("duration_seconds"),
                 executed_order=executed_order,
                 executed_connection_ids=[
-                    entry.get('connection_id')
+                    entry.get("connection_id")
                     for entry in executed_connections
-                    if isinstance(entry, dict) and entry.get('connection_id')
+                    if isinstance(entry, dict) and entry.get("connection_id")
                 ],
                 executed_connections=executed_connections,
                 input_data=input_data or {},
-                output_data=result.get('output_data'),
+                output_data=result.get("output_data"),
                 node_results=node_results,
                 execution_events=execution_events,
                 context_snapshot=context_snapshot,
             ).model_dump()
 
         except Exception as e:
-            _logger.exception("execute_from_node failed: workflow=%s node=%s", workflow_id, node_id)
+            _logger.exception(
+                "execute_from_node failed: workflow=%s node=%s", workflow_id, node_id
+            )
             return ExecutionErrorSchema(error=str(e)).model_dump()
 
-    @http.route('/workflow_studio/run/<int:run_id>', type='json', auth='user', methods=['GET', 'POST'])
+    @http.route(
+        "/workflow_studio/run/<int:run_id>",
+        type="json",
+        auth="user",
+        methods=["GET", "POST"],
+    )
     def get_run(self, run_id):
         """Get workflow run details.
-        
+
         Args:
             run_id: Database ID of workflow run
-            
+
         Returns:
             ExecutionResultSchema dict
         """
-        run = request.env['workflow.run'].browse(run_id)
+        run = request.env["workflow.run"].browse(run_id)
         if not run.exists():
-            return ExecutionErrorSchema(error='Run not found').model_dump()
-        
+            return ExecutionErrorSchema(error="Run not found").model_dump()
+
         run_result_data = self._collect_run_node_results(run)
-        node_results = run_result_data['node_results']
-        execution_events = run_result_data['execution_events']
-        executed_order = run_result_data['executed_order']
-        node_outputs_map = run_result_data['node_outputs_map']
+        node_results = run_result_data["node_results"]
+        execution_events = run_result_data["execution_events"]
+        executed_order = run_result_data["executed_order"]
+        node_outputs_map = run_result_data["node_outputs_map"]
         executed_connections = run.executed_connections or []
-        
+
         workflow = run.workflow_id
         context_snapshot = ContextSnapshotSchema(
             json=run.output_data,
             node=node_outputs_map,
             execution={
-                'id': run.id,
-                'name': run.name,
-                'status': run.status,
-                'started_at': run.started_at.isoformat() if run.started_at else None,
-                'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+                "id": run.id,
+                "name": run.name,
+                "status": run.status,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "completed_at": run.completed_at.isoformat()
+                if run.completed_at
+                else None,
             },
             workflow={
-                'id': workflow.id if workflow else None,
-                'name': workflow.name if workflow else None,
-                'active': workflow.active if workflow else False,
+                "id": workflow.id if workflow else None,
+                "name": workflow.name if workflow else None,
+                "active": workflow.active if workflow else False,
             },
         )
-        
+
         return ExecutionResultSchema(
             run_id=run.id,
             run_name=run.name,
@@ -485,17 +518,23 @@ class WorkflowPilotController(http.Controller):
             error=run.error_message,
             error_node_id=run.error_node_id,
             execution_mode=run.execution_mode,
-            queue_job_uuid=run.queue_job_uuid if hasattr(run, 'queue_job_uuid') else False,
-            queue_job_state=getattr(run, 'queue_job_state', False) if hasattr(run, 'queue_job_state') else False,
-            queue_can_cancel=bool(getattr(run, 'queue_can_cancel', False)) if hasattr(run, 'queue_can_cancel') else False,
+            queue_job_uuid=run.queue_job_uuid
+            if hasattr(run, "queue_job_uuid")
+            else False,
+            queue_job_state=getattr(run, "queue_job_state", False)
+            if hasattr(run, "queue_job_state")
+            else False,
+            queue_can_cancel=bool(getattr(run, "queue_can_cancel", False))
+            if hasattr(run, "queue_can_cancel")
+            else False,
             execution_count=run.execution_count,
             node_count_executed=run.node_count_executed,
             duration_seconds=run.duration_seconds,
             executed_order=executed_order,
             executed_connection_ids=[
-                entry.get('connection_id')
+                entry.get("connection_id")
                 for entry in executed_connections
-                if isinstance(entry, dict) and entry.get('connection_id')
+                if isinstance(entry, dict) and entry.get("connection_id")
             ],
             executed_connections=executed_connections,
             input_data=run.input_data or {},
@@ -506,16 +545,31 @@ class WorkflowPilotController(http.Controller):
             executed_snapshot=run.executed_snapshot or {},
         ).model_dump()
 
-    @http.route('/workflow_studio/node_run/<int:node_run_id>', type='json', auth='user', methods=['GET', 'POST'])
+    @http.route(
+        "/workflow_studio/node_run/<int:node_run_id>",
+        type="json",
+        auth="user",
+        methods=["GET", "POST"],
+    )
     def get_node_run(self, node_run_id):
         """Return a single workflow.run.node payload for pin-data selection."""
-        node_run = request.env['workflow.run.node'].browse(node_run_id)
+        node_run = request.env["workflow.run.node"].browse(node_run_id)
         if not node_run.exists():
-            return ExecutionErrorSchema(error='Node run not found').model_dump()
+            return ExecutionErrorSchema(error="Node run not found").model_dump()
         return self._build_node_result_schema(node_run).model_dump()
 
-    @http.route('/workflow_studio/execute_until', type='json', auth='user', methods=['POST'])
-    def execute_until(self, workflow_id=None, target_node_id=None, input_data=None, snapshot=None, config_overrides=None, **kwargs):
+    @http.route(
+        "/workflow_studio/execute_until", type="json", auth="user", methods=["POST"]
+    )
+    def execute_until(
+        self,
+        workflow_id=None,
+        target_node_id=None,
+        input_data=None,
+        snapshot=None,
+        config_overrides=None,
+        **kwargs,
+    ):
         """Execute workflow until target node is reached (preview mode).
 
         Args:
@@ -530,25 +584,25 @@ class WorkflowPilotController(http.Controller):
         """
         payload = request.httprequest.json or {}
         if workflow_id is None:
-            workflow_id = payload.get('workflow_id')
+            workflow_id = payload.get("workflow_id")
         if target_node_id is None:
-            target_node_id = payload.get('target_node_id')
+            target_node_id = payload.get("target_node_id")
         if input_data is None:
-            input_data = payload.get('input_data', {})
+            input_data = payload.get("input_data", {})
         if snapshot is None:
-            snapshot = payload.get('snapshot')
+            snapshot = payload.get("snapshot")
         if config_overrides is None:
-            config_overrides = payload.get('config_overrides')
+            config_overrides = payload.get("config_overrides")
 
         if workflow_id is None:
-            return ExecutionErrorSchema(error='Workflow ID is required').model_dump()
+            return ExecutionErrorSchema(error="Workflow ID is required").model_dump()
         if not target_node_id:
-            return ExecutionErrorSchema(error='Target node ID is required').model_dump()
+            return ExecutionErrorSchema(error="Target node ID is required").model_dump()
 
         workflow_id = int(workflow_id)
-        workflow = request.env['ir.workflow'].browse(workflow_id)
+        workflow = request.env["ir.workflow"].browse(workflow_id)
         if not workflow.exists():
-            return ExecutionErrorSchema(error='Workflow not found').model_dump()
+            return ExecutionErrorSchema(error="Workflow not found").model_dump()
 
         try:
             result = workflow.execute_preview(
@@ -559,12 +613,12 @@ class WorkflowPilotController(http.Controller):
             )
 
             # Convert node_outputs to plain dicts (strip DotDict wrappers)
-            node_outputs = to_plain(result.get('node_outputs') or {})
-            executed_order = result.get('executed_order') or []
-            status = result.get('status', 'completed')
-            error_message = result.get('error')
-            error_node_id = result.get('error_node_id')
-            
+            node_outputs = to_plain(result.get("node_outputs") or {})
+            executed_order = result.get("executed_order") or []
+            status = result.get("status", "completed")
+            error_message = result.get("error")
+            error_node_id = result.get("error_node_id")
+
             # Deduplicate executed_order: keep last occurrence only.
             # Loop nodes execute many times but node_outputs already
             # overwrites so only the final result matters.
@@ -580,46 +634,48 @@ class WorkflowPilotController(http.Controller):
             node_results = []
             for node_id in executed_order:
                 output = node_outputs.get(node_id, {})
-                node_results.append(NodeResultSchema(
-                    node_id=node_id,
-                    node_type=output.get('node_type'),
-                    node_label=output.get('title'),
-                    status='completed' if not output.get('error') else 'failed',
-                    output_data=output.get('json'),
-                    error_message=output.get('error'),
-                    title=output.get('title'),
-                    meta=output.get('meta'),
-                ))
-            
+                node_results.append(
+                    NodeResultSchema(
+                        node_id=node_id,
+                        node_type=output.get("node_type"),
+                        node_label=output.get("title"),
+                        status="completed" if not output.get("error") else "failed",
+                        output_data=output.get("json"),
+                        error_message=output.get("error"),
+                        title=output.get("title"),
+                        meta=output.get("meta"),
+                    )
+                )
+
             # Build context snapshot (strip DotDict wrappers)
-            raw_snapshot = to_plain(result.get('context_snapshot') or {})
+            raw_snapshot = to_plain(result.get("context_snapshot") or {})
             context_snapshot = ContextSnapshotSchema(
-                json=raw_snapshot.get('json'),
-                node=raw_snapshot.get('node', {}),
-                vars=raw_snapshot.get('vars', {}),
-                node_context=raw_snapshot.get('node_context', {}),
-                execution=raw_snapshot.get('execution'),
-                workflow=raw_snapshot.get('workflow'),
-                now=raw_snapshot.get('now'),
-                today=raw_snapshot.get('today'),
+                json=raw_snapshot.get("json"),
+                node=raw_snapshot.get("node", {}),
+                vars=raw_snapshot.get("vars", {}),
+                node_context=raw_snapshot.get("node_context", {}),
+                execution=raw_snapshot.get("execution"),
+                workflow=raw_snapshot.get("workflow"),
+                now=raw_snapshot.get("now"),
+                today=raw_snapshot.get("today"),
             )
 
             return ExecutionResultSchema(
                 status=status,
                 error=error_message,
                 error_node_id=error_node_id,
-                target_node_id=result.get('target_node_id'),
-                execution_count=result.get('execution_count', 0),
+                target_node_id=result.get("target_node_id"),
+                execution_count=result.get("execution_count", 0),
                 node_count_executed=len(executed_order),
                 executed_order=executed_order,
-                executed_connection_ids=result.get('executed_connection_ids') or [],
-                executed_connections=result.get('executed_connections') or [],
+                executed_connection_ids=result.get("executed_connection_ids") or [],
+                executed_connections=result.get("executed_connections") or [],
                 input_data=input_data or {},
                 node_results=node_results,
                 node_outputs=node_outputs,  # Keep for backward compatibility
                 context_snapshot=context_snapshot,
             ).model_dump()
-            
+
         except Exception as e:
             _logger.exception("Workflow preview execution failed")
             return ExecutionErrorSchema(error=str(e)).model_dump()
@@ -629,16 +685,21 @@ class WorkflowPilotController(http.Controller):
     def _collect_webhook_request_data(self):
         req = request.httprequest
         safe_headers = {
-            k: v for k, v in req.headers
-            if k.lower() in (
-                'content-type', 'accept', 'user-agent',
-                'x-request-id', 'x-forwarded-for',
+            k: v
+            for k, v in req.headers
+            if k.lower()
+            in (
+                "content-type",
+                "accept",
+                "user-agent",
+                "x-request-id",
+                "x-forwarded-for",
             )
         }
 
         body = {}
-        raw_body = req.get_data(cache=True, as_text=True) or ''
-        if req.content_type and 'json' in req.content_type:
+        raw_body = req.get_data(cache=True, as_text=True) or ""
+        if req.content_type and "json" in req.content_type:
             try:
                 body = req.get_json(silent=True) or {}
             except Exception:
@@ -649,27 +710,33 @@ class WorkflowPilotController(http.Controller):
             body = raw_body
 
         return {
-            'method': req.method,
-            'headers': safe_headers,
-            'query': dict(req.args),
-            'body': body,
+            "method": req.method,
+            "headers": safe_headers,
+            "query": dict(req.args),
+            "body": body,
         }
 
     def _find_webhook_trigger(self, webhook_uuid, *, test_mode=False):
-        trigger_model = request.env['workflow.trigger'].sudo().with_context(active_test=False)
+        trigger_model = (
+            request.env["workflow.trigger"].sudo().with_context(active_test=False)
+        )
         domain = [
-            ('trigger_type', '=', 'webhook'),
+            ("trigger_type", "=", "webhook"),
         ]
         if test_mode:
-            domain.extend([
-                ('webhook_test_uuid', '=', webhook_uuid),
-                ('webhook_test_active', '=', True),
-            ])
+            domain.extend(
+                [
+                    ("webhook_test_uuid", "=", webhook_uuid),
+                    ("webhook_test_active", "=", True),
+                ]
+            )
         else:
-            domain.extend([
-                ('webhook_uuid', '=', webhook_uuid),
-                ('active', '=', True),
-            ])
+            domain.extend(
+                [
+                    ("webhook_uuid", "=", webhook_uuid),
+                    ("active", "=", True),
+                ]
+            )
         return trigger_model.search(domain, limit=1)
 
     def _handle_webhook_trigger(self, trigger, webhook_uuid, *, test_mode=False):
@@ -677,18 +744,18 @@ class WorkflowPilotController(http.Controller):
 
         workflow = trigger.workflow_id
         if not workflow.is_published:
-            return werkzeug.exceptions.NotFound('Workflow is not published')
+            return werkzeug.exceptions.NotFound("Workflow is not published")
 
         node_config = trigger._get_node_config()
-        allowed_method = (node_config.get('http_method') or 'POST').upper()
+        allowed_method = (node_config.get("http_method") or "POST").upper()
         request_data = self._collect_webhook_request_data()
 
-        if allowed_method and request_data['method'] != allowed_method:
+        if allowed_method and request_data["method"] != allowed_method:
             return request.make_json_response(
                 {
-                    'error': 'Method not allowed',
-                    'expected_method': allowed_method,
-                    'received_method': request_data['method'],
+                    "error": "Method not allowed",
+                    "expected_method": allowed_method,
+                    "received_method": request_data["method"],
                 },
                 status=405,
             )
@@ -696,20 +763,20 @@ class WorkflowPilotController(http.Controller):
         if test_mode:
             trigger.record_test_webhook_call(request_data)
 
-        response_mode = node_config.get('response_mode', 'immediate')
+        response_mode = node_config.get("response_mode", "immediate")
         trigger_payload = {
             **request_data,
-            'test_mode': test_mode,
+            "test_mode": test_mode,
         }
 
-        if response_mode == 'last_node':
+        if response_mode == "last_node":
             try:
                 trigger._record_triggered()
                 input_data = {
-                    '_trigger': {
-                        'type': 'webhook',
-                        'node_id': trigger.node_id,
-                        'context': workflow._sanitize_context(request.env.context),
+                    "_trigger": {
+                        "type": "webhook",
+                        "node_id": trigger.node_id,
+                        "context": workflow._sanitize_context(request.env.context),
                         **trigger_payload,
                     },
                 }
@@ -717,30 +784,33 @@ class WorkflowPilotController(http.Controller):
                     start_node_id=trigger.node_id,
                     input_data=input_data,
                     notify_user=False,
-                    execution_mode='webhook',
-                    trigger_type='webhook',
+                    execution_mode="webhook",
+                    trigger_type="webhook",
                     trigger_data=trigger_payload,
-                    launch_intent='sync',
+                    launch_intent="sync",
                     include_pin_data=False,
                 )
-                if result.get('status') == 'failed':
+                if result.get("status") == "failed":
                     return request.make_json_response(
-                        {'error': result.get('error') or 'Execution failed'},
+                        {"error": result.get("error") or "Execution failed"},
                         status=500,
                     )
-                return request.make_json_response(result.get('output_data', {}))
+                return request.make_json_response(result.get("output_data", {}))
             except Exception as e:
                 _logger.exception(
                     "Webhook execution failed for workflow %s",
                     workflow.id,
                 )
                 return request.make_json_response(
-                    {'error': str(e)}, status=500,
+                    {"error": str(e)},
+                    status=500,
                 )
 
         try:
             workflow._execute_from_trigger(
-                trigger.node_id, 'webhook', trigger_payload,
+                trigger.node_id,
+                "webhook",
+                trigger_payload,
             )
         except Exception:
             _logger.exception(
@@ -749,17 +819,17 @@ class WorkflowPilotController(http.Controller):
             )
         return request.make_json_response(
             {
-                'status': 'accepted',
-                'webhook_uuid': webhook_uuid,
-                'mode': 'test' if test_mode else 'production',
+                "status": "accepted",
+                "webhook_uuid": webhook_uuid,
+                "mode": "test" if test_mode else "production",
             },
         )
 
     @http.route(
-        '/workflow_studio/webhook/<string:webhook_uuid>',
-        type='http',
-        auth='public',
-        methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        "/workflow_studio/webhook/<string:webhook_uuid>",
+        type="http",
+        auth="public",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         csrf=False,
     )
     def webhook_trigger(self, webhook_uuid, **kwargs):
@@ -778,14 +848,14 @@ class WorkflowPilotController(http.Controller):
 
         trigger = self._find_webhook_trigger(webhook_uuid, test_mode=False)
         if not trigger:
-            return werkzeug.exceptions.NotFound('Webhook not found or inactive')
+            return werkzeug.exceptions.NotFound("Webhook not found or inactive")
         return self._handle_webhook_trigger(trigger, webhook_uuid, test_mode=False)
 
     @http.route(
-        '/workflow_studio/webhook-test/<string:webhook_uuid>',
-        type='http',
-        auth='public',
-        methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        "/workflow_studio/webhook-test/<string:webhook_uuid>",
+        type="http",
+        auth="public",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         csrf=False,
     )
     def webhook_trigger_test(self, webhook_uuid, **kwargs):
@@ -794,5 +864,7 @@ class WorkflowPilotController(http.Controller):
 
         trigger = self._find_webhook_trigger(webhook_uuid, test_mode=True)
         if not trigger:
-            return werkzeug.exceptions.NotFound('Test webhook not found or not listening')
+            return werkzeug.exceptions.NotFound(
+                "Test webhook not found or not listening"
+            )
         return self._handle_webhook_trigger(trigger, webhook_uuid, test_mode=True)

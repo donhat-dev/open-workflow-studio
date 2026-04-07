@@ -10,21 +10,21 @@ import { WorkflowHistoryPanel } from "@workflow_studio/components/workflow_histo
 import { ExecutionLogPanel } from "@workflow_studio/components/execution_log_panel/execution_log_panel";
 /**
  * WorkflowEditorApp - Production Odoo client action for workflow editor
- * 
+ *
  * Loads workflow from backend via RPC, provides Save button, handles version conflicts.
  * Renders EditorCanvas for graph editing.
  */
 export class WorkflowEditorApp extends Component {
     static template = "workflow_studio.workflow_editor_app";
     static components = { EditorCanvas, View, Chatter, WorkflowHistoryPanel, ExecutionLogPanel };
-    
+
     setup() {
         this.editorService = useEditor();
         this.notification = useService("notification");
         this.dialog = useService("dialog");
         this.action = useService("action");
         this.orm = useService("orm");
-        
+
         // State
         this.state = useState({
             loading: true,
@@ -39,7 +39,7 @@ export class WorkflowEditorApp extends Component {
             is_published: false,
             node_count: 0,
         });
-        
+
         // Get workflow_id from props (try context.active_id first, then params)
         let workflowId = null;
         if (this.props.action && this.props.action.context && this.props.action.context.active_id) {
@@ -47,17 +47,17 @@ export class WorkflowEditorApp extends Component {
         } else if (this.props.action && this.props.action.params && this.props.action.params.workflow_id) {
             workflowId = this.props.action.params.workflow_id;
         }
-        
+
         // Error if no workflow_id
         if (!workflowId) {
             this.state.error = "No workflow ID provided";
             this.state.loading = false;
             return;
         }
-        
+
         // Store for reload
         this.workflowId = workflowId;
-        
+
         // Setup SubEnv for child components
         useSubEnv({
             bus: this.editorService.bus,
@@ -70,12 +70,12 @@ export class WorkflowEditorApp extends Component {
 
         useBus(this.editorService.bus, "save", () => this.save());
         useBus(this.editorService.bus, "run", () => this.execute());
-        
+
         onWillUnmount(() => {
             this.editorService.actions.clearExecution();
             this._uninstallWindowAppFacade();
         });
-         
+
         // Load on mount
         onMounted(async () => {
             window._app = this; // DEV ONLY
@@ -184,7 +184,7 @@ export class WorkflowEditorApp extends Component {
             this.workflowInfo.name = result[0].name;
         }
     }
-    
+
     /**
      * Save workflow to backend (also publishes)
      * Handles conflict errors by showing modal, other errors by showing error state
@@ -215,7 +215,7 @@ export class WorkflowEditorApp extends Component {
             this.editorService.actions.setSaving(false);
         }
     }
-    
+
     /**
      * Execute current workflow
      * If auto_save is enabled, saves workflow first
@@ -247,7 +247,7 @@ export class WorkflowEditorApp extends Component {
             this.editorService.actions.setExecuting(false);
         }
     }
-    
+
     /**
      * Reload page to get fresh workflow data
      */

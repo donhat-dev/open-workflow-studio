@@ -133,7 +133,7 @@ function buildFallbackTriggerControls(node) {
  * NodeConfigPanel Component
  *
  * Provides a configuration interface for a selected workflow node.
- * Uses adapterService for configuration operations and 
+ * Uses adapterService for configuration operations and
  * runService for node/workflow execution.
  */
 export class NodeConfigPanel extends Component {
@@ -318,7 +318,7 @@ export class NodeConfigPanel extends Component {
                 for (const p of pairs) {
                     const id = p?.id;
                     if (id === undefined || id === null) continue;
-                    
+
                     const existing = map[id];
                     if (!existing) {
                         map[id] = { key: 'fixed', value: 'fixed' };
@@ -894,7 +894,7 @@ export class NodeConfigPanel extends Component {
     get leftPanelData() {
         const currentNodeId = this.props.node.id;
         const execution = this.state.execution;
-        
+
         if (execution && Array.isArray(execution.nodeResults) && execution.nodeResults.length) {
             // Filter to show only structural predecessors (ignore loop back-edges).
             const predecessorResults = this._filterPredecessorResults(
@@ -1149,7 +1149,7 @@ export class NodeConfigPanel extends Component {
         }
         await this.workflowEditor.copyText(value, { label });
     };
-    
+
     /**
      * Filter execution results to show only predecessors of the current node.
      * Uses workflow connections to determine which nodes are predecessors.
@@ -1165,7 +1165,7 @@ export class NodeConfigPanel extends Component {
         const predecessorIds = getStructuralPredecessorIds(workflow, currentNodeId);
         return getLatestNodeResultsByNodeIds(nodeResults, predecessorIds);
     }
-    
+
     get executionDisplayResult() {
         const runResult = this.executionNodeResult;
         if (runResult) {
@@ -1282,7 +1282,7 @@ export class NodeConfigPanel extends Component {
      */
     _initAncestorCollapseState() {
         const leftData = this.leftPanelData || [];
-        const defaults = { 
+        const defaults = {
             '_context': true,  // Context variables collapsed by default
         };
         for (const item of leftData) {
@@ -1468,12 +1468,12 @@ export class NodeConfigPanel extends Component {
         const current = this.state.pairModes || {};
         const map = { ...(current[controlKey] || {}) };
         const pairMode = typeof map[pairId] === 'object' ? map[pairId] : { key: 'fixed', value: 'fixed' };
-        
+
         map[pairId] = {
             ...pairMode,
             [cell]: mode,
         };
-        
+
         this.state.pairModes = { ...current, [controlKey]: map };
         this._persistUiModes();
     };
@@ -1555,7 +1555,7 @@ export class NodeConfigPanel extends Component {
             throw new Error("[NodeConfigPanel] Missing actions.getExpressionContext");
         }
         const ctx = this.actions.getExpressionContext() || {};
-        
+
         return {
             _now: ctx._now || new Date().toISOString(),
             _today: ctx._today || new Date().toISOString().split('T')[0],

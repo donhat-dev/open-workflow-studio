@@ -6,11 +6,11 @@ import { getConnectionPath } from "../utils/connection_path";
 
 /**
  * Hook to manage connection visibility and rendering (Culling)
- * 
+ *
  * optimizations:
  * 1. Visibility Check: Only render connections connected to visible nodes
  * 2. Memoization: Cache expensive path calculations
- * 
+ *
  * @param {Object} params
  * @param {Function} params.getNodes - Returns array of nodes
  * @param {Function} params.getConnections - Returns array of connections

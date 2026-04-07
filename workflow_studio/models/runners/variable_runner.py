@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Variable Node Runner
 
@@ -15,36 +13,36 @@ from .base import BaseNodeRunner
 class VariableNodeRunner(BaseNodeRunner):
     """Runner for variable node operations."""
 
-    node_type = 'variable'
+    node_type = "variable"
 
     def execute(self, node_config, input_data, context):
         payload = input_data or {}
         eval_context = build_eval_context(payload, context, include_input_item=True)
-        vars_store = context.get('vars', {})
+        vars_store = context.get("vars", {})
 
-        operation = node_config.get('operation', 'set')
-        var_name = (node_config.get('variableName') or '').strip()
-        raw_value = node_config.get('value')
+        operation = node_config.get("operation", "set")
+        var_name = (node_config.get("variableName") or "").strip()
+        raw_value = node_config.get("value")
 
         if not var_name:
-            return self._error_result('Variable name is required')
+            return self._error_result("Variable name is required")
 
         value = self.resolver.resolve(raw_value, eval_context)
         value = self._coerce_value(value)
 
         result = {
-            'success': True,
-            'operation': operation,
-            'variable': var_name,
-            'value': None,
+            "success": True,
+            "operation": operation,
+            "variable": var_name,
+            "value": None,
         }
 
-        if operation == 'set':
+        if operation == "set":
             self._set_path(vars_store, var_name, value)
-            result['value'] = value
-        elif operation == 'get':
-            result['value'] = self._get_path(vars_store, var_name)
-        elif operation == 'append':
+            result["value"] = value
+        elif operation == "get":
+            result["value"] = self._get_path(vars_store, var_name)
+        elif operation == "append":
             current = self._get_path(vars_store, var_name)
             if current is None:
                 current = []
@@ -52,31 +50,31 @@ class VariableNodeRunner(BaseNodeRunner):
                 current = [current]
             current.append(value)
             self._set_path(vars_store, var_name, current)
-            result['value'] = current
-        elif operation == 'merge':
+            result["value"] = current
+        elif operation == "merge":
             current = self._get_path(vars_store, var_name)
             if isinstance(current, dict) and isinstance(value, dict):
                 merged = {**current, **value}
             else:
                 merged = value
             self._set_path(vars_store, var_name, merged)
-            result['value'] = merged
-        elif operation == 'increment':
+            result["value"] = merged
+        elif operation == "increment":
             increment = self._to_number(value, fallback=1)
             current = self._get_path(vars_store, var_name)
             base = self._to_number(current, fallback=0)
             new_value = base + increment
             self._set_path(vars_store, var_name, new_value)
-            result['value'] = new_value
-        elif operation == 'delete':
+            result["value"] = new_value
+        elif operation == "delete":
             self._delete_path(vars_store, var_name)
-            result['value'] = None
+            result["value"] = None
         else:
-            return self._error_result('Unknown operation: %s' % operation)
+            return self._error_result("Unknown operation: %s" % operation)
 
         return {
-            'outputs': [[result]],
-            'json': result,
+            "outputs": [[result]],
+            "json": result,
         }
 
     def _coerce_value(self, value):
@@ -84,9 +82,9 @@ class VariableNodeRunner(BaseNodeRunner):
             stripped = value.strip()
             if not stripped:
                 return value
-            if stripped.lower() in ('true', 'false'):
-                return stripped.lower() == 'true'
-            if stripped.startswith('{') or stripped.startswith('['):
+            if stripped.lower() in ("true", "false"):
+                return stripped.lower() == "true"
+            if stripped.startswith("{") or stripped.startswith("["):
                 try:
                     return json.loads(stripped)
                 except Exception:
@@ -107,7 +105,7 @@ class VariableNodeRunner(BaseNodeRunner):
         return fallback
 
     def _split_path(self, path):
-        return [segment for segment in path.split('.') if segment]
+        return [segment for segment in path.split(".") if segment]
 
     def _get_path(self, data, path):
         if not isinstance(data, dict):
@@ -149,10 +147,10 @@ class VariableNodeRunner(BaseNodeRunner):
 
     def _error_result(self, message):
         result = {
-            'success': False,
-            'error': message,
+            "success": False,
+            "error": message,
         }
         return {
-            'outputs': [[result]],
-            'json': result,
+            "outputs": [[result]],
+            "json": result,
         }

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Workflow Snapshot Blob Model
 
@@ -80,14 +78,16 @@ class WorkflowSnapshotBlob(models.Model):
             return existing, blob_hash
 
         raw_bytes, compressed = self._compress_payload(payload)
-        record = self.create({
-            "name": f"Snapshot {blob_hash[:8]}",
-            "blob_hash": blob_hash,
-            "compression": "zlib",
-            "data": self._encode_binary(compressed),
-            "raw_size": len(raw_bytes),
-            "compressed_size": len(compressed),
-        })
+        record = self.create(
+            {
+                "name": f"Snapshot {blob_hash[:8]}",
+                "blob_hash": blob_hash,
+                "compression": "zlib",
+                "data": self._encode_binary(compressed),
+                "raw_size": len(raw_bytes),
+                "compressed_size": len(compressed),
+            }
+        )
         return record, blob_hash
 
     @api.model

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SecretBroker - Secure Secret Access for Workflow Execution.
 
@@ -18,8 +17,8 @@ class SecretBroker:
     - Logs access for auditing
     """
 
-    PREFIX = 'workflow_studio.secret.'
-    MASK_VALUE = '********'
+    PREFIX = "workflow_studio.secret."
+    MASK_VALUE = "********"
 
     def __init__(self, env, mask_mode=True, audit_callback=None):
         """
@@ -51,7 +50,7 @@ class SecretBroker:
         full_key = f"{self.PREFIX}{key}"
 
         # Get from ir.config_parameter
-        IrConfig = self._env['ir.config_parameter'].sudo()
+        IrConfig = self._env["ir.config_parameter"].sudo()
         value = IrConfig.get_param(full_key, default=default)
 
         # Audit access
@@ -82,7 +81,7 @@ class SecretBroker:
             return False
 
         full_key = f"{self.PREFIX}{key}"
-        IrConfig = self._env['ir.config_parameter'].sudo()
+        IrConfig = self._env["ir.config_parameter"].sudo()
         value = IrConfig.get_param(full_key, default=None)
         return value is not None
 
@@ -94,7 +93,7 @@ class SecretBroker:
         """
         if not key or not isinstance(key, str):
             return False
-        pattern = re.compile(r'^[a-zA-Z][a-zA-Z0-9_.\-]*$')
+        pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9_.\-]*$")
         return bool(pattern.match(key))
 
     def _mask_key(self, key):
@@ -104,11 +103,11 @@ class SecretBroker:
         Shows first 3 and last 2 chars if long enough.
         """
         if len(key) <= 6:
-            return key[:2] + '***'
-        return key[:3] + '***' + key[-2:]
+            return key[:2] + "***"
+        return key[:3] + "***" + key[-2:]
 
     def __repr__(self):
-        mode = 'masked' if self._mask_mode else 'unmasked'
+        mode = "masked" if self._mask_mode else "unmasked"
         return f"SecretBroker(mode={mode})"
 
 
@@ -131,27 +130,43 @@ class SecretBrokerFactory:
             node_id: Current node ID for audit
             workflow_id: Workflow ID for audit
         """
+
         def audit_callback(masked_key, is_masked):
             try:
                 message_display = f"Secret accessed: {masked_key}"
                 # Use separate cursor to avoid transaction issues
                 with env.registry.cursor() as cr:
                     # Insert base ir_logging record first
-                    cr.execute("""
+                    cr.execute(
+                        """
                         INSERT INTO ir_logging (create_date, create_uid, type, dbname, name, level, message, path, line, func)
                         VALUES (NOW() at time zone 'UTC', %s, 'server', %s, 'workflow_studio', 'INFO', %s, '', '0', 'SecretBroker.get')
                         RETURNING id
-                    """, (env.uid, cr.dbname, message_display))
+                    """,
+                        (env.uid, cr.dbname, message_display),
+                    )
                     logging_id = cr.fetchone()[0]
-                    
+
                     # Insert workflow-specific record
-                    cr.execute("""
+                    cr.execute(
+                        """
                         INSERT INTO ir_workflow_logging (
                             logging_id, workflow_run_id, workflow_node_id, workflow_id,
                             event_type, secret_key, message_display, success
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (logging_id, run_id, node_id, workflow_id, 'secret_access', masked_key, message_display, True))
+                    """,
+                        (
+                            logging_id,
+                            run_id,
+                            node_id,
+                            workflow_id,
+                            "secret_access",
+                            masked_key,
+                            message_display,
+                            True,
+                        ),
+                    )
             except Exception:
                 pass  # Silently ignore logging errors
 

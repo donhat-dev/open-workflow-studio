@@ -73,7 +73,7 @@
                                             <button
                                                 t-attf-class="history-item {{ state.selectedRevisionId === revision.revision_id ? 'active' : '' }}"
                                                 t-on-click="() => this.onRevisionClick(revision.revision_id)">
-                                                
+
                                                 <!-- Timeline Visuals -->
                                                 <div class="history-item__timeline-col">
                                                     <div class="history-item__line_top"/>

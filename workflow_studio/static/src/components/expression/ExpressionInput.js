@@ -19,7 +19,7 @@ import {
 
 /**
  * ExpressionInput Component
- * 
+ *
  * Input field that supports both static values and n8n-style expressions.
  * Mode is controlled by parent; no auto-switching based on value.
  */

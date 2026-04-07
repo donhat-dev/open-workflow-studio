@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <templates id="template" xml:space="preserve">
 	<t t-name="workflow_studio.workflow_node">
-		<div class="workflow-node cursor-pointer d-flex flex-row" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '') + (isPinned ? ' wf-node--pinned' : '') + (executionClass ? ' ' + executionClass : '')" 
+		<div class="workflow-node cursor-pointer d-flex flex-row" t-ref="root" t-att-class="nodeTypeClass + (props.selected ? ' selected' : '') + (isDisabled ? ' disabled' : '') + (isPinned ? ' wf-node--pinned' : '') + (executionClass ? ' ' + executionClass : '')"
 		t-att-style="nodeStyle" t-att-data-node-id="props.node.id" t-on-dblclick="onNodeDoubleClick" t-on-mousedown="onHeaderMouseDown">
 			<CanvasNodeToolbar t-if="toolbarProps" t-props="toolbarProps"/>
 
@@ -13,7 +13,7 @@
 				<i class="fa fa-play me-1"/>
 				<span>Execute</span>
 			</button>
-			
+
 			<!-- Input sockets (absolute left) -->
 			<div class="workflow-node__inputs" t-if="inputEntries.length">
 				<t t-foreach="inputEntries" t-as="entry" t-key="entry[0]">
@@ -41,7 +41,7 @@
 				<span class="workflow-node__title o_text_overflow" t-att-title="displayTitle">
 					<t t-esc="displayTitle"/>
 				</span>
-				
+
 				<span class="workflow-node__subtitle o_text_overflow" t-att-title="props.node.type">
 					<t t-esc="displaySubtitle"/>
 				</span>

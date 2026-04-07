@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Schedule Trigger Runner
 
@@ -29,18 +27,18 @@ class ScheduleTriggerNodeRunner(BaseNodeRunner):
     - ``fired_at``: ISO timestamp of trigger
     """
 
-    node_type = 'schedule_trigger'
+    node_type = "schedule_trigger"
 
     def execute(self, node_config, input_data, context):
-        trigger_payload = input_data.get('_trigger', {})
+        trigger_payload = input_data.get("_trigger", {})
 
         output = {
-            'trigger_type': 'schedule',
-            'context': trigger_payload.get('context', {}),
-            'fired_at': trigger_payload.get('fired_at', ''),
+            "trigger_type": "schedule",
+            "context": trigger_payload.get("context", {}),
+            "fired_at": trigger_payload.get("fired_at", ""),
         }
 
         return {
-            'outputs': [[output]],
-            'json': output,
+            "outputs": [[output]],
+            "json": output,
         }

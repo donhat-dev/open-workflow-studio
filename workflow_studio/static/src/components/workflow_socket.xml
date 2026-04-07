@@ -6,7 +6,7 @@
 			<div class="workflow-node__socket-wrapper" t-att-data-socket-key="props.name" t-att-data-socket-type="props.type" t-on-mousedown.stop.prevent="onPointMouseDown" t-on-mouseup.stop="onPointMouseUp">
 				<div class="workflow-node__socket-point" t-att-class="(props.isConnected ? 'is-connected' : '') + (props.isSnapped ? ' is-snapped' : '')"/>
 			</div>
-			
+
 			<!-- Socket label (Output only) -->
 			<!-- Positioned with z-index to overlap quick-add connection if present -->
 			<span class="workflow-node__socket-label" t-att-class="props.isConnected ? 'is-connected' : ''" t-if="props.type === 'output' and props.label">

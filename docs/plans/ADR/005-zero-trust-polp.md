@@ -75,14 +75,14 @@ Adopt a **Zero Trust + Principle of Least Privilege (PoLP)** security model for 
 ```python
 class IrWorkflow(models.Model):
     _inherit = 'ir.workflow'  # or actual model name
-    
+
     # Run-as user (default = current user at runtime)
     run_as_user_id = fields.Many2one(
         'res.users',
         string='Run as User',
         help='User context for workflow execution. Leave empty to use current user.'
     )
-    
+
     # Model access control
     model_allowlist = fields.Text(
         string='Model Allowlist (JSON)',
@@ -100,7 +100,7 @@ class IrWorkflow(models.Model):
 ```python
 class WorkflowType(models.Model):
     _inherit = 'workflow.type'
-    
+
     group_id = fields.Many2one(
         'res.groups',
         string='Required Group',
@@ -109,14 +109,14 @@ class WorkflowType(models.Model):
 
 class WorkflowNode(models.Model):
     _inherit = 'workflow.node'
-    
+
     # Override group (takes priority over node type)
     group_id = fields.Many2one(
         'res.groups',
         string='Required Group (Override)',
         help='Overrides the node type group_id'
     )
-    
+
     # Unmask expression
     unmask_expression = fields.Char(
         string='Unmask Expression',
@@ -130,7 +130,7 @@ class WorkflowNode(models.Model):
 ```python
 class IrLoggingWorkflow(models.Model):
     _inherit = 'ir.logging'
-    
+
     # Workflow context
     workflow_run_id = fields.Many2one(
         'workflow.run',
@@ -144,7 +144,7 @@ class IrLoggingWorkflow(models.Model):
         index=True,
         ondelete='set null'
     )
-    
+
     # Event categorization
     event_type = fields.Selection([
         ('node_start', 'Node Started'),
@@ -156,26 +156,26 @@ class IrLoggingWorkflow(models.Model):
         ('output_read', 'Output Read'),
         ('output_unmask', 'Output Unmasked'),
     ], string='Event Type', index=True)
-    
+
     # Timing
     duration_ms = fields.Integer(string='Duration (ms)')
-    
+
     # Masked message for display
     message_display = fields.Text(
         string='Masked Message',
         help='Masked version of message for non-privileged users'
     )
-    
+
     # Model access tracking
     model_name = fields.Char(string='Model', index=True)
     method_name = fields.Char(string='Method')
-    
+
     # Secret access tracking
     secret_key = fields.Char(string='Secret Key (masked)')
-    
+
     # Success/failure
     success = fields.Boolean(string='Success', default=True)
-    
+
     @api.autovacuum
     def _gc_workflow_logs(self):
         """Auto-cleanup workflow logs older than 30 days."""
@@ -194,10 +194,10 @@ class IrLoggingWorkflow(models.Model):
 class WorkflowNodeOutput(models.Model):
     _name = 'workflow.node.output'
     _description = 'Workflow Node Output'
-    
+
     run_id = fields.Many2one('workflow.run', required=True, ondelete='cascade')
     node_id = fields.Many2one('workflow.node', required=True, ondelete='cascade')
-    
+
     # Dual outputs
     output_raw = fields.Text(
         string='Raw Output',
@@ -208,7 +208,7 @@ class WorkflowNodeOutput(models.Model):
         string='Display Output',
         help='Masked output for general viewing'
     )
-    
+
     # JSON for programmatic access
     output_json = fields.Text(string='Output JSON')
 ```
@@ -249,7 +249,7 @@ class SafeEnvProxy(Proxy):
     """
     from odoo.api import Environment
     _wrapped__ = Environment
-    
+
     # === Safe attributes (whitelist) ===
     user = ProxyAttr()
     uid = ProxyAttr()
@@ -257,19 +257,19 @@ class SafeEnvProxy(Proxy):
     companies = ProxyAttr()
     context = ProxyAttr()
     lang = ProxyAttr()
-    
+
     # === Safe methods (whitelist) ===
     ref = ProxyFunc()
     is_superuser = ProxyFunc()
     is_admin = ProxyFunc()
-    
+
     # === NOT declared (blocked) ===
     # sudo, with_user, with_context → AttributeError
-    
+
     def __init__(self, env, allowlist=None, denylist=None, hooks=None):
         """
         Initialize SafeEnvProxy.
-        
+
         Args:
             env: Original odoo.api.Environment
             allowlist: List of allowed model names (empty = all except denylist)
@@ -280,7 +280,7 @@ class SafeEnvProxy(Proxy):
         object.__setattr__(self, '_allowlist', allowlist or [])
         object.__setattr__(self, '_denylist', denylist or ['ir.%'])
         object.__setattr__(self, '_hooks', hooks or {'pre': [], 'post': []})
-    
+
     def __getitem__(self, model_name):
         """
         Override model access to enforce allowlist/denylist.
@@ -291,7 +291,7 @@ class SafeEnvProxy(Proxy):
                 f"Model '{model_name}' is not allowed in this workflow context. "
                 f"Blocked by denylist pattern or not in allowlist."
             )
-        
+
         from .safe_model_proxy import SafeModelProxy
         return SafeModelProxy(
             self._wrapped__[model_name],
@@ -299,61 +299,61 @@ class SafeEnvProxy(Proxy):
             pre_hooks=self._hooks.get('pre', []),
             post_hooks=self._hooks.get('post', [])
         )
-    
+
     def _is_model_allowed(self, model_name):
         """Check if model is allowed based on allowlist/denylist."""
         # Always block ir.* (security critical)
         if model_name.startswith('ir.'):
             return False
-        
+
         # Check denylist patterns
         for pattern in self._denylist:
             if self._match_pattern(model_name, pattern):
                 return False
-        
+
         # Check allowlist (if set, must be in list)
         if self._allowlist:
             return any(
-                self._match_pattern(model_name, p) 
+                self._match_pattern(model_name, p)
                 for p in self._allowlist
             )
-        
+
         return True
-    
+
     @staticmethod
     def _match_pattern(name, pattern):
         """Match model name against pattern with % wildcard."""
         if '%' not in pattern:
             return name == pattern
-        
+
         # Convert % wildcard to regex-like matching
         if pattern.endswith('%'):
             prefix = pattern[:-1]
             return name.startswith(prefix)
-        
+
         # Simple prefix/suffix matching
         parts = pattern.split('%')
         if len(parts) == 2:
             return name.startswith(parts[0]) and name.endswith(parts[1])
-        
+
         return name == pattern
-    
+
     @classmethod
     def from_workflow(cls, env, workflow):
         """
         Factory method to create SafeEnvProxy from workflow record.
-        
+
         Args:
             env: Original environment
             workflow: workflow.run or ir.workflow record with security settings
         """
         allowlist = json.loads(workflow.model_allowlist or '[]')
         denylist = json.loads(workflow.model_denylist or '["ir.%"]')
-        
+
         # Ensure ir.* is always in denylist
         if 'ir.%' not in denylist:
             denylist.append('ir.%')
-        
+
         return cls(env, allowlist=allowlist, denylist=denylist)
 ```
 
@@ -384,17 +384,17 @@ from odoo.exceptions import AccessError
 class SafeModelProxy:
     """
     Model proxy with method interception hooks.
-    
+
     Unlike SafeEnvProxy which uses whitelist (Facade pattern),
     this uses blacklist + delegation since ORM has many methods.
     """
-    
+
     BLOCKED_METHODS = frozenset({'sudo', 'with_user'})
-    
+
     def __init__(self, model, env_proxy, pre_hooks=None, post_hooks=None):
         """
         Initialize SafeModelProxy.
-        
+
         Args:
             model: Odoo model/recordset to wrap
             env_proxy: Parent SafeEnvProxy instance
@@ -405,7 +405,7 @@ class SafeModelProxy:
         object.__setattr__(self, '_env_proxy', env_proxy)
         object.__setattr__(self, '_pre_hooks', pre_hooks or [])
         object.__setattr__(self, '_post_hooks', post_hooks or [])
-    
+
     def __getattr__(self, name):
         """
         Intercept attribute access:
@@ -419,22 +419,22 @@ class SafeModelProxy:
                 f"{name}() is not allowed in workflow execution. "
                 f"Use the configured run_as_user instead."
             )
-        
+
         attr = getattr(self._model, name)
-        
+
         # Wrap callables with hooks
         if callable(attr):
             return self._wrap_with_hooks(name, attr)
-        
+
         return attr
-    
+
     def __setattr__(self, name, value):
         """Delegate attribute setting to wrapped model."""
         if name.startswith('_'):
             object.__setattr__(self, name, value)
         else:
             setattr(self._model, name, value)
-    
+
     def __iter__(self):
         """Iterate over wrapped recordset."""
         for record in self._model:
@@ -444,46 +444,46 @@ class SafeModelProxy:
                 self._pre_hooks,
                 self._post_hooks
             )
-    
+
     def __len__(self):
         return len(self._model)
-    
+
     def __bool__(self):
         return bool(self._model)
-    
+
     def __repr__(self):
         return f"<SafeModelProxy({self._model!r})>"
-    
+
     def _wrap_with_hooks(self, method_name, method):
         """
         Wrap method with pre/post hooks.
-        
+
         Pre-hooks are called before method execution.
         Post-hooks are called after, with result.
-        
+
         If result is a recordset, wrap it in new proxy.
         """
         @functools.wraps(method)
         def wrapper(*args, **kwargs):
             model_name = self._model._name
-            
+
             # Call pre-hooks
             for hook in self._pre_hooks:
                 try:
                     hook(model_name, method_name, args, kwargs)
                 except Exception:
                     pass  # Don't let hook errors break execution
-            
+
             # Execute actual method
             result = method(*args, **kwargs)
-            
+
             # Call post-hooks
             for hook in self._post_hooks:
                 try:
                     hook(model_name, method_name, args, kwargs, result)
                 except Exception:
                     pass
-            
+
             # Wrap recordset results in new proxy
             if isinstance(result, models.BaseModel):
                 return SafeModelProxy(
@@ -492,25 +492,25 @@ class SafeModelProxy:
                     self._pre_hooks,
                     self._post_hooks
                 )
-            
+
             return result
-        
+
         return wrapper
-    
+
     # === Delegate common ORM properties ===
-    
+
     @property
     def ids(self):
         return self._model.ids
-    
+
     @property
     def id(self):
         return self._model.id
-    
+
     @property
     def _name(self):
         return self._model._name
-    
+
     @property
     def env(self):
         """Return SafeEnvProxy instead of raw env."""
@@ -535,21 +535,21 @@ Future: KMS, HashiCorp Vault, AWS Secrets Manager
 class SecretBroker:
     """
     Provides secure access to secrets.
-    
+
     In runtime mode: returns actual secret values
     In display mode: returns masked values
-    
+
     Usage in code node:
         api_key = secret.get('openai_api_key')
     """
-    
+
     MASK_VALUE = '********'
     PREFIX = 'workflow_pilot.secret.'
-    
+
     def __init__(self, env, mask_mode=False):
         """
         Initialize SecretBroker.
-        
+
         Args:
             env: Odoo environment (for ir.config_parameter access)
             mask_mode: If True, return masked values instead of actual secrets
@@ -562,15 +562,15 @@ class SecretBroker:
             # KMSBackend(env),
             # VaultBackend(env),
         ]
-    
+
     def get(self, key, default=None):
         """
         Get secret value by key.
-        
+
         Args:
             key: Secret key (without prefix)
             default: Default value if not found
-            
+
         Returns:
             Actual value (runtime mode) or masked value (display mode)
         """
@@ -580,11 +580,11 @@ class SecretBroker:
                     return self.MASK_VALUE
                 return backend.get(key)
         return default
-    
+
     def has(self, key):
         """Check if secret exists."""
         return any(backend.has_key(key) for backend in self._backends)
-    
+
     def list_keys(self):
         """
         List available secret keys (for autocomplete).
@@ -599,28 +599,28 @@ class SecretBroker:
 class ConfigParameterBackend:
     """
     Secret backend using ir.config_parameter.
-    
+
     Keys are stored with prefix: workflow_pilot.secret.<key>
     """
-    
+
     def __init__(self, env, prefix):
         self._env = env
         self._prefix = prefix
-    
+
     def _full_key(self, key):
         return self._prefix + key
-    
+
     def has_key(self, key):
         param = self._env['ir.config_parameter'].sudo().get_param(
             self._full_key(key), default=None
         )
         return param is not None
-    
+
     def get(self, key):
         return self._env['ir.config_parameter'].sudo().get_param(
             self._full_key(key)
         )
-    
+
     def list_keys(self):
         """List all keys with our prefix."""
         params = self._env['ir.config_parameter'].sudo().search([
@@ -642,12 +642,12 @@ class ConfigParameterBackend:
 def _should_unmask_for_user(self, user, run=None):
     """
     Check if output should be unmasked for this user.
-    
+
     Priority:
     1. node.group_id (instance override)
     2. node_type.group_id
     3. unmask_expression (evaluated with safe_eval)
-    
+
     Returns:
         bool: True if user can view unmasked output
     """
@@ -661,28 +661,28 @@ def _should_unmask_for_user(self, user, run=None):
             # No external ID, check direct membership
             if effective_group not in user.groups_id:
                 return False
-    
+
     # Check unmask_expression if set
     if self.unmask_expression:
         return self._eval_unmask_expression(user, run)
-    
+
     # Default: masked (Zero Trust)
     return False
 
 def _eval_unmask_expression(self, user, run=None):
     """
     Evaluate unmask expression with safe_eval mode='eval'.
-    
+
     Context available:
     - env, user, uid, company, company_id, company_ids
     - workflow, node, run
     - True, False
-    
+
     Returns:
         bool: Expression result (False on error)
     """
     from odoo.tools.safe_eval import safe_eval
-    
+
     context = {
         # Environment context
         'env': self.env,
@@ -691,17 +691,17 @@ def _eval_unmask_expression(self, user, run=None):
         'company': user.company_id,
         'company_id': user.company_id.id,
         'company_ids': user.company_ids.ids,
-        
+
         # Workflow context
         'workflow': self.workflow_id,
         'node': self,
         'run': run or self.env.context.get('active_run'),
-        
+
         # Builtins
         'True': True,
         'False': False,
     }
-    
+
     try:
         result = safe_eval(self.unmask_expression, context, mode='eval')
         return bool(result)
@@ -720,7 +720,7 @@ def _eval_unmask_expression(self, user, run=None):
 def _get_secure_eval_context(self, node, input_data):
     """
     Build secure evaluation context for node execution.
-    
+
     Returns context dict with:
     - Standard namespaces (_json, _vars, _node, etc.)
     - SafeEnvProxy (instead of raw env)
@@ -728,13 +728,13 @@ def _get_secure_eval_context(self, node, input_data):
     """
     from .security.safe_env_proxy import SafeEnvProxy
     from .security.secret_broker import SecretBroker
-    
+
     workflow = self.workflow_id
-    
+
     # Determine effective user
     run_as_user = workflow.run_as_user_id or self.env.user
     effective_env = self.env(user=run_as_user)
-    
+
     # Create audit hook
     def audit_model_access(model_name, method_name, args, kwargs):
         self.env['ir.logging'].create({
@@ -754,14 +754,14 @@ def _get_secure_eval_context(self, node, input_data):
             'message_display': f"Accessed {model_name}.{method_name}",
             'success': True,
         })
-    
+
     # Create safe environment proxy
     safe_env = SafeEnvProxy.from_workflow(effective_env, workflow)
     safe_env._hooks['pre'].append(audit_model_access)
-    
+
     # Create secret broker (runtime mode = unmasked)
     secret = SecretBroker(self.env, mask_mode=False)
-    
+
     return {
         # Standard namespaces
         '_json': input_data,
@@ -769,19 +769,19 @@ def _get_secure_eval_context(self, node, input_data):
         '_vars': self._get_variables(),
         '_node': self._get_node_outputs(),
         '_loop': self._get_loop_context(),
-        
+
         # Time
         '_now': datetime.now(),
         '_today': date.today(),
-        
+
         # Execution metadata
         '_execution': self._get_execution_context(),
         '_workflow': self._get_workflow_context(),
-        
+
         # Secure proxies
         'env': safe_env,
         'secret': secret,
-        
+
         # Output variable
         'result': None,
     }
@@ -789,26 +789,26 @@ def _get_secure_eval_context(self, node, input_data):
 def _redact_output(self, output, node):
     """
     Redact output for display.
-    
+
     Returns:
         tuple: (output_raw, output_display)
     """
     import json
-    
+
     output_raw = json.dumps(output) if not isinstance(output, str) else output
-    
+
     # Check if current user can see unmasked
     if node._should_unmask_for_user(self.env.user, run=self.run_id):
         output_display = output_raw
     else:
         output_display = self._mask_sensitive_data(output_raw)
-    
+
     return output_raw, output_display
 
 def _mask_sensitive_data(self, text):
     """
     Mask sensitive patterns in text.
-    
+
     Patterns masked:
     - API keys (sk-..., key-..., etc.)
     - Passwords
@@ -817,7 +817,7 @@ def _mask_sensitive_data(self, text):
     - Credit card numbers
     """
     import re
-    
+
     patterns = [
         (r'(sk-[a-zA-Z0-9]{20,})', '********'),  # OpenAI-style keys
         (r'(key-[a-zA-Z0-9]{20,})', '********'),  # Generic API keys
@@ -826,11 +826,11 @@ def _mask_sensitive_data(self, text):
         (r'(secret["\s:=]+)[^\s,"]+', r'\1********'),  # Secrets
         (r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '***@***.***'),  # Emails
     ]
-    
+
     result = text
     for pattern, replacement in patterns:
         result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
-    
+
     return result
 ```
 
@@ -957,7 +957,7 @@ access_workflow_node_output_admin,workflow.node.output admin,model_workflow_node
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Performance overhead from hooks | Medium | Hooks are lightweight; can disable per-workflow if needed |
-| Breaking existing code nodes | High | Block `sudo` and `with_user`; all other ORM methods work normally | 
+| Breaking existing code nodes | High | Block `sudo` and `with_user`; all other ORM methods work normally |
 | Audit log table growth | Medium | 30-day retention + @api.autovacuum |
 | `safe_eval` restrictions block code | Medium | Document allowed patterns; provide escape hatch for admins |
 | Facade not exported in odoo.tools | Low | Import directly from `odoo.tools.facade` |

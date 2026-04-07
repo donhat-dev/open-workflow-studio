@@ -4,7 +4,7 @@ import { BaseNode, DataSocket } from '../core/node';
 
 /**
  * ManualTriggerNode - Start node for manual workflow execution
- * 
+ *
  * No inputs (this is a start node)
  * No controls (no configuration needed)
  * One output: output (DataSocket)

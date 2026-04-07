@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Base Node Runner and Smart Expression Resolver
 
@@ -9,8 +7,8 @@ Provides foundation for node execution:
         - BaseNodeRunner: Abstract base class for node execution
 """
 
-import re
 import logging
+import re
 
 from odoo.tools.safe_eval import safe_eval
 
@@ -20,6 +18,7 @@ _logger = logging.getLogger(__name__)
 # =============================================================================
 # SMART EXPRESSION RESOLVER (unified, type-preserving)
 # =============================================================================
+
 
 class SmartExpressionResolver:
     """Unified strict expression resolver with explicit `=` contract.
@@ -35,11 +34,11 @@ class SmartExpressionResolver:
         - plain text literal: ``=_json.id`` → ``"_json.id"``
     """
 
-    _TEMPLATE_RE = re.compile(r'\{\{(.+?)\}\}')
-    _FULL_TEMPLATE_RE = re.compile(r'^\s*\{\{(.+)\}\}\s*$')
+    _TEMPLATE_RE = re.compile(r"\{\{(.+?)\}\}")
+    _FULL_TEMPLATE_RE = re.compile(r"^\s*\{\{(.+)\}\}\s*$")
 
     def is_expression_mode(self, value):
-        return isinstance(value, str) and value.startswith('=')
+        return isinstance(value, str) and value.startswith("=")
 
     def strip_expression_prefix(self, value):
         if not isinstance(value, str):
@@ -62,11 +61,11 @@ class SmartExpressionResolver:
         def _replace(match):
             inner = match.group(1).strip()
             try:
-                result = safe_eval(inner, eval_context, mode='eval')
-                return str(result) if result is not None else ''
+                result = safe_eval(inner, eval_context, mode="eval")
+                return str(result) if result is not None else ""
             except Exception as e:
                 _logger.warning("Expression interpolation failed: %s -> %s", inner, e)
-                return ''
+                return ""
 
         return self._TEMPLATE_RE.sub(_replace, value)
 
@@ -77,15 +76,17 @@ class SmartExpressionResolver:
 
         stripped = body.strip()
         if not stripped:
-            return ''
+            return ""
 
         full_match = self._FULL_TEMPLATE_RE.match(stripped)
         if full_match:
             inner_expr = full_match.group(1).strip()
             try:
-                return safe_eval(inner_expr, eval_context, mode='eval')
+                return safe_eval(inner_expr, eval_context, mode="eval")
             except Exception as e:
-                _logger.warning("Prefixed expression evaluation failed: %s -> %s", inner_expr, e)
+                _logger.warning(
+                    "Prefixed expression evaluation failed: %s -> %s", inner_expr, e
+                )
                 return body
 
         if self._TEMPLATE_RE.search(body):
@@ -98,7 +99,7 @@ class SmartExpressionResolver:
         if not isinstance(value, str):
             return value
 
-        if value == '':
+        if value == "":
             return value
 
         if not self.is_expression_mode(value):
@@ -114,7 +115,7 @@ class SmartExpressionResolver:
         """Resolve and always return a string."""
         result = self.resolve(value, eval_context)
         if result is None:
-            return ''
+            return ""
         return str(result)
 
     def resolve_int(self, value, eval_context, default=None):
@@ -122,7 +123,7 @@ class SmartExpressionResolver:
         if self.is_literal_prefixed_string(value):
             return default
         result = self.resolve(value, eval_context)
-        if result is None or result == '':
+        if result is None or result == "":
             return default
         try:
             return int(result)
@@ -140,10 +141,11 @@ class SmartExpressionResolver:
             return list(result)
         if isinstance(result, str):
             stripped = result.strip()
-            if not stripped or stripped == '[]':
+            if not stripped or stripped == "[]":
                 return default if default is not None else []
             # Attempt JSON parse
             import json
+
             try:
                 parsed = json.loads(stripped)
                 if isinstance(parsed, list):
@@ -155,15 +157,16 @@ class SmartExpressionResolver:
     def resolve_domain(self, domain_value, eval_context):
         """Resolve a domain value (list or string) to a Python domain list.
 
-                Accepts:
-                    - ``={{ [('field', '=', val)] }}`` — explicit expression mode
-                    - ``[('field', '=', val)]``  — plain Odoo domain string
-                    - Already a ``list``
+        Accepts:
+            - ``={{ [('field', '=', val)] }}`` — explicit expression mode
+            - ``[('field', '=', val)]``  — plain Odoo domain string
+            - Already a ``list``
 
-                After resolving to a list, per-leaf explicit ``=...`` expressions are
-                resolved individually.
+        After resolving to a list, per-leaf explicit ``=...`` expressions are
+        resolved individually.
         """
         import ast
+
         raw = domain_value
         if raw is None:
             return []
@@ -178,12 +181,12 @@ class SmartExpressionResolver:
             return self._resolve_domain_leaves(resolved, eval_context)
         if isinstance(resolved, str):
             stripped = resolved.strip()
-            if not stripped or stripped == '[]':
+            if not stripped or stripped == "[]":
                 return []
             try:
                 parsed = ast.literal_eval(stripped)
             except (ValueError, SyntaxError):
-                parsed = safe_eval(stripped, eval_context, mode='eval')
+                parsed = safe_eval(stripped, eval_context, mode="eval")
             if isinstance(parsed, list):
                 return self._resolve_domain_leaves(parsed, eval_context)
         raise ValueError(
@@ -216,7 +219,7 @@ class SmartExpressionResolver:
         if not isinstance(value, str):
             return value
 
-        if value == '':
+        if value == "":
             return value
 
         if self.is_expression_mode(value):
@@ -232,6 +235,7 @@ _resolver = SmartExpressionResolver()
 # =============================================================================
 # BASE NODE RUNNER
 # =============================================================================
+
 
 class BaseNodeRunner:
     """Base class for node execution."""

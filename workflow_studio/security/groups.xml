@@ -1,169 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="0">
-        <!-- ================================ -->
-        <!-- Security Groups                  -->
-        <!-- ================================ -->
-        
-        <!-- Module Category -->
-        <record id="module_category_workflow_pilot" model="ir.module.category">
-            <field name="name">Workflow Studio</field>
-            <field name="description">Workflow automation and integration</field>
-            <field name="sequence">50</field>
-        </record>
+    <!-- ================================ -->
+    <!-- Security Groups                  -->
+    <!-- ================================ -->
 
-        <!-- Group: User (Base access) -->
-        <record id="group_workflow_user" model="res.groups">
-            <field name="name">User</field>
-            <field name="category_id" ref="module_category_workflow_pilot"/>
-            <field name="comment">Can create and edit own workflows</field>
-        </record>
+    <!-- Module Category -->
+    <record id="module_category_workflow_pilot" model="ir.module.category">
+        <field name="name">Workflow Studio</field>
+        <field name="description">Workflow automation and integration</field>
+        <field name="sequence">50</field>
+    </record>
 
-        <!-- Group: Manager (Implied from User) -->
-        <record id="group_workflow_manager" model="res.groups">
-            <field name="name">Manager</field>
-            <field name="category_id" ref="module_category_workflow_pilot"/>
-            <field name="implied_ids" eval="[(4, ref('group_workflow_user'))]"/>
-            <field name="comment">Can view and edit all workflows in company</field>
-        </record>
+    <!-- Group: User (Base access) -->
+    <record id="group_workflow_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="category_id" ref="module_category_workflow_pilot"/>
+        <field name="comment">Can create and edit own workflows</field>
+    </record>
 
-        <!-- Group: Admin (Implied from Manager) -->
-        <record id="group_workflow_admin" model="res.groups">
-            <field name="name">Administrator</field>
-            <field name="category_id" ref="module_category_workflow_pilot"/>
-            <field name="implied_ids" eval="[(4, ref('group_workflow_manager'))]"/>
-            <field name="comment">Full access including node type management</field>
-        </record>
-    </data>
+    <!-- Group: Manager (Implied from User) -->
+    <record id="group_workflow_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_workflow_pilot"/>
+        <field name="implied_ids" eval="[(4, ref('group_workflow_user'))]"/>
+        <field name="comment">Can view and edit all workflows in company</field>
+    </record>
 
-    <data noupdate="1">
-        <!-- ================================ -->
-        <!-- Record Rules (Multi-Company)    -->
-        <!-- ================================ -->
-
-        <!-- workflow.type: Global read for all users -->
-        <record id="rule_workflow_type_global_read" model="ir.rule">
-            <field name="name">Workflow Type: Global Read</field>
-            <field name="model_id" ref="model_workflow_type"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-            <field name="perm_read" eval="1"/>
-            <field name="perm_write" eval="0"/>
-            <field name="perm_create" eval="0"/>
-            <field name="perm_unlink" eval="0"/>
-        </record>
-
-        <!-- workflow.type: Full access for admin only -->
-        <record id="rule_workflow_type_admin" model="ir.rule">
-            <field name="name">Workflow Type: Admin Full Access</field>
-            <field name="model_id" ref="model_workflow_type"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_admin'))]"/>
-            <field name="perm_read" eval="1"/>
-            <field name="perm_write" eval="1"/>
-            <field name="perm_create" eval="1"/>
-            <field name="perm_unlink" eval="1"/>
-        </record>
-
-        <!-- ir.workflow: User sees own workflows in company -->
-        <record id="rule_workflow_user" model="ir.rule">
-            <field name="name">Workflow: User Own Company</field>
-            <field name="model_id" ref="model_ir_workflow"/>
-            <field name="domain_force">[
-                ('user_id', '=', user.id),
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-        </record>
-
-        <!-- ir.workflow: Manager sees all workflows in company -->
-        <record id="rule_workflow_manager" model="ir.rule">
-            <field name="name">Workflow: Manager Company</field>
-            <field name="model_id" ref="model_ir_workflow"/>
-            <field name="domain_force">[
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
-        </record>
-
-        <!-- workflow.node: Same as parent workflow -->
-        <record id="rule_workflow_node_user" model="ir.rule">
-            <field name="name">Workflow Node: User Own Company</field>
-            <field name="model_id" ref="model_workflow_node"/>
-            <field name="domain_force">[
-                ('workflow_id.user_id', '=', user.id),
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-        </record>
-
-        <record id="rule_workflow_node_manager" model="ir.rule">
-            <field name="name">Workflow Node: Manager Company</field>
-            <field name="model_id" ref="model_workflow_node"/>
-            <field name="domain_force">[
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
-        </record>
-
-        <!-- workflow.connection: Same as parent workflow -->
-        <record id="rule_workflow_connection_user" model="ir.rule">
-            <field name="name">Workflow Connection: User Own Company</field>
-            <field name="model_id" ref="model_workflow_connection"/>
-            <field name="domain_force">[
-                ('workflow_id.user_id', '=', user.id),
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-        </record>
-
-        <record id="rule_workflow_connection_manager" model="ir.rule">
-            <field name="name">Workflow Connection: Manager Company</field>
-            <field name="model_id" ref="model_workflow_connection"/>
-            <field name="domain_force">[
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
-        </record>
-
-        <!-- workflow.run: Same as parent workflow -->
-        <record id="rule_workflow_run_user" model="ir.rule">
-            <field name="name">Workflow Run: User Own Company</field>
-            <field name="model_id" ref="model_workflow_run"/>
-            <field name="domain_force">[
-                ('workflow_id.user_id', '=', user.id),
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-        </record>
-
-        <record id="rule_workflow_run_manager" model="ir.rule">
-            <field name="name">Workflow Run: Manager Company</field>
-            <field name="model_id" ref="model_workflow_run"/>
-            <field name="domain_force">[
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
-        </record>
-
-        <!-- workflow.run.node: Same as parent run -->
-        <record id="rule_workflow_run_node_user" model="ir.rule">
-            <field name="name">Workflow Run Node: User Own Company</field>
-            <field name="model_id" ref="model_workflow_run_node"/>
-            <field name="domain_force">[
-                ('run_id.workflow_id.user_id', '=', user.id),
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
-        </record>
-
-        <record id="rule_workflow_run_node_manager" model="ir.rule">
-            <field name="name">Workflow Run Node: Manager Company</field>
-            <field name="model_id" ref="model_workflow_run_node"/>
-            <field name="domain_force">[
-                '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
-            ]</field>
-            <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
-        </record>
-    </data>
+    <!-- Group: Admin (Implied from Manager) -->
+    <record id="group_workflow_admin" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="category_id" ref="module_category_workflow_pilot"/>
+        <field name="implied_ids" eval="[(4, ref('group_workflow_manager'))]"/>
+        <field name="comment">Full access including node type management</field>
+    </record>
 </odoo>

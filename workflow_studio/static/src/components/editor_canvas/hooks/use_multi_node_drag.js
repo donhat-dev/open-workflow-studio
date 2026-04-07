@@ -188,7 +188,7 @@ export function useMultiNodeDrag(options) {
         const selectedIds = editor.state.ui.selection.nodeIds || [];
 
         // If keeping existing selection or starting new one, the list of nodes to move
-        // is the current selection. If the user drags a non-selected node without Ctrl, 
+        // is the current selection. If the user drags a non-selected node without Ctrl,
         // the selection logic in WorkflowNode should have already updated selection.
         let nodesToMove = selectedIds.includes(nodeId) ? selectedIds : [nodeId];
 

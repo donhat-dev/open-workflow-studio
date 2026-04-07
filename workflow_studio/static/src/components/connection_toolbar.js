@@ -3,16 +3,16 @@ import { Component, xml, useEnv, useRef, onMounted, onWillUnmount } from "@odoo/
 
 /**
  * ConnectionToolbar Component
- * 
+ *
  * A floating toolbar that appears on connection hover.
  * Provides quick actions: Add node (insert into connection) and Delete connection.
  * Scales with zoom to maintain visual proportion with the canvas.
- * 
+ *
  * Uses workflowEditor service for actions (thin UI pattern).
  */
 export class ConnectionToolbar extends Component {
     static template = xml`
-        <div class="connection-toolbar" 
+        <div class="connection-toolbar"
              t-ref="root"
              t-att-style="toolbarStyle"
              t-on-mouseenter="onMouseEnter"
@@ -20,13 +20,13 @@ export class ConnectionToolbar extends Component {
              t-on-mousedown.stop=""
              t-on-contextmenu.stop.prevent="">
             <!-- Add Node Button -->
-            <button class="connection-toolbar__btn connection-toolbar__btn--add" 
+            <button class="connection-toolbar__btn connection-toolbar__btn--add"
                     t-on-click.stop="onAddClick"
                     title="Add node">
                 +
             </button>
             <!-- Delete Connection Button -->
-            <button class="connection-toolbar__btn connection-toolbar__btn--delete" 
+            <button class="connection-toolbar__btn connection-toolbar__btn--delete"
                     t-on-click.stop="onDeleteClick"
                     title="Delete connection">
                 ×

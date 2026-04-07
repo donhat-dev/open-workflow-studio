@@ -10,7 +10,7 @@
 
 ## Context
 
-Current workflow execution relies on passing deep copies of full JSON payload objects between nodes via the `WorkflowExecutor` stack and storing them directly in `WorkflowRunNode` (`input_data`, `output_data`). 
+Current workflow execution relies on passing deep copies of full JSON payload objects between nodes via the `WorkflowExecutor` stack and storing them directly in `WorkflowRunNode` (`input_data`, `output_data`).
 
 When a workflow runs at high scale (e.g., 15k orders/day, 5k peak/hour async via `queue_job`), passing a 100KB payload through 5 sequentially chained nodes creates 5 redundant copies in memory (~500KB RAM overhead per run), not including snapshot strings and database overhead. This causes:
 1. **Severe Python Worker RAM Bloat**: High risk of OS Out-of-Memory (OOM) errors leading to worker restarts.

@@ -2,7 +2,7 @@
 
 /**
  * Geometry Utilities
- * 
+ *
  * Pure functions for geometric calculations.
  * No OWL dependencies - framework agnostic.
  */

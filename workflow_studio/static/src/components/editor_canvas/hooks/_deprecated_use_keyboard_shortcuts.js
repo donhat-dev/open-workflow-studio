@@ -10,7 +10,7 @@ import { useExternalListener } from "@odoo/owl";
  * - Arrow Keys: Move selected nodes
  * - Ctrl+Z/Y: Undo/Redo
  * - Ctrl+A: Select All
- * 
+ *
  * Note: Copy/Paste is handled separately (see EditorCanvas or useClipboard)
  *
  * @param {Object} options

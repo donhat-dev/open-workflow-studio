@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Workflow Executor - Backend Execution Engine
 
@@ -15,36 +13,35 @@ Expression Evaluation:
     Translates _json.field to Python _json['field'] for safe_eval.
 """
 
-import logging
 import inspect
+import json
+import logging
 import re
 import time
-from datetime import datetime, date, timedelta
-import json
-from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
-from odoo.tools import config
+from datetime import date, datetime, timedelta
 
+from odoo import _, models
+from odoo.exceptions import UserError, ValidationError
+
+from ..workflow import WorkflowNodeRegistry
+from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .runners import (
-    BaseNodeRunner,
+    CodeNodeRunner,
     HttpNodeRunner,
     IfNodeRunner,
     LoopNodeRunner,
     NoOpNodeRunner,
-    VariableNodeRunner,
-    ValidationNodeRunner,
-    CodeNodeRunner,
-    SwitchNodeRunner,
+    RecordEventTriggerNodeRunner,
     RecordOperationNodeRunner,
     ScheduleTriggerNodeRunner,
+    SwitchNodeRunner,
+    ValidationNodeRunner,
+    VariableNodeRunner,
     WebhookTriggerNodeRunner,
-    RecordEventTriggerNodeRunner,
 )
-from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .security.safe_env_proxy import SafeEnvProxy
 from .security.safe_model_proxy import SafeModelProxy
 from .security.secret_broker import SecretBrokerFactory
-from ..workflow import WorkflowNodeRegistry
 
 _logger = logging.getLogger(__name__)
 
@@ -53,53 +50,66 @@ _logger = logging.getLogger(__name__)
 # WORKFLOW EXECUTOR
 # =============================================================================
 
+
 class WorkflowExecutor:
     """Stack-based workflow execution engine.
-    
+
     Follows ADR-001 architecture:
     - Push start nodes to stack
     - Pop and execute until stack empty or error
     - Route outputs based on connections and output data
     """
-    
+
     # Pre-compiled patterns for sensitive data masking.
     # Avoids re.compile overhead on every _mask_sensitive_data call.
     _MASK_PATTERNS = [
-        (re.compile(r'(sk-[a-zA-Z0-9]{20,})', re.IGNORECASE), '********'),
-        (re.compile(r'(key-[a-zA-Z0-9]{20,})', re.IGNORECASE), '********'),
-        (re.compile(r'(password["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
-        (re.compile(r'(token["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
-        (re.compile(r'(secret["\s:=]+)[^\s,"]+', re.IGNORECASE), r'\1********'),
-        (re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', re.IGNORECASE), '***@***.***'),
+        (re.compile(r"(sk-[a-zA-Z0-9]{20,})", re.IGNORECASE), "********"),
+        (re.compile(r"(key-[a-zA-Z0-9]{20,})", re.IGNORECASE), "********"),
+        (re.compile(r'(password["\s:=]+)[^\s,"]+', re.IGNORECASE), r"\1********"),
+        (re.compile(r'(token["\s:=]+)[^\s,"]+', re.IGNORECASE), r"\1********"),
+        (re.compile(r'(secret["\s:=]+)[^\s,"]+', re.IGNORECASE), r"\1********"),
+        (
+            re.compile(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", re.IGNORECASE
+            ),
+            "***@***.***",
+        ),
     ]
 
     # Marker keys for Odoo record references in execution output.
-    _RECORD_REFS_KEY = '__wf_record_refs__'
-    _RECORD_REFS_COUNT_KEY = '__wf_record_refs_count__'
-    _RECORD_REFS_TRUNCATED_KEY = '__wf_record_refs_truncated__'
-    _RECORD_REFS_MODEL_KEY = '__wf_record_refs_model__'
+    _RECORD_REFS_KEY = "__wf_record_refs__"
+    _RECORD_REFS_COUNT_KEY = "__wf_record_refs_count__"
+    _RECORD_REFS_TRUNCATED_KEY = "__wf_record_refs_truncated__"
+    _RECORD_REFS_MODEL_KEY = "__wf_record_refs_model__"
     _MAX_RECORD_REFS = 100
     _MAX_NORMALIZE_DEPTH = 20
 
     # Node runner registry
     NODE_RUNNERS = {
-        'http': HttpNodeRunner,
-        'if': IfNodeRunner,
-        'loop': LoopNodeRunner,
-        'noop': NoOpNodeRunner,
-        'variable': VariableNodeRunner,
-        'validation': ValidationNodeRunner,
-        'code': CodeNodeRunner,
-        'switch': SwitchNodeRunner,
-        'record_operation': RecordOperationNodeRunner,
-        'schedule_trigger': ScheduleTriggerNodeRunner,
-        'webhook_trigger': WebhookTriggerNodeRunner,
-        'record_event_trigger': RecordEventTriggerNodeRunner,
+        "http": HttpNodeRunner,
+        "if": IfNodeRunner,
+        "loop": LoopNodeRunner,
+        "noop": NoOpNodeRunner,
+        "variable": VariableNodeRunner,
+        "validation": ValidationNodeRunner,
+        "code": CodeNodeRunner,
+        "switch": SwitchNodeRunner,
+        "record_operation": RecordOperationNodeRunner,
+        "schedule_trigger": ScheduleTriggerNodeRunner,
+        "webhook_trigger": WebhookTriggerNodeRunner,
+        "record_event_trigger": RecordEventTriggerNodeRunner,
     }
-    
-    def __init__(self, env, workflow_run=None, snapshot=None, persist=True,
-                 notify_channel=None, rollback_on_failure=False,
-                 manage_run_lifecycle=False):
+
+    def __init__(
+        self,
+        env,
+        workflow_run=None,
+        snapshot=None,
+        persist=True,
+        notify_channel=None,
+        rollback_on_failure=False,
+        manage_run_lifecycle=False,
+    ):
         """Initialize executor.
 
         Args:
@@ -124,31 +134,39 @@ class WorkflowExecutor:
 
         if self.persist:
             if not self.run:
-                raise UserError("WorkflowExecutor requires a workflow.run record when persist=True")
+                raise UserError(
+                    _(
+                        "WorkflowExecutor requires a workflow.run record when persist=True"
+                    )
+                )
             self.snapshot = self.run.executed_snapshot
         else:
             self.snapshot = snapshot or {}
-        
+
         # Execution state
         self.stack = []  # [{nodeId, inputData}]
         self.node_outputs = {}  # nodeId -> NodeOutput
         self.node_context = {}  # nodeId -> persistent state (loops)
         self._vars_dirty_paths = set()
-        self.vars = wrap_mutable({}, tracker=self._track_var_path, path="")  # Workflow variables (mutable, dot-access)
+        self.vars = wrap_mutable(
+            {}, tracker=self._track_var_path, path=""
+        )  # Workflow variables (mutable, dot-access)
         self.executed_order = []
         self.executed_connections = []  # [{connection_id, source, source_socket, target, target_socket, output_index, sequence}]
         self._last_error_node_id = None
         self._node_record_cache = {}  # node_id -> record (avoids N+1 queries)
-        self._node_run_buffer = []   # in-memory node run data for batch persist
+        self._node_run_buffer = []  # in-memory node run data for batch persist
         self._cached_execution_context = None
         self._cached_workflow_context = None
-        self.execution_result = None  # populated by execute() for external lifecycle handlers
+        self.execution_result = (
+            None  # populated by execute() for external lifecycle handlers
+        )
 
         # Bus notification batching (time-based)
-        self._pending_batch = []        # [{node_id, status, node_type, node_label}]
+        self._pending_batch = []  # [{node_id, status, node_type, node_label}]
         self._pending_connections = []  # [routed_connection entries]
-        self._last_flush_time = 0.0    # monotonic timestamp of last bus flush
-        self._bus_flush_interval = 0.15 # 150ms wall-clock threshold
+        self._last_flush_time = 0.0  # monotonic timestamp of last bus flush
+        self._bus_flush_interval = 0.15  # 150ms wall-clock threshold
 
         self.exec_context = ExecutionContext(
             node_outputs=self.node_outputs,
@@ -160,10 +178,10 @@ class WorkflowExecutor:
 
         self.node_output_sockets = self._load_node_output_sockets()
         self.custom_runtime_types = self._load_custom_runtime_types()
-        
+
         # Build lookup structures
         self._build_graph()
-        
+
         # Initialize runners
         self.runners = {
             node_type: runner_class(self)
@@ -186,7 +204,7 @@ class WorkflowExecutor:
         try:
             with self.env.registry.cursor() as cr:
                 env = self.env(cr=cr)
-                env['bus.bus']._sendone(
+                env["bus.bus"]._sendone(
                     self._notify_channel,
                     notification_type,
                     message,
@@ -200,18 +218,19 @@ class WorkflowExecutor:
                 exc_info=True,
             )
 
-
     def _bus_append(self, node_id, status, routed_connections=None):
         """Append a node result to the pending bus batch."""
         if not self._notify_channel:
             return
         node = self.nodes.get(node_id, {})
-        self._pending_batch.append({
-            'node_id': node_id,
-            'status': status,
-            'node_type': node.get('type'),
-            'node_label': node.get('label', ''),
-        })
+        self._pending_batch.append(
+            {
+                "node_id": node_id,
+                "status": status,
+                "node_type": node.get("type"),
+                "node_label": node.get("label", ""),
+            }
+        )
         if routed_connections:
             self._pending_connections.extend(routed_connections)
 
@@ -235,21 +254,21 @@ class WorkflowExecutor:
             return
 
         message = {
-            'run_id': self.run.id if self.run else None,
-            'completed_nodes': list(self._pending_batch),
-            'connections': list(self._pending_connections),
-            'next_running_node_id': next_node_id,
+            "run_id": self.run.id if self.run else None,
+            "completed_nodes": list(self._pending_batch),
+            "connections": list(self._pending_connections),
+            "next_running_node_id": next_node_id,
         }
 
         if final_status:
-            message['status'] = final_status
-            message['error'] = error
-            message['executed_order'] = list(self.executed_order)
-            message['executed_connections'] = list(self.executed_connections)
-            message['executed_connection_ids'] = self._get_executed_connection_ids()
-            message['node_count'] = len(self.executed_order)
+            message["status"] = final_status
+            message["error"] = error
+            message["executed_order"] = list(self.executed_order)
+            message["executed_connections"] = list(self.executed_connections)
+            message["executed_connection_ids"] = self._get_executed_connection_ids()
+            message["node_count"] = len(self.executed_order)
 
-        self._send_bus_notification('workflow.execution/progress', message)
+        self._send_bus_notification("workflow.execution/progress", message)
         self._pending_batch.clear()
         self._pending_connections.clear()
         self._last_flush_time = time.monotonic()
@@ -257,9 +276,9 @@ class WorkflowExecutor:
     def _get_executed_connection_ids(self):
         """Return traversed connection IDs in execution order."""
         return [
-            entry.get('connection_id')
+            entry.get("connection_id")
             for entry in self.executed_connections
-            if entry.get('connection_id')
+            if entry.get("connection_id")
         ]
 
     def _load_node_output_sockets(self):
@@ -274,17 +293,17 @@ class WorkflowExecutor:
         to pattern-matching / generic fallback.
         """
         try:
-            return self.env['workflow.type']._get_output_socket_mapping()
+            return self.env["workflow.type"]._get_output_socket_mapping()
         except Exception:
             return {}
 
     def _load_custom_runtime_types(self):
         """Load custom runtime contract mapping from workflow.type."""
         try:
-            return self.env['workflow.type']._get_custom_runtime_mapping()
+            return self.env["workflow.type"]._get_custom_runtime_mapping()
         except Exception:
             return {}
-    
+
     def _build_graph(self):
         """Build node and connection lookup structures.
 
@@ -294,17 +313,17 @@ class WorkflowExecutor:
         self.nodes = {}
         self.connections = []
         self.connections_by_source = {}
-        self._reverse_adj = {}   # target -> [source, ...]
-        self._forward_adj = {}   # source -> [target, ...]
+        self._reverse_adj = {}  # target -> [source, ...]
+        self._forward_adj = {}  # source -> [target, ...]
         self._nodes_with_incoming = set()
 
-        for node in self.snapshot.get('nodes', []):
-            self.nodes[node['id']] = node
-        
-        for conn in self.snapshot.get('connections', []):
+        for node in self.snapshot.get("nodes", []):
+            self.nodes[node["id"]] = node
+
+        for conn in self.snapshot.get("connections", []):
             self.connections.append(conn)
-            source = conn.get('source')
-            target = conn.get('target')
+            source = conn.get("source")
+            target = conn.get("target")
             if source:
                 self.connections_by_source.setdefault(source, []).append(conn)
             if source and target:
@@ -316,8 +335,8 @@ class WorkflowExecutor:
     def _is_node_disabled(self, node_id):
         """Check if a node is disabled via its meta.disabled flag."""
         node = self.nodes.get(node_id, {})
-        meta = node.get('meta') or {}
-        return bool(meta.get('disabled'))
+        meta = node.get("meta") or {}
+        return bool(meta.get("disabled"))
 
     # ========================================================================
     # Savepoint helpers (rollback-on-failure)
@@ -374,20 +393,20 @@ class WorkflowExecutor:
         output_vals = []
         for entry in self._node_run_buffer:
             # Derive completed_at from started_at + duration_ms
-            started_at = entry['started_at']
-            duration_ms = entry.get('duration_ms', 0)
+            started_at = entry["started_at"]
+            duration_ms = entry.get("duration_ms", 0)
             completed_at = started_at + timedelta(milliseconds=duration_ms)
 
             # Redact output in batch (Bottleneck C: deferred from hot loop)
-            raw_json = entry.get('_raw_json')
+            raw_json = entry.get("_raw_json")
             redacted = None
             output_display = None
             if raw_json is not None:
-                redacted = self._redact_output(raw_json, entry['node_id'])
-                output_display = redacted['display']
+                redacted = self._redact_output(raw_json, entry["node_id"])
+                output_display = redacted["display"]
 
             # Normalize input_data for storage (plain Python, truncated)
-            raw_input = entry.get('_input_data')
+            raw_input = entry.get("_input_data")
             input_display = None
             if raw_input is not None:
                 try:
@@ -395,49 +414,51 @@ class WorkflowExecutor:
                     input_json_str = json.dumps(plain_input, ensure_ascii=False)
                     # Truncate large payloads to stay within DB field limits
                     if len(input_json_str) > 65536:
-                        plain_input = {'__truncated__': True, 'preview': input_json_str[:512]}
+                        plain_input = {
+                            "__truncated__": True,
+                            "preview": input_json_str[:512],
+                        }
                     input_display = plain_input
                 except Exception:
                     input_display = None
 
-            run_node_vals.append({
-                'run_id': self.run.id,
-                'node_id': entry['node_id'],
-                'node_type': entry['node_type'],
-                'node_label': entry['node_label'],
-                'status': entry['status'],
-                'started_at': started_at,
-                'completed_at': completed_at,
-                'duration_ms': duration_ms,
-                'input_data': input_display,
-                'output_data': output_display,
-                'output_socket': entry.get('output_socket'),
-                'error_message': entry.get('error_message'),
-                'sequence': entry['sequence'],
-            })
+            run_node_vals.append(
+                {
+                    "run_id": self.run.id,
+                    "node_id": entry["node_id"],
+                    "node_type": entry["node_type"],
+                    "node_label": entry["node_label"],
+                    "status": entry["status"],
+                    "started_at": started_at,
+                    "completed_at": completed_at,
+                    "duration_ms": duration_ms,
+                    "input_data": input_display,
+                    "output_data": output_display,
+                    "output_socket": entry.get("output_socket"),
+                    "error_message": entry.get("error_message"),
+                    "sequence": entry["sequence"],
+                }
+            )
 
             # Collect workflow.node.output in same loop (reuse redacted result)
             if redacted is not None:
-                node_record = self._get_node_record(entry['node_id'])
+                node_record = self._get_node_record(entry["node_id"])
                 if node_record:
-                    output_vals.append({
-                        'run_id': self.run.id,
-                        'node_id': node_record.id,
-                        'output_raw': redacted['raw_text'],
-                        'output_display': redacted['display_text'],
-                        'output_json': redacted['display_text'],
-                    })
+                    output_vals.append(
+                        {
+                            "run_id": self.run.id,
+                            "node_id": node_record.id,
+                            "output_raw": redacted["raw_text"],
+                            "output_display": redacted["display_text"],
+                            "output_json": redacted["display_text"],
+                        }
+                    )
 
         if run_node_vals:
-            self.env['workflow.run.node'].create(run_node_vals)
+            self.env["workflow.run.node"].create(run_node_vals)
 
         if output_vals:
-            self.env['workflow.node.output'].create(output_vals)
-
-    def _commit_progress(self):
-        if not self.persist or config['test_enable']:
-            return
-        self.env.cr.commit()
+            self.env["workflow.node.output"].create(output_vals)
 
     def execute(self, input_data=None, start_node_ids=None):
         """Execute workflow from start to completion (stack loop only).
@@ -473,10 +494,12 @@ class WorkflowExecutor:
 
             # Push start nodes to stack
             for node_id in start_nodes:
-                self.stack.append({
-                    'nodeId': node_id,
-                    'inputData': launch_input_data,
-                })
+                self.stack.append(
+                    {
+                        "nodeId": node_id,
+                        "inputData": launch_input_data,
+                    }
+                )
 
             # Savepoint: when rollback_on_failure is enabled, wrap
             # the execution loop so all ORM side effects can be undone
@@ -493,8 +516,8 @@ class WorkflowExecutor:
             while self.stack and iteration < max_iterations:
                 iteration += 1
                 entry = self.stack.pop()
-                node_id = entry['nodeId']
-                input_data = entry['inputData']
+                node_id = entry["nodeId"]
+                input_data = entry["inputData"]
 
                 # Skip disabled nodes (stop path propagation)
                 if self._is_node_disabled(node_id):
@@ -507,14 +530,14 @@ class WorkflowExecutor:
                 except Exception as exc:
                     self._last_error_node_id = node_id
                     failed_result = {
-                        'outputs': [],
-                        'json': None,
-                        'error': str(exc),
+                        "outputs": [],
+                        "json": None,
+                        "error": str(exc),
                     }
                     self.node_outputs[node_id] = failed_result
                     self.executed_order.append(node_id)
-                    self._bus_append(node_id, 'error')
-                    self._bus_flush(final_status='failed', error=str(exc))
+                    self._bus_append(node_id, "error")
+                    self._bus_flush(final_status="failed", error=str(exc))
                     raise
 
                 # Store output
@@ -525,13 +548,15 @@ class WorkflowExecutor:
                 routed_connections = self._route_outputs(node_id, result)
 
                 # Append to bus batch; flush when wall-clock threshold exceeded
-                self._bus_append(node_id, 'success', routed_connections)
+                self._bus_append(node_id, "success", routed_connections)
                 if self._bus_should_flush():
-                    next_id = self.stack[-1]['nodeId'] if self.stack else None
+                    next_id = self.stack[-1]["nodeId"] if self.stack else None
                     self._bus_flush(next_node_id=next_id)
 
             if iteration >= max_iterations:
-                raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
+                raise UserError(
+                    _("Workflow exceeded maximum iterations (possible infinite loop)")
+                )
 
             # Success: release savepoint (keep all changes)
             savepoint = self._release_savepoint(savepoint)
@@ -546,16 +571,16 @@ class WorkflowExecutor:
 
             # Expose execution result metadata for external handlers
             self.execution_result = {
-                'success': True,
-                'output_data': output_data_display,
-                'execution_count': iteration,
-                'node_count_executed': len(self.node_outputs),
-                'executed_connections': list(self.executed_connections),
-                'duration_seconds': duration,
+                "success": True,
+                "output_data": output_data_display,
+                "execution_count": iteration,
+                "node_count_executed": len(self.node_outputs),
+                "executed_connections": list(self.executed_connections),
+                "duration_seconds": duration,
             }
 
             # Final flush: remaining batch + done status
-            self._bus_flush(final_status='completed')
+            self._bus_flush(final_status="completed")
 
             _logger.info("Workflow execution completed in %.4f seconds", duration)
 
@@ -570,17 +595,17 @@ class WorkflowExecutor:
 
             # Expose failure metadata for external handlers
             self.execution_result = {
-                'success': False,
-                'error': str(e),
-                'error_node_id': self._last_error_node_id,
-                'execution_count': len(self.executed_order),
-                'node_count_executed': len(self.node_outputs),
-                'executed_connections': list(self.executed_connections),
-                'duration_seconds': failed_duration,
+                "success": False,
+                "error": str(e),
+                "error_node_id": self._last_error_node_id,
+                "execution_count": len(self.executed_order),
+                "node_count_executed": len(self.node_outputs),
+                "executed_connections": list(self.executed_connections),
+                "duration_seconds": failed_duration,
             }
 
             # Final flush: remaining batch + failed status
-            self._bus_flush(final_status='failed', error=str(e))
+            self._bus_flush(final_status="failed", error=str(e))
             raise
 
     def execute_until(self, target_node_id, input_data=None, max_iterations=1000):
@@ -604,10 +629,12 @@ class WorkflowExecutor:
 
         # Push start nodes to stack
         for node_id in start_nodes:
-            self.stack.append({
-                'nodeId': node_id,
-                'inputData': input_data or {},
-            })
+            self.stack.append(
+                {
+                    "nodeId": node_id,
+                    "inputData": input_data or {},
+                }
+            )
 
         # Savepoint for rollback-on-failure
         savepoint = None
@@ -623,8 +650,8 @@ class WorkflowExecutor:
         while self.stack and iteration < max_iterations:
             iteration += 1
             entry = self.stack.pop()
-            node_id = entry['nodeId']
-            node_input = entry['inputData']
+            node_id = entry["nodeId"]
+            node_input = entry["inputData"]
 
             # Skip disabled nodes (stop path propagation)
             if self._is_node_disabled(node_id):
@@ -640,9 +667,9 @@ class WorkflowExecutor:
                 error_message = str(exc)
                 error_node_id = node_id
                 result = {
-                    'outputs': [],
-                    'json': None,
-                    'error': error_message,
+                    "outputs": [],
+                    "json": None,
+                    "error": error_message,
                 }
                 self.node_outputs[node_id] = result
                 self.executed_order.append(node_id)
@@ -664,20 +691,24 @@ class WorkflowExecutor:
 
         if iteration >= max_iterations:
             savepoint = self._release_savepoint(savepoint, rollback=True)
-            raise UserError(_("Workflow exceeded maximum iterations (possible infinite loop)"))
+            raise UserError(
+                _("Workflow exceeded maximum iterations (possible infinite loop)")
+            )
 
         if error_message:
             return {
-                'status': 'failed',
-                'error': error_message,
-                'error_node_id': error_node_id,
-                'node_outputs': self.node_outputs,
-                'executed_order': self.executed_order,
-                'executed_connections': self.executed_connections,
-                'executed_connection_ids': self._get_executed_connection_ids(),
-                'execution_count': iteration,
-                'target_node_id': target_node_id,
-                'context_snapshot': self._build_context_snapshot(error_node_id, target_result),
+                "status": "failed",
+                "error": error_message,
+                "error_node_id": error_node_id,
+                "node_outputs": self.node_outputs,
+                "executed_order": self.executed_order,
+                "executed_connections": self.executed_connections,
+                "executed_connection_ids": self._get_executed_connection_ids(),
+                "execution_count": iteration,
+                "target_node_id": target_node_id,
+                "context_snapshot": self._build_context_snapshot(
+                    error_node_id, target_result
+                ),
             }
 
         if not target_reached:
@@ -688,16 +719,18 @@ class WorkflowExecutor:
         savepoint = self._release_savepoint(savepoint)
 
         return {
-            'status': 'completed',
-            'node_outputs': self.node_outputs,
-            'executed_order': self.executed_order,
-            'executed_connections': self.executed_connections,
-            'executed_connection_ids': self._get_executed_connection_ids(),
-            'execution_count': iteration,
-            'target_node_id': target_node_id,
-            'context_snapshot': self._build_context_snapshot(target_node_id, target_result),
+            "status": "completed",
+            "node_outputs": self.node_outputs,
+            "executed_order": self.executed_order,
+            "executed_connections": self.executed_connections,
+            "executed_connection_ids": self._get_executed_connection_ids(),
+            "execution_count": iteration,
+            "target_node_id": target_node_id,
+            "context_snapshot": self._build_context_snapshot(
+                target_node_id, target_result
+            ),
         }
-    
+
     def _find_start_nodes(self):
         """Find enabled nodes with no incoming connections.
 
@@ -708,18 +741,28 @@ class WorkflowExecutor:
             UserError: If no enabled start nodes remain after filtering.
         """
         start_nodes = [
-            node_id for node_id in self.nodes
+            node_id
+            for node_id in self.nodes
             if node_id not in self._nodes_with_incoming
             and not self._is_node_disabled(node_id)
         ]
         if not start_nodes:
             all_starts = [
-                node_id for node_id in self.nodes
+                node_id
+                for node_id in self.nodes
                 if node_id not in self._nodes_with_incoming
             ]
             if all_starts:
-                raise UserError(_("All start nodes are disabled. Enable at least one start node to execute."))
-            raise UserError(_("Workflow must have at least one start node (a node without incoming connections)."))
+                raise UserError(
+                    _(
+                        "All start nodes are disabled. Enable at least one start node to execute."
+                    )
+                )
+            raise UserError(
+                _(
+                    "Workflow must have at least one start node (a node without incoming connections)."
+                )
+            )
         return start_nodes
 
     def _find_start_nodes_for_target(self, target_node_id):
@@ -736,10 +779,7 @@ class WorkflowExecutor:
         ancestors = self._get_node_ancestors(target_node_id)
         ancestors.add(target_node_id)
 
-        filtered = [
-            node_id for node_id in start_nodes
-            if node_id in ancestors
-        ]
+        filtered = [node_id for node_id in start_nodes if node_id in ancestors]
 
         if not filtered:
             if target_node_id in start_nodes:
@@ -766,7 +806,7 @@ class WorkflowExecutor:
                     queue.append(parent)
 
         return ancestors
-    
+
     def _execute_node_core(self, node_id, input_data, node=None):
         """Execute a single node (no persistence).
 
@@ -780,15 +820,19 @@ class WorkflowExecutor:
         if not node:
             raise UserError(_("Node not found: %s") % node_id)
 
-        node_type = node.get('type')
-        config = node.get('config', {})
+        node_type = node.get("type")
+        config = node.get("config", {})
         is_custom_node = self._is_custom_node_type(node_type)
-        custom_runtime = self.custom_runtime_types.get(node_type) if is_custom_node else None
+        custom_runtime = (
+            self.custom_runtime_types.get(node_type) if is_custom_node else None
+        )
         if is_custom_node and not custom_runtime:
-            raise ValidationError(_(
-                "Custom node type '%(key)s' is not configured or inactive in workflow.type.",
-                key=node_type,
-            ))
+            raise ValidationError(
+                _(
+                    "Custom node type '%(key)s' is not configured or inactive in workflow.type.",
+                    key=node_type,
+                )
+            )
 
         # Build execution context (single in-memory context)
         context = self.exec_context.get_runtime_context(
@@ -797,8 +841,10 @@ class WorkflowExecutor:
             workflow=self._get_workflow_context(),
         )
 
-        if node_type in ('code', 'record_operation') or is_custom_node:
-            context['secure_eval_context'] = self._get_secure_eval_context(node_id, input_data)
+        if node_type in ("code", "record_operation") or is_custom_node:
+            context["secure_eval_context"] = self._get_secure_eval_context(
+                node_id, input_data
+            )
 
         if is_custom_node:
             result = self._execute_custom_node_runtime(
@@ -815,80 +861,94 @@ class WorkflowExecutor:
         runner = self.runners.get(node_type)
         if not runner:
             return {
-                'outputs': [[input_data]],
-                'json': input_data,
+                "outputs": [[input_data]],
+                "json": input_data,
             }
         result = runner.execute(config, input_data, context)
-        if node_type == 'code':
+        if node_type == "code":
             self._sanitize_dirty_vars()
         return result
 
     @staticmethod
     def _is_custom_node_type(node_type):
-        return isinstance(node_type, str) and node_type.startswith('x_')
+        return isinstance(node_type, str) and node_type.startswith("x_")
 
     def _validate_custom_node_runtime(self, node_type, runtime_meta):
         """Validate runtime contract for custom node type."""
-        runtime_backend = (runtime_meta or {}).get('runtime_backend') or 'python_code'
-        code = (runtime_meta or {}).get('code')
-        callable_key = (runtime_meta or {}).get('callable_key')
-        required_group_id = (runtime_meta or {}).get('group_id')
+        runtime_backend = (runtime_meta or {}).get("runtime_backend") or "python_code"
+        code = (runtime_meta or {}).get("code")
+        callable_key = (runtime_meta or {}).get("callable_key")
+        required_group_id = (runtime_meta or {}).get("group_id")
 
-        if runtime_backend == 'python_code':
+        if runtime_backend == "python_code":
             if not isinstance(code, str) or not code.strip():
-                raise ValidationError(_(
-                    "Custom node type '%(key)s' has empty runtime code.",
-                    key=node_type,
-                ))
-        elif runtime_backend == 'python_callable':
+                raise ValidationError(
+                    _(
+                        "Custom node type '%(key)s' has empty runtime code.",
+                        key=node_type,
+                    )
+                )
+        elif runtime_backend == "python_callable":
             if not isinstance(callable_key, str) or not callable_key.strip():
-                raise ValidationError(_(
-                    "Custom node type '%(key)s' has empty Callable Key.",
-                    key=node_type,
-                ))
+                raise ValidationError(
+                    _(
+                        "Custom node type '%(key)s' has empty Callable Key.",
+                        key=node_type,
+                    )
+                )
         else:
-            raise ValidationError(_(
-                "Custom node type '%(key)s' uses unsupported runtime backend '%(backend)s'.",
-                key=node_type,
-                backend=runtime_backend,
-            ))
+            raise ValidationError(
+                _(
+                    "Custom node type '%(key)s' uses unsupported runtime backend '%(backend)s'.",
+                    key=node_type,
+                    backend=runtime_backend,
+                )
+            )
 
         if not required_group_id:
-            raise ValidationError(_(
-                "Custom node type '%(key)s' is missing Required Group.",
-                key=node_type,
-            ))
+            raise ValidationError(
+                _(
+                    "Custom node type '%(key)s' is missing Required Group.",
+                    key=node_type,
+                )
+            )
 
     def _check_custom_node_permission(self, node_type, runtime_meta):
         """Enforce group-based runtime permission for custom nodes."""
-        required_group_id = (runtime_meta or {}).get('group_id')
+        required_group_id = (runtime_meta or {}).get("group_id")
         if not required_group_id:
-            raise ValidationError(_(
-                "Custom node type '%(key)s' is missing Required Group.",
-                key=node_type,
-            ))
+            raise ValidationError(
+                _(
+                    "Custom node type '%(key)s' is missing Required Group.",
+                    key=node_type,
+                )
+            )
 
         user = self._get_effective_execution_user()
         if required_group_id in user.groups_id.ids:
             return
 
-        group = self.env['res.groups'].browse(required_group_id)
+        group = self.env["res.groups"].browse(required_group_id)
         group_name = group.display_name if group.exists() else str(required_group_id)
-        raise UserError(_(
-            "User '%(user)s' cannot execute custom node type '%(key)s'. "
-            "Required group: %(group)s.",
-            user=user.display_name,
-            key=node_type,
-            group=group_name,
-        ))
+        raise UserError(
+            _(
+                "User '%(user)s' cannot execute custom node type '%(key)s'. "
+                "Required group: %(group)s.",
+                user=user.display_name,
+                key=node_type,
+                group=group_name,
+            )
+        )
 
-    def _execute_custom_node_runtime(self, node_type, node_config, input_data, context, runtime_meta):
+    def _execute_custom_node_runtime(
+        self, node_type, node_config, input_data, context, runtime_meta
+    ):
         """Execute custom node runtime code or callable backend."""
         self._validate_custom_node_runtime(node_type, runtime_meta)
         self._check_custom_node_permission(node_type, runtime_meta)
 
-        runtime_backend = (runtime_meta or {}).get('runtime_backend') or 'python_code'
-        if runtime_backend == 'python_callable':
+        runtime_backend = (runtime_meta or {}).get("runtime_backend") or "python_code"
+        if runtime_backend == "python_callable":
             return self._execute_callable_node_runtime(
                 node_type=node_type,
                 node_config=node_config,
@@ -897,33 +957,37 @@ class WorkflowExecutor:
                 runtime_meta=runtime_meta,
             )
 
-        secure_context = context.get('secure_eval_context')
+        secure_context = context.get("secure_eval_context")
         if isinstance(secure_context, dict):
-            secure_context['_config'] = node_config or {}
-            secure_context['_node_config'] = node_config or {}
-            secure_context['_node_type'] = node_type
+            secure_context["_config"] = node_config or {}
+            secure_context["_node_config"] = node_config or {}
+            secure_context["_node_type"] = node_type
 
-        code_runner = self.runners.get('code')
+        code_runner = self.runners.get("code")
         if not code_runner:
-            raise ValidationError(_("Code runner is unavailable for custom node runtime execution."))
+            raise ValidationError(
+                _("Code runner is unavailable for custom node runtime execution.")
+            )
 
         runtime_config = {
-            'code': (runtime_meta.get('code') or '').strip(),
+            "code": (runtime_meta.get("code") or "").strip(),
         }
         return code_runner.execute(runtime_config, input_data, context)
 
     def _resolve_workflow_callable(self, node_type, runtime_meta):
-        callable_key = (runtime_meta or {}).get('callable_key') or ''
+        callable_key = (runtime_meta or {}).get("callable_key") or ""
         entry = None
         if callable_key:
             entry = WorkflowNodeRegistry.get_by_callable_key(callable_key)
         if not entry:
             entry = WorkflowNodeRegistry.get_node(node_type)
-        if not entry or not callable(entry.get('func')):
-            raise ValidationError(_(
-                "Custom node type '%(key)s' refers to an unavailable Python callable.",
-                key=node_type,
-            ))
+        if not entry or not callable(entry.get("func")):
+            raise ValidationError(
+                _(
+                    "Custom node type '%(key)s' refers to an unavailable Python callable.",
+                    key=node_type,
+                )
+            )
         return entry
 
     def _normalize_runtime_outputs(self, outputs):
@@ -935,10 +999,9 @@ class WorkflowExecutor:
                 normalized.append([None])
                 continue
             if isinstance(output, list):
-                normalized.append([
-                    self._normalize_output_value(item)
-                    for item in output
-                ])
+                normalized.append(
+                    [self._normalize_output_value(item) for item in output]
+                )
                 continue
             normalized.append([self._normalize_output_value(output)])
         return normalized
@@ -946,34 +1009,40 @@ class WorkflowExecutor:
     def _normalize_callable_node_result(self, result):
         plain_result = to_plain(result)
         if isinstance(plain_result, dict) and (
-            'outputs' in plain_result or 'json' in plain_result or 'error' in plain_result
+            "outputs" in plain_result
+            or "json" in plain_result
+            or "error" in plain_result
         ):
             payload = dict(plain_result)
-            outputs = payload.get('outputs')
-            json_value = payload.get('json')
+            outputs = payload.get("outputs")
+            json_value = payload.get("json")
             if outputs is not None:
                 outputs = self._normalize_runtime_outputs(outputs)
-                payload['outputs'] = outputs
-                if 'json' not in payload:
+                payload["outputs"] = outputs
+                if "json" not in payload:
                     if outputs:
                         first_output = outputs[0] if len(outputs) >= 1 else []
                         if isinstance(first_output, list):
-                            json_value = first_output[0] if len(first_output) == 1 else first_output
+                            json_value = (
+                                first_output[0]
+                                if len(first_output) == 1
+                                else first_output
+                            )
                         else:
                             json_value = first_output
-                        payload['json'] = json_value
+                        payload["json"] = json_value
                     else:
-                        payload['json'] = None
+                        payload["json"] = None
             else:
                 normalized_json = self._normalize_output_value(json_value)
-                payload['json'] = normalized_json
-                payload['outputs'] = [[normalized_json]]
+                payload["json"] = normalized_json
+                payload["outputs"] = [[normalized_json]]
             return payload
 
         normalized = self._normalize_output_value(plain_result)
         return {
-            'outputs': [[normalized]],
-            'json': normalized,
+            "outputs": [[normalized]],
+            "json": normalized,
         }
 
     def _call_workflow_node_function(self, func, context, input_data, node_config):
@@ -984,31 +1053,38 @@ class WorkflowExecutor:
 
         if signature:
             positional_params = [
-                param for param in signature.parameters.values()
-                if param.kind in (
+                param
+                for param in signature.parameters.values()
+                if param.kind
+                in (
                     inspect.Parameter.POSITIONAL_ONLY,
                     inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 )
             ]
-            required_count = len([
-                param for param in positional_params
-                if param.default is inspect._empty
-            ])
+            required_count = len(
+                [
+                    param
+                    for param in positional_params
+                    if param.default is inspect._empty
+                ]
+            )
             if required_count <= 1 and len(positional_params) <= 1:
                 return func(context)
             if required_count <= 2 and len(positional_params) <= 2:
                 return func(context, input_data)
         return func(context, input_data, node_config or {})
 
-    def _execute_callable_node_runtime(self, node_type, node_config, input_data, context, runtime_meta):
+    def _execute_callable_node_runtime(
+        self, node_type, node_config, input_data, context, runtime_meta
+    ):
         entry = self._resolve_workflow_callable(node_type, runtime_meta)
-        func = entry['func']
+        func = entry["func"]
 
-        secure_context = context.get('secure_eval_context')
+        secure_context = context.get("secure_eval_context")
         if isinstance(secure_context, dict):
-            secure_context['_config'] = node_config or {}
-            secure_context['_node_config'] = node_config or {}
-            secure_context['_node_type'] = node_type
+            secure_context["_config"] = node_config or {}
+            secure_context["_node_config"] = node_config or {}
+            secure_context["_node_type"] = node_type
 
         try:
             result = self._call_workflow_node_function(
@@ -1018,11 +1094,13 @@ class WorkflowExecutor:
                 node_config,
             )
         except TypeError as exc:
-            raise ValidationError(_(
-                "Workflow node callable for '%(key)s' could not be invoked: %(error)s",
-                key=node_type,
-                error=str(exc),
-            )) from exc
+            raise ValidationError(
+                _(
+                    "Workflow node callable for '%(key)s' could not be invoked: %(error)s",
+                    key=node_type,
+                    error=str(exc),
+                )
+            ) from exc
 
         return self._normalize_callable_node_result(result)
 
@@ -1030,14 +1108,16 @@ class WorkflowExecutor:
         if not self.run:
             return None
         payload = {
-            'workflow': self._get_execution_workflow(),
-            'run': self.run,
-            'execution_mode': self.run.execution_mode,
-            'status': self.run.status,
-            'input_data': self.run.input_data or {},
-            'start_node_ids': list(self.run.start_node_ids or []),
-            'start_node_id': (self.run.start_node_ids or [None])[0] if self.run.start_node_ids else None,
-            'trigger_type': self.run.execution_mode,
+            "workflow": self._get_execution_workflow(),
+            "run": self.run,
+            "execution_mode": self.run.execution_mode,
+            "status": self.run.status,
+            "input_data": self.run.input_data or {},
+            "start_node_ids": list(self.run.start_node_ids or []),
+            "start_node_id": (self.run.start_node_ids or [None])[0]
+            if self.run.start_node_ids
+            else None,
+            "trigger_type": self.run.execution_mode,
         }
         payload.update(extra)
         return self.run._emit_workflow_event(event_name, payload)
@@ -1048,13 +1128,13 @@ class WorkflowExecutor:
         if not self.run:
             return None
         ctx = {
-            'id': self.run.id,
-            'name': self.run.name,
-            'status': self.run.status,
-            'started_at': self.run.started_at,
-            'completed_at': self.run.completed_at,
-            'duration_seconds': self.run.duration_seconds,
-            'execution_count': self.run.execution_count,
+            "id": self.run.id,
+            "name": self.run.name,
+            "status": self.run.status,
+            "started_at": self.run.started_at,
+            "completed_at": self.run.completed_at,
+            "duration_seconds": self.run.duration_seconds,
+            "execution_count": self.run.execution_count,
         }
         self._cached_execution_context = ctx
         return ctx
@@ -1065,15 +1145,15 @@ class WorkflowExecutor:
         workflow = self._get_execution_workflow()
         if workflow:
             ctx = {
-                'id': workflow.id,
-                'name': workflow.name,
-                'active': workflow.active,
+                "id": workflow.id,
+                "name": workflow.name,
+                "active": workflow.active,
             }
             self._cached_workflow_context = ctx
             return ctx
 
-        metadata = self.snapshot.get('metadata') or {}
-        workflow = metadata.get('workflow')
+        metadata = self.snapshot.get("metadata") or {}
+        workflow = metadata.get("workflow")
         if isinstance(workflow, dict):
             self._cached_workflow_context = workflow
             return workflow
@@ -1093,13 +1173,15 @@ class WorkflowExecutor:
         if self.run and self.run.workflow_id:
             return self.run.workflow_id
 
-        metadata = self.snapshot.get('metadata') or {}
-        workflow_data = metadata.get('workflow')
-        workflow_id = workflow_data.get('id') if isinstance(workflow_data, dict) else None
+        metadata = self.snapshot.get("metadata") or {}
+        workflow_data = metadata.get("workflow")
+        workflow_id = (
+            workflow_data.get("id") if isinstance(workflow_data, dict) else None
+        )
         if not workflow_id:
             return None
 
-        workflow = self.env['ir.workflow'].browse(workflow_id)
+        workflow = self.env["ir.workflow"].browse(workflow_id)
         return workflow if workflow.exists() else None
 
     def _get_effective_execution_user(self):
@@ -1120,29 +1202,32 @@ class WorkflowExecutor:
         cached = self._node_record_cache.get(node_id)
         if cached is not None:
             return cached
-        record = self.env['workflow.node'].search([
-            ('workflow_id', '=', self.run.workflow_id.id),
-            ('node_id', '=', node_id),
-        ], limit=1)
+        record = self.env["workflow.node"].search(
+            [
+                ("workflow_id", "=", self.run.workflow_id.id),
+                ("node_id", "=", node_id),
+            ],
+            limit=1,
+        )
         self._node_record_cache[node_id] = record
         return record
 
     def _get_secure_eval_context(self, node_id, input_data):
         """
         Build secure evaluation context for code/expression nodes.
-        
+
         Includes:
         - SafeEnvProxy (blocks sudo, enforces allowlist/denylist)
         - SecretBroker (secret.get(key))
         - Standard namespaces (_json, _vars, _node, etc.)
-        
+
         Hooks are auto-registered via @SafeEnvProxy.pre_hook decorator.
         The audit_model_access hook is defined in safe_env_proxy.py.
-        
+
         Args:
             node_id: Current node ID
             input_data: Input data for node
-            
+
         Returns:
             dict: Secure evaluation context
         """
@@ -1151,42 +1236,41 @@ class WorkflowExecutor:
 
         # Determine effective user for execution
         effective_user = self._get_effective_execution_user()
-        
+
         # Create environment with effective user
         effective_env = self._get_env_with_user(effective_user)
-        
+
         # Get node record for audit
         node_record_id = None
         node_record = self._get_node_record(node_id)
         if node_record:
             node_record_id = node_record.id
-        
+
         # Build execution context for hooks
         hook_context = {
-            'env': self.env,
-            'run_id': self.run.id if self.run else None,
-            'node_id': node_record_id,
-            'workflow_id': workflow.id if workflow else None,
-            'persist': self.persist,
+            "env": self.env,
+            "run_id": self.run.id if self.run else None,
+            "node_id": node_record_id,
+            "workflow_id": workflow.id if workflow else None,
+            "persist": self.persist,
         }
-        
+
         # Create safe environment proxy with context
         # Hooks are auto-bound from @SafeEnvProxy.pre_hook decorators
         if workflow:
-            safe_env = SafeEnvProxy.from_workflow(effective_env, workflow, context=hook_context)
+            safe_env = SafeEnvProxy.from_workflow(
+                effective_env, workflow, context=hook_context
+            )
         else:
             safe_env = SafeEnvProxy(effective_env, context=hook_context)
-        
+
         # Create secret broker (runtime mode = unmasked)
         run_id = self.run.id if self.run else None
         workflow_id = workflow.id if workflow else None
         secret = SecretBrokerFactory.for_execution(
-            self.env, 
-            run_id=run_id, 
-            node_id=node_record_id,
-            workflow_id=workflow_id
+            self.env, run_id=run_id, node_id=node_record_id, workflow_id=workflow_id
         )
-        
+
         def setvar(path, value):
             cleaned = self._sanitize_value(value, path="_vars.%s" % path)
             self._set_var_path(path, wrap_mutable(cleaned))
@@ -1204,11 +1288,11 @@ class WorkflowExecutor:
             node_id=node_id,
         )
 
-        eval_context['env'] = safe_env
-        eval_context['secret'] = secret
-        eval_context['setvar'] = setvar
-        eval_context['getvar'] = getvar
-        eval_context['result'] = None
+        eval_context["env"] = safe_env
+        eval_context["secret"] = secret
+        eval_context["setvar"] = setvar
+        eval_context["getvar"] = getvar
+        eval_context["result"] = None
 
         return eval_context
 
@@ -1232,10 +1316,10 @@ class WorkflowExecutor:
         output_display = self._normalize_output_value(output_display)
 
         return {
-            'raw': output_raw,
-            'display': output_display,
-            'raw_text': self._serialize_output(output_raw),
-            'display_text': self._serialize_output(output_display),
+            "raw": output_raw,
+            "display": output_display,
+            "raw_text": self._serialize_output(output_raw),
+            "display_text": self._serialize_output(output_display),
         }
 
     def _can_unmask_output(self, node_id):
@@ -1260,11 +1344,11 @@ class WorkflowExecutor:
 
     def _build_record_refs_marker(self, recordset):
         ids = list(recordset.ids or [])
-        limited_ids = ids[:self._MAX_RECORD_REFS]
+        limited_ids = ids[: self._MAX_RECORD_REFS]
         refs = [
             {
-                'model': recordset._name,
-                'id': rid,
+                "model": recordset._name,
+                "id": rid,
             }
             for rid in limited_ids
         ]
@@ -1297,7 +1381,7 @@ class WorkflowExecutor:
             return value.isoformat()
 
         if isinstance(value, bytes):
-            return value.decode('utf-8', errors='replace')
+            return value.decode("utf-8", errors="replace")
 
         if isinstance(value, dict):
             if self._is_record_refs_marker(value):
@@ -1306,18 +1390,20 @@ class WorkflowExecutor:
                 for ref in refs:
                     if not isinstance(ref, dict):
                         continue
-                    model_name = ref.get('model')
-                    record_id = ref.get('id')
+                    model_name = ref.get("model")
+                    record_id = ref.get("id")
                     if not model_name:
                         continue
                     try:
                         record_id = int(record_id)
                     except Exception:
                         continue
-                    normalized_refs.append({
-                        'model': model_name,
-                        'id': record_id,
-                    })
+                    normalized_refs.append(
+                        {
+                            "model": model_name,
+                            "id": record_id,
+                        }
+                    )
                 count = value.get(self._RECORD_REFS_COUNT_KEY)
                 if not isinstance(count, int):
                     count = len(normalized_refs)
@@ -1325,7 +1411,9 @@ class WorkflowExecutor:
                     self._RECORD_REFS_KEY: normalized_refs,
                     self._RECORD_REFS_MODEL_KEY: value.get(self._RECORD_REFS_MODEL_KEY),
                     self._RECORD_REFS_COUNT_KEY: count,
-                    self._RECORD_REFS_TRUNCATED_KEY: bool(value.get(self._RECORD_REFS_TRUNCATED_KEY)),
+                    self._RECORD_REFS_TRUNCATED_KEY: bool(
+                        value.get(self._RECORD_REFS_TRUNCATED_KEY)
+                    ),
                 }
 
             normalized = {}
@@ -1346,10 +1434,7 @@ class WorkflowExecutor:
         that pass raw output should call to_plain() beforehand.
         """
         if isinstance(value, dict):
-            return {
-                key: self._mask_sensitive_data(item)
-                for key, item in value.items()
-            }
+            return {key: self._mask_sensitive_data(item) for key, item in value.items()}
         if isinstance(value, (list, tuple)):
             return [self._mask_sensitive_data(item) for item in value]
         if not isinstance(value, str):
@@ -1363,35 +1448,38 @@ class WorkflowExecutor:
 
     # Node types that cannot use pinned data (triggers, structural nodes).
     _PIN_DATA_DENY_TYPES = {
-        'manual_trigger', 'schedule_trigger', 'webhook_trigger',
-        'record_event_trigger', 'loop',
+        "manual_trigger",
+        "schedule_trigger",
+        "webhook_trigger",
+        "record_event_trigger",
+        "loop",
     }
 
     def _get_pin_reference(self, node_id):
         """Return pinned node-run reference for a node, or None."""
-        metadata = self.snapshot.get('metadata') or {}
-        pin_store = metadata.get('pin_data')
+        metadata = self.snapshot.get("metadata") or {}
+        pin_store = metadata.get("pin_data")
         if not isinstance(pin_store, dict):
-            pin_store = metadata.get('pinData') or {}
+            pin_store = metadata.get("pinData") or {}
         return pin_store.get(node_id)
 
     def _should_apply_pin_data(self):
         if not self.run:
             return True
-        return self.run.execution_mode == 'manual'
+        return self.run.execution_mode == "manual"
 
     def _build_pinned_result(self, node, node_run):
         """Convert a persisted workflow.run.node to a NodeOutput payload."""
         if node_run.error_message:
             return {
-                'outputs': [],
-                'json': None,
-                'error': node_run.error_message,
-                'meta': {'pinned_node_run_id': node_run.id},
+                "outputs": [],
+                "json": None,
+                "error": node_run.error_message,
+                "meta": {"pinned_node_run_id": node_run.id},
             }
 
         output_value = self._normalize_output_value(node_run.output_data)
-        output_socket = node_run.output_socket or 'output'
+        output_socket = node_run.output_socket or "output"
         output_index = self._socket_to_index(node or {}, output_socket)
         if output_index < 0:
             output_index = 0
@@ -1408,15 +1496,15 @@ class WorkflowExecutor:
             json_value = output_value
 
         return {
-            'outputs': outputs,
-            'json': json_value,
-            'meta': {'pinned_node_run_id': node_run.id},
+            "outputs": outputs,
+            "json": json_value,
+            "meta": {"pinned_node_run_id": node_run.id},
         }
 
     def _build_inline_pin_result(self, node_id, pin_data):
         """Convert an inline pin data dict to a NodeOutput payload."""
-        output_value = self._normalize_output_value(pin_data.get('output_data'))
-        output_socket = pin_data.get('output_socket') or 'output'
+        output_value = self._normalize_output_value(pin_data.get("output_data"))
+        output_socket = pin_data.get("output_socket") or "output"
         node = self.nodes.get(node_id) or {}
         output_index = self._socket_to_index(node, output_socket)
         if output_index < 0:
@@ -1434,9 +1522,9 @@ class WorkflowExecutor:
             json_value = output_value
 
         return {
-            'outputs': outputs,
-            'json': json_value,
-            'meta': {'pinned_inline': True},
+            "outputs": outputs,
+            "json": json_value,
+            "meta": {"pinned_inline": True},
         }
 
     def _get_pin_data(self, node_id):
@@ -1461,12 +1549,16 @@ class WorkflowExecutor:
         try:
             pin_ref = int(pin_ref)
         except Exception:
-            _logger.warning("Invalid pin_data reference for node %s: %r", node_id, pin_ref)
+            _logger.warning(
+                "Invalid pin_data reference for node %s: %r", node_id, pin_ref
+            )
             return None
 
-        node_run = self.env['workflow.run.node'].browse(pin_ref)
+        node_run = self.env["workflow.run.node"].browse(pin_ref)
         if not node_run.exists():
-            _logger.warning("Pinned node run %s not found for node %s", pin_ref, node_id)
+            _logger.warning(
+                "Pinned node run %s not found for node %s", pin_ref, node_id
+            )
             return None
 
         if node_run.node_id != node_id:
@@ -1519,7 +1611,7 @@ class WorkflowExecutor:
 
         if self.run:
             self._emit_run_event(
-                'node_started',
+                "node_started",
                 node=node,
                 node_id=node_id,
                 input_data=input_data,
@@ -1528,27 +1620,31 @@ class WorkflowExecutor:
         # --- Pin data gate ---------------------------------------------------
         # Honour pinned data for all executor invocations *except* production
         # triggers (those create their own run with execution_mode != manual).
-        node_type = node.get('type', '')
+        node_type = node.get("type", "")
         if self._should_apply_pin_data() and node_type not in self._PIN_DATA_DENY_TYPES:
             pin_data = self._get_pin_data(node_id)
             if pin_data is not None:
                 result = dict(pin_data)  # shallow copy to avoid mutating snapshot
                 if persist:
-                    self._node_run_buffer.append({
-                        'node_id': node_id,
-                        'node_type': node_type,
-                        'node_label': node.get('label', ''),
-                        'status': 'pinned',
-                        'started_at': datetime.now(),
-                        'duration_ms': 0,
-                        'output_socket': self._get_primary_output_socket(node, result),
-                        'sequence': len(self.executed_order),
-                        '_raw_json': result.get('json'),
-                        '_input_data': input_data,
-                    })
+                    self._node_run_buffer.append(
+                        {
+                            "node_id": node_id,
+                            "node_type": node_type,
+                            "node_label": node.get("label", ""),
+                            "status": "pinned",
+                            "started_at": datetime.now(),
+                            "duration_ms": 0,
+                            "output_socket": self._get_primary_output_socket(
+                                node, result
+                            ),
+                            "sequence": len(self.executed_order),
+                            "_raw_json": result.get("json"),
+                            "_input_data": input_data,
+                        }
+                    )
                 if self.run:
                     self._emit_run_event(
-                        'node_completed',
+                        "node_completed",
                         node=node,
                         node_id=node_id,
                         input_data=input_data,
@@ -1560,7 +1656,7 @@ class WorkflowExecutor:
             result = self._execute_node_core(node_id, input_data, node=node)
             if self.run:
                 self._emit_run_event(
-                    'node_completed',
+                    "node_completed",
                     node=node,
                     node_id=node_id,
                     input_data=input_data,
@@ -1577,26 +1673,28 @@ class WorkflowExecutor:
             # Some runners (e.g. loop back-edge) signal a preferred log input
             # so the persisted input_data reflects the *original* data rather
             # than whatever the back-edge child returned.
-            log_input = result.pop('_log_input', None)
+            log_input = result.pop("_log_input", None)
 
             duration_ms = (time.monotonic() - t0) * 1000
             output_socket = self._get_primary_output_socket(node, result)
 
-            self._node_run_buffer.append({
-                'node_id': node_id,
-                'node_type': node_type,
-                'node_label': node.get('label', ''),
-                'status': 'completed',
-                'started_at': started_at,
-                'duration_ms': duration_ms,
-                'output_socket': output_socket,
-                'sequence': len(self.executed_order),
-                '_raw_json': result.get('json'),
-                '_input_data': log_input if log_input is not None else input_data,
-            })
+            self._node_run_buffer.append(
+                {
+                    "node_id": node_id,
+                    "node_type": node_type,
+                    "node_label": node.get("label", ""),
+                    "status": "completed",
+                    "started_at": started_at,
+                    "duration_ms": duration_ms,
+                    "output_socket": output_socket,
+                    "sequence": len(self.executed_order),
+                    "_raw_json": result.get("json"),
+                    "_input_data": log_input if log_input is not None else input_data,
+                }
+            )
             if self.run:
                 self._emit_run_event(
-                    'node_completed',
+                    "node_completed",
                     node=node,
                     node_id=node_id,
                     input_data=input_data,
@@ -1607,31 +1705,39 @@ class WorkflowExecutor:
 
         except Exception as e:
             duration_ms = (time.monotonic() - t0) * 1000
-            self._node_run_buffer.append({
-                'node_id': node_id,
-                'node_type': node_type,
-                'node_label': node.get('label', ''),
-                'status': 'failed',
-                'started_at': started_at,
-                'duration_ms': duration_ms,
-                'output_socket': None,
-                'error_message': str(e),
-                'sequence': len(self.executed_order),
-                '_input_data': input_data,
-            })
+            self._node_run_buffer.append(
+                {
+                    "node_id": node_id,
+                    "node_type": node_type,
+                    "node_label": node.get("label", ""),
+                    "status": "failed",
+                    "started_at": started_at,
+                    "duration_ms": duration_ms,
+                    "output_socket": None,
+                    "error_message": str(e),
+                    "sequence": len(self.executed_order),
+                    "_input_data": input_data,
+                }
+            )
             if self.run:
                 self._emit_run_event(
-                    'node_failed',
+                    "node_failed",
                     node=node,
                     node_id=node_id,
                     input_data=input_data,
                     error=str(e),
                 )
-            raise UserError(_("Node '%s' failed: %s") % (node.get('label', node_id), str(e)))
-    
+            raise UserError(
+                _("Node '%(node)s' failed: %(error)s")
+                % {
+                    "node": node.get("label", node_id),
+                    "error": str(e),
+                }
+            ) from e
+
     def _route_outputs(self, node_id, result):
         """Route node outputs to connected nodes.
-        
+
         Args:
             node_id: Source node ID
             result: NodeOutput from execution
@@ -1639,57 +1745,61 @@ class WorkflowExecutor:
         Returns:
             list[dict]: Routed connection entries for this node.
         """
-        outputs = result.get('outputs', [[result.get('json')]])
+        outputs = result.get("outputs", [[result.get("json")]])
         connections = self.connections_by_source.get(node_id, [])
         routed_connections = []
-        
+
         # Get node to determine socket names
         node = self.nodes.get(node_id, {})
-        
+
         for conn in connections:
-            source_handle = conn.get('sourceHandle', 'output')
-            target_id = conn.get('target')
-            
+            source_handle = conn.get("sourceHandle", "output")
+            target_id = conn.get("target")
+
             if not target_id:
                 continue
-            
+
             # Map socket name to output index
             output_index = self._socket_to_index(node, source_handle)
-            
+
             # Skip unmatched sockets (-1 means socket name not found)
             if output_index < 0:
                 continue
-            
+
             if output_index < len(outputs):
                 output_data = outputs[output_index]
-                
+
                 # Only push if output has data (data-driven routing)
                 if output_data:
                     # Get first item for single input
-                    input_data = output_data[0] if len(output_data) == 1 else output_data
+                    input_data = (
+                        output_data[0] if len(output_data) == 1 else output_data
+                    )
 
                     connection_event = {
-                        'connection_id': conn.get('id'),
-                        'source': node_id,
-                        'source_socket': source_handle,
-                        'target': target_id,
-                        'target_socket': conn.get('targetHandle'),
-                        'output_index': output_index,
-                        'sequence': len(self.executed_connections),
+                        "connection_id": conn.get("id"),
+                        "source": node_id,
+                        "source_socket": source_handle,
+                        "target": target_id,
+                        "target_socket": conn.get("targetHandle"),
+                        "output_index": output_index,
+                        "sequence": len(self.executed_connections),
                     }
                     self.executed_connections.append(connection_event)
                     routed_connections.append(connection_event)
-                    
-                    self.stack.append({
-                        'nodeId': target_id,
-                        'inputData': input_data,
-                    })
+
+                    self.stack.append(
+                        {
+                            "nodeId": target_id,
+                            "inputData": input_data,
+                        }
+                    )
 
         return routed_connections
 
     def _get_primary_output_socket(self, node, result):
         """Return first non-empty output socket name for persistence."""
-        outputs = (result or {}).get('outputs') or []
+        outputs = (result or {}).get("outputs") or []
         for index, output_data in enumerate(outputs):
             if output_data:
                 return self._output_index_to_socket_name(node, index)
@@ -1697,17 +1807,17 @@ class WorkflowExecutor:
 
     def _output_index_to_socket_name(self, node, index):
         """Convert output index to socket name for a node."""
-        node_type = (node or {}).get('type', '')
+        node_type = (node or {}).get("type", "")
         sockets = self.node_output_sockets.get(node_type) or []
         if 0 <= index < len(sockets):
             return sockets[index]
         return str(index)
-    
+
     # Pre-compiled pattern for dynamic switch sockets (case_1, case_2, etc.)
-    _CASE_SOCKET_RE = re.compile(r'case_?(\d+)$')
+    _CASE_SOCKET_RE = re.compile(r"case_?(\d+)$")
 
     # Generic fallback for common socket names when node type is unknown.
-    _GENERIC_SOCKET_MAP = {'output': 0, 'result': 0, 'data': 0}
+    _GENERIC_SOCKET_MAP = {"output": 0, "result": 0, "data": 0}
 
     def _socket_to_index(self, node, socket_name):
         """Map socket name to output index based on node type definition.
@@ -1724,7 +1834,7 @@ class WorkflowExecutor:
         if not socket_name:
             return -1
 
-        node_type = node.get('type', '')
+        node_type = node.get("type", "")
 
         # 1. Try node-type-aware lookup first
         sockets = self.node_output_sockets.get(node_type)
@@ -1739,26 +1849,26 @@ class WorkflowExecutor:
         if match:
             index = int(match.group(1)) - 1
             return max(index, 0)
-        if socket_name == 'default':
+        if socket_name == "default":
             return 3
 
         # 3. Generic fallback for common names (unknown node types)
         return self._GENERIC_SOCKET_MAP.get(socket_name, -1)
-    
+
     def _collect_final_output(self):
         """Collect final output from leaf nodes."""
         # Find nodes with no outgoing connections
         nodes_with_outgoing = set()
         for conn in self.connections:
-            source = conn.get('source')
+            source = conn.get("source")
             if source:
                 nodes_with_outgoing.add(source)
-        
+
         final_outputs = {}
         for node_id in self.nodes:
             if node_id not in nodes_with_outgoing and node_id in self.node_outputs:
-                final_outputs[node_id] = self.node_outputs[node_id].get('json')
-        
+                final_outputs[node_id] = self.node_outputs[node_id].get("json")
+
         # Return single output if only one leaf, otherwise dict
         if len(final_outputs) == 1:
             return list(final_outputs.values())[0]
@@ -1767,8 +1877,8 @@ class WorkflowExecutor:
     def _track_var_path(self, path):
         if not isinstance(path, str):
             return
-        if '[' in path:
-            path = path.split('[', 1)[0]
+        if "[" in path:
+            path = path.split("[", 1)[0]
         self._vars_dirty_paths.add(path)
 
     def _sanitize_dirty_vars(self):
@@ -1824,7 +1934,11 @@ class WorkflowExecutor:
             for key, item in value.items():
                 if not isinstance(key, str):
                     raise UserError(
-                        _("Invalid vars key at %s (expected string): %s") % (path, key)
+                        _("Invalid vars key at %(path)s (expected string): %(key)s")
+                        % {
+                            "path": path,
+                            "key": key,
+                        }
                     )
                 cleaned[key] = self._sanitize_value(item, path="%s.%s" % (path, key))
             return cleaned
@@ -1834,13 +1948,17 @@ class WorkflowExecutor:
                 for idx, item in enumerate(value)
             ]
         raise UserError(
-            _("Invalid vars value at %s (type %s)") % (path, type(value).__name__)
+            _("Invalid vars value at %(path)s (type %(value_type)s)")
+            % {
+                "path": path,
+                "value_type": type(value).__name__,
+            }
         )
 
     def _split_var_path(self, path):
         if not isinstance(path, str):
             raise UserError(_("Variable path must be a string"))
-        return [segment for segment in path.split('.') if segment]
+        return [segment for segment in path.split(".") if segment]
 
     def _get_var_path(self, path, default=None):
         parts = self._split_var_path(path)

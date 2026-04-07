@@ -21,7 +21,7 @@
   • Node Library ◐           • Pre-run Validation      • Queue Workers
   • UI/UX Editor ◐           • Odoo Integration        • Rate Limiting
   • Editor Refactor ◯        • Python Engine           • Monitoring Dashboard
-  • Expression System ◐      
+  • Expression System ◐
 
   Est: 8-10 weeks            Est: 6 weeks             Est: 8-10 weeks
   ───────────────            ────────────             ─────────────────────

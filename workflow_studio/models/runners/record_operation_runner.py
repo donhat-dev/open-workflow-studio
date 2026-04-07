@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Record Operation Node Runner
 
@@ -10,7 +8,6 @@ Phase-1 operations:
     - delete (unlink)
 """
 
-import ast
 from odoo.tools.safe_eval import safe_eval
 
 from ..context_objects import build_eval_context
@@ -20,49 +17,51 @@ from .base import BaseNodeRunner
 class RecordOperationNodeRunner(BaseNodeRunner):
     """Runner for record_operation node."""
 
-    node_type = 'record_operation'
+    node_type = "record_operation"
 
     def execute(self, node_config, input_data, context):
         payload = input_data or {}
         eval_context = self._get_eval_context(payload, context)
 
-        operation = str(node_config.get('operation') or 'search').strip().lower()
-        model_name = self._resolve_model_name(node_config.get('model'), eval_context)
+        operation = str(node_config.get("operation") or "search").strip().lower()
+        model_name = self._resolve_model_name(node_config.get("model"), eval_context)
         if not model_name:
             raise ValueError("Model is required")
 
-        model = eval_context['env'][model_name]
+        model = eval_context["env"][model_name]
 
-        if operation == 'search':
+        if operation == "search":
             result = self._run_search(model, node_config, eval_context)
-        elif operation == 'create':
+        elif operation == "create":
             result = self._run_create(model, node_config, eval_context)
-        elif operation == 'write':
+        elif operation == "write":
             result = self._run_write(model, node_config, eval_context)
-        elif operation == 'delete':
+        elif operation == "delete":
             result = self._run_delete(model, node_config, eval_context)
         else:
             raise ValueError("Unsupported operation: %s" % operation)
 
         return {
-            'outputs': [[result]],
-            'json': result,
+            "outputs": [[result]],
+            "json": result,
         }
 
     def _get_eval_context(self, payload, context):
-        secure_context = context.get('secure_eval_context') if isinstance(context, dict) else None
-        if isinstance(secure_context, dict) and secure_context.get('env'):
+        secure_context = (
+            context.get("secure_eval_context") if isinstance(context, dict) else None
+        )
+        if isinstance(secure_context, dict) and secure_context.get("env"):
             return secure_context
         # Fallback for non-runtime contexts
         fallback = build_eval_context(payload, context, include_input_item=True)
-        if 'env' not in fallback:
+        if "env" not in fallback:
             raise ValueError("Secure env context is required for record operations")
         return fallback
 
     def _resolve_model_name(self, raw_model, eval_context):
         value = self.resolver.resolve(raw_model, eval_context)
         if value is None:
-            return ''
+            return ""
         return str(value).strip()
 
     def _resolve_int(self, raw_value, eval_context, default=None):
@@ -86,32 +85,32 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         ftype = field.type
 
         if not isinstance(value, str):
-            if ftype == 'boolean' and isinstance(value, int):
+            if ftype == "boolean" and isinstance(value, int):
                 return bool(value)
             return value
 
         stripped = value.strip()
 
-        if ftype in ('integer', 'many2one'):
-            if stripped == '' or stripped.lower() in ('false', 'none'):
+        if ftype in ("integer", "many2one"):
+            if stripped == "" or stripped.lower() in ("false", "none"):
                 return False
             try:
                 return int(stripped)
             except (ValueError, TypeError):
                 return value
 
-        if ftype == 'float':
-            if stripped == '':
+        if ftype == "float":
+            if stripped == "":
                 return 0.0
             try:
                 return float(stripped)
             except (ValueError, TypeError):
                 return value
 
-        if ftype == 'boolean':
-            if stripped.lower() in ('true', '1', 'yes'):
+        if ftype == "boolean":
+            if stripped.lower() in ("true", "1", "yes"):
                 return True
-            if stripped.lower() in ('false', '0', 'no', ''):
+            if stripped.lower() in ("false", "0", "no", ""):
                 return False
             return bool(stripped)
 
@@ -129,7 +128,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
                 After resolving the domain to a list, per-value explicit ``=...``
                 expressions inside individual tuples are resolved.
         """
-        raw = node_config.get('domain_expr') or '[]'
+        raw = node_config.get("domain_expr") or "[]"
         return self.resolver.resolve_domain(raw, eval_context)
 
     def _resolve_domain_values(self, domain_list, eval_context):
@@ -160,21 +159,24 @@ class RecordOperationNodeRunner(BaseNodeRunner):
 
     def _resolve_fields(self, node_config, eval_context):
         """Resolve fields_expr to a list of field names.
-        
+
         Accepts three formats:
                     1. ``={{ ['field1', 'field2'] }}`` — explicit expression mode
                     2. ``'field1, field2'``           — comma-separated string from FieldSelector
                     3. Already a list of field names
-        
+
         If the resolved value is empty or None, defaults to ['id', 'display_name'].
         Returns a list of strings.
         """
 
-        fields_value = self.resolver.resolve(node_config.get('fields_expr', "={{ ['id', 'display_name'] }}"), eval_context)
-        if fields_value in (None, ''):
-            return ['id', 'display_name']
+        fields_value = self.resolver.resolve(
+            node_config.get("fields_expr", "={{ ['id', 'display_name'] }}"),
+            eval_context,
+        )
+        if fields_value in (None, ""):
+            return ["id", "display_name"]
         if isinstance(fields_value, str):
-            return [field.strip() for field in fields_value.split(',') if field.strip()]
+            return [field.strip() for field in fields_value.split(",") if field.strip()]
         if not isinstance(fields_value, list):
             raise ValueError("Fields must evaluate to a list")
         return [str(field) for field in fields_value if field]
@@ -183,7 +185,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         if not isinstance(value, str):
             return False
         stripped = value.strip()
-        return stripped.startswith('{{') and stripped.endswith('}}')
+        return stripped.startswith("{{") and stripped.endswith("}}")
 
     def _should_defer_vals_string_resolution(self, raw_value):
         """Defer interpolation for JSON-like vals strings containing templates.
@@ -199,8 +201,10 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         if not stripped or self._is_full_template_string(stripped):
             return False
 
-        is_json_object = stripped.startswith('{') and stripped.endswith('}')
-        is_json_array = stripped.startswith('[') and stripped.endswith(']') and '{' in stripped
+        is_json_object = stripped.startswith("{") and stripped.endswith("}")
+        is_json_array = (
+            stripped.startswith("[") and stripped.endswith("]") and "{" in stripped
+        )
         return is_json_object or is_json_array
 
     def _resolve_vals(self, node_config, eval_context, model=None):
@@ -218,7 +222,8 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         expected Python type via :meth:`_coerce_field_value`.
         """
         import json
-        raw = node_config.get('vals_expr') or '{}'
+
+        raw = node_config.get("vals_expr") or "{}"
         literal_prefixed_raw = self.resolver.is_literal_prefixed_string(raw)
 
         if self._should_defer_vals_string_resolution(raw):
@@ -239,7 +244,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             ]
         if isinstance(vals, str):
             stripped = vals.strip()
-            if not stripped or stripped in ('{}', '[]'):
+            if not stripped or stripped in ("{}", "[]"):
                 return {}
             if literal_prefixed_raw:
                 raise ValueError(
@@ -260,7 +265,7 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             except (ValueError, TypeError):
                 pass
             # Fallback: Python literal via safe_eval (backward compat)
-            parsed = safe_eval(stripped, eval_context, mode='eval')
+            parsed = safe_eval(stripped, eval_context, mode="eval")
             if isinstance(parsed, dict):
                 return self._eval_val_expressions(parsed, eval_context, model=model)
             if isinstance(parsed, list):
@@ -276,7 +281,9 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         """Resolve explicit ``=...`` expressions recursively in nested vals payloads."""
         if isinstance(value, dict):
             return {
-                self._resolve_val_key(key, eval_context): self._resolve_val_item(item, eval_context)
+                self._resolve_val_key(key, eval_context): self._resolve_val_item(
+                    item, eval_context
+                )
                 for key, item in value.items()
             }
         if isinstance(value, list):
@@ -288,8 +295,8 @@ class RecordOperationNodeRunner(BaseNodeRunner):
     def _resolve_val_key(self, key, eval_context):
         if isinstance(key, str):
             resolved = self.resolver.resolve(key, eval_context)
-            return '' if resolved is None else str(resolved)
-        return '' if key is None else str(key)
+            return "" if resolved is None else str(resolved)
+        return "" if key is None else str(key)
 
     def _eval_val_expressions(self, d, eval_context, model=None):
         """Evaluate any explicit ``=...`` expression values inside a dict.
@@ -310,8 +317,10 @@ class RecordOperationNodeRunner(BaseNodeRunner):
         return result
 
     def _resolve_ids(self, node_config, eval_context):
-        ids_value = self.resolver.resolve(node_config.get('ids_expr', '={{ [] }}'), eval_context)
-        if ids_value in (None, ''):
+        ids_value = self.resolver.resolve(
+            node_config.get("ids_expr", "={{ [] }}"), eval_context
+        )
+        if ids_value in (None, ""):
             return []
         if isinstance(ids_value, int):
             return [ids_value]
@@ -324,11 +333,11 @@ class RecordOperationNodeRunner(BaseNodeRunner):
                     continue
             return result
         raise ValueError("Record IDs must evaluate to int or list of ints")
-    
+
     def _resolve_order(self, node_config, eval_context):
-        order_value = self.resolver.resolve(node_config.get('order'), eval_context)
+        order_value = self.resolver.resolve(node_config.get("order"), eval_context)
         if order_value is None:
-            return ''
+            return ""
         return str(order_value).strip()
 
     def _resolve_target_records(self, model, node_config, eval_context):
@@ -337,38 +346,38 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             return model.browse(ids)
 
         domain = self._resolve_domain(node_config, eval_context)
-        limit = self._resolve_int(node_config.get('limit'), eval_context, default=None)
+        limit = self._resolve_int(node_config.get("limit"), eval_context, default=None)
         return model.search(domain, limit=limit or None)
 
     def _run_search(self, model, node_config, eval_context):
         domain = self._resolve_domain(node_config, eval_context)
         fields_list = self._resolve_fields(node_config, eval_context)
-        limit = self._resolve_int(node_config.get('limit'), eval_context, default=20)
+        limit = self._resolve_int(node_config.get("limit"), eval_context, default=20)
         order = self._resolve_order(node_config, eval_context)
 
         records = model.search(domain, limit=limit or None, order=order or None)
         return {
-            'success': True,
-            'operation': 'search',
-            'model': model._name,
-            'count': len(records),
-            'ids': records.ids,
-            'records': records,
-            'fields': fields_list,
-            'limit': limit,
-            'order': order or '',
+            "success": True,
+            "operation": "search",
+            "model": model._name,
+            "count": len(records),
+            "ids": records.ids,
+            "records": records,
+            "fields": fields_list,
+            "limit": limit,
+            "order": order or "",
         }
 
     def _run_create(self, model, node_config, eval_context):
         vals = self._resolve_vals(node_config, eval_context, model=model)
         created = model.create(vals)
         return {
-            'success': True,
-            'operation': 'create',
-            'model': model._name,
-            'count': len(created),
-            'ids': created.ids,
-            'records': created,
+            "success": True,
+            "operation": "create",
+            "model": model._name,
+            "count": len(created),
+            "ids": created.ids,
+            "records": created,
         }
 
     def _run_write(self, model, node_config, eval_context):
@@ -382,12 +391,12 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             records.write(vals)
 
         return {
-            'success': True,
-            'operation': 'write',
-            'model': model._name,
-            'count': count,
-            'ids': records.ids,
-            'values': vals,
+            "success": True,
+            "operation": "write",
+            "model": model._name,
+            "count": count,
+            "ids": records.ids,
+            "values": vals,
         }
 
     def _run_delete(self, model, node_config, eval_context):
@@ -398,9 +407,9 @@ class RecordOperationNodeRunner(BaseNodeRunner):
             records.unlink()
 
         return {
-            'success': True,
-            'operation': 'delete',
-            'model': model._name,
-            'count': count,
-            'ids': ids,
+            "success": True,
+            "operation": "delete",
+            "model": model._name,
+            "count": count,
+            "ids": ids,
         }

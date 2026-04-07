@@ -2,17 +2,17 @@
 
 /**
  * NodeMenu Component
- * 
+ *
  * A floating context menu for adding nodes to the workflow canvas.
  * Uses workflowEditor.nodes for dynamic node categories.
- * 
+ *
  * Features:
  * - Search bar with auto-focus
  * - Dynamic categorized node list from registry
  * - Keyboard navigation (Escape to close)
  * - Click outside to close
  * - Absolute positioning at spawn location
- * 
+ *
  * @odoo-dependency - Uses useEditor hook for workflowEditor service
  */
 
@@ -22,7 +22,7 @@ import { MotionHelpers } from "@workflow_studio/utils/motion_helpers";
 
 export class NodeMenu extends Component {
     static template = xml`
-        <div class="node-menu" 
+        <div class="node-menu"
              t-att-style="menuStyle"
              t-att-class="{ 'node-menu--large': props.variant === 'large' }"
              t-ref="menuRoot"
@@ -31,14 +31,14 @@ export class NodeMenu extends Component {
              t-on-contextmenu.stop.prevent="">
             <!-- Search Bar -->
             <div class="node-menu__search">
-                <input type="text" 
+                <input type="text"
                        class="node-menu__search-input"
                        t-ref="searchInput"
                        t-model="state.searchQuery"
                        placeholder="Search for blocks or requests"
                        t-on-input="onSearchInput"/>
             </div>
-            
+
             <!-- Node Categories -->
             <div class="node-menu__content">
                 <t t-foreach="filteredCategories" t-as="category" t-key="category.key">
@@ -51,7 +51,7 @@ export class NodeMenu extends Component {
                             <t t-esc="category.name"/>
                         </div>
                         <t t-foreach="category.items" t-as="item" t-key="item.key">
-                            <div class="node-menu__item" 
+                            <div class="node-menu__item"
                                  t-att-data-node-type="item.key"
                                  t-on-click="onItemClick">
                                 <div class="node-menu__item-icon">
@@ -70,7 +70,7 @@ export class NodeMenu extends Component {
                         </t>
                     </div>
                 </t>
-                
+
                 <!-- Empty State -->
                 <div class="node-menu__empty" t-if="filteredCategories.length === 0">
                     No nodes found

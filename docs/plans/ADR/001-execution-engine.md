@@ -143,7 +143,7 @@ Flow direction is determined **100% by data**, not by engine logic. The engine i
 // Engine logic (generic):
 for (let outputIndex = 0; outputIndex < outputs.length; outputIndex++) {
   const items = outputs[outputIndex];
-  
+
   if (items.length > 0) {  // Only schedule if has data
     // Push connected nodes to stack
   }

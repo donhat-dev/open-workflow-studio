@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 SafeModelProxy - Secure Model Proxy for Workflow Execution.
 
 Blocks: sudo(), with_user()
 Allows: All other ORM methods with optional hooks for auditing.
 """
+
 from odoo import models
 from odoo.exceptions import AccessError
 
@@ -18,7 +18,7 @@ class SafeModelProxy:
     """
 
     # Methods that should never be allowed
-    BLOCKED_METHODS = {'sudo', 'with_user'}
+    BLOCKED_METHODS = {"sudo", "with_user"}
 
     def __init__(self, model, env_proxy=None, hooks=None, context=None):
         """
@@ -30,10 +30,10 @@ class SafeModelProxy:
             hooks: Dict with 'pre' and 'post' hook lists
             context: Execution context dict passed to hooks
         """
-        object.__setattr__(self, '_model', model)
-        object.__setattr__(self, '_env_proxy', env_proxy)
-        object.__setattr__(self, '_hooks', hooks or {'pre': [], 'post': []})
-        object.__setattr__(self, '_context', context or {})
+        object.__setattr__(self, "_model", model)
+        object.__setattr__(self, "_env_proxy", env_proxy)
+        object.__setattr__(self, "_hooks", hooks or {"pre": [], "post": []})
+        object.__setattr__(self, "_context", context or {})
 
     def __getattr__(self, name):
         """
@@ -54,7 +54,7 @@ class SafeModelProxy:
                 attr,
                 env_proxy=self._env_proxy,
                 hooks=self._hooks,
-                context=self._context
+                context=self._context,
             )
 
         # If callable, wrap with hooks
@@ -74,10 +74,10 @@ class SafeModelProxy:
         hooks = self._hooks
         context = self._context
         model = self._model
-        
+
         def wrapped(*args, **kwargs):
             # Run pre-hooks with context
-            for hook in hooks.get('pre', []):
+            for hook in hooks.get("pre", []):
                 try:
                     hook(context, model._name, method_name, args, kwargs)
                 except Exception:
@@ -87,7 +87,7 @@ class SafeModelProxy:
             result = method(*args, **kwargs)
 
             # Run post-hooks with context
-            for hook in hooks.get('post', []):
+            for hook in hooks.get("post", []):
                 try:
                     hook(context, model._name, method_name, args, kwargs, result)
                 except Exception:
@@ -96,10 +96,7 @@ class SafeModelProxy:
             # Wrap recordset results
             if isinstance(result, models.BaseModel):
                 return SafeModelProxy(
-                    result,
-                    env_proxy=self._env_proxy,
-                    hooks=hooks,
-                    context=context
+                    result, env_proxy=self._env_proxy, hooks=hooks, context=context
                 )
 
             return result
@@ -113,7 +110,7 @@ class SafeModelProxy:
                 record,
                 env_proxy=self._env_proxy,
                 hooks=self._hooks,
-                context=self._context
+                context=self._context,
             )
 
     def __len__(self):
@@ -132,7 +129,7 @@ class SafeModelProxy:
                 result,
                 env_proxy=self._env_proxy,
                 hooks=self._hooks,
-                context=self._context
+                context=self._context,
             )
         return result
 
@@ -171,10 +168,7 @@ class SafeModelProxy:
         """Check existence."""
         result = self._model.exists()
         return SafeModelProxy(
-            result,
-            env_proxy=self._env_proxy,
-            hooks=self._hooks,
-            context=self._context
+            result, env_proxy=self._env_proxy, hooks=self._hooks, context=self._context
         )
 
     def __repr__(self):

@@ -2,11 +2,11 @@
 
 /**
  * Node Index - Re-exports and backward compatibility
- * 
+ *
  * This file provides:
  * 1. Re-exports of all node classes for direct import
  * 2. Legacy NodeRegistry object for backward compatibility
- * 
+ *
  * Note: Nodes now self-register to Odoo registry in their own files.
  * The registry is the source of truth; this file is for compatibility.
  */

@@ -48,7 +48,7 @@ export class QueryParamsControl extends Component {
             const nextSig = this._signature(next);
             const curSig = this._signature(this.state.params);
             if (nextSig !== curSig) {
-                this.state.params = next; 
+                this.state.params = next;
             }
         });
     }

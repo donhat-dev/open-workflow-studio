@@ -7,7 +7,7 @@
 
 /**
  * Control - Base class for node configuration UI elements
- * 
+ *
  * Controls represent configurable parameters within a node
  * (text inputs, selects, key-value pairs, etc.)
  */
@@ -266,4 +266,3 @@ export const ControlRegistry = {
     body_type: BodyTypeControl,
     query_params: QueryParamsControl,
 };
-

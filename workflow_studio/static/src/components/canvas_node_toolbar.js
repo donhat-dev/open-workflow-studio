@@ -4,7 +4,7 @@ import { Component } from "@odoo/owl";
 
 /**
  * CanvasNodeToolbar - Floating toolbar above workflow nodes
- * 
+ *
  * Shows on hover with actions: Execute, Disable/Enable, Delete, Menu
  * Inspired by n8n's CanvasNodeToolbar pattern.
  */

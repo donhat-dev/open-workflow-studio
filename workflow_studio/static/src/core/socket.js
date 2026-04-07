@@ -8,7 +8,7 @@
 /**
  * Socket - Defines typed connection points for nodes
  * Inspired by Rete.js ClassicPreset.Socket
- * 
+ *
  * Sockets determine which outputs can connect to which inputs
  * based on type compatibility.
  */

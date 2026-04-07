@@ -20,7 +20,7 @@
 					<div class="input-data-panel__empty">
 						<i class="fa fa-info-circle"/>
                         No input data available
-                    
+
 					</div>
 				</t>
 			</div>
@@ -28,7 +28,7 @@
 			<div class="input-data-panel__hint">
 				<i class="fa fa-hand-pointer-o"/>
                 Drag items to map data
-            
+
 			</div>
 		</div>
 	</t>

@@ -1,0 +1,31 @@
+target-version = "py310"
+fix = true
+
+[lint]
+extend-select = [
+    "B",
+    "I",
+]
+exclude = [
+    "setup/*",
+    "stock_barcode/*",
+    "lf_web_studio/*",
+]
+
+[format]
+exclude = [
+    "setup/*",
+    "stock_barcode/*",
+    "lf_web_studio/*",
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401", "I001"]
+"__manifest__.py" = ["B018"]
+
+[lint.isort]
+section-order = ["future", "standard-library", "third-party", "odoo", "odoo-addons", "first-party", "local-folder"]
+
+[lint.isort.sections]
+"odoo" = ["odoo"]
+"odoo-addons" = ["odoo.addons"]

@@ -31,7 +31,7 @@
   - `use_canvas_gestures.js` - new 180-line hook for pan/selection
   - `editor_canvas.js` - reduced 1676→1279 lines (-24%), delegated gesture handling
   - `editor_canvas.xml` - fixed template binding `gestures.state.isSelecting`
-- **Bugs & Mistakes:** 
+- **Bugs & Mistakes:**
   - Template binding broken after state moved to hook
   - Click event cleared selection after mouseup (fixed with `_justCompletedSelection` flag)
 - **Proposed commit message:** `[IMP] editor_canvas: extract useCanvasGestures hook (-24% lines)`
@@ -114,4 +114,3 @@
 - Line 23: Replaced "⟲" with `<LucideIcon t-props="{ name: 'RefreshCw', size: 16 }"/>` for Reset View button
 
 **Note:** Fixed prop name from `icon` to `name` to match LucideIcon component API
-

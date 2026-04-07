@@ -10,7 +10,7 @@ import { Connection } from './connection';
 
 /**
  * WorkflowEditor - Central state manager for workflow graph
- * 
+ *
  * Manages nodes and connections, handles validation,
  * and provides serialization/deserialization.
  */

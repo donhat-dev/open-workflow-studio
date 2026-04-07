@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Webhook Trigger Runner
 
@@ -29,21 +27,21 @@ class WebhookTriggerNodeRunner(BaseNodeRunner):
     - ``body``: parsed request body (JSON or form)
     """
 
-    node_type = 'webhook_trigger'
+    node_type = "webhook_trigger"
 
     def execute(self, node_config, input_data, context):
-        trigger_payload = input_data.get('_trigger', {})
+        trigger_payload = input_data.get("_trigger", {})
 
         output = {
-            'trigger_type': 'webhook',
-            'context': trigger_payload.get('context', {}),
-            'method': trigger_payload.get('method', ''),
-            'headers': trigger_payload.get('headers', {}),
-            'query': trigger_payload.get('query', {}),
-            'body': trigger_payload.get('body', {}),
+            "trigger_type": "webhook",
+            "context": trigger_payload.get("context", {}),
+            "method": trigger_payload.get("method", ""),
+            "headers": trigger_payload.get("headers", {}),
+            "query": trigger_payload.get("query", {}),
+            "body": trigger_payload.get("body", {}),
         }
 
         return {
-            'outputs': [[output]],
-            'json': output,
+            "outputs": [[output]],
+            "json": output,
         }

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 HTTP Node Runner
 
@@ -34,7 +32,7 @@ class HttpNodeRunner(BaseNodeRunner):
         follow_redirects: Boolean (default True)
     """
 
-    node_type = 'http'
+    node_type = "http"
     DEFAULT_TIMEOUT = 30
     MAX_RESPONSE_SIZE = 1024 * 1024  # 1MB
 
@@ -44,20 +42,22 @@ class HttpNodeRunner(BaseNodeRunner):
         eval_context = build_eval_context(payload, context, include_input_item=True)
 
         # Evaluate URL
-        url = node_config.get('url', '')
+        url = node_config.get("url", "")
         url = self.resolver.resolve_str(url, eval_context)
 
         if not url:
             raise ValueError("HTTP node requires a URL")
 
         # Get method
-        method = node_config.get('method', 'GET').upper()
+        method = node_config.get("method", "GET").upper()
 
         # Build query params
         query_params = self._build_query_params(node_config, eval_context)
 
         # Build auth headers / params
-        auth_headers, auth_params, auth_obj = self._build_auth(node_config, eval_context)
+        auth_headers, auth_params, auth_obj = self._build_auth(
+            node_config, eval_context
+        )
 
         # Build request headers
         evaluated_headers = self._build_headers(node_config, eval_context)
@@ -72,19 +72,19 @@ class HttpNodeRunner(BaseNodeRunner):
             node_config, method, eval_context
         )
         if content_type_header:
-            evaluated_headers.setdefault('Content-Type', content_type_header)
+            evaluated_headers.setdefault("Content-Type", content_type_header)
 
         # Get timeout
-        timeout = node_config.get('timeout', self.DEFAULT_TIMEOUT)
+        timeout = node_config.get("timeout", self.DEFAULT_TIMEOUT)
         try:
             timeout = int(timeout) if timeout else self.DEFAULT_TIMEOUT
         except (ValueError, TypeError):
             timeout = self.DEFAULT_TIMEOUT
 
         # Follow redirects
-        follow_redirects = node_config.get('follow_redirects', True)
+        follow_redirects = node_config.get("follow_redirects", True)
         if isinstance(follow_redirects, str):
-            follow_redirects = follow_redirects.lower() not in ('false', '0', 'no')
+            follow_redirects = follow_redirects.lower() not in ("false", "0", "no")
 
         # Make request
         try:
@@ -106,16 +106,18 @@ class HttpNodeRunner(BaseNodeRunner):
             except ValueError:
                 content = response.text
                 if len(content) > self.MAX_RESPONSE_SIZE:
-                    content = content[:self.MAX_RESPONSE_SIZE]
-                    _logger.warning("HTTP response truncated to %d bytes", self.MAX_RESPONSE_SIZE)
-                response_data = {'body': content, 'text': True}
+                    content = content[: self.MAX_RESPONSE_SIZE]
+                    _logger.warning(
+                        "HTTP response truncated to %d bytes", self.MAX_RESPONSE_SIZE
+                    )
+                response_data = {"body": content, "text": True}
 
-            raw_response = node_config.get('raw_response', False)
+            raw_response = node_config.get("raw_response", False)
             if raw_response:
                 result = {
-                    'data': response_data,
-                    'status': response.status_code,
-                    'headers': dict(response.headers),
+                    "data": response_data,
+                    "status": response.status_code,
+                    "headers": dict(response.headers),
                 }
             else:
                 result = response_data
@@ -124,12 +126,12 @@ class HttpNodeRunner(BaseNodeRunner):
                 raise ValueError(f"HTTP {response.status_code}: {response.reason}")
 
             return {
-                'outputs': [[result]],
-                'json': result,
+                "outputs": [[result]],
+                "json": result,
             }
 
         except requests.RequestException as e:
-            raise ValueError(f"HTTP request failed: {str(e)}")
+            raise ValueError(f"HTTP request failed: {str(e)}") from e
 
     # ------------------------------------------------------------------
     # Auth
@@ -139,43 +141,53 @@ class HttpNodeRunner(BaseNodeRunner):
 
         Returns: (headers_dict, query_params_dict, auth_tuple_or_None)
         """
-        auth_config = node_config.get('auth', {})
+        auth_config = node_config.get("auth", {})
         if not auth_config or not isinstance(auth_config, dict):
             return {}, {}, None
 
-        auth_type = auth_config.get('type', 'none')
+        auth_type = auth_config.get("type", "none")
 
-        if auth_type == 'bearer':
-            token = self.resolver.resolve_str(auth_config.get('token', ''), eval_context)
-            return {'Authorization': f'Bearer {token}'}, {}, None
+        if auth_type == "bearer":
+            token = self.resolver.resolve_str(
+                auth_config.get("token", ""), eval_context
+            )
+            return {"Authorization": f"Bearer {token}"}, {}, None
 
-        if auth_type == 'basic':
-            username = self.resolver.resolve_str(auth_config.get('username', ''), eval_context)
-            password = self.resolver.resolve_str(auth_config.get('password', ''), eval_context)
+        if auth_type == "basic":
+            username = self.resolver.resolve_str(
+                auth_config.get("username", ""), eval_context
+            )
+            password = self.resolver.resolve_str(
+                auth_config.get("password", ""), eval_context
+            )
             return {}, {}, (username, password)
 
-        if auth_type == 'api_key':
-            key_name = self.resolver.resolve_str(auth_config.get('key_name', ''), eval_context)
-            key_value = self.resolver.resolve_str(auth_config.get('key_value', ''), eval_context)
-            location = auth_config.get('key_location', 'header')
-            if location == 'query':
+        if auth_type == "api_key":
+            key_name = self.resolver.resolve_str(
+                auth_config.get("key_name", ""), eval_context
+            )
+            key_value = self.resolver.resolve_str(
+                auth_config.get("key_value", ""), eval_context
+            )
+            location = auth_config.get("key_location", "header")
+            if location == "query":
                 return {}, {key_name: key_value} if key_name else {}, None
             return {key_name: key_value} if key_name else {}, {}, None
 
-        if auth_type == 'oauth2':
+        if auth_type == "oauth2":
             access_token = self.resolver.resolve_str(
-                auth_config.get('access_token', ''), eval_context
+                auth_config.get("access_token", ""), eval_context
             )
             if access_token:
-                return {'Authorization': f'Bearer {access_token}'}, {}, None
+                return {"Authorization": f"Bearer {access_token}"}, {}, None
             return {}, {}, None
 
-        if auth_type == 'custom_header':
+        if auth_type == "custom_header":
             header_name = self.resolver.resolve_str(
-                auth_config.get('header_name', ''), eval_context
+                auth_config.get("header_name", ""), eval_context
             )
             header_value = self.resolver.resolve_str(
-                auth_config.get('header_value', ''), eval_context
+                auth_config.get("header_value", ""), eval_context
             )
             if header_name:
                 return {header_name: header_value}, {}, None
@@ -188,7 +200,7 @@ class HttpNodeRunner(BaseNodeRunner):
     # ------------------------------------------------------------------
     def _build_query_params(self, node_config, eval_context):
         """Build query params dict from config array."""
-        raw_params = node_config.get('query_params', [])
+        raw_params = node_config.get("query_params", [])
         if not raw_params or not isinstance(raw_params, list):
             return {}
 
@@ -196,12 +208,12 @@ class HttpNodeRunner(BaseNodeRunner):
         for p in raw_params:
             if not isinstance(p, dict):
                 continue
-            if not p.get('enabled', True):
+            if not p.get("enabled", True):
                 continue
-            key = p.get('key', '')
+            key = p.get("key", "")
             if not key:
                 continue
-            value = self.resolver.resolve_str(p.get('value', ''), eval_context)
+            value = self.resolver.resolve_str(p.get("value", ""), eval_context)
             params[key] = value
         return params
 
@@ -210,7 +222,7 @@ class HttpNodeRunner(BaseNodeRunner):
     # ------------------------------------------------------------------
     def _build_headers(self, node_config, eval_context):
         """Build headers dict from config array."""
-        headers = node_config.get('headers', [])
+        headers = node_config.get("headers", [])
         evaluated = {}
         if not headers or not isinstance(headers, list):
             return evaluated
@@ -218,10 +230,10 @@ class HttpNodeRunner(BaseNodeRunner):
         for h in headers:
             if not isinstance(h, dict):
                 continue
-            key = h.get('key', '')
+            key = h.get("key", "")
             if not key:
                 continue
-            value = h.get('value', '')
+            value = h.get("value", "")
             evaluated[key] = self.resolver.resolve_str(value, eval_context)
         return evaluated
 
@@ -233,82 +245,86 @@ class HttpNodeRunner(BaseNodeRunner):
 
         Returns: (json_body, data_body, content_type_header)
         """
-        if method not in ('POST', 'PUT', 'PATCH'):
+        if method not in ("POST", "PUT", "PATCH"):
             return None, None, None
 
-        body_config = node_config.get('body_config', {})
+        body_config = node_config.get("body_config", {})
 
         # Backward compat: old schema used flat 'body' string
         if not body_config or not isinstance(body_config, dict):
-            old_body = node_config.get('body', '')
+            old_body = node_config.get("body", "")
             if old_body:
                 if isinstance(old_body, str):
                     body_str = self.resolver.resolve_str(old_body, eval_context)
                     # Try to parse as JSON
                     try:
-                        return json_lib.loads(body_str), None, 'application/json'
+                        return json_lib.loads(body_str), None, "application/json"
                     except (json_lib.JSONDecodeError, TypeError):
                         return None, body_str, None
                 if isinstance(old_body, dict):
                     evaluated = {}
                     for k, v in old_body.items():
                         evaluated[k] = self.resolver.resolve(v, eval_context)
-                    return evaluated, None, 'application/json'
+                    return evaluated, None, "application/json"
             return None, None, None
 
-        content_type = body_config.get('content_type', 'none')
+        content_type = body_config.get("content_type", "none")
 
-        if content_type == 'none':
+        if content_type == "none":
             return None, None, None
 
-        if content_type == 'json':
-            raw_body = body_config.get('body', '')
+        if content_type == "json":
+            raw_body = body_config.get("body", "")
             body_str = self.resolver.resolve(raw_body, eval_context)
-            if body_str is not None and body_str != '':
+            if body_str is not None and body_str != "":
                 # If resolver returned a dict/list, use directly as JSON
                 if isinstance(body_str, (dict, list)):
-                    return body_str, None, 'application/json'
+                    return body_str, None, "application/json"
                 # String result — try to parse as JSON
                 try:
-                    return json_lib.loads(str(body_str)), None, 'application/json'
+                    return json_lib.loads(str(body_str)), None, "application/json"
                 except (json_lib.JSONDecodeError, TypeError):
-                    return None, str(body_str), 'application/json'
-            return None, None, 'application/json'
+                    return None, str(body_str), "application/json"
+            return None, None, "application/json"
 
-        if content_type == 'form_data':
-            form_data = body_config.get('form_data', [])
+        if content_type == "form_data":
+            form_data = body_config.get("form_data", [])
             if isinstance(form_data, list):
                 data = {}
                 for item in form_data:
                     if not isinstance(item, dict):
                         continue
-                    key = item.get('key', '')
+                    key = item.get("key", "")
                     if not key:
                         continue
-                    value = self.resolver.resolve_str(item.get('value', ''), eval_context)
+                    value = self.resolver.resolve_str(
+                        item.get("value", ""), eval_context
+                    )
                     data[key] = value
-                return None, data, 'multipart/form-data'
+                return None, data, "multipart/form-data"
             return None, None, None
 
-        if content_type == 'urlencoded':
-            form_data = body_config.get('form_data', [])
+        if content_type == "urlencoded":
+            form_data = body_config.get("form_data", [])
             if isinstance(form_data, list):
                 data = {}
                 for item in form_data:
                     if not isinstance(item, dict):
                         continue
-                    key = item.get('key', '')
+                    key = item.get("key", "")
                     if not key:
                         continue
-                    value = self.resolver.resolve_str(item.get('value', ''), eval_context)
+                    value = self.resolver.resolve_str(
+                        item.get("value", ""), eval_context
+                    )
                     data[key] = value
-                return None, urlencode(data), 'application/x-www-form-urlencoded'
+                return None, urlencode(data), "application/x-www-form-urlencoded"
             return None, None, None
 
-        if content_type == 'raw':
-            raw_body = body_config.get('body', '')
+        if content_type == "raw":
+            raw_body = body_config.get("body", "")
             body_str = self.resolver.resolve_str(raw_body, eval_context)
-            raw_type = body_config.get('raw_type', 'text/plain')
+            raw_type = body_config.get("raw_type", "text/plain")
             return None, body_str, raw_type
 
         return None, None, None

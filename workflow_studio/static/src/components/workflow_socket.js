@@ -4,7 +4,7 @@ import { Component } from "@odoo/owl";
 
 /**
  * WorkflowSocket Component
- * 
+ *
  * Represents a connection point (handle) on a node.
  * Used for both inputs (left side) and outputs (right side).
  */
@@ -27,7 +27,7 @@ export class WorkflowSocket extends Component {
 
     /**
      * Handle mouse down on the socket point (start connection)
-     * @param {MouseEvent} ev 
+     * @param {MouseEvent} ev
      */
     onPointMouseDown(ev) {
         if (this.props.readonly) return;
@@ -57,7 +57,7 @@ export class WorkflowSocket extends Component {
 
     /**
      * Handle mouse up on the socket point (complete connection)
-     * @param {MouseEvent} ev 
+     * @param {MouseEvent} ev
      */
     onPointMouseUp(ev) {
         if (this.props.readonly) return;
@@ -82,7 +82,7 @@ export class WorkflowSocket extends Component {
 
     /**
      * Handle quick-add button click
-     * @param {MouseEvent} ev 
+     * @param {MouseEvent} ev
      */
     onQuickAddClick(ev) {
         if (this.props.readonly) return;
@@ -99,7 +99,7 @@ export class WorkflowSocket extends Component {
     /**
      * Handle mouse down on quick-add button - start connection drag from this socket
      * This allows users to drag from the + button to create connections
-     * @param {MouseEvent} ev 
+     * @param {MouseEvent} ev
      */
     onQuickAddMouseDown(ev) {
         if (this.props.readonly) return;
@@ -117,4 +117,3 @@ export class WorkflowSocket extends Component {
         });
     }
 }
-

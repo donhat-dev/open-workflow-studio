@@ -43,7 +43,7 @@
 				<div t-if="state.isDragOver" class="expression-input__drop-indicator">
 					<i class="fa fa-plus-circle"/>
 					Drop to insert
-				
+
 				</div>
 				<!-- Suggestions -->
 				<div t-if="shouldShowSuggestions" class="expression-input__suggestions" t-att-style="suggestionsStyle">

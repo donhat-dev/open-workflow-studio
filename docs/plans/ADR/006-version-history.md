@@ -124,7 +124,7 @@ Sử dụng **mixin field** trên `ir.workflow` (không tạo model riêng cho r
 ```python
 class Workflow(models.Model):
     _inherit = ['...', 'workflow.field.history.mixin']
-    
+
     # Mixin adds:
     # - workflow_field_history: Json
     # - workflow_field_history_metadata: computed

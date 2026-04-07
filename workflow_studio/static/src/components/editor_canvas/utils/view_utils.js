@@ -2,7 +2,7 @@
 
 /**
  * View Utilities
- * 
+ *
  * Helper functions for viewport calculations.
  * Pure functions: no framework dependencies.
  */

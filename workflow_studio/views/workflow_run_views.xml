@@ -196,8 +196,8 @@
 					<div class="oe_title">
 						<h1>
 							<field name="node_label"/>
-							<span class="text-muted">(																
-								<field name="node_type"/>)														
+							<span class="text-muted">(
+								<field name="node_type"/>)
 							</span>
 						</h1>
 					</div>

@@ -2,10 +2,10 @@
 
 /**
  * Motion.dev Helper Utilities for Workflow Studio
- * 
+ *
  * Provides animation functions for UX enhancements.
  * Uses window.Motion which is loaded from CDN.
- * 
+ *
  * @core - Pure utility, works with or without Odoo
  */
 
@@ -20,7 +20,7 @@ export const MotionHelpers = {
     /**
      * Animate node entrance (drop/create)
      * Uses CSS transform for smoother performance
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      */
     animateNodeIn(element) {
         if (!this.isAvailable() || !element) return;
@@ -40,7 +40,7 @@ export const MotionHelpers = {
 
     /**
      * Animate node exit (delete)
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      * @param {Function} onComplete - callback after animation
      * @returns {Promise}
      */
@@ -69,9 +69,9 @@ export const MotionHelpers = {
     /**
      * Animate node to new position (for tidy up)
      * Uses CSS transform for GPU acceleration
-     * @param {HTMLElement} element 
-     * @param {number} x 
-     * @param {number} y 
+     * @param {HTMLElement} element
+     * @param {number} x
+     * @param {number} y
      * @param {Object} options
      */
     animateNodePosition(element, x, y, options = {}) {
@@ -103,7 +103,7 @@ export const MotionHelpers = {
 
     /**
      * Animate connection path (stroke draw-in effect)
-     * @param {SVGPathElement} pathElement 
+     * @param {SVGPathElement} pathElement
      */
     animateConnectionIn(pathElement) {
         if (!this.isAvailable() || !pathElement) return;
@@ -136,7 +136,7 @@ export const MotionHelpers = {
 
     /**
      * Stagger helper for multiple elements
-     * @param {number} delayPerItem 
+     * @param {number} delayPerItem
      * @returns {Function}
      */
     stagger(delayPerItem = 0.02) {
@@ -146,7 +146,7 @@ export const MotionHelpers = {
 
     /**
      * Animate dropdown entrance (from toolbar + Node)
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      */
     animateDropdownIn(element) {
         if (!this.isAvailable() || !element) return;
@@ -165,7 +165,7 @@ export const MotionHelpers = {
 
     /**
      * Animate dropdown exit
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      * @param {Function} onComplete
      * @returns {Promise}
      */
@@ -193,7 +193,7 @@ export const MotionHelpers = {
 
     /**
      * Simple fade in
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      * @param {number} duration
      */
     fadeIn(element, duration = 0.2) {
@@ -203,7 +203,7 @@ export const MotionHelpers = {
 
     /**
      * Simple fade out
-     * @param {HTMLElement} element 
+     * @param {HTMLElement} element
      * @param {Function} onComplete
      * @returns {Promise}
      */

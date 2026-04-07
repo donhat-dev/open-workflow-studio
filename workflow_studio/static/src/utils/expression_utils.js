@@ -2,9 +2,9 @@
 
 /**
  * Expression Utilities
- * 
+ *
  * Expression handling: ={{ _json.field }}, =Name is {{ _json.field }}, ={{ _vars.name }}, ={{ _loop.item }}
- * 
+ *
  * Supports all ExecutionContext namespaces:
  * - _json: Previous node output (shortcut)
  * - _node: Node outputs keyed by node ID
@@ -15,7 +15,7 @@
  * - _workflow: Workflow metadata
  * - _now: Current datetime (ISO in preview)
  * - _today: Current date (ISO in preview)
- * 
+ *
  * @core - Pure JavaScript utilities, no Odoo dependencies.
  */
 
@@ -123,7 +123,7 @@ export function hasExpressions(value) {
 
 /**
  * Check if value is in expression mode (n8n style: starts with =)
- * @param {string} value 
+ * @param {string} value
  * @returns {boolean}
  */
 export function isExpressionMode(value) {
@@ -172,7 +172,7 @@ export function inferExpressionModeFromValue(value) {
 
 /**
  * Extract all expression templates from a string
- * @param {string} value 
+ * @param {string} value
  * @returns {Array<{full: string, expression: string, start: number, end: number}>}
  */
 export function extractExpressions(value) {
@@ -300,7 +300,7 @@ export function parseExpressionPath(path) {
 
 /**
  * Parse path and return just parts
- * @param {string} path 
+ * @param {string} path
  * @returns {string[]}
  */
 export function parsePathParts(path) {
@@ -328,7 +328,7 @@ export function getValueByPath(data, path) {
 /**
  * Resolve value from full expression context
  * Supports all namespaces: _json, _vars, _loop, _node, _input, _execution, _workflow, _now, _today
- * 
+ *
  * @param {string} expression - Expression like _json.email, _vars.result, _loop.item
  * @param {Object} context - Full context { _json, _vars, _loop, _node, _input }
  * @returns {*} - Resolved value or undefined
@@ -391,10 +391,10 @@ export function resolveExpression(expression, context = {}) {
 /**
  * Evaluate a simple expression against context
  * Supports all namespaces: _json, _vars, _loop, _node
- * 
+ *
  * Note: This is a basic evaluator for client-side preview.
  * Full evaluation happens on Python engine.
- * 
+ *
  * @param {string} expression - Expression like {{ _json.email }} or {{ _vars.result }}
  * @param {Object} context - Context object { _json, _vars, _loop, _node }
  * @returns {{ value: *, error: string|null }}

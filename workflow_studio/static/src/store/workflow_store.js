@@ -618,8 +618,8 @@ export const workflowEditorService = {
 
             /**
              * Pan by delta amounts
-             * @param {number} deltaX 
-             * @param {number} deltaY 
+             * @param {number} deltaX
+             * @param {number} deltaY
              */
             panBy(deltaX, deltaY) {
                 state.ui.viewport.pan.x += deltaX;
@@ -845,7 +845,7 @@ export const workflowEditorService = {
              * Open NodeMenu at specified position
              * @param {Object} config - Menu configuration
              * @param {number} config.x - Screen X position
-             * @param {number} config.y - Screen Y position  
+             * @param {number} config.y - Screen Y position
              * @param {number} config.canvasX - Canvas X position for node creation
              * @param {number} config.canvasY - Canvas Y position for node creation
              * @param {string} [config.variant='default'] - 'default' or 'large'

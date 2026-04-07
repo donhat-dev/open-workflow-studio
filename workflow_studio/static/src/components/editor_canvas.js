@@ -19,7 +19,7 @@ import {
 
 /**
  * EditorCanvas Component
- * 
+ *
  * Main canvas for the workflow editor. Manages node positions, selection,
  * and drag-drop from palette.
  * Reads graph state from workflowEditor service via env.
@@ -934,8 +934,8 @@ export class EditorCanvas extends Component {
     /**
      * Convert canvas coordinates to screen coordinates (relative to canvas container)
      * Delegated to useViewport hook
-     * @param {number} canvasX 
-     * @param {number} canvasY 
+     * @param {number} canvasX
+     * @param {number} canvasY
      * @returns {{ x: number, y: number }}
      */
     getScreenPosition(canvasX, canvasY) {
@@ -1311,7 +1311,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle drag over for palette drops
-     * @param {DragEvent} ev 
+     * @param {DragEvent} ev
      */
     onDragOver(ev) {
         if (this.isReadonly) return;
@@ -1322,7 +1322,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle drop from node palette
-     * @param {DragEvent} ev 
+     * @param {DragEvent} ev
      */
     onDrop(ev) {
         if (this.isReadonly) return;
@@ -1343,7 +1343,7 @@ export class EditorCanvas extends Component {
     /**
      * Handle node selection
      * Supports Ctrl+click for multi-select
-     * @param {Object} node 
+     * @param {Object} node
      * @param {MouseEvent} [event] - Mouse event for checking Ctrl key
      */
     onNodeSelect(node, event) {
@@ -1426,7 +1426,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle node disable/enable toggle from toolbar
-     * @param {string} nodeId 
+     * @param {string} nodeId
      */
     onNodeToggleDisable(nodeId) {
         if (this.isReadonly) return;
@@ -1437,7 +1437,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Deselect when clicking on canvas background
-     * @param {MouseEvent} ev 
+     * @param {MouseEvent} ev
      */
     onCanvasClick(ev) {
         // Skip if we just finished a selection drag (click fires after mouseup)
@@ -1454,7 +1454,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Handle connection selection
-     * @param {string} connId 
+     * @param {string} connId
      */
     onConnectionSelect(connId) {
         if (this.isReadonly) return;
@@ -1475,7 +1475,7 @@ export class EditorCanvas extends Component {
     /**
      * Check if node is selected
      * Uses Set for O(1) lookup instead of Array.includes O(n)
-     * @param {Object} node 
+     * @param {Object} node
      * @returns {boolean}
      */
     isNodeSelected(node) {
@@ -1737,7 +1737,7 @@ export class EditorCanvas extends Component {
 
     /**
      * Insert a new node into an existing connection
-     * 
+     *
      * Logic: When inserting C into A→B connection:
      * 1. Create new node C at position
      * 2. Remove old connection A→B
