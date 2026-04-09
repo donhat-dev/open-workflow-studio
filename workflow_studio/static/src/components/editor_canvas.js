@@ -1831,7 +1831,12 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Handle "+ Node" button click from toolbar
+     * Handle node selection from AddNodeDropdown (Odoo Dropdown POC)
+     * Places node at center of viewport.
+     */
+    /**
+     * Handle "+
+ Node" button click from toolbar
      */
     onAddNodeClick(ev) {
         if (!this.canEdit) return;

@@ -4,7 +4,7 @@
         <Dialog
             size="'fs'"
             modalRef="modalRef"
-            footer="true"
+            footer="false"
             header="false"
             withBodyPadding="true"
             contentClass="'wf-config-panel-dialog__content'"
@@ -16,88 +16,12 @@
                 actions="props.actions"
                 execution="props.execution"
                 viewMode="props.viewMode"
+                previousNavigation="previousNavigation"
+                nextNavigation="nextNavigation"
+                onNavigateToNode.bind="onNavigateToNode"
                 onClose="props.close"
                 onSave="safeOnSave"
             />
-            <t t-set-slot="footer">
-                <t t-set="previousNav" t-value="previousNavigation"/>
-                <t t-set="nextNav" t-value="nextNavigation"/>
-                <div class="wf-config-panel-dialog__footer w-100 d-flex align-items-stretch justify-content-between gap-3">
-                    <div class="wf-config-nav-slot wf-config-nav-slot--previous d-flex justify-content-start">
-                        <t t-if="previousNav.hasMultiple">
-                            <details class="wf-config-nav-menu">
-                                <summary class="wf-config-nav-button wf-config-nav-button--previous list-unstyled mb-0">
-                                    <span class="wf-config-nav-copy d-flex flex-column">
-                                        <span class="wf-config-nav-eyebrow" t-esc="previousNav.heading"/>
-                                        <strong class="wf-config-nav-title" t-esc="previousNav.summaryTitle"/>
-                                        <span class="wf-config-nav-meta" t-esc="previousNav.summaryMeta"/>
-                                    </span>
-                                    <i class="fa fa-chevron-up wf-config-nav-caret"/>
-                                </summary>
-                                <div class="wf-config-nav-dropdown">
-                                    <t t-foreach="previousNav.options" t-as="option" t-key="option.key">
-                                        <button type="button" class="wf-config-nav-dropdown-item btn btn-link text-start text-decoration-none" t-on-click="() => this.onNavigateToNode(option.nodeId)">
-                                            <strong class="wf-config-nav-dropdown-title" t-esc="option.title"/>
-                                            <span t-if="option.socketLabel" class="wf-config-nav-dropdown-meta" t-esc="option.socketLabel"/>
-                                        </button>
-                                    </t>
-                                </div>
-                            </details>
-                        </t>
-                        <button t-elif="previousNav.primary" type="button" class="wf-config-nav-button wf-config-nav-button--previous" t-on-click="() => this.onNavigateToNode(previousNav.primary.nodeId)">
-                            <span class="wf-config-nav-copy d-flex flex-column">
-                                <span class="wf-config-nav-eyebrow" t-esc="previousNav.heading"/>
-                                <strong class="wf-config-nav-title" t-esc="previousNav.primary.title"/>
-                                <span t-if="previousNav.primary.socketLabel" class="wf-config-nav-meta" t-esc="previousNav.primary.socketLabel"/>
-                            </span>
-                        </button>
-                        <button t-else="" type="button" class="wf-config-nav-button wf-config-nav-button--previous is-disabled" disabled="disabled">
-                            <span class="wf-config-nav-copy d-flex flex-column">
-                                <span class="wf-config-nav-eyebrow" t-esc="previousNav.heading"/>
-                                <strong class="wf-config-nav-title" t-esc="previousNav.summaryTitle"/>
-                                <span class="wf-config-nav-meta" t-esc="previousNav.summaryMeta"/>
-                            </span>
-                        </button>
-                    </div>
-
-                    <div class="wf-config-nav-slot wf-config-nav-slot--next d-flex justify-content-end">
-                        <t t-if="nextNav.hasMultiple">
-                            <details class="wf-config-nav-menu wf-config-nav-menu--next">
-                                <summary class="wf-config-nav-button wf-config-nav-button--next list-unstyled mb-0 text-end">
-                                    <span class="wf-config-nav-copy d-flex flex-column align-items-end ms-auto">
-                                        <span class="wf-config-nav-eyebrow" t-esc="nextNav.heading"/>
-                                        <strong class="wf-config-nav-title" t-esc="nextNav.summaryTitle"/>
-                                        <span class="wf-config-nav-meta" t-esc="nextNav.summaryMeta"/>
-                                    </span>
-                                    <i class="fa fa-chevron-up wf-config-nav-caret"/>
-                                </summary>
-                                <div class="wf-config-nav-dropdown wf-config-nav-dropdown--next">
-                                    <t t-foreach="nextNav.options" t-as="option" t-key="option.key">
-                                        <button type="button" class="wf-config-nav-dropdown-item btn btn-link text-start text-decoration-none" t-on-click="() => this.onNavigateToNode(option.nodeId)">
-                                            <strong class="wf-config-nav-dropdown-title" t-esc="option.title"/>
-                                            <span t-if="option.socketLabel" class="wf-config-nav-dropdown-meta" t-esc="option.socketLabel"/>
-                                        </button>
-                                    </t>
-                                </div>
-                            </details>
-                        </t>
-                        <button t-elif="nextNav.primary" type="button" class="wf-config-nav-button wf-config-nav-button--next text-end" t-on-click="() => this.onNavigateToNode(nextNav.primary.nodeId)">
-                            <span class="wf-config-nav-copy d-flex flex-column align-items-end ms-auto">
-                                <span class="wf-config-nav-eyebrow" t-esc="nextNav.heading"/>
-                                <strong class="wf-config-nav-title" t-esc="nextNav.primary.title"/>
-                                <span t-if="nextNav.primary.socketLabel" class="wf-config-nav-meta" t-esc="nextNav.primary.socketLabel"/>
-                            </span>
-                        </button>
-                        <button t-else="" type="button" class="wf-config-nav-button wf-config-nav-button--next is-disabled text-end" disabled="disabled">
-                            <span class="wf-config-nav-copy d-flex flex-column align-items-end ms-auto">
-                                <span class="wf-config-nav-eyebrow" t-esc="nextNav.heading"/>
-                                <strong class="wf-config-nav-title" t-esc="nextNav.summaryTitle"/>
-                                <span class="wf-config-nav-meta" t-esc="nextNav.summaryMeta"/>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            </t>
         </Dialog>
     </t>
 </templates>

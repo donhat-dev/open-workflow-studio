@@ -1,6 +1,7 @@
 ﻿# CONTINUITY
 
 ## Goal (active):
+- **Local Odoo instance manager V1 prototype (2026-04-09)**: Build a thin dedicated local service plus lightweight UI/API/MCP bridge for managing Docker Compose based Odoo instances across repos/IDE windows. Source of truth is local service metadata + lock state; manual up/down/restart for users, context discovery for agents.
 - **Editor canvas partial style simplification (2026-03-24)**: Plan a partial visual simplification pass for `workflow_studio` editor canvas by reducing wrapper/layer density, trimming noisy styles, and adopting Odoo-core-derived action/active/focus colors as local `$wf-*` tokens where core does not expose exact global tokens.
 - **Icon library comparison (2026-03-23)**: Compare Font Awesome, Lucide static font, and Lineicons (free icon font/CDN) for the Odoo `workflow_studio` frontend, focusing on licensing, asset packaging, icon coverage, styling flexibility, and production trade-offs.
 - **Lucide static font research (2026-03-23)**: Evaluate replacing the current Lucide component/`data-lucide` direction with Lucide's static icon font (`lucide-static`) using CSS classes such as `icon-history`, and determine fit for Odoo asset bundling versus CDN usage.

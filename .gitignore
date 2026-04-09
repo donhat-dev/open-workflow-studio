@@ -18,6 +18,9 @@ tmp/
 memory-bank/
 opencode.json
 .agent/
+.instance-manager/
+.tmp_test_local_instance_manager/
+.tmp_test_local_instance_manager_e2e/
 # C extensions
 *.so
 

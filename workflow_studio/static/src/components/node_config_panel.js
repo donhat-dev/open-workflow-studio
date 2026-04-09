@@ -159,7 +159,10 @@ export class NodeConfigPanel extends Component {
         onClose: { type: Function },
         onSave: { type: Function },
         onExecute: { type: Function, optional: true },  // Callback after node execution
+        onNavigateToNode: { type: Function, optional: true },
         execution: { type: Object, optional: true },
+        previousNavigation: { type: Object, optional: true },
+        nextNavigation: { type: Object, optional: true },
         viewMode: { type: String, optional: true },  // 'edit' (default) or 'execution'
     };
 
@@ -712,6 +715,38 @@ export class NodeConfigPanel extends Component {
         return this.state.triggerFieldSuggestions || [];
     }
 
+    get previousNavigation() {
+        return this.props.previousNavigation || {
+            heading: "Previous",
+            hasMultiple: false,
+            hasOptions: false,
+            primary: null,
+            options: [],
+            summaryTitle: "No previous node",
+            summaryMeta: "This node has no incoming connections",
+        };
+    }
+
+    get nextNavigation() {
+        return this.props.nextNavigation || {
+            heading: "Next",
+            hasMultiple: false,
+            hasOptions: false,
+            primary: null,
+            options: [],
+            summaryTitle: "No next node",
+            summaryMeta: "This node has no outgoing connections",
+        };
+    }
+
+    get showHeaderExecute() {
+        return !this.isExecutionView && !this.isTriggerNode;
+    }
+
+    get showHeaderRail() {
+        return this.showHeaderExecute || !!this.props.onNavigateToNode;
+    }
+
     // ============================================
     // EXECUTION
     // ============================================
@@ -1149,6 +1184,14 @@ export class NodeConfigPanel extends Component {
         }
         await this.workflowEditor.copyText(value, { label });
     };
+
+    onNavigateToNode(nodeId) {
+        const onNavigateToNode = this.props.onNavigateToNode;
+        if (!onNavigateToNode || !nodeId) {
+            return;
+        }
+        onNavigateToNode(nodeId);
+    }
 
     /**
      * Filter execution results to show only predecessors of the current node.

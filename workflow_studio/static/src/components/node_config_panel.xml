@@ -12,24 +12,69 @@
 	</t>
 
 	<t t-name="workflow_studio.ConfigPanel.Header">
-		<div class="node-config-header d-flex align-items-start justify-content-between border-bottom" t-att-class="{ 'node-config-header--trigger': isTriggerNode }">
-			<div class="node-config-title-group d-flex flex-column min-w-0">
-				<div class="node-config-title d-flex align-items-center gap-2 fw-semibold">
+		<!-- Single-row header: [← prev] [icon · title] [Execute] [sep] [status · close] [→ next] -->
+		<div class="ncp-header d-flex align-items-stretch border-bottom" t-att-class="{ 'ncp-header--trigger': isTriggerNode }">
+
+			<!-- PREV NAV -->
+			<t t-if="props.onNavigateToNode">
+				<t t-set="prevNav" t-value="previousNavigation"/>
+				<t t-if="prevNav.hasMultiple">
+					<details class="ncp-nav-menu">
+						<summary class="ncp-nav-btn" title="Previous nodes">
+							<i class="fa fa-arrow-left"/>
+							<i class="fa fa-caret-down ncp-nav-caret"/>
+						</summary>
+						<div class="ncp-nav-dropdown">
+							<t t-foreach="prevNav.options" t-as="opt" t-key="opt.key">
+								<button type="button" class="ncp-nav-dd-item" t-on-click="() => this.onNavigateToNode(opt.nodeId)">
+									<span class="ncp-nav-dd-title" t-esc="opt.title"/>
+									<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
+								</button>
+							</t>
+						</div>
+					</details>
+				</t>
+				<button t-elif="prevNav.primary" type="button" class="ncp-nav-btn" title="Previous node" t-on-click="() => this.onNavigateToNode(prevNav.primary.nodeId)">
+					<i class="fa fa-arrow-left"/>
+				</button>
+				<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No previous node">
+					<i class="fa fa-arrow-left"/>
+				</button>
+				<div class="ncp-header-sep"/>
+			</t>
+
+			<!-- IDENTITY: node icon + title -->
+			<div class="ncp-header-identity d-flex align-items-center gap-2 flex-grow-1 min-w-0 px-3 py-2">
+				<div class="ncp-node-icon-badge flex-shrink-0">
 					<i t-att-class="'fa ' + nodeIcon"/>
-					<t t-if="canEditNodeTitle">
-						<input type="text" class="node-config-title-input ms-1 form-control form-control-sm" t-att-value="nodeNameInputValue" placeholder="Enter node name..." t-on-input="onNodeNameChange" />
-					</t>
-					<t t-else="">
-						<span t-esc="nodeTitle"/>
-					</t>
 				</div>
-				<div t-if="isTriggerNode and triggerHeaderSummary" class="node-config-subtitle" t-esc="triggerHeaderSummary"/>
+				<div class="ncp-title-group min-w-0 flex-grow-1">
+					<div class="ncp-title fw-semibold">
+						<t t-if="canEditNodeTitle">
+							<input type="text" class="ncp-title-input" t-att-value="nodeNameInputValue" placeholder="Enter node name..." t-on-input="onNodeNameChange"/>
+						</t>
+						<t t-else="">
+							<span class="text-truncate d-block" t-esc="nodeTitle"/>
+						</t>
+					</div>
+					<div t-if="isTriggerNode and triggerHeaderSummary" class="ncp-subtitle" t-esc="triggerHeaderSummary"/>
+				</div>
 			</div>
-			<div class="node-config-actions d-flex align-items-center gap-2">
+
+			<!-- EXECUTE (flush separator + full-height btn) -->
+			<t t-if="showHeaderExecute">
+				<div class="ncp-header-sep"/>
+				<button class="ncp-execute-btn btn btn-success d-flex align-items-center gap-2" t-on-click="onExecute" type="button" title="Execute up to this node">
+					<i class="fa fa-play"/>
+					<span>Execute</span>
+				</button>
+			</t>
+
+			<!-- ACTIONS: status labels + trigger btns + close -->
+			<div class="ncp-header-sep"/>
+			<div class="ncp-header-actions d-flex align-items-center gap-2 px-2">
 				<t t-if="isTriggerNode and triggerHeaderStatusLabel">
-					<span class="trigger-badge" t-att-class="triggerHeaderStatusClass">
-						<t t-esc="triggerHeaderStatusLabel"/>
-					</span>
+					<span class="trigger-badge" t-att-class="triggerHeaderStatusClass" t-esc="triggerHeaderStatusLabel"/>
 				</t>
 				<t t-if="isTriggerNode">
 					<t t-foreach="triggerHeaderButtons" t-as="button" t-key="button.id">
@@ -45,14 +90,39 @@
 						<span t-esc="executionStatus === 'success' ? 'Success' : executionStatus === 'error' ? 'Error' : 'Running'"/>
 					</span>
 				</t>
-				<button t-if="!isExecutionView and !isTriggerNode" class="node-config-execute-btn btn btn-sm btn-success d-flex align-items-center gap-1" t-on-click="onExecute" type="button" title="Execute up to this node">
-					<i class="fa fa-play"/>
- Execute
-				</button>
-				<button class="node-config-icon-btn node-config-close btn btn-sm btn-link p-0 border-0" t-on-click="onClose" title="Close" type="button">
+				<button class="node-config-icon-btn btn btn-sm btn-link p-0 border-0" t-on-click="onClose" title="Close" type="button">
 					<i class="fa fa-times"/>
 				</button>
 			</div>
+
+			<!-- NEXT NAV -->
+			<t t-if="props.onNavigateToNode">
+				<div class="ncp-header-sep"/>
+				<t t-set="nextNav" t-value="nextNavigation"/>
+				<t t-if="nextNav.hasMultiple">
+					<details class="ncp-nav-menu">
+						<summary class="ncp-nav-btn" title="Next nodes">
+							<i class="fa fa-caret-down ncp-nav-caret"/>
+							<i class="fa fa-arrow-right"/>
+						</summary>
+						<div class="ncp-nav-dropdown ncp-nav-dropdown--right">
+							<t t-foreach="nextNav.options" t-as="opt" t-key="opt.key">
+								<button type="button" class="ncp-nav-dd-item" t-on-click="() => this.onNavigateToNode(opt.nodeId)">
+									<span class="ncp-nav-dd-title" t-esc="opt.title"/>
+									<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
+								</button>
+							</t>
+						</div>
+					</details>
+				</t>
+				<button t-elif="nextNav.primary" type="button" class="ncp-nav-btn" title="Next node" t-on-click="() => this.onNavigateToNode(nextNav.primary.nodeId)">
+					<i class="fa fa-arrow-right"/>
+				</button>
+				<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No next node">
+					<i class="fa fa-arrow-right"/>
+				</button>
+			</t>
+
 		</div>
 	</t>
 
