@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""
+odoo-bin wrapper for container shell usage.
+
+When called from the container shell (not by supervisor), this wrapper:
+  - Detects that :8069 is already bound by supervisor
+  - Adds --no-http automatically so user doesn't get "port already in use"
+  - Passes through all args to the real odoo-bin
+
+When called by supervisor with LISTEN_FDS=1:
+  - Runs Odoo in-process with readiness signaling
+  - Creates /tmp/odoo-http.ready after registry preload completes
+  - Supervisor uses this sentinel to gate cron spawn (avoid concurrent registry load)
+"""
+import os
+import sys
+
+REAL_ODOO_BIN = "/opt/odoo/source/odoo-bin"
+ODOO_CONF = "/etc/odoo/odoo.conf"
+READY_SENTINEL = "/tmp/odoo-http.ready"
+
+
+def main():
+    args = sys.argv[1:]
+
+    # If supervisor is spawning us, run in-process with readiness signaling
+    if os.environ.get("LISTEN_FDS"):
+        os.environ["LISTEN_PID"] = str(os.getpid())
+        sys.argv = [REAL_ODOO_BIN] + args
+        sys.path.insert(0, os.path.dirname(REAL_ODOO_BIN))
+
+        import odoo
+        import odoo.service.server
+
+        # Monkeypatch: create sentinel after all registries are preloaded.
+        # preload_registries(dbnames) runs AFTER server.start() but BEFORE
+        # the main serve loop — once it returns, the HTTP worker is ready.
+        _orig_preload = getattr(odoo.service.server, 'preload_registries', None)
+        if _orig_preload is not None:
+            def _preload_then_signal(dbnames):
+                rc = _orig_preload(dbnames)
+                try:
+                    with open(READY_SENTINEL, 'w') as f:
+                        f.write("ready pid=%d\n" % os.getpid())
+                except OSError:
+                    pass
+                return rc
+            odoo.service.server.preload_registries = _preload_then_signal
+
+        odoo.cli.main()
+        sys.exit(0)
+
+    # Shell usage: add defaults if not already specified
+    if not any(a.startswith("-c") or a.startswith("--config") for a in args):
+        args = ["-c", ODOO_CONF] + args
+
+    # Auto-add --no-http for shell commands that would conflict with supervisor socket
+    # (unless user explicitly asked for HTTP or is running a non-server command)
+    non_server_commands = (
+        "deploy", "help", "neutralize", "obfuscate", "scaffold",
+        "start", "i18n", "module", "cloc", "populate",
+    )
+    is_non_server = any(a in non_server_commands for a in args)
+    has_http_flag = any(
+        a.startswith("--http-interface") or a.startswith("--http-port") or a == "--no-http"
+        for a in args
+    )
+    has_stop_after = "--stop-after-init" in args
+
+    if not is_non_server and not has_http_flag and not has_stop_after:
+        args.append("--no-http")
+
+    os.execvp(sys.executable, [sys.executable, REAL_ODOO_BIN] + args)
+
+
+if __name__ == "__main__":
+    main()

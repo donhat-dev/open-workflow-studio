@@ -1,0 +1,51 @@
+# =============================================================================
+# docker-compose.wsl.yml
+# Mount source from WSL2's native ext4 filesystem to bypass 9p penalty.
+#
+# Usage (from WSL2 bash):
+#   cd /home/odoo/odoo-workspace
+#   docker compose -f docker/docker-compose.wsl.yml up --build
+#
+# Or from PowerShell:
+#   wsl -d Ubuntu -e bash -c "cd /home/odoo/odoo-workspace && docker compose -f docker/docker-compose.wsl.yml up --build"
+# =============================================================================
+
+services:
+  odoo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: odoo-wsl-bench
+    restart: unless-stopped
+    ports:
+      - "${ODOO_PORT:-8169}:8069"
+      - "${DEBUGPY_PORT:-5778}:5678"
+    volumes:
+      # ---- ALL paths below are WSL2-native ext4, NOT Windows 9p ----
+
+      # Odoo 18 EE source (read-only)
+      - /home/odoo/odoo-workspace/source:/opt/odoo/source:ro
+      # Odoo addons (read-write)
+      - /home/odoo/odoo-workspace/odoo_addons:/opt/odoo/odoo/addons:rw
+      # Custom addons (read-write)
+      - /home/odoo/odoo-workspace/custom/workflow_studio:/opt/odoo/custom/workflow_studio:rw
+      - /home/odoo/odoo-workspace/custom/workflow_studio_queue_job:/opt/odoo/custom/workflow_studio_queue_job:rw
+      - /home/odoo/odoo-workspace/custom/flight_json_widget:/opt/odoo/custom/flight_json_widget:rw
+      - /home/odoo/odoo-workspace/custom/lf_web_studio:/opt/odoo/custom/lf_web_studio:rw
+      - /home/odoo/odoo-workspace/hrm_addons:/opt/odoo/hrm_addons:rw
+      - /home/odoo/odoo-workspace/third_party_addons:/opt/odoo/third_party_addons:rw
+      - /home/odoo/odoo-workspace/core_addons:/opt/odoo/core_addons:rw
+      - /home/odoo/odoo-workspace/queue:/opt/odoo/queue:rw
+      # Config
+      - /home/odoo/odoo-workspace/docker/odoo.conf:/etc/odoo/odoo.conf:ro
+      # Persistent data (keep on WSL2 for speed too)
+      - /home/odoo/odoo-workspace/data:/opt/odoo/data
+    env_file:
+      - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ODOO_DEBUG=${ODOO_DEBUG:-0}
+      - DEBUGPY_PORT=${DEBUGPY_PORT:-5678}
+
+volumes: {}

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-ODOO_DEBUG="${ODOO_DEBUG:-1}"
+DEBUGPY_ENABLE="${DEBUGPY_ENABLE:-0}"
 DEBUGPY_PORT="${DEBUGPY_PORT:-5678}"
 ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 
@@ -20,7 +20,7 @@ if [ $# -gt 0 ]; then
     ODOO_ARGS="$ODOO_ARGS $@"
 fi
 
-if [ "$ODOO_DEBUG" = "1" ]; then
+if [ "$DEBUGPY_ENABLE" = "1" ]; then
     echo "==> Starting Odoo with debugpy on port $DEBUGPY_PORT (waiting for VS Code to attach...)"
     exec python -m debugpy \
         --listen "0.0.0.0:$DEBUGPY_PORT" \

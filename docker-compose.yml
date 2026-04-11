@@ -26,12 +26,33 @@ services:
       - ./docker/odoo.conf:/etc/odoo/odoo.conf:ro
       # Persistent data
       - C:/var/lib/odoo:/opt/odoo/data
+      # Bytecode cache (native Docker volume — fast I/O, survives restart)
+      - pycache:/tmp/pycache
     env_file:
       - ./docker/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       - ODOO_DEBUG=${ODOO_DEBUG:-1}
+      - DEBUGPY_ENABLE=${DEBUGPY_ENABLE:-0}
       - DEBUGPY_PORT=${DEBUGPY_PORT:-5678}
+      # Container identity (routing key for control plane)
+      - PGDATABASE=${PGDATABASE:-hrm_pro_18}
+      # DB connection — overridable from control plane, defaults from .env
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-odoo}
+      - DB_PASSWORD=${DB_PASSWORD:-odoo}
+      # Supervisor tuning
+      - SUPERVISOR_IDLE_TIMEOUT=${SUPERVISOR_IDLE_TIMEOUT:-900}
+      - SUPERVISOR_CRON_INTERVAL=${SUPERVISOR_CRON_INTERVAL:-300}
+      - SUPERVISOR_CRON_TIMEOUT=${SUPERVISOR_CRON_TIMEOUT:-120}
+      - SUPERVISOR_PRECOMPILE=${SUPERVISOR_PRECOMPILE:-0}
+      # Performance (mirrored from odoo.sh)
+      - PGOPTIONS=-c jit=off
+      - OMP_NUM_THREADS=1
+      - NUMEXPR_MAX_THREADS=1
+      - SPT_NOENV=1
 
-volumes: {}
+volumes:
+  pycache:

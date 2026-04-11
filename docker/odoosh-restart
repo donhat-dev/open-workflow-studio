@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""
+odoosh-restart — Restart Odoo workers via the control plane.
+
+Mimics the odoo.sh odoosh-restart flow:
+  1. Reads PGDATABASE from env (container identity)
+  2. Sends a pg_notify to the 'odoo_plane' channel
+  3. Waits for a response on a callback channel
+
+Usage:
+  odoosh-restart http    # restart HTTP worker
+  odoosh-restart cron    # restart cron worker
+  odoosh-restart status  # get worker status
+
+Requires: psycopg2 (already installed in container)
+
+DB connection is read from environment:
+  DB_HOST (default: host.docker.internal)
+  DB_PORT (default: 5432)
+  DB_USER (default: odoo)
+  DB_PASSWORD (default: odoo)
+  PGDATABASE (required — container identity)
+"""
+import json
+import os
+import select
+import sys
+import uuid
+
+import psycopg2
+
+CHANNEL = "odoo_plane"
+CALLBACK_TIMEOUT = 30  # seconds
+
+
+def _get_dsn():
+    host = os.environ.get("DB_HOST", "host.docker.internal")
+    port = os.environ.get("DB_PORT", "5432")
+    user = os.environ.get("DB_USER", "odoo")
+    password = os.environ.get("DB_PASSWORD", "odoo")
+    dbname = os.environ.get("PGDATABASE", "")
+    if not dbname:
+        print("ERROR: PGDATABASE not set", file=sys.stderr)
+        sys.exit(1)
+    return f"host={host} port={port} user={user} password={password} dbname={dbname}"
+
+
+def send_and_wait(payload):
+    """Send a notification and wait for callback response."""
+    dsn = _get_dsn()
+    callback_channel = str(uuid.uuid4())
+    conn = psycopg2.connect(dsn)
+    conn.set_isolation_level(0)  # AUTOCOMMIT
+    cur = conn.cursor()
+
+    try:
+        # Listen on callback channel first
+        cur.execute('LISTEN "%s";' % callback_channel)
+
+        # Send request via channel_notify function
+        cur.execute(
+            "SELECT channel_notify(%s, %s, %s);",
+            (CHANNEL, json.dumps(payload), callback_channel),
+        )
+
+        # Wait for response
+        while True:
+            conn.poll()
+            if conn.notifies:
+                notify = conn.notifies.pop(0)
+                try:
+                    resp = json.loads(notify.payload)
+                    return resp
+                except json.JSONDecodeError:
+                    print(f"Invalid response: {notify.payload}", file=sys.stderr)
+                    return {"rc": 125, "payload": "Invalid response from control plane"}
+
+            if select.select([conn], [], [], CALLBACK_TIMEOUT) == ([], [], []):
+                return {"rc": 110, "payload": "Request timed out. Is the control plane running?"}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: odoosh-restart <http|cron|status>", file=sys.stderr)
+        sys.exit(1)
+
+    service = sys.argv[1]
+    db = os.environ.get("PGDATABASE", "")
+
+    if service == "status":
+        payload = {"action": "status", "db": db}
+    elif service in ("http", "cron"):
+        payload = {"action": "restart", "db": db, "args": {"service": service}}
+    else:
+        print(f"Unknown service: {service}", file=sys.stderr)
+        print("Usage: odoosh-restart <http|cron|status>", file=sys.stderr)
+        sys.exit(1)
+
+    resp = send_and_wait(payload)
+    rc = resp.get("rc", 1)
+    msg = resp.get("payload", "")
+
+    if rc == 0:
+        print(msg)
+    else:
+        print(f"FAILED (rc={rc}): {msg}", file=sys.stderr)
+        sys.exit(rc)
+
+
+if __name__ == "__main__":
+    main()
