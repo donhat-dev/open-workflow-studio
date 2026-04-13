@@ -277,15 +277,27 @@ Tests live in `workflow_studio/tests/` and `workflow_studio_queue_job/tests/`.
 
 ### Linting
 
-```bash
-# Python style + imports
-ruff check .
+The easiest way to run all checks locally is:
 
-# Python structural checks
-pylint --rcfile=.pylintrc workflow_studio/
+```bash
+pre-commit run -a
 ```
 
-Config files: `.ruff.toml`, `.pylintrc`, `.pylintrc-mandatory`
+This runs the full `.pre-commit-config.yaml` pipeline, which includes:
+
+```bash
+# Python style, import order, and auto-format
+ruff check --fix workflow_studio/
+ruff format workflow_studio/
+
+# Odoo-specific structural checks (optional rules, exit 0)
+pylint_odoo --rcfile=.pylintrc workflow_studio/
+
+# Odoo-specific structural checks (mandatory rules)
+pylint_odoo --rcfile=.pylintrc-mandatory workflow_studio/
+```
+
+Config files: `.pylintrc`, `.pylintrc-mandatory`
 
 ### JavaScript (Frontend)
 
