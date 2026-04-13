@@ -60,8 +60,8 @@ workflow_studio/                  # Core workflow editor + backend execution
 
 ### Reference Validity (Applies to all rules)
 
-- Every convention/anti-pattern MUST include a concrete reference (file+line or URL). If the reference is missing, invalid, or indicates the rule is deprecated, treat it as out-of-date and do not apply it; propose an update to `AGENTS.md`.
-  - Source: `AGENTS.md` (this section)
+- Every convention/anti-pattern MUST include a concrete reference (`file+line`, file-only for stable documents or current-document/section references, or URL). If the reference is missing, invalid, or indicates the rule is deprecated, treat it as out-of-date and do not apply it; propose an update to `AGENTS.md`.
+  - Source: `AGENTS.md` (Reference Validity section)
 
 ### Project Memory
 
