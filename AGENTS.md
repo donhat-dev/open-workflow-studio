@@ -297,7 +297,7 @@ No JS test suite currently exists. Planned for Phase 2.
 |------|-----------|--------|
 | **Runner interface** | Each runner must subclass `BaseNodeRunner` and implement `execute(self, node_config, input_data, context)` returning a dict with `outputs` (2D array) and `json` (first output item) | `workflow_studio/models/runners/base.py:240-260` |
 | **Expression resolution** | Use `SmartExpressionResolver` (available as `self.resolver` on all runners); `=`-prefixed strings are expression mode, `{{ ... }}` inside are template markers | `workflow_studio/models/runners/base.py:23-100` |
-| **Error handling** | Runners raise `odoo.exceptions.UserError` for user-facing validation errors; return error payload dict for execution-level errors | `workflow_studio/models/runners/base.py` |
+| **Error handling** | Runners raise standard Python exceptions for validation/configuration issues (for example `ValueError`), and execution-level failures are wrapped by the executor into payloads with an `error` field | `workflow_studio/models/runners/`; executor implementation (see file/line in current code)` |
 | **Model naming** | Core models use `ir.workflow` prefix; run/node models use `workflow.*` prefix | `workflow_studio/models/ir_workflow.py`; `workflow_studio/models/workflow_run.py` |
 | **Linting** | `ruff` for style/imports (config: `.ruff.toml`); `pylint` with `.pylintrc-mandatory` for structural checks | `.ruff.toml`; `.pylintrc-mandatory` |
 
