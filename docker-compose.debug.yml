@@ -1,0 +1,9 @@
+# Debug overlay — enables debugpy for VS Code remote attach
+# Usage: docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+services:
+  odoo:
+    environment:
+      - ODOO_DEBUG=1
+      - DEBUGPY_PORT=${DEBUGPY_PORT:-5678}
+    ports:
+      - "${DEBUGPY_PORT:-5678}:5678"
