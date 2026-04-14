@@ -2,14 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Docker: Odoo debug",
+      "name": "Docker: debug",
       "type": "debugpy",
       "request": "attach",
-      "preLaunchTask": "docker-compose-debug",
+      "preLaunchTask": "supervisor:restart-worker:debug",
       "connect": {
         "host": "localhost",
         "port": 5678
       },
+      "logToFile": true,
       "pathMappings": [
         {
           "localRoot": "${workspaceFolder}",
@@ -36,7 +37,7 @@
           "remoteRoot": "/opt/odoo/source"
         }
       ],
-      "justMyCode": true
+      "justMyCode": false
     },
     {
       "name": "hrm",

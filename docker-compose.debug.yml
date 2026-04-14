@@ -3,7 +3,7 @@
 services:
   odoo:
     environment:
-      - ODOO_DEBUG=1
+      - ODOO_ENABLE_DEBUGPY=1
       - DEBUGPY_PORT=${DEBUGPY_PORT:-5678}
     ports:
       - "${DEBUGPY_PORT:-5678}:5678"

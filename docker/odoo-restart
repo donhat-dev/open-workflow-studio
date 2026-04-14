@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Small local-dev restart helper for the supervisor-lite container.
+
+This intentionally stays tiny: it only maps commands to signals and sends them
+to PID 1 inside the container.
+
+Commands:
+    odoo-restart http    Send SIGUSR1 to PID 1 (HTTP worker restart)
+    odoo-restart cron    Send SIGUSR2 to PID 1 (future cron contract)
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import signal
+import sys
+
+
+SUPERVISOR_PID = 1
+HTTP_SIGNAL = signal.SIGUSR1
+CRON_SIGNAL = signal.SIGUSR2
+
+
+def _send_signal(target_signal: signal.Signals) -> int:
+    try:
+        os.kill(SUPERVISOR_PID, target_signal)
+    except OSError as exc:
+        print(f"FAILED: could not send {target_signal.name} to pid={SUPERVISOR_PID}: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Sent {target_signal.name} to pid={SUPERVISOR_PID}", flush=True)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="odoo-restart",
+        description="Send restart signals to the local Odoo supervisor container.",
+    )
+    parser.add_argument(
+        "command",
+        choices=("http", "cron"),
+        help="Which action to perform.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.command == "http":
+        return _send_signal(HTTP_SIGNAL)
+    return _send_signal(CRON_SIGNAL)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

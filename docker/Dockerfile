@@ -6,7 +6,8 @@ SHELL ["/bin/bash", "-xo", "pipefail", "-c"]
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PATH=/opt/odoo/open-workflow-studio/docker:$PATH
 
 # System dependencies for Odoo 18 on Debian Bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -66,42 +67,11 @@ RUN pip install --no-cache-dir -r /tmp/requirements-project.txt \
 
 # Copy config
 COPY odoo.conf /etc/odoo/odoo.conf
-RUN chown odoo:odoo /etc/odoo/odoo.conf
-
-# Copy supervisor (root-only, hidden from odoo user)
-COPY supervisor.py /usr/local/sbin/odoo-supervisor
-RUN sed -i 's/\r$//' /usr/local/sbin/odoo-supervisor \
-    && chmod 700 /usr/local/sbin/odoo-supervisor \
-    && chown root:root /usr/local/sbin/odoo-supervisor
-
-# Copy odoo-rpc cron worker (readable by odoo user, spawned by supervisor)
-COPY odoo-rpc /usr/local/sbin/odoo-rpc
-RUN sed -i 's/\r$//' /usr/local/sbin/odoo-rpc \
-    && chmod 755 /usr/local/sbin/odoo-rpc \
-    && chown root:root /usr/local/sbin/odoo-rpc
-
-# Copy odoo-bin wrapper (callable by odoo user from shell)
-COPY odoo-bin /usr/local/bin/odoo-bin
-RUN sed -i 's/\r$//' /usr/local/bin/odoo-bin \
-    && chmod 755 /usr/local/bin/odoo-bin
-
-# Copy supervisorctl CLI (callable by odoo user from shell)
-COPY supervisorctl /usr/local/bin/supervisorctl
-RUN sed -i 's/\r$//' /usr/local/bin/supervisorctl \
-    && chmod 755 /usr/local/bin/supervisorctl
-
-# Copy odoosh-restart CLI (callable by odoo user — sends PG NOTIFY to control plane)
-COPY odoosh-restart /usr/local/bin/odoosh-restart
-RUN sed -i 's/\r$//' /usr/local/bin/odoosh-restart \
-    && chmod 755 /usr/local/bin/odoosh-restart
-
-# Ensure /var/run exists for UDS control socket
-RUN mkdir -p /var/run
-
-# Keep entrypoint.sh as fallback (renamed)
-COPY entrypoint.sh /opt/odoo/entrypoint-legacy.sh
-RUN sed -i 's/\r$//' /opt/odoo/entrypoint-legacy.sh \
-    && chmod +x /opt/odoo/entrypoint-legacy.sh
+COPY entrypoint.sh /opt/odoo/entrypoint.sh
+RUN sed -i 's/\r$//' /opt/odoo/entrypoint.sh \
+    && ln -sf /opt/odoo/open-workflow-studio/docker/odoo-restart /usr/local/bin/odoo-restart \
+    && chmod +x /opt/odoo/entrypoint.sh \
+    && chown odoo:odoo /etc/odoo/odoo.conf
 
 WORKDIR /opt/odoo/source
 

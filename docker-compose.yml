@@ -22,10 +22,9 @@ services:
       - ${ODOO_DATA_DIR:-/home/odoo/.local/share/Odoo}:/home/odoo/.local/share/Odoo:rw
     env_file:
       - ./docker/.env
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    entrypoint: ["python3", "/opt/odoo/open-workflow-studio/docker/supervisor-lite.py"]
     environment:
-      - ODOO_DEBUG=${ODOO_DEBUG:-0}
+      - SUPERVISOR_KILL_IDLE=${SUPERVISOR_KILL_IDLE:-0}
 
 volumes:
   pycache:

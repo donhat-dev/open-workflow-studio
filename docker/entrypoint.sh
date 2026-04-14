@@ -15,7 +15,12 @@ fi
 
 ODOO_ARGS="-c $ODOO_CONF"
 
-# Append any extra args passed to the container
+# Append extra args from env var (e.g. ODOO_EXTRA_ARGS="-u workflow_studio")
+if [ -n "${ODOO_EXTRA_ARGS:-}" ]; then
+    ODOO_ARGS="$ODOO_ARGS $ODOO_EXTRA_ARGS"
+fi
+
+# Append any extra args passed directly to the container command
 if [ $# -gt 0 ]; then
     ODOO_ARGS="$ODOO_ARGS $@"
 fi
