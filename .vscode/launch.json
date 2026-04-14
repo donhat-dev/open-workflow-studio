@@ -5,26 +5,34 @@
       "name": "Docker: Odoo debug",
       "type": "debugpy",
       "request": "attach",
-      "preLaunchTask": "docker-compose-restart",
+      "preLaunchTask": "docker-compose-debug",
       "connect": {
         "host": "localhost",
         "port": 5678
       },
       "pathMappings": [
         {
-          "localRoot": "${workspaceFolder}/workflow_studio",
-          "remoteRoot": "/opt/odoo/custom/workflow_studio"
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/opt/odoo/open-workflow-studio"
         },
         {
-          "localRoot": "${workspaceFolder}/flight_json_widget",
-          "remoteRoot": "/opt/odoo/custom/flight_json_widget"
+          "localRoot": "/home/odoo/workspace/queue",
+          "remoteRoot": "/opt/odoo/queue"
         },
         {
-          "localRoot": "${workspaceFolder}/lf_web_studio",
-          "remoteRoot": "/opt/odoo/custom/lf_web_studio"
+          "localRoot": "/home/odoo/workspace/hrm-odoo/addons/core",
+          "remoteRoot": "/opt/odoo/hrm-odoo/addons/core"
         },
         {
-          "localRoot": "C:/Users/ODOO/Documents/GitHub/18EE-NS",
+          "localRoot": "/home/odoo/workspace/hrm-odoo/addons/hrm",
+          "remoteRoot": "/opt/odoo/hrm-odoo/addons/hrm"
+        },
+        {
+          "localRoot": "/home/odoo/workspace/hrm-odoo/addons/third_party",
+          "remoteRoot": "/opt/odoo/hrm-odoo/addons/third_party"
+        },
+        {
+          "localRoot": "/home/odoo/workspace/18EE-NS",
           "remoteRoot": "/opt/odoo/source"
         }
       ],
@@ -34,12 +42,12 @@
       "name": "hrm",
       "type": "debugpy",
       "request": "launch",
-      "program": "C:\\Users\\ODOO\\Documents\\GitHub\\18EE-NS\\odoo-bin",
-      "python": "C:\\Users\\ODOO\\Documents\\.venv18\\Scripts\\python.exe",
+      "program": "/home/odoo/workspace/18EE-NS/odoo-bin",
+      "python": "/home/odoo/workspace/.venv18/bin/python",
       "console": "integratedTerminal",
       "args": [
         "-c",
-        "C:\\Users\\ODOO\\Documents\\GitHub\\hrm-odoo\\.github\\odoo.conf",
+        "/home/odoo/workspace/config/odoo-hrm.conf",
         "--dev",
         "xml",
         "-d",

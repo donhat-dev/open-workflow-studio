@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DEBUGPY_ENABLE="${DEBUGPY_ENABLE:-0}"
+ODOO_DEBUG="${ODOO_DEBUG:-0}"
 DEBUGPY_PORT="${DEBUGPY_PORT:-5678}"
 ODOO_CONF="${ODOO_CONF:-/etc/odoo/odoo.conf}"
 

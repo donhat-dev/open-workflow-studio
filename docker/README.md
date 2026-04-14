@@ -8,23 +8,27 @@
 │                                       │
 │  python 3.12 + debugpy (:5678)        │
 │  Mount: /opt/odoo/source  ← 18EE-NS  │
-│  Mount: /opt/odoo/custom  ← addons   │
+│  Mount: /opt/odoo/open-workflow-studio│
+│  Mount: /opt/odoo/queue              │
+│  Mount: /opt/odoo/hrm-odoo/addons/*  │
 │  Port:  8069 (web), 5678 (debug)     │
 └───────────┬───────────────────────────┘
             │ host.docker.internal:5432
             ▼
 ┌───────────────────────┐
-│  Windows Host         │
+│  WSL Host             │
 │  PostgreSQL :5432     │
 │  VS Code (attach)     │
 └───────────────────────┘
 ```
 
+> Current `docker-compose.yml` defaults target WSL-native paths under `/home/odoo/workspace/...` and mount addon **roots** instead of individual addon folders.
+
 ## Prerequisites
 
-- Docker Desktop for Windows
-- PostgreSQL running on Windows (port 5432)
-- Odoo 18 EE source at `C:\Users\ODOO\Documents\GitHub\18EE-NS`
+- Docker Desktop / Docker Engine accessible from WSL
+- PostgreSQL reachable from Docker on `host.docker.internal:5432`
+- Odoo 18 EE source at `/home/odoo/workspace/18EE-NS`
 
 ## 1. Configure PostgreSQL on Windows
 
@@ -86,9 +90,13 @@ Odoo **chờ** VS Code attach trước khi start. Attach debugger để tiếp t
 4. Nhấn F5 (Start Debugging)
 
 Breakpoints sẽ hoạt động cho:
-- `workflow_studio/` → `/opt/odoo/custom/workflow_studio`
-- `flight_json_widget/` → `/opt/odoo/custom/flight_json_widget`
-- `lf_web_studio/` → `/opt/odoo/custom/lf_web_studio`
+- `workflow_studio/` → `/opt/odoo/open-workflow-studio/workflow_studio`
+- `workflow_studio_queue_job/` → `/opt/odoo/open-workflow-studio/workflow_studio_queue_job`
+- `flight_json_widget/` → `/opt/odoo/open-workflow-studio/flight_json_widget`
+- `queue/` → `/opt/odoo/queue`
+- `hrm-odoo/addons/core` → `/opt/odoo/hrm-odoo/addons/core`
+- `hrm-odoo/addons/hrm` → `/opt/odoo/hrm-odoo/addons/hrm`
+- `hrm-odoo/addons/third_party` → `/opt/odoo/hrm-odoo/addons/third_party`
 - Odoo source (18EE-NS) → `/opt/odoo/source`
 
 ## 4. Usage
@@ -140,7 +148,7 @@ docker compose up
 Edit `docker-compose.yml` hoặc set env var:
 
 ```bash
-ODOO_SOURCE_PATH="D:/path/to/odoo" docker compose up
+ODOO_SOURCE_PATH="/home/odoo/workspace/18EE-NS" docker compose up
 ```
 
 ## Troubleshooting
@@ -161,7 +169,7 @@ ODOO_SOURCE_PATH="D:/path/to/odoo" docker compose up
 ### Module not found
 
 Check `addons_path` trong `docker/odoo.conf` bao gồm đúng paths.
-Verify mounts: `docker compose exec odoo ls /opt/odoo/custom/`
+Verify mounts: `docker compose exec odoo ls /opt/odoo/open-workflow-studio/`
 
 ## File Structure
 
