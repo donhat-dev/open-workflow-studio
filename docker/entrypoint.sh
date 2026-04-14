@@ -20,7 +20,7 @@ if [ $# -gt 0 ]; then
     ODOO_ARGS="$ODOO_ARGS $@"
 fi
 
-if [ "$ODOO_DEBUG" = "1" ]; then
+if [ "$DEBUGPY_ENABLE" = "1" ]; then
     echo "==> Starting Odoo with debugpy on port $DEBUGPY_PORT (waiting for VS Code to attach...)"
     exec python -m debugpy \
         --listen "0.0.0.0:$DEBUGPY_PORT" \

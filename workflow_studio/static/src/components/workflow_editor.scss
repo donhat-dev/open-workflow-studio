@@ -218,6 +218,8 @@
   stroke: $o-gray-500;
   color: $o-gray-500;
   pointer-events: visibleStroke;
+  transition: stroke 120ms ease, color 120ms ease, opacity 120ms ease,
+    filter 120ms ease;
 }
 
 .workflow-connection-group {
@@ -229,40 +231,35 @@
 .workflow-connection-group.hovered .workflow-connection {
   stroke: $o-gray-700;
   color: $o-gray-700;
-  stroke-width: 2.5;
+  opacity: 1;
+  filter: drop-shadow(0 0 1px rgba($o-gray-700, 0.25));
 }
 
 .workflow-connection-group.selected .workflow-connection {
   stroke: $o-action;
   color: $o-action;
-  stroke-width: 3;
-}
-
-/* Z-index raise: bring connection layer above nodes when a connection is selected/hovered */
-.workflow-connections:has(.workflow-connection-group.selected),
-.workflow-connections:has(.workflow-connection-group.hovered),
-.workflow-connections:has(.workflow-connection-group:hover) {
-  z-index: 15; /* Above nodes (10), below controls (100) and overlays (500) */
+  opacity: 1;
+  filter: drop-shadow(0 0 1.5px rgba($o-action, 0.3));
 }
 
 /* Executed Connection Highlighting */
 .workflow-connection--executed {
   stroke: $o-success;
   color: $o-success;
-  stroke-width: 2.5;
   opacity: 0.9;
 }
 
 .workflow-connection-group:hover .workflow-connection--executed,
 .workflow-connection-group.hovered .workflow-connection--executed {
-  stroke-width: 3;
+  opacity: 1;
+  filter: drop-shadow(0 0 1px rgba($o-success, 0.25));
 }
 
 .workflow-connection-group.selected .workflow-connection--executed {
   stroke: $o-success;
   color: $o-success;
-  stroke-width: 3;
   opacity: 1;
+  filter: drop-shadow(0 0 1.5px rgba($o-success, 0.3));
 }
 
 .workflow-connection-hitarea {
@@ -283,12 +280,14 @@
 /* CSS Custom Properties for Dimensions */
 .workflow-node {
   /* Default dimension variables */
-  --node-width: 220px; /* Wider for card layout */
+  --node-width: 240px; /* Matches DimensionConfig default */
   --node-header-height: auto;
   --node-body-padding: 10px;
   --socket-spacing: 24px;
   --socket-radius: 5px;
   --socket-offset-y: 12px;
+  --input-socket-start-row: 0;
+  --output-socket-start-row: 0;
 
   position: absolute;
   min-width: var(--node-width);
@@ -654,11 +653,18 @@ $wf-pin-color: #7c3aed;
     cursor: pointer;
   }
 
-/* First socket vertical alignment (matches getSocketPosition) */
-.workflow-node__socket:first-child {
+/* First socket vertical alignment (matches DimensionConfig.getSocketPosition) */
+.workflow-node__inputs .workflow-node__socket:first-child {
   margin-top: calc(
     var(--node-body-padding) + var(--socket-offset-y) - var(--socket-spacing) /
-      2
+      2 + var(--input-socket-start-row, 0) * var(--socket-spacing)
+  );
+}
+
+.workflow-node__outputs .workflow-node__socket:first-child {
+  margin-top: calc(
+    var(--node-body-padding) + var(--socket-offset-y) - var(--socket-spacing) /
+      2 + var(--output-socket-start-row, 0) * var(--socket-spacing)
   );
 }
 
@@ -672,6 +678,49 @@ $wf-pin-color: #7c3aed;
   flex-direction: row;
   position: relative; /* Context for quick-add overlay */
   overflow: visible; /* Allow line to extend */
+}
+
+/* Socket point: geometry anchor (small) + generous hit area */
+.workflow-node__socket-wrapper {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* Keep the layout box aligned with DimensionConfig.socketRadius.
+   The hit area is expanded via ::before so visuals/geometry stay aligned. */
+.workflow-node__socket-point {
+  width: calc(var(--socket-radius) * 2);
+  height: calc(var(--socket-radius) * 2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.workflow-node__socket-point::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  /* Near-transparent paint so hit-testing is reliable. */
+  background: rgba($o-black, 0.001);
+}
+
+/* Visible socket marker: crisp filled square */
+.workflow-node__socket-marker {
+  width: 6px;
+  height: 6px;
+  background: $o-black;
+  border-radius: 0;
+  pointer-events: none;
+}
+
+/* Snapped socket highlight (used by smart snapping) */
+.workflow-node__socket-point.is-snapped::before {
+  box-shadow: 0 0 0 2px rgba($o-action, 0.35);
 }
 
 /* Socket Label */

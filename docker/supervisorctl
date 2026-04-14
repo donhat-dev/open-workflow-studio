@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""
+supervisorctl — CLI for Odoo Supervisor control socket.
+
+Usage:
+  supervisorctl restart http    # restart HTTP worker
+  supervisorctl restart cron    # restart cron worker
+  supervisorctl status          # show all workers
+"""
+import json
+import os
+import socket
+import sys
+
+CONTROL_SOCKET = os.environ.get("SUPERVISOR_SOCK", "/var/run/odoo-supervisor.sock")
+
+
+def send_command(msg):
+    """Connect to UDS, send JSON, print response."""
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.connect(CONTROL_SOCKET)
+        sock.sendall(json.dumps(msg).encode("utf-8") + b"\n")
+        sock.shutdown(socket.SHUT_WR)
+
+        data = b""
+        while True:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+
+        resp = json.loads(data.decode("utf-8").strip())
+        return resp
+    finally:
+        sock.close()
+
+
+def cmd_restart(group):
+    resp = send_command({"action": "restart", "group": group})
+    if resp.get("ok"):
+        print(f"{group}: restarted (pid={resp.get('pid')})")
+    else:
+        print(f"{group}: FAILED — {resp.get('msg')}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_status():
+    resp = send_command({"action": "status"})
+    if not resp.get("ok"):
+        print(f"Error: {resp.get('msg')}", file=sys.stderr)
+        sys.exit(1)
+
+    workers = resp.get("workers", {})
+    db = resp.get("db", "")
+    if db:
+        print(f"Database: {db}")
+    print(f"{'GROUP':<10} {'PID':<8} {'STATE':<10} {'UPTIME'}")
+    print("-" * 40)
+    for group, info in sorted(workers.items()):
+        state = "RUNNING" if info["alive"] else "STOPPED"
+        pid = info["pid"] or "-"
+        uptime = f"{info['uptime']:.0f}s" if info["alive"] else "-"
+        print(f"{group:<10} {str(pid):<8} {state:<10} {uptime}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: supervisorctl <restart|status> [group]", file=sys.stderr)
+        sys.exit(1)
+
+    action = sys.argv[1]
+    if action == "restart":
+        if len(sys.argv) < 3:
+            print("Usage: supervisorctl restart <http|cron>", file=sys.stderr)
+            sys.exit(1)
+        cmd_restart(sys.argv[2])
+    elif action == "status":
+        cmd_status()
+    else:
+        print(f"Unknown command: {action}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

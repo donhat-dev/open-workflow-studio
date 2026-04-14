@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 
 .claude
+.omx
+.codex
 settings.json
 settings.local.json
 .github/*

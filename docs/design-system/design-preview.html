@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workflow Studio — Design Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --wf-surface-base: #ffffff;
+        --wf-surface-subtle: #f6f8fc;
+        --wf-surface-emphasis: #edf2fa;
+        --wf-border-base: #d6dfeb;
+        --wf-border-strong: #a9b7cc;
+        --wf-text-base: #0f172a;
+        --wf-text-muted: #526071;
+        --wf-text-muted-strong: #253244;
+        --wf-text-faint: #8a98ab;
+        --wf-action: #0040ff;
+        --wf-action-soft: rgba(0, 64, 255, 0.08);
+        --wf-success: #0f8f62;
+        --wf-success-soft: rgba(15, 143, 98, 0.1);
+        --wf-danger: #d92d20;
+        --wf-danger-soft: rgba(217, 45, 32, 0.1);
+        --wf-warning: #f08c00;
+        --wf-warning-soft: rgba(240, 140, 0, 0.14);
+        --wf-info: #0059ff;
+        --wf-info-soft: rgba(0, 89, 255, 0.08);
+        --wf-support: #ff6600;
+        --wf-odoo: #714b67;
+        --wf-frame-line: rgba(15, 23, 42, 0.18);
+        --wf-shadow-soft: 0 1px 0 rgba(15, 23, 42, 0.08);
+        --wf-shadow-md: 0 10px 24px rgba(15, 23, 42, 0.08);
+        --wf-shadow-focus: 0 0 0 2px rgba(0, 64, 255, 0.18);
+        --wf-container: min(1180px, calc(100vw - 48px));
+        --wf-space-1: 4px;
+        --wf-space-2: 8px;
+        --wf-space-3: 12px;
+        --wf-space-4: 16px;
+        --wf-space-5: 20px;
+        --wf-space-6: 24px;
+        --wf-space-8: 32px;
+        --wf-space-10: 40px;
+        --wf-space-12: 48px;
+        --wf-space-16: 64px;
+        --wf-font-ui: "Space Grotesk", system-ui, sans-serif;
+        --wf-font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+        --wf-grid-line: rgba(15, 23, 42, 0.05);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--wf-font-ui);
+        color: var(--wf-text-base);
+        background:
+          linear-gradient(var(--wf-grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--wf-grid-line) 1px, transparent 1px),
+          linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+        background-size: 124px 124px, 124px 124px, auto;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .mono {
+        font-family: var(--wf-font-mono);
+      }
+
+      .page-shell {
+        width: var(--wf-container);
+        margin: 0 auto;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        backdrop-filter: blur(16px);
+        background: rgba(255, 255, 255, 0.9);
+        border-bottom: 1px solid rgba(214, 223, 235, 0.85);
+      }
+
+      .topbar-inner {
+        width: var(--wf-container);
+        margin: 0 auto;
+        min-height: 68px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .brand-kicker,
+      .section-label,
+      .meta-label,
+      .component-meta,
+      .token-meta,
+      .type-meta,
+      .spacing-meta,
+      .radius-meta,
+      .elevation-meta,
+      .footer-meta {
+        font-family: var(--wf-font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .brand-kicker,
+      .section-label,
+      .meta-label,
+      .footer-meta {
+        font-size: 11px;
+        color: var(--wf-text-faint);
+      }
+
+      .brand-title {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .nav-links a {
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-size: 13px;
+        color: var(--wf-text-muted);
+      }
+
+      .nav-links a:hover,
+      .nav-links a:focus-visible {
+        border-color: var(--wf-border-base);
+        color: var(--wf-text-base);
+        outline: none;
+      }
+
+      .hero {
+        padding: 72px 0 48px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+        gap: 40px;
+        align-items: start;
+      }
+
+      .hero-title {
+        margin: 12px 0 16px;
+        font-size: clamp(2.8rem, 7vw, 5.8rem);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+      }
+
+      .hero-copy {
+        max-width: 720px;
+        font-size: clamp(1.05rem, 2vw, 1.28rem);
+        line-height: 1.7;
+        color: var(--wf-text-muted-strong);
+      }
+
+      .hero-actions,
+      .pill-row,
+      .button-row,
+      .tab-row,
+      .badge-row,
+      .chip-row,
+      .spacing-row,
+      .radius-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .hero-actions {
+        margin-top: 28px;
+      }
+
+      .wf-btn {
+        min-height: 42px;
+        padding: 0 18px;
+        border: 1px solid transparent;
+        background: var(--wf-surface-base);
+        color: var(--wf-text-base);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: var(--wf-shadow-soft);
+        transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+
+      .wf-btn:hover,
+      .wf-btn:focus-visible {
+        transform: translateY(-1px);
+        outline: none;
+      }
+
+      .wf-btn--primary {
+        background: var(--wf-action);
+        color: #fff;
+      }
+
+      .wf-btn--secondary {
+        border-color: var(--wf-border-base);
+      }
+
+      .wf-btn--ghost {
+        box-shadow: none;
+        color: var(--wf-text-muted);
+      }
+
+      .wf-btn--danger {
+        background: var(--wf-danger);
+        color: #fff;
+      }
+
+      .eyebrow {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.32em;
+        color: var(--wf-text-muted);
+        font-weight: 500;
+      }
+
+      .hero-card,
+      .panel,
+      .token-card,
+      .type-card,
+      .component-card,
+      .spec-card,
+      .elevation-card,
+      .canvas-stage,
+      .footer-card {
+        border: 1px solid var(--wf-border-base);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: var(--wf-shadow-soft);
+      }
+
+      .hero-card {
+        padding: 24px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero-metric {
+        display: grid;
+        gap: 4px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--wf-border-base);
+      }
+
+      .hero-metric:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .hero-metric-value {
+        font-size: 30px;
+        font-weight: 700;
+        color: var(--wf-action);
+        letter-spacing: -0.04em;
+      }
+
+      .hero-metric-copy {
+        color: var(--wf-text-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      main section {
+        padding: 28px 0 56px;
+        border-top: 1px solid rgba(214, 223, 235, 0.8);
+      }
+
+      .section-head {
+        margin-bottom: 28px;
+        max-width: 780px;
+      }
+
+      .section-title {
+        margin: 10px 0 10px;
+        font-size: clamp(2rem, 3vw, 2.5rem);
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+      }
+
+      .section-copy {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.7;
+        color: var(--wf-text-muted);
+      }
+
+      .meta-label {
+        margin-bottom: 12px;
+      }
+
+      .token-group + .token-group,
+      .component-card + .component-card {
+        margin-top: 20px;
+      }
+
+      .color-grid,
+      .type-grid,
+      .card-grid,
+      .component-grid,
+      .spec-grid,
+      .elevation-grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .color-grid {
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+
+      .token-card {
+        overflow: hidden;
+      }
+
+      .token-swatch {
+        height: 76px;
+        border-bottom: 1px solid var(--wf-border-base);
+      }
+
+      .token-body {
+        padding: 14px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .token-name {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .token-meta,
+      .type-meta,
+      .component-meta,
+      .spacing-meta,
+      .radius-meta,
+      .elevation-meta {
+        font-size: 11px;
+        color: var(--wf-text-faint);
+      }
+
+      .token-role {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--wf-text-muted);
+      }
+
+      .type-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .type-card,
+      .component-card,
+      .spec-card,
+      .elevation-card,
+      .footer-card {
+        padding: 18px;
+      }
+
+      .type-sample-display {
+        font-size: clamp(2.3rem, 5vw, 4rem);
+        line-height: 0.98;
+        letter-spacing: -0.055em;
+        margin-bottom: 12px;
+      }
+
+      .type-sample-heading {
+        font-size: 1.6rem;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        margin-bottom: 10px;
+      }
+
+      .type-sample-body {
+        font-size: 1rem;
+        line-height: 1.58;
+        margin-bottom: 10px;
+        color: var(--wf-text-muted-strong);
+      }
+
+      .type-sample-mono {
+        font-family: var(--wf-font-mono);
+        font-size: 0.84rem;
+        line-height: 1.5;
+        margin-bottom: 10px;
+      }
+
+      .component-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .component-title,
+      .spec-title,
+      .elevation-title {
+        margin: 0 0 12px;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .wf-badge,
+      .wf-chip,
+      .wf-pill {
+        min-height: 24px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        border: 1px solid var(--wf-border-base);
+        font-size: 12px;
+      }
+
+      .wf-badge-dot {
+        width: 7px;
+        height: 7px;
+        background: currentColor;
+        border-radius: 999px;
+      }
+
+      .wf-badge--success { background: var(--wf-success-soft); color: var(--wf-success); }
+      .wf-badge--danger { background: var(--wf-danger-soft); color: var(--wf-danger); }
+      .wf-badge--warning { background: var(--wf-warning-soft); color: var(--wf-warning); }
+      .wf-badge--info { background: var(--wf-info-soft); color: var(--wf-info); }
+      .wf-badge--active { background: var(--wf-action-soft); color: var(--wf-action); }
+
+      .wf-chip--code {
+        font-family: var(--wf-font-mono);
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .wf-pill {
+        padding: 0 12px;
+        border-radius: 999px;
+        color: var(--wf-text-muted-strong);
+      }
+
+      .wf-pill--accent {
+        border-color: rgba(0, 64, 255, 0.22);
+        background: var(--wf-action-soft);
+        color: var(--wf-action);
+      }
+
+      .wf-pill--support {
+        border-color: rgba(255, 102, 0, 0.22);
+        background: rgba(255, 102, 0, 0.08);
+        color: var(--wf-support);
+      }
+
+      .wf-tab-nav {
+        display: inline-flex;
+        gap: 16px;
+        border-bottom: 1px solid var(--wf-border-base);
+      }
+
+      .wf-tab-btn {
+        padding: 10px 2px 12px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        background: transparent;
+        font: inherit;
+        color: var(--wf-text-muted);
+      }
+
+      .wf-tab-btn.active {
+        color: var(--wf-action);
+        border-bottom-color: var(--wf-action);
+        font-weight: 700;
+      }
+
+      .wf-control,
+      .wf-select,
+      .wf-textarea {
+        width: 100%;
+        min-height: 40px;
+        border: 1.5px solid var(--wf-border-base);
+        background: var(--wf-surface-base);
+        padding: 10px 12px;
+        font: inherit;
+        color: var(--wf-text-base);
+      }
+
+      .wf-textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      .wf-control:focus-visible,
+      .wf-select:focus-visible,
+      .wf-textarea:focus-visible {
+        outline: none;
+        border-color: var(--wf-action);
+        box-shadow: var(--wf-shadow-focus);
+      }
+
+      .wf-control--expression {
+        background: #eef3ff;
+        border-color: #9ab0ff;
+        color: #1d4ed8;
+        font-family: var(--wf-font-mono);
+      }
+
+      .wf-banner {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: start;
+        min-height: 44px;
+        padding: 12px 14px;
+        border-left: 3px solid var(--wf-info);
+        background: var(--wf-info-soft);
+      }
+
+      .wf-banner-title {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .wf-banner-copy {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--wf-text-muted);
+      }
+
+      .wf-banner-icon,
+      .wf-url-copy {
+        font-family: var(--wf-font-mono);
+        font-size: 12px;
+      }
+
+      .wf-url-box {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border: 1px solid var(--wf-border-base);
+        background: var(--wf-surface-subtle);
+      }
+
+      .wf-url-value {
+        font-family: var(--wf-font-mono);
+        font-size: 12px;
+        color: var(--wf-text-muted-strong);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .card-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .wf-tile {
+        padding: 22px;
+        border: 1px solid var(--wf-border-base);
+        border-top: 3px solid var(--wf-action);
+        background: linear-gradient(180deg, rgba(0, 64, 255, 0.045) 0%, rgba(0, 64, 255, 0) 56px), rgba(255, 255, 255, 0.94);
+        box-shadow: var(--wf-shadow-soft);
+      }
+
+      .wf-tile-kicker {
+        margin-bottom: 10px;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--wf-action);
+      }
+
+      .wf-tile-title {
+        margin: 0 0 10px;
+        font-size: 1.32rem;
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+      }
+
+      .wf-tile-copy {
+        margin: 0 0 16px;
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--wf-text-muted);
+      }
+
+      .wf-tile-metric {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        color: var(--wf-action);
+        margin-bottom: 14px;
+      }
+
+      .spec-grid {
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+
+      .canvas-stage {
+        padding: 24px;
+        background:
+          linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+          #fcfdff;
+        background-size: 72px 72px, 72px 72px, auto;
+      }
+
+      .canvas-caption {
+        margin-bottom: 18px;
+        color: var(--wf-text-muted);
+        font-size: 14px;
+      }
+
+      .canvas-flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .node-card {
+        position: relative;
+        border: 1px solid var(--wf-border-base);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 16px 18px;
+        min-height: 138px;
+        box-shadow: var(--wf-shadow-soft);
+      }
+
+      .node-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+      }
+
+      .node-icon {
+        width: 34px;
+        height: 34px;
+        display: inline-grid;
+        place-items: center;
+        border: 1px solid var(--wf-border-base);
+        background: var(--wf-surface-subtle);
+        font-family: var(--wf-font-mono);
+        font-size: 12px;
+      }
+
+      .node-title {
+        margin: 8px 0 6px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .node-copy {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--wf-text-muted);
+      }
+
+      .wf-socket {
+        position: absolute;
+        top: 50%;
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--wf-frame-line);
+        background: #fff;
+        transform: translateY(-50%);
+      }
+
+      .wf-socket--left { left: -9px; }
+      .wf-socket--right { right: -9px; }
+
+      .connector {
+        width: 120px;
+        height: 74px;
+        position: relative;
+      }
+
+      .connector::before,
+      .connector::after {
+        content: "";
+        position: absolute;
+        background: rgba(15, 23, 42, 0.22);
+      }
+
+      .connector::before {
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 2px;
+      }
+
+      .connector::after {
+        top: 14px;
+        right: 24px;
+        width: 2px;
+        height: 38px;
+        background: rgba(0, 64, 255, 0.42);
+      }
+
+      .connector-label {
+        position: absolute;
+        top: 6px;
+        left: 16px;
+        padding: 4px 8px;
+        border: 1px solid var(--wf-border-base);
+        background: rgba(255, 255, 255, 0.9);
+        font: 11px var(--wf-font-mono);
+        color: var(--wf-text-muted-strong);
+      }
+
+      .connector-arrow {
+        position: absolute;
+        top: 42px;
+        right: 17px;
+        width: 12px;
+        height: 12px;
+        border-top: 2px solid rgba(0, 64, 255, 0.42);
+        border-right: 2px solid rgba(0, 64, 255, 0.42);
+        transform: rotate(45deg);
+      }
+
+      .spacing-row,
+      .radius-row {
+        align-items: end;
+      }
+
+      .spacing-item,
+      .radius-item {
+        text-align: center;
+      }
+
+      .spacing-block {
+        height: 28px;
+        background: var(--wf-text-base);
+        margin-bottom: 8px;
+      }
+
+      .radius-box {
+        width: 64px;
+        height: 64px;
+        background: var(--wf-text-base);
+        margin-bottom: 8px;
+      }
+
+      .elevation-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
+
+      .elevation-card.level-0 {
+        box-shadow: none;
+      }
+
+      .elevation-card.level-1 {
+        box-shadow: var(--wf-shadow-soft);
+      }
+
+      .elevation-card.level-2 {
+        box-shadow: var(--wf-shadow-md);
+      }
+
+      .elevation-card.level-focus {
+        box-shadow: var(--wf-shadow-focus);
+      }
+
+      .footer-card {
+        margin: 0 0 56px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: center;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid,
+        .canvas-flow {
+          grid-template-columns: 1fr;
+        }
+
+        .connector {
+          width: 100%;
+          height: 42px;
+        }
+
+        .connector::after,
+        .connector-arrow {
+          display: none;
+        }
+
+        .nav-links {
+          display: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .topbar-inner,
+        .page-shell {
+          width: min(100vw - 24px, 1180px);
+        }
+
+        .hero {
+          padding-top: 48px;
+        }
+
+        main section {
+          padding: 20px 0 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-kicker">Workflow Studio / Editorial Carbon</div>
+          <div class="brand-title">Design Preview</div>
+        </div>
+        <nav class="nav-links" aria-label="Section navigation">
+          <a href="#colors">Colors</a>
+          <a href="#type">Typography</a>
+          <a href="#components">Components</a>
+          <a href="#canvas">Canvas</a>
+          <a href="#spacing">Spacing</a>
+          <a href="#elevation">Elevation</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="page-shell">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Design system preview artifact</div>
+            <h1 class="hero-title">Border-led workflow UI for technical operators.</h1>
+            <p class="hero-copy">
+              Workflow Studio should read like a precise instrument: crisp cobalt action,
+              editorial rhythm, structural cards, mono payloads, and square canvas grammar.
+              This preview turns the repo’s design rules into a fast visual reference for humans and agents.
+            </p>
+            <div class="hero-actions">
+              <a class="wf-btn wf-btn--primary" href="./DESIGN.md">Open DESIGN.md</a>
+              <a class="wf-btn wf-btn--secondary" href="./DESIGN_SYSTEM.md">Open Deep Spec</a>
+              <a class="wf-btn wf-btn--ghost" href="./USAGE_EXAMPLES.md">Usage Examples</a>
+            </div>
+            <div class="pill-row" style="margin-top: 20px;">
+              <span class="wf-pill wf-pill--accent">Reading-first hierarchy</span>
+              <span class="wf-pill wf-pill--support">One calm accent</span>
+              <span class="wf-pill">Hard-edged surfaces</span>
+            </div>
+          </div>
+
+          <aside class="hero-card">
+            <div class="hero-metric">
+              <div class="brand-kicker">Accent</div>
+              <div class="hero-metric-value mono">#0040ff</div>
+              <div class="hero-metric-copy">Primary actions, active states, and focus.</div>
+            </div>
+            <div class="hero-metric">
+              <div class="brand-kicker">Fonts</div>
+              <div class="hero-metric-value" style="font-size: 22px; color: var(--wf-text-base);">Space Grotesk + JetBrains Mono</div>
+              <div class="hero-metric-copy">Display/UI stays geometric; payloads switch to mono.</div>
+            </div>
+            <div class="hero-metric">
+              <div class="brand-kicker">Surface rule</div>
+              <div class="hero-metric-value" style="font-size: 22px; color: var(--wf-text-base);">Borders before shadows</div>
+              <div class="hero-metric-copy">Depth is restrained; structure and rhythm do the heavy lifting.</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <main>
+        <section id="colors">
+          <div class="section-head">
+            <div class="section-label">01 / Colors</div>
+            <h2 class="section-title">Color palette with explicit roles.</h2>
+            <p class="section-copy">
+              The system uses a white editorial base, one dominant cobalt interaction color,
+              restrained support orange, and muted semantic tints for workflow state.
+            </p>
+          </div>
+
+          <div class="token-group">
+            <div class="meta-label">Surfaces & text</div>
+            <div class="color-grid">
+              <article class="token-card"><div class="token-swatch" style="background:#ffffff"></div><div class="token-body"><div class="token-name">surface-base</div><div class="token-meta">#ffffff</div><div class="token-role">Primary panel, tile, and dialog surface.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#f6f8fc"></div><div class="token-body"><div class="token-name">surface-subtle</div><div class="token-meta">#f6f8fc</div><div class="token-role">Muted containers and alternate rows.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#edf2fa"></div><div class="token-body"><div class="token-name">surface-emphasis</div><div class="token-meta">#edf2fa</div><div class="token-role">Pressed or hovered neutral surfaces.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#0f172a"></div><div class="token-body"><div class="token-name">text-base</div><div class="token-meta">#0f172a</div><div class="token-role">Primary heading and body text.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#526071"></div><div class="token-body"><div class="token-name">text-muted</div><div class="token-meta">#526071</div><div class="token-role">Support copy and quiet labels.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#d6dfeb"></div><div class="token-body"><div class="token-name">border-base</div><div class="token-meta">#d6dfeb</div><div class="token-role">Hairline separators and control outlines.</div></div></article>
+            </div>
+          </div>
+
+          <div class="token-group">
+            <div class="meta-label">Accent & semantic states</div>
+            <div class="color-grid">
+              <article class="token-card"><div class="token-swatch" style="background:#0040ff"></div><div class="token-body"><div class="token-name">action</div><div class="token-meta">#0040ff</div><div class="token-role">Primary CTA, active tab, selected state.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#ff6600"></div><div class="token-body"><div class="token-name">support-accent</div><div class="token-meta">#ff6600</div><div class="token-role">Editorial kicker only.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#0f8f62"></div><div class="token-body"><div class="token-name">success</div><div class="token-meta">#0f8f62</div><div class="token-role">Healthy runs and positive confirmation.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#d92d20"></div><div class="token-body"><div class="token-name">danger</div><div class="token-meta">#d92d20</div><div class="token-role">Failures and destructive actions.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#f08c00"></div><div class="token-body"><div class="token-name">warning</div><div class="token-meta">#f08c00</div><div class="token-role">Pending and caution state.</div></div></article>
+              <article class="token-card"><div class="token-swatch" style="background:#0059ff"></div><div class="token-body"><div class="token-name">info</div><div class="token-meta">#0059ff</div><div class="token-role">Informational banners and neutral system feedback.</div></div></article>
+            </div>
+          </div>
+        </section>
+
+        <section id="type">
+          <div class="section-head">
+            <div class="section-label">02 / Typography</div>
+            <h2 class="section-title">Editorial hierarchy with mono technical notes.</h2>
+            <p class="section-copy">
+              Space Grotesk carries display and UI rhythm. JetBrains Mono appears only when the interface shifts into expressions, payloads, URLs, and technical metadata.
+            </p>
+          </div>
+
+          <div class="type-grid">
+            <article class="type-card">
+              <div class="type-sample-display">Build, inspect, and run.</div>
+              <div class="type-meta">Display L / clamp(2rem, 4vw, 3.4rem) / 700 / 1.04 / -0.05em / Space Grotesk</div>
+            </article>
+            <article class="type-card">
+              <div class="type-sample-heading">Execution summary for trigger chain</div>
+              <div class="type-sample-body">Body copy should stay calm, readable, and dense enough for technical operators without becoming cramped.</div>
+              <div class="type-meta">Heading M / 1.6rem / 700 / 1.1 + Body M / 1rem / 400 / 1.58</div>
+            </article>
+            <article class="type-card">
+              <div class="type-sample-mono">{{ $json.customer.email }} → POST /crm/lead</div>
+              <div class="type-sample-body">Mono appears for values, code-like content, and payload-oriented metadata only.</div>
+              <div class="type-meta">Mono Body / 0.84rem / 400 / 1.5 / 0.02em / JetBrains Mono</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="components">
+          <div class="section-head">
+            <div class="section-label">03 / Components</div>
+            <h2 class="section-title">Utilities first, editorial shells second.</h2>
+            <p class="section-copy">
+              Controls stay clean and operational. Larger containers carry the stronger visual identity through borders, spacing, and subtle accent rails.
+            </p>
+          </div>
+
+          <div class="component-grid">
+            <article class="component-card">
+              <h3 class="component-title">Buttons</h3>
+              <div class="button-row">
+                <button class="wf-btn wf-btn--primary">Execute</button>
+                <button class="wf-btn wf-btn--secondary">Save</button>
+                <button class="wf-btn wf-btn--ghost">Cancel</button>
+                <button class="wf-btn wf-btn--danger">Delete</button>
+              </div>
+              <div class="component-meta" style="margin-top:12px;">primary / secondary / ghost / danger</div>
+            </article>
+
+            <article class="component-card">
+              <h3 class="component-title">Status, tags, and chips</h3>
+              <div class="badge-row">
+                <span class="wf-badge wf-badge--success"><span class="wf-badge-dot"></span>Completed</span>
+                <span class="wf-badge wf-badge--active"><span class="wf-badge-dot"></span>Running</span>
+                <span class="wf-badge wf-badge--warning"><span class="wf-badge-dot"></span>Queued</span>
+              </div>
+              <div class="chip-row" style="margin-top:12px;">
+                <span class="wf-pill wf-pill--accent">Webhook</span>
+                <span class="wf-pill wf-pill--support">Validation</span>
+                <span class="wf-chip wf-chip--code">outputs[0][0]</span>
+              </div>
+              <div class="component-meta" style="margin-top:12px;">taxonomy uses tags / state uses badges / payload uses mono chips</div>
+            </article>
+
+            <article class="component-card">
+              <h3 class="component-title">Tab nav</h3>
+              <div class="tab-row">
+                <nav class="wf-tab-nav">
+                  <button class="wf-tab-btn active">Parameters</button>
+                  <button class="wf-tab-btn">Settings</button>
+                  <button class="wf-tab-btn">Preview</button>
+                </nav>
+              </div>
+              <div class="component-meta" style="margin-top:12px;">active state = text + underline, not heavy pills</div>
+            </article>
+
+            <article class="component-card">
+              <h3 class="component-title">Controls</h3>
+              <div style="display:grid; gap:10px;">
+                <input class="wf-control" value="HTTP Request" aria-label="Node name" />
+                <select class="wf-select" aria-label="Method"><option>POST</option></select>
+                <input class="wf-control wf-control--expression" value="{{ $json.customer.email }}" aria-label="Expression" />
+              </div>
+              <div class="component-meta" style="margin-top:12px;">white surface / strong border / focused cobalt ring</div>
+            </article>
+
+            <article class="component-card">
+              <h3 class="component-title">Inline feedback</h3>
+              <div class="wf-banner">
+                <div class="wf-banner-icon">i</div>
+                <div>
+                  <div class="wf-banner-title">Publishing note</div>
+                  <div class="wf-banner-copy">Webhook URLs update when the workflow is republished. Keep copy actions immediately available.</div>
+                </div>
+                <div class="wf-url-copy">OK</div>
+              </div>
+              <div class="component-meta" style="margin-top:12px;">3px rail + muted tint + quiet supporting copy</div>
+            </article>
+
+            <article class="component-card">
+              <h3 class="component-title">Technical surface</h3>
+              <div class="wf-url-box">
+                <div class="wf-url-value">https://example.odoo.com/webhook/34d2-83fe-9bff</div>
+                <div class="wf-url-copy">COPY</div>
+              </div>
+              <div class="component-meta" style="margin-top:12px;">mono payload + quiet border-led container</div>
+            </article>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-label">04 / Tiles & layout shells</div>
+            <h2 class="section-title">Narrative tiles with structural rhythm.</h2>
+            <p class="section-copy">
+              Storytelling surfaces use accent rails, sharp borders, and concise hierarchy rather than deep visual effects.
+            </p>
+          </div>
+
+          <div class="card-grid">
+            <article class="wf-tile">
+              <div class="wf-tile-kicker">Execution</div>
+              <h3 class="wf-tile-title">Stack executor keeps branch routing explicit.</h3>
+              <p class="wf-tile-copy">The UI should feel like an instrument panel: clear hierarchy, direct state, no decorative softness.</p>
+              <div class="wf-chip wf-chip--code">outputs[][]</div>
+            </article>
+            <article class="wf-tile">
+              <div class="wf-tile-kicker">Observability</div>
+              <div class="wf-tile-metric">42</div>
+              <p class="wf-tile-copy">Recent runs surfaced in an editorial tile with restrained emphasis and technical metadata nearby.</p>
+              <div class="badge-row"><span class="wf-badge wf-badge--success"><span class="wf-badge-dot"></span>Healthy</span></div>
+            </article>
+            <article class="wf-tile">
+              <div class="wf-tile-kicker">Configuration</div>
+              <h3 class="wf-tile-title">Dense controls, generous section intros.</h3>
+              <p class="wf-tile-copy">Information-heavy regions stay compact, but larger framing areas retain space for orientation and reading.</p>
+              <div class="wf-pill wf-pill--accent">Detail grid</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="canvas">
+          <div class="section-head">
+            <div class="section-label">05 / Canvas grammar</div>
+            <h2 class="section-title">Square sockets, orthogonal flow, low noise.</h2>
+            <p class="section-copy">
+              The workflow canvas should read as a technical diagram with crisp node shells and just enough accent to reveal active flow.
+            </p>
+          </div>
+
+          <div class="canvas-stage">
+            <div class="canvas-caption">Manual trigger → HTTP request, with accent reserved for the meaningful delivery segment.</div>
+            <div class="canvas-flow">
+              <article class="node-card">
+                <span class="wf-socket wf-socket--right"></span>
+                <div class="node-row">
+                  <div class="node-icon">MT</div>
+                  <span class="wf-badge wf-badge--active"><span class="wf-badge-dot"></span>Ready</span>
+                </div>
+                <div class="node-title">Manual Trigger</div>
+                <p class="node-copy">No payload transformation yet. Start state remains simple and legible.</p>
+              </article>
+
+              <div class="connector" aria-hidden="true">
+                <div class="connector-label">payload</div>
+                <div class="connector-arrow"></div>
+              </div>
+
+              <article class="node-card">
+                <span class="wf-socket wf-socket--left"></span>
+                <div class="node-row">
+                  <div class="node-icon">HTTP</div>
+                  <span class="wf-badge wf-badge--info"><span class="wf-badge-dot"></span>POST</span>
+                </div>
+                <div class="node-title">HTTP Request</div>
+                <p class="node-copy">Technical surfaces, mono values, and structured status keep operational confidence high.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="spacing">
+          <div class="section-head">
+            <div class="section-label">06 / Spacing & radius</div>
+            <h2 class="section-title">Tokenized spacing, minimal softness.</h2>
+            <p class="section-copy">
+              Spacing grows on a 4px base. Radius stays sharp by default; pill shapes are reserved for chips and segmented labels.
+            </p>
+          </div>
+
+          <div class="spec-grid">
+            <article class="spec-card">
+              <h3 class="spec-title">Spacing scale</h3>
+              <div class="spacing-row">
+                <div class="spacing-item"><div class="spacing-block" style="width:4px;"></div><div class="spacing-meta">4</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:8px;"></div><div class="spacing-meta">8</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:12px;"></div><div class="spacing-meta">12</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:16px;"></div><div class="spacing-meta">16</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:24px;"></div><div class="spacing-meta">24</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:32px;"></div><div class="spacing-meta">32</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:48px;"></div><div class="spacing-meta">48</div></div>
+                <div class="spacing-item"><div class="spacing-block" style="width:64px;"></div><div class="spacing-meta">64</div></div>
+              </div>
+            </article>
+
+            <article class="spec-card">
+              <h3 class="spec-title">Radius language</h3>
+              <div class="radius-row">
+                <div class="radius-item"><div class="radius-box" style="border-radius:0;"></div><div class="radius-meta">0 / shell</div></div>
+                <div class="radius-item"><div class="radius-box" style="border-radius:2px;"></div><div class="radius-meta">2 / micro</div></div>
+                <div class="radius-item"><div class="radius-box" style="border-radius:4px;"></div><div class="radius-meta">4 / control</div></div>
+                <div class="radius-item"><div class="radius-box" style="border-radius:6px;"></div><div class="radius-meta">6 / popover</div></div>
+                <div class="radius-item"><div class="radius-box" style="border-radius:999px;"></div><div class="radius-meta">pill / chips</div></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="elevation">
+          <div class="section-head">
+            <div class="section-label">07 / Elevation</div>
+            <h2 class="section-title">Depth stays restrained and explicit.</h2>
+            <p class="section-copy">
+              Most separation comes from borders. Medium shadows appear only when a surface genuinely floats above the layout.
+            </p>
+          </div>
+
+          <div class="elevation-grid">
+            <article class="elevation-card level-0"><h3 class="elevation-title">Level 0</h3><div class="elevation-meta">flat / border only</div></article>
+            <article class="elevation-card level-1"><h3 class="elevation-title">Level 1</h3><div class="elevation-meta">0 1px 0 rgba(15, 23, 42, 0.08)</div></article>
+            <article class="elevation-card level-2"><h3 class="elevation-title">Level 2</h3><div class="elevation-meta">0 10px 24px rgba(15, 23, 42, 0.08)</div></article>
+            <article class="elevation-card level-focus"><h3 class="elevation-title">Focus ring</h3><div class="elevation-meta">0 0 0 2px rgba(0, 64, 255, 0.18)</div></article>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer-card">
+        <div>
+          <div class="footer-meta">Workflow Studio / docs/design-system</div>
+          <div>Use this preview for fast visual validation; use <span class="mono">DESIGN.md</span> for agent prompts and <span class="mono">DESIGN_SYSTEM.md</span> for deeper implementation guidance.</div>
+        </div>
+        <div class="footer-meta">Space Grotesk · JetBrains Mono · #0040ff</div>
+      </footer>
+    </div>
+  </body>
+</html>

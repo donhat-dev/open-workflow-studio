@@ -27,4 +27,5 @@ services:
     environment:
       - ODOO_DEBUG=${ODOO_DEBUG:-0}
 
-volumes: {}
+volumes:
+  pycache:
