@@ -472,15 +472,20 @@ export class WorkflowNode extends Component {
             }
         }
 
+        if (dimensionConfig && typeof dimensionConfig.getSocketStartRow === "function") {
+            styles += `--input-socket-start-row:${dimensionConfig.getSocketStartRow(this.props.node, "input")};`;
+            styles += `--output-socket-start-row:${dimensionConfig.getSocketStartRow(this.props.node, "output")};`;
+        }
+
         // min-height: ensures node extends to cover all socket positions
         const maxSockets = Math.max(this.inputEntries.length, this.outputEntries.length);
         if (maxSockets > 0) {
             const dc = dimensionConfig || {};
-            const sockets = maxSockets - 1 == 0 ? 1 : maxSockets - 1; // Avoid zero spacing if only 1 socket
+            const layoutRowCount = Math.max(maxSockets, 2);
             const bodyPad = dc.nodeBodyPadding || 10;
             const sockOffY = dc.socketOffsetY || 12;
             const sockSpacing = dc.socketSpacing || 24;
-            const minH = bodyPad + sockOffY + (sockets * sockSpacing) + sockOffY + bodyPad;
+            const minH = bodyPad + sockOffY + ((layoutRowCount - 1) * sockSpacing) + sockOffY + bodyPad;
             styles += `min-height:${minH}px;`;
         }
 

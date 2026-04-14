@@ -90,6 +90,42 @@ export class DimensionConfig {
     }
 
     /**
+     * Get the layout row count used to size the node and place sockets.
+     * Keep at least 2 rows when sockets exist so a single socket can sit in
+     * the vertical middle of the socket grid instead of hugging the top row.
+     * @param {Object} node
+     * @returns {number}
+     */
+    getSocketLayoutRowCount(node) {
+        const rowCount = this.getSocketRowCount(node);
+        if (!rowCount) {
+            return 0;
+        }
+        return Math.max(rowCount, 2);
+    }
+
+    /**
+     * Get the starting row offset for one socket column.
+     * Single-socket columns are vertically centered inside the current socket grid.
+     * Multi-socket columns keep the existing top-aligned behavior.
+     * @param {Object} node
+     * @param {string} socketType - 'input' or 'output'
+     * @returns {number}
+     */
+    getSocketStartRow(node, socketType) {
+        const sockets = socketType === 'input' ? node.inputs : node.outputs;
+        const socketCount = Object.keys(sockets || {}).length;
+        if (!socketCount) {
+            return 0;
+        }
+        if (socketCount === 1) {
+            const layoutRowCount = this.getSocketLayoutRowCount(node);
+            return (layoutRowCount - 1) / 2;
+        }
+        return 0;
+    }
+
+    /**
      * Calculate socket position based on node position and socket index
      * @param {Object} node - Node object with x, y, inputs, outputs
      * @param {string} socketKey - Socket key name
@@ -101,10 +137,11 @@ export class DimensionConfig {
         const sockets = socketType === 'input' ? node.inputs : node.outputs;
         const socketKeys = Object.keys(sockets || {});
         const index = socketKeys.indexOf(socketKey);
+        const startRow = this.getSocketStartRow(node, socketType);
 
         // If row-paired, use the same row index for matching input/output
         // This ensures connections align properly
-        const rowIndex = index >= 0 ? index : 0;
+        const rowIndex = (index >= 0 ? index : 0) + startRow;
 
         // X position: left edge for inputs, right edge for outputs
         const x = socketType === 'input'
@@ -127,11 +164,11 @@ export class DimensionConfig {
      * @returns {number}
      */
     getNodeMinHeight(node) {
-        const rowCount = this.getSocketRowCount(node);
-        if (!rowCount) {
+        const layoutRowCount = this.getSocketLayoutRowCount(node);
+        if (!layoutRowCount) {
             return 0;
         }
-        const spacedRows = Math.max(rowCount - 1, 1);
+        const spacedRows = layoutRowCount - 1;
         return this.nodeBodyPadding
             + this.socketOffsetY
             + (spacedRows * this.socketSpacing)
@@ -178,12 +215,16 @@ export class DimensionConfig {
     getNodeStyle(node) {
         const x = (node && node.x) || 0;
         const y = (node && node.y) || 0;
+        const inputStartRow = this.getSocketStartRow(node, 'input');
+        const outputStartRow = this.getSocketStartRow(node, 'output');
 
         let styles = `left:${x}px;top:${y}px;`;
         const cssProps = this.getCSSProperties();
         for (const [key, value] of Object.entries(cssProps)) {
             styles += `${key}:${value};`;
         }
+        styles += `--input-socket-start-row:${inputStartRow};`;
+        styles += `--output-socket-start-row:${outputStartRow};`;
 
         const minHeight = this.getNodeMinHeight(node);
         if (minHeight > 0) {

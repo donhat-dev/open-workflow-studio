@@ -66,7 +66,7 @@
 								<!-- Thicker invisible path for easier clicking -->
 								<path t-att-d="pathD" class="workflow-connection-hitarea" stroke="transparent" stroke-width="12" fill="none" />
 								<!-- Visible path (arrowhead only on last segment) -->
-								<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" t-att-marker-end="'url(#wf-arrow)'"/>
+							<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" t-att-marker-end="pathD_index === conn.paths.length - 1 ? 'url(#wf-arrow)' : undefined"/>
 							</t>
 						</g>
 					</t>
