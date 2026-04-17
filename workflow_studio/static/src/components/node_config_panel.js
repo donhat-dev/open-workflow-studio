@@ -1,6 +1,9 @@
 /** @odoo-module **/
 
 import { Component, useState, onMounted, onWillUnmount, onWillUpdateProps } from "@odoo/owl";
+import { Dropdown } from "@web/core/dropdown/dropdown";
+import { DropdownItem } from "@web/core/dropdown/dropdown_item";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
 import { useService } from "@web/core/utils/hooks";
 import { ControlRenderer } from "./control_renderer";
 import { JsonTreeNode } from "./data_panel/JsonTreeNode";
@@ -138,7 +141,7 @@ function buildFallbackTriggerControls(node) {
  */
 export class NodeConfigPanel extends Component {
     static template = "workflow_studio.ConfigPanel";
-    static components = { ControlRenderer, JsonTreeNode, TabNav, UrlBox };
+    static components = { ControlRenderer, Dropdown, DropdownItem, JsonTreeNode, TabNav, UrlBox };
     static subTemplates = {
         header: "workflow_studio.ConfigPanel.Header",
         input: "workflow_studio.ConfigPanel.Input",
@@ -209,9 +212,23 @@ export class NodeConfigPanel extends Component {
             triggerFieldSuggestions: [],
             triggerErrorMessage: "",
             execution: this.props.execution || null,
+            navActiveOptionKeys: {
+                previous: null,
+                next: null,
+            },
+            navMenuMetrics: {
+                previous: { triggerWidth: 0 },
+                next: { triggerWidth: 0 },
+            },
         });
 
         this._saveDebounceTimer = null;
+        this.previousNavDropdownState = useDropdownState();
+        this.nextNavDropdownState = useDropdownState();
+        this._navMenuCloseTimers = {
+            previous: null,
+            next: null,
+        };
 
         // Initialize control values from adapter
         onMounted(async () => {
@@ -233,6 +250,8 @@ export class NodeConfigPanel extends Component {
                 this.state.recordRefCache = {};
                 this.state.selectedOutputSocket = null;
                 this.state.selectedExecutionVersion = null;
+                this.state.navActiveOptionKeys.previous = null;
+                this.state.navActiveOptionKeys.next = null;
                 this.initControlValues(nextProps.node);
                 if (TRIGGER_NODE_TYPES.has(nextProps.node.type)) {
                     await this._bootstrapTriggerPanel(nextProps.node);
@@ -244,6 +263,7 @@ export class NodeConfigPanel extends Component {
 
         onWillUnmount(() => {
             this._stopTriggerPolling();
+            this._clearAllNavMenuCloseTimers();
         });
     }
 
@@ -747,6 +767,197 @@ export class NodeConfigPanel extends Component {
         return this.showHeaderExecute || !!this.props.onNavigateToNode;
     }
 
+    getNavDropdownState(direction) {
+        return direction === "next" ? this.nextNavDropdownState : this.previousNavDropdownState;
+    }
+
+    getNavModel(direction) {
+        return direction === "next" ? this.nextNavigation : this.previousNavigation;
+    }
+
+    getPrimaryNavigationOption(direction) {
+        const navigation = this.getNavModel(direction);
+        if (navigation.primary) {
+            return navigation.primary;
+        }
+        if (Array.isArray(navigation.options) && navigation.options.length) {
+            return navigation.options[0];
+        }
+        return null;
+    }
+
+    getNavMenuStyle(direction) {
+        const triggerWidth = this.state.navMenuMetrics[direction]
+            ? this.state.navMenuMetrics[direction].triggerWidth || 0
+            : 0;
+        const minWidth = Math.max(220, triggerWidth);
+        return `min-width: ${minWidth}px; max-width: min(340px, calc(100vw - 24px));`;
+    }
+
+    getNavItemAttrs(direction, option) {
+        return {
+            "data-nav-direction": direction,
+            "data-nav-key": String(option && option.key ? option.key : ""),
+        };
+    }
+
+    getNavItemClass(direction, option) {
+        const classes = ["ncp-nav-dd-item"];
+        if (this.isNavOptionActive(direction, option)) {
+            classes.push("is-active");
+        }
+        return classes.join(" ");
+    }
+
+    isNavOptionActive(direction, option) {
+        if (!option) {
+            return false;
+        }
+        return this.state.navActiveOptionKeys[direction] === option.key;
+    }
+
+    isPrimaryNavOption(direction, option) {
+        const primary = this.getPrimaryNavigationOption(direction);
+        return !!(primary && option && primary.key === option.key);
+    }
+
+    onNavTriggerMouseEnter(direction, ev) {
+        const navigation = this.getNavModel(direction);
+        if (!navigation.hasMultiple) {
+            return;
+        }
+        this._captureNavTriggerMetrics(direction, ev.currentTarget);
+        this._clearNavMenuCloseTimer(direction);
+        this._primeNavActiveOption(direction);
+
+        const otherDirection = direction === "next" ? "previous" : "next";
+        this._clearNavMenuCloseTimer(otherDirection);
+        this.getNavDropdownState(otherDirection).close();
+        this.getNavDropdownState(direction).open();
+    }
+
+    onNavTriggerMouseLeave(direction) {
+        this._scheduleNavMenuClose(direction);
+    }
+
+    onNavMenuMouseEnter(direction) {
+        this._clearNavMenuCloseTimer(direction);
+        this._primeNavActiveOption(direction);
+    }
+
+    onNavMenuMouseOver(direction, ev) {
+        const item = ev.target instanceof Element
+            ? ev.target.closest(".ncp-nav-dd-item[data-nav-key]")
+            : null;
+        if (!item) {
+            return;
+        }
+        const key = item.dataset.navKey;
+        if (!key || this.state.navActiveOptionKeys[direction] === key) {
+            return;
+        }
+        this.state.navActiveOptionKeys[direction] = key;
+    }
+
+    onNavMenuMouseLeave(direction) {
+        this._scheduleNavMenuClose(direction);
+    }
+
+    onNavDropdownOpened(direction) {
+        this._primeNavActiveOption(direction);
+        this._focusActiveNavItem(direction);
+    }
+
+    onPrimaryNavClick(direction, ev) {
+        const primary = this.getPrimaryNavigationOption(direction);
+        if (!primary) {
+            return;
+        }
+        this._captureNavTriggerMetrics(direction, ev.currentTarget);
+        this._primeNavActiveOption(direction);
+        this.getNavDropdownState(direction).close();
+        this.onNavigateToNode(primary.nodeId);
+    }
+
+    onNavOptionSelected(direction, option) {
+        if (!option) {
+            return;
+        }
+        this.state.navActiveOptionKeys[direction] = option.key;
+        this.onNavigateToNode(option.nodeId);
+    }
+
+    _primeNavActiveOption(direction) {
+        const primary = this.getPrimaryNavigationOption(direction);
+        this.state.navActiveOptionKeys[direction] = primary ? primary.key : null;
+    }
+
+    _focusActiveNavItem(direction) {
+        window.requestAnimationFrame(() => {
+            const activeItem = this._findActiveNavItem(direction) || this._findPrimaryNavItem(direction);
+            if (!activeItem) {
+                return;
+            }
+            activeItem.focus();
+            activeItem.scrollIntoView({ block: "nearest" });
+        });
+    }
+
+    _findActiveNavItem(direction) {
+        const activeKey = this.state.navActiveOptionKeys[direction];
+        if (!activeKey) {
+            return null;
+        }
+        return this._findNavItemByKey(direction, activeKey);
+    }
+
+    _findPrimaryNavItem(direction) {
+        const primary = this.getPrimaryNavigationOption(direction);
+        if (!primary) {
+            return null;
+        }
+        return this._findNavItemByKey(direction, primary.key);
+    }
+
+    _findNavItemByKey(direction, key) {
+        const items = document.querySelectorAll(`.ncp-nav-popover--${direction} .ncp-nav-dd-item[data-nav-key]`);
+        for (const item of items) {
+            if (item instanceof HTMLElement && item.dataset.navKey === String(key)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    _captureNavTriggerMetrics(direction, target) {
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        const rect = target.getBoundingClientRect();
+        this.state.navMenuMetrics[direction] = {
+            triggerWidth: Math.ceil(rect.width),
+        };
+    }
+
+    _scheduleNavMenuClose(direction) {
+        this._clearNavMenuCloseTimer(direction);
+        this._navMenuCloseTimers[direction] = setTimeout(() => {
+            this.getNavDropdownState(direction).close();
+        }, 140);
+    }
+
+    _clearNavMenuCloseTimer(direction) {
+        if (this._navMenuCloseTimers[direction]) {
+            clearTimeout(this._navMenuCloseTimers[direction]);
+            this._navMenuCloseTimers[direction] = null;
+        }
+    }
+
+    _clearAllNavMenuCloseTimers() {
+        this._clearNavMenuCloseTimer("previous");
+        this._clearNavMenuCloseTimer("next");
+    }
+
     // ============================================
     // EXECUTION
     // ============================================
@@ -1190,6 +1401,9 @@ export class NodeConfigPanel extends Component {
         if (!onNavigateToNode || !nodeId) {
             return;
         }
+        this._clearAllNavMenuCloseTimers();
+        this.previousNavDropdownState.close();
+        this.nextNavDropdownState.close();
         onNavigateToNode(nodeId);
     }
 

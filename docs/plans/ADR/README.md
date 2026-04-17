@@ -17,6 +17,9 @@
 | [ADR-006](./006-version-history.md)     | Workflow Version History (Parent-Object Patch) | **Accepted ✅** | 2026-02-04 |
 | [ADR-008](./008-hybrid-trigger-architecture.md) | Hybrid Realtime Trigger Architecture | **Accepted ✅** | 2026-02-07 |
 | [ADR-009](./009-content-addressed-storage.md) | Content-Addressed Storage for Workflow Data Deduplication | **Accepted ✅** | 2026-03-30 |
+| [ADR-010](./010-workflow-connector-workspace-and-node-bridge-architecture.md) | Workflow Connector Workspace and Node-Bridge Architecture | **Proposed 🟡** | 2026-04-15 |
+| [ADR-011](./011-workflow-connector-mapping-presets-and-canonical-translation.md) | Workflow Connector Mapping Presets and Canonical Translation | **Proposed 🟡** | 2026-04-15 |
+| [ADR-012](./012-workflow-connector-transaction-and-exchange-lifecycle.md) | Workflow Connector Transaction and Exchange Lifecycle | **Proposed 🟡** | 2026-04-15 |
 
 ---
 

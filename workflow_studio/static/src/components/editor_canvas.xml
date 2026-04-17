@@ -49,13 +49,13 @@
 				<!-- SVG Connection Layer -->
 				<svg class="workflow-connections" t-ref="svgConnections">
 					<defs>
-						<!-- Arrowhead for stable connections (inherits color via currentColor) -->
+						<!-- Arrowhead for stable connections (inherits stroke color from referencing path) -->
 						<marker id="wf-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-							<polygon points="0 0, 8 3, 0 6" fill="currentColor"/>
+							<polygon points="0 0, 8 3, 0 6" fill="context-stroke" stroke="context-stroke" stroke-linejoin="round"/>
 						</marker>
 						<!-- Arrowhead for in-progress drawing connection -->
 						<marker id="wf-arrow-temp" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse">
-							<polygon points="0 0, 8 3, 0 6" fill="currentColor"/>
+							<polygon points="0 0, 8 3, 0 6" fill="context-stroke" stroke="context-stroke" stroke-linejoin="round"/>
 						</marker>
 					</defs>
 					<!-- Render connection paths -->
@@ -65,8 +65,8 @@
 							<t t-foreach="conn.paths" t-as="pathD" t-key="conn.id + '_' + pathD_index">
 								<!-- Thicker invisible path for easier clicking -->
 								<path t-att-d="pathD" class="workflow-connection-hitarea" stroke="transparent" stroke-width="12" fill="none" />
-								<!-- Visible path (arrowhead only on last segment) -->
-							<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" t-att-marker-end="pathD_index === conn.paths.length - 1 ? 'url(#wf-arrow)' : undefined"/>
+								<!-- Visible path (each segment keeps its own arrowhead marker) -->
+								<path t-att-d="pathD" t-att-data-connection-id="conn.id" t-att-class="'workflow-connection' + (conn.isBackEdge ? ' workflow-connection--back-edge' : '') + (conn.isVerticalStack ? ' workflow-connection--vertical-stack' : '') + (isConnectionExecuted(conn.id) ? ' workflow-connection--executed' : '')" stroke-width="2" fill="none" marker-end="url(#wf-arrow)"/>
 							</t>
 						</g>
 					</t>

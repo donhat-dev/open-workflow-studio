@@ -125,4 +125,5 @@ This repository contains two Odoo addons:
 - JS files use `/** @odoo-module **/`. Template names follow `module.template_name`. JS file names are `snake_case.js`.
 - Asset ordering matters in `__manifest__.py`: libs/registries/app/store/services/core/utils/shared SCSS/component/view assets are loaded in a deliberate order.
 - Shared styling belongs in `workflow_studio/static/src/scss/` as `$wf-*` tokens and reusable primitives. Component SCSS should consume those shared contracts instead of repeating hardcoded values.
+- For non-trivial UI work, start with `docs/design-system/DESIGN.md`; it is the canonical concise design brief and links to deeper specs/examples when needed. Reuse existing `wf-*` primitives and `--wf-*` / `$wf-*` tokens instead of inventing a parallel design language.
 - Use Odoo hooks such as `useCommand`, `useHotkey`, `useActiveElement`, `useBus`, and `useSubEnv` for editor interactions; avoid raw `window` keyboard listeners.

@@ -1176,8 +1176,7 @@ export class EditorCanvas extends Component {
     }
 
     /**
-     * Calculate socket position based on node position and socket type
-     * Uses centralized DimensionConfig for consistency
+     * Calculate socket position from centralized geometry.
      * @param {Object} node - Node object with x, y
      * @param {string} socketKey - Socket key (e.g., "response", "data")
      * @param {string} socketType - "input" or "output"

@@ -281,18 +281,19 @@
 .workflow-node {
   /* Default dimension variables */
   --node-width: 240px; /* Matches DimensionConfig default */
-  --node-header-height: auto;
-  --node-body-padding: 10px;
-  --socket-spacing: 24px;
-  --socket-radius: 5px;
-  --socket-offset-y: 12px;
-  --input-socket-start-row: 0;
-  --output-socket-start-row: 0;
+  --node-border-width: 2px;
+  --socket-pitch: 24px;
+  --socket-hitbox-size: 10px;
+  --socket-marker-width: 5px;
+  --socket-marker-height: 10px;
+  --wf-node-border-current: #{$wf-node-border-color};
 
   position: absolute;
+  box-sizing: border-box;
+  width: var(--node-width);
   min-width: var(--node-width);
   background: $wf-node-bg;
-  border: 2px solid $wf-node-border-color;
+  border: var(--node-border-width) solid $wf-node-border-color;
   border-radius: 8px;
   box-shadow: $wf-node-shadow;
   z-index: 10;
@@ -450,11 +451,13 @@
 }
 
 .workflow-node:hover {
+  --wf-node-border-current: #{$o-gray-500};
   border-color: $o-gray-500;
   box-shadow: $wf-node-hover-shadow;
 }
 
 .workflow-node.selected {
+  --wf-node-border-current: #{$wf-node-selected-border};
   border-color: $wf-node-selected-border;
   box-shadow: $wf-node-selected-shadow;
   z-index: 15; /* Raise above other nodes (10) when selected */
@@ -477,6 +480,7 @@
 
 /* Disabled Node State */
 .workflow-node.disabled {
+  --wf-node-border-current: #{$o-gray-400};
   opacity: 0.5;
   filter: grayscale(80%);
   border-style: dashed;
@@ -495,6 +499,7 @@
 
 /* Execution Status States (n8n-style) */
 .workflow-node.execution-success {
+  --wf-node-border-current: #{$o-success};
   border-color: $o-success;
   box-shadow: 0 0 0 1px $o-success, 0 2px 8px rgba($o-success, 0.15);
 }
@@ -504,6 +509,7 @@
 // }
 
 .workflow-node.execution-error {
+  --wf-node-border-current: #{$o-danger};
   border-color: $o-danger;
   box-shadow: 0 0 0 1px $o-danger, 0 2px 8px rgba($o-danger, 0.15);
 }
@@ -514,12 +520,13 @@
 
 /* Keep execution styles when also selected */
 .workflow-node.execution-success.selected {
+  --wf-node-border-current: #{$o-success};
   border-color: $o-success;
   box-shadow: 0 0 0 2px $o-success, 0 4px 12px rgba($o-success, 0.2);
-  border-width: 1px;
 }
 
 .workflow-node.execution-error.selected {
+  --wf-node-border-current: #{$o-danger};
   border-color: $o-danger;
   box-shadow: 0 0 0 2px $o-danger, 0 4px 12px rgba($o-danger, 0.2);
 }
@@ -528,6 +535,7 @@
 $wf-pin-color: #7c3aed;
 
 .workflow-node.wf-node--pinned {
+  --wf-node-border-current: #{$wf-pin-color};
   border-color: $wf-pin-color;
   box-shadow: 0 0 0 1px $wf-pin-color, 0 2px 8px rgba($wf-pin-color, 0.15);
 }
@@ -537,6 +545,7 @@ $wf-pin-color: #7c3aed;
 // }
 
 .workflow-node.wf-node--pinned.selected {
+  --wf-node-border-current: #{$wf-pin-color};
   border-color: $wf-pin-color;
   box-shadow: 0 0 0 2px $wf-pin-color, 0 4px 12px rgba($wf-pin-color, 0.2);
 }
@@ -603,6 +612,7 @@ $wf-pin-color: #7c3aed;
 
 /* Running / executing state (info border + pulse) */
 .workflow-node.execution-running {
+  --wf-node-border-current: #{$o-info};
   border-color: $o-info;
   box-shadow: 0 0 0 1px $o-info, 0 2px 8px rgba($o-info, 0.15);
 }
@@ -612,6 +622,7 @@ $wf-pin-color: #7c3aed;
 // }
 
 .workflow-node.execution-running.selected {
+  --wf-node-border-current: #{$o-info};
   border-color: $o-info;
   box-shadow: 0 0 0 2px $o-info, 0 4px 12px rgba($o-info, 0.2);
 }
@@ -630,43 +641,31 @@ $wf-pin-color: #7c3aed;
 .workflow-node__outputs {
   position: absolute;
   top: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  z-index: 1;
+  justify-content: center;
+  z-index: 2;
 }
 
 .workflow-node__inputs {
-  right: calc(100% - var(--socket-radius) * 2);
+  right: calc(100% + var(--node-border-width));
 }
 
 .workflow-node__outputs {
-  left: calc(100% - var(--socket-radius) * 2);
+  left: calc(100% + var(--node-border-width));
 }
 
 /* Individual socket element */
 .workflow-node__socket {
-  height: var(--socket-spacing);
+  height: var(--socket-pitch);
+  overflow: visible;
 }
   .workflow-node__socket--input,
   .workflow-node__socket--output {
     cursor: pointer;
   }
-
-/* First socket vertical alignment (matches DimensionConfig.getSocketPosition) */
-.workflow-node__inputs .workflow-node__socket:first-child {
-  margin-top: calc(
-    var(--node-body-padding) + var(--socket-offset-y) - var(--socket-spacing) /
-      2 + var(--input-socket-start-row, 0) * var(--socket-spacing)
-  );
-}
-
-.workflow-node__outputs .workflow-node__socket:first-child {
-  margin-top: calc(
-    var(--node-body-padding) + var(--socket-offset-y) - var(--socket-spacing) /
-      2 + var(--output-socket-start-row, 0) * var(--socket-spacing)
-  );
-}
 
 /* Input sockets: reverse so dot is rightmost (touching core edge) */
 .workflow-node__socket--input {
@@ -684,17 +683,27 @@ $wf-pin-color: #7c3aed;
 .workflow-node__socket-wrapper {
   position: relative;
   flex: 0 0 auto;
+  color: var(--wf-node-border-current);
 }
 
-/* Keep the layout box aligned with DimensionConfig.socketRadius.
-   The hit area is expanded via ::before so visuals/geometry stay aligned. */
+/* Keep the layout box deterministic for geometry math.
+  The hit area is expanded via ::before so visuals/anchors stay aligned. */
 .workflow-node__socket-point {
-  width: calc(var(--socket-radius) * 2);
-  height: calc(var(--socket-radius) * 2);
+  width: var(--socket-hitbox-size);
+  height: var(--socket-hitbox-size);
   display: flex;
   align-items: center;
-  justify-content: center;
+  overflow: visible;
   position: relative;
+  z-index: 2;
+}
+
+.workflow-node__socket--input .workflow-node__socket-point {
+  justify-content: flex-end;
+}
+
+.workflow-node__socket--output .workflow-node__socket-point {
+  justify-content: flex-start;
 }
 
 .workflow-node__socket-point::before {
@@ -709,12 +718,12 @@ $wf-pin-color: #7c3aed;
   background: rgba($o-black, 0.001);
 }
 
-/* Visible socket marker: crisp filled square */
+/* Visible socket marker: crisp vertical bar */
 .workflow-node__socket-marker {
-  width: 6px;
-  height: 6px;
-  background: $o-black;
-  border-radius: 0;
+  width: var(--socket-marker-width);
+  height: var(--socket-marker-height);
+  background: currentColor;
+  border-radius: 1px;
   pointer-events: none;
 }
 
@@ -746,13 +755,13 @@ $wf-pin-color: #7c3aed;
 }
 
 .workflow-node__socket--output .workflow-node__socket-label {
-  margin-left: 24px; /* Push label out to overlapping area */
+  margin-left: 14px; /* Preserve previous visual offset after moving socket outside */
 }
 
 /* Socket Quick-Add Connector (output only) */
 .socket-quick-add-connector {
   position: absolute; /* Sit behind label */
-  left: 10px; /* Start from socket dot center */
+  left: calc(var(--socket-marker-width) / 2); /* Start from marker center */
   right: -28px; /* Extend past node right edge so button is always visible */
   top: 50%;
   transform: translateY(-50%);

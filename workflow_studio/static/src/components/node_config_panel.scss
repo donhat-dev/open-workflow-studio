@@ -25,6 +25,9 @@
   overflow: hidden; /* Ensure content doesn't push footer out */
 }
 
+$ncp-column-rail-min-height: 44px;
+$ncp-column-rail-padding-x: 16px;
+
 /* Header */
 // ── Header: single-row layout ────────────────────────────────────────────────
 
@@ -41,18 +44,11 @@
 }
 
 // Nav buttons — compact square, full-height
-.ncp-nav-menu {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-
-  summary {
-    list-style: none;
-
-    &::-webkit-details-marker {
-      display: none;
-    }
-  }
+.ncp-nav-popover {
+  padding: 4px;
+  border-radius: $wf-radius-none;
+  border-color: $wf-border-base;
+  box-shadow: $wf-shadow-md;
 }
 
 .ncp-nav-btn {
@@ -75,6 +71,11 @@
     color: $wf-action-color;
   }
 
+  &.is-open {
+    background: $wf-action-soft-bg;
+    color: $wf-action-color;
+  }
+
   &.is-disabled,
   &:disabled {
     opacity: 0.35;
@@ -88,53 +89,82 @@
 }
 
 .ncp-nav-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 220px;
-  padding: 4px;
-  background: $wf-surface-base;
-  border: 1px solid $wf-border-base;
-  border-radius: 8px;
-  box-shadow: $wf-shadow-md;
-  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 2px;
-
-  &.ncp-nav-dropdown--right {
-    left: auto;
-    right: 0;
-  }
+  min-width: 0;
 }
 
 .ncp-nav-dd-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 8px;
   padding: 8px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: $wf-radius-none;
   background: transparent;
   text-align: left;
   cursor: pointer;
-  color: $o-main-text-color;
+  color: $wf-text-base;
 
+  &.is-active,
   &:hover,
   &:focus-visible {
-    background: rgba($o-action, 0.06);
+    background: $wf-action-soft-bg;
+    color: $wf-action-color;
   }
+}
+
+.ncp-nav-dd-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .ncp-nav-dd-title {
   font-size: 0.813rem;
   font-weight: 500;
-  color: $o-main-text-color;
+  color: $wf-text-base;
+
+  .ncp-nav-dd-item.is-active &,
+  .ncp-nav-dd-item:hover &,
+  .ncp-nav-dd-item:focus-visible & {
+    color: $wf-action-color;
+  }
 }
 
 .ncp-nav-dd-meta {
   font-size: 0.75rem;
-  color: $o-gray-500;
+  color: $wf-text-faint;
+
+  .ncp-nav-dd-item.is-active &,
+  .ncp-nav-dd-item:hover &,
+  .ncp-nav-dd-item:focus-visible & {
+    color: $wf-text-muted;
+  }
+}
+
+.ncp-nav-dd-default {
+  align-self: center;
+  padding: 1px 6px;
+  border: 1px solid rgba($wf-action-color, 0.18);
+  border-radius: $wf-radius-none;
+  background: rgba($wf-action-color, 0.04);
+  color: $wf-text-muted;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  .ncp-nav-dd-item.is-active &,
+  .ncp-nav-dd-item:hover &,
+  .ncp-nav-dd-item:focus-visible & {
+    border-color: rgba($wf-action-color, 0.28);
+    color: $wf-action-color;
+  }
 }
 
 // Identity: icon badge + title
@@ -217,6 +247,25 @@
 
 // Actions area (trigger status + close btn)
 .ncp-header-actions {
+  flex: 0 0 auto;
+  gap: 0;
+}
+
+.ncp-header-actions-status {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.ncp-trigger-action-btn {
+  flex-shrink: 0;
+
+  & + .ncp-trigger-action-btn {
+    margin-left: -1px;
+  }
+}
+
+.ncp-header-nav-cluster {
   flex: 0 0 auto;
 }
 
@@ -364,6 +413,19 @@
   overflow: hidden;
 }
 
+.node-config-col-config > .wf-tab-nav,
+.trigger-config-panel > .wf-tab-nav {
+  min-height: $ncp-column-rail-min-height;
+  border-bottom: 1px solid $wf-border-base;
+  background: $wf-surface-base;
+}
+
+.node-config-col-config > .wf-tab-nav .wf-tab-btn,
+.trigger-config-panel > .wf-tab-nav .wf-tab-btn {
+  min-height: $ncp-column-rail-min-height;
+  padding: 0 $ncp-column-rail-padding-x;
+}
+
 .node-config-col-config .node-config-tabs {
   flex-shrink: 0;
   border-bottom: 1px solid $o-gray-300;
@@ -403,21 +465,22 @@
 /* ============================================ */
 
 .col-panel-header {
-  padding: 4px 16px;
-  padding-bottom: 3px;
-  border-bottom: 1px solid $o-gray-300;
-  color: $o-gray-700;
+  min-height: $ncp-column-rail-min-height;
+  padding: 0 $ncp-column-rail-padding-x;
+  border-bottom: 1px solid $wf-border-base;
+  background: $wf-surface-base;
+  color: $wf-text-muted-strong;
   flex-shrink: 0;
 }
 
 .col-panel-header i {
-  color: $o-action;
+  color: $wf-action-color;
 }
 
 .col-panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 10px;
   min-height: 0;
 }
 
@@ -444,62 +507,57 @@
 
 /* Output column specific styles */
 .output-tree-container {
-  padding: 4px;
+  padding: 2px;
 }
 
 /* Pin toggle button in output header */
 .pin-toggle-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid $o-gray-300;
-  border-radius: 6px;
-  background: $o-white;
-  color: $o-gray-600;
-  font-size: 0.875rem;
-  line-height: 1;
-  transition: color 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
-
-  &:hover {
-    border-color: rgba($o-warning, 0.45);
-    background: rgba($o-warning, 0.06);
-    color: $o-warning;
-  }
+  flex-shrink: 0;
+  color: $wf-text-muted;
 
   &.pin-active {
-    border-color: rgba($o-warning, 0.55);
-    background: rgba($o-warning, 0.08);
-    color: $o-warning;
+    color: $wf-warning-color;
+    background: $wf-warning-soft-bg;
+    box-shadow: inset 0 0 0 1px rgba($wf-warning-color, 0.18);
   }
 
-  &:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba($o-warning, 0.18);
+  &:hover:not(:disabled):not(.disabled),
+  &:focus-visible {
+    color: $wf-warning-color;
+    background: $wf-warning-soft-bg;
   }
 
   &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-    background: $o-gray-100;
-    color: $o-gray-400;
-    border-color: $o-gray-300;
-    box-shadow: none;
+    opacity: 0.4;
   }
 }
 
 /* Pinned data banner */
 .pinned-data-banner {
-  background: rgba($o-warning, 0.08);
-  color: $o-gray-700;
-  font-size: 0.813rem;
   flex-shrink: 0;
+  align-items: center;
+  border-bottom: 1px solid $wf-border-base;
 
-  i {
-    font-size: 0.75rem;
+  .wf-banner-title {
+    display: block;
+    font-size: 0.78rem;
+    letter-spacing: 0.01em;
   }
+
+  .wf-banner-text {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+}
+
+.pinned-data-banner__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pinned-data-banner__dismiss {
+  flex-shrink: 0;
 }
 
 .output-error-banner {
@@ -534,24 +592,28 @@
 
 .output-socket-tabs {
   flex-shrink: 0;
-  gap: 0;
-  background: $o-gray-100;
+  padding: 8px 12px;
+  border-bottom: 1px solid $wf-border-base;
+  background: $wf-surface-base;
+  overflow-x: auto;
 
-  .output-socket-tab {
-    font-size: 0.75rem;
-    color: $o-gray-600;
-    transition: color 0.15s;
-
-    &:hover {
-      color: $o-gray-900;
-    }
-
-    &.active {
-      color: $o-action;
-      border-bottom-width: 2px !important;
-    }
+  .wf-toggle {
+    min-width: max-content;
   }
 }
+
+.output-socket-tab {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+
+.output-socket-tab.active,
+.output-socket-tab.is-active {
+  font-weight: 600;
+  }
 
 .output-empty-hint {
   padding: 40px 16px;
@@ -670,6 +732,9 @@
   font-weight: 500;
   padding: 2px 8px;
   border-radius: 10px;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
 }
 
 .execution-status-badge.status-success {
@@ -1011,7 +1076,7 @@
 /* ============================================ */
 
 .ancestor-node-section {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   border: 1px solid $o-gray-300;
   border-radius: 6px;
   overflow: hidden;
@@ -1020,8 +1085,8 @@
 .ancestor-node-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 7px;
+  padding: 7px 10px;
   background: $o-view-background-color;
   font-size: 12px;
   font-weight: 500;
@@ -1051,7 +1116,7 @@
 }
 
 .ancestor-node-data {
-  padding: 8px;
+  padding: 6px;
   background: $o-gray-100;
   max-height: 80%;
   overflow-y: auto;

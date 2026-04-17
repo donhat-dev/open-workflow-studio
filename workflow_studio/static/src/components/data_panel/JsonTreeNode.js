@@ -56,6 +56,9 @@ export class JsonTreeNode extends Component {
     }
 
     get initialExpandState() {
+        if (this.shouldFlattenRoot) {
+            return true;
+        }
         if (!this.hasChildren) {
             return false;
         }
@@ -101,6 +104,13 @@ export class JsonTreeNode extends Component {
 
     get childLevel() {
         return this.currentLevel + 1;
+    }
+
+    get shouldFlattenRoot() {
+        return this.currentLevel === 0 &&
+            this.props.keyName === undefined &&
+            this.hasChildren &&
+            !this.isRecordRefMarker;
     }
 
     get isObject() {

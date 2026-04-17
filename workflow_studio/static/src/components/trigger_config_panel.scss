@@ -19,11 +19,12 @@
 }
 
 .trigger-config-panel__output {
-    background: $wf-surface-subtle;
+    background: $o-gray-100;
 }
 
 .trigger-config-panel__body {
     min-height: 0;
+    padding: 16px;
 }
 
 .trigger-panel-state {
@@ -32,36 +33,36 @@
 
 .trigger-card {
     border: 1px solid $wf-border-base;
-    border-radius: $wf-radius-lg;
+    border-radius: $wf-radius-md;
     background: $wf-surface-base;
-    box-shadow: $wf-shadow-sm;
+    box-shadow: none;
 
     & + .trigger-card {
-        margin-top: 1rem;
+        margin-top: 0.75rem;
     }
 }
 
 .trigger-card__header {
-    padding: 0.875rem 1rem 0.75rem;
+    padding: 0.75rem 0.875rem 0.625rem;
     border-bottom: 1px solid $wf-border-base;
 
     h4 {
-        margin: 0 0 0.375rem;
-        font-size: 1rem;
+        margin: 0 0 0.25rem;
+        font-size: 0.9375rem;
         font-weight: 600;
-        color: $o-gray-900;
+        color: $wf-text-base;
     }
 
     p {
         margin: 0;
-        color: $o-gray-500;
+        color: $wf-text-muted;
         font-size: 0.8125rem;
         line-height: 1.45;
     }
 }
 
 .trigger-card__body {
-    padding: 0.875rem 1rem 1rem;
+    padding: 0.75rem 0.875rem 0.875rem;
 
     // Label / value contrast: field labels are muted, values pop
     .form-label {
@@ -77,29 +78,33 @@
 .trigger-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.3rem 0.7rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: $wf-radius-sm;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    background: $o-gray-100;
-    color: $o-gray-700;
+    background: $wf-surface-subtle;
+    color: $wf-text-muted-strong;
 
     &.is-active {
-        background: rgba($o-success, 0.12);
+        border-color: rgba($o-success, 0.14);
+        background: $wf-success-soft-bg;
         color: $o-success;
     }
 
     &.is-inactive {
-        background: rgba($o-warning, 0.12);
+        border-color: rgba($o-warning, 0.18);
+        background: $wf-warning-soft-bg;
         color: $o-warning;
     }
 }
 
 .trigger-badge--soft {
-    font-size: 0.6875rem;
-    padding: 0.2rem 0.5rem;
+    font-size: 0.625rem;
+    padding: 2px 8px;
 }
 
 .trigger-inline-note {
@@ -114,12 +119,12 @@
 
 .trigger-webhook-tabs {
     .wf-tab-nav {
-        border-bottom-color: $o-gray-200;
+        border-bottom-color: $wf-border-base;
     }
 
     // Extra breathing room between tab content and tab strip
     > .trigger-webhook-tabs {
-        padding-top: 0.5rem;
+        padding-top: 0.375rem;
     }
 }
 
@@ -149,7 +154,7 @@
     text-transform: none;
     letter-spacing: normal;
     line-height: 1.4;
-    color: $o-gray-500;
+    color: $wf-text-muted;
 }
 
 .trigger-output-panel {
@@ -163,15 +168,15 @@
     border: 1px solid $wf-border-base;
     border-radius: $wf-radius-md;
     background: $wf-surface-base;
-    margin-top: 0.5rem;
-    border-top: 2px solid $wf-border-base;
+    margin-top: 0;
 }
 
 .trigger-output-empty {
-    min-height: 130px;
+    min-height: 112px;
     border: 1px dashed $o-gray-300;
-    border-radius: $wf-radius-lg;
+    border-radius: $wf-radius-md;
     background: $wf-surface-subtle;
+    padding: 28px 16px;
 
     p {
         font-weight: 600;
@@ -185,7 +190,7 @@
 }
 
 .trigger-output-empty--compact {
-    min-height: 110px;
+    min-height: 96px;
 }
 
 .trigger-field-grid {

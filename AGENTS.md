@@ -97,6 +97,7 @@ workflow_studio/                  # Core workflow editor + backend execution
 | **Manifest assets** | Use glob patterns; asset order: libs → registries → services → core → nodes → utils → components | `workflow_studio/__manifest__.py:19-60` |
 | **SCSS architecture** | Shared module styling contracts live in `workflow_studio/static/src/scss/`; load them in order `primary_variables.scss` → `secondary_variables.scss` → `bootstrap_overridden.scss` → `shared_primitives.scss` before component SCSS. | `workflow_studio/__manifest__.py:40-50`; `workflow_studio/static/src/scss/primary_variables.scss:1-26`; `workflow_studio/static/src/scss/secondary_variables.scss:1-41`; `workflow_studio/static/src/scss/shared_primitives.scss:1-365` |
 | **SCSS usage** | Shared colors/shadows/radii/states should be declared as `$wf-*` tokens in the shared SCSS layer; reusable visual contracts (shells/actions/helpers/status/list patterns) should live in `shared_primitives.scss`; component SCSS should consume those contracts instead of repeating hardcoded values. | `workflow_studio/static/src/scss/primary_variables.scss:1-26`; `workflow_studio/static/src/scss/secondary_variables.scss:1-41`; `workflow_studio/static/src/scss/shared_primitives.scss:1-365` |
+| **Design workflow** | For non-trivial UI work, start with `docs/design-system/DESIGN.md`; it is the canonical design brief and links onward to deeper specs/examples when needed. Reuse existing `wf-*` primitives and `--wf-*` / `$wf-*` tokens before inventing new styling patterns or component names. | `docs/design-system/DESIGN.md`; `workflow_studio/static/src/scss/shared_primitives.scss:1-365`; `workflow_studio/static/src/scss/primary_variables.scss:1-26`; `workflow_studio/static/src/scss/secondary_variables.scss:1-41` |
 | **UI taxonomy** | Use `wf-tab-nav` for peer navigation, `wf-segmented-toggle` for local mutually exclusive states/filters (including Input/Output visibility), `wf-status-badge` for compact state labels, and `wf-inline-banner` / `wf-helper-text` for feedback layers. | `workflow_studio/static/src/scss/shared_primitives.scss:24-70,109-185,282-335` |
 | **Feature gating** | Gate disabled features with a const flag + early return; keep services registered | `knowledge/editor_canvas_refactor_mistakes.md` |
 | **Bus usage** | Use bus for global events (e.g., save/execute) and scoped model/service events. Prefer direct actions/callbacks for local UI. | `workflow_studio/static/src/store/workflow_store.js:85`; `workflow_studio/static/src/app/workflow_editor_app.js:63-72` |
@@ -107,6 +108,14 @@ workflow_studio/                  # Core workflow editor + backend execution
 | **Node types** | Node types seeded via XML; manual trigger is a start node (no inputs) | `workflow_studio/data/workflow_type_data.xml`; `workflow_studio/static/src/nodes/manual_trigger.js` |
 | **Node runners** | Keep per-node runners under `models/runners/`; each must subclass `BaseNodeRunner` and implement `execute(node_config, input_data, context)` | `workflow_studio/models/runners/base.py:240-260` |
 | **t-props** | Bundle complex/long props (including callbacks) via `t-props` to keep templates clean | `workflow_studio/static/src/components/workflow_node.xml:6,20,27` |
+
+### UI & Design System
+
+For any non-trivial UI task, start with the canonical local brief in [`docs/design-system/DESIGN.md`](docs/design-system/DESIGN.md). That file is the single instruction entrypoint for UI work in this repo and links to deeper specs/examples when more detail is needed.
+
+- Prefer existing `wf-*` primitives and `shared_primitives.scss` contracts over creating parallel component taxonomies. Source: `docs/design-system/DESIGN.md`; `workflow_studio/static/src/scss/shared_primitives.scss:1-365`
+- Prefer existing `--wf-*` / `$wf-*` tokens over raw one-off values for color, spacing, radius, and shadows. Source: `docs/design-system/DESIGN.md`; `workflow_studio/static/src/scss/primary_variables.scss:1-26`; `workflow_studio/static/src/scss/secondary_variables.scss:1-41`
+- If `DESIGN.md` points to deeper spec or examples for a missing detail, follow those linked docs instead of inventing a parallel design language. Source: `docs/design-system/DESIGN.md`
 
 ### OWL Framework
 

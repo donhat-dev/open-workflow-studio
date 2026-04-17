@@ -20,16 +20,17 @@ export function estimateNodeHeight(node, dims) {
 
     const inputCount = Object.keys(node.inputs || {}).length;
     const outputCount = Object.keys(node.outputs || {}).length;
-    const rows = Math.max(inputCount, outputCount, 1);
+    const rowCount = Math.max(inputCount, outputCount, 0);
+    const socketPitch = dims.socketPitch ?? dims.socketSpacing ?? 24;
+    const socketClearanceY = dims.socketClearanceY ?? dims.nodeBodyPadding ?? 10;
+    const socketMinRows = dims.socketMinRows ?? 2;
+    const nodeChromeMinHeight = dims.nodeChromeMinHeight ?? 68;
+    const layoutRows = rowCount ? Math.max(rowCount, socketMinRows) : 0;
+    const socketDrivenMinHeight = layoutRows
+        ? (layoutRows * socketPitch) + (socketClearanceY * 2)
+        : 0;
 
-    // Conservative estimate; OK if slightly larger than actual DOM.
-    return (
-        dims.nodeHeaderHeight +
-        (dims.nodeBodyPadding * 2) +
-        dims.socketOffsetY +
-        (Math.max(0, rows - 1) * dims.socketSpacing) +
-        (dims.socketRadius * 2)
-    );
+    return Math.max(nodeChromeMinHeight, socketDrivenMinHeight);
 }
 
 function getFitZoom(mode, canvasRect, contentWidth, contentHeight, topOffsetPx) {

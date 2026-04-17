@@ -12,36 +12,8 @@
 	</t>
 
 	<t t-name="workflow_studio.ConfigPanel.Header">
-		<!-- Single-row header: [← prev] [icon · title] [Execute] [sep] [status · close] [→ next] -->
+		<!-- Single-row header: [icon · title] [Execute] [trigger actions] [←][→][×] -->
 		<div class="ncp-header d-flex align-items-stretch border-bottom" t-att-class="{ 'ncp-header--trigger': isTriggerNode }">
-
-			<!-- PREV NAV -->
-			<t t-if="props.onNavigateToNode">
-				<t t-set="prevNav" t-value="previousNavigation"/>
-				<t t-if="prevNav.hasMultiple">
-					<details class="ncp-nav-menu">
-						<summary class="ncp-nav-btn" title="Previous nodes">
-							<i class="fa fa-arrow-left"/>
-							<i class="fa fa-caret-down ncp-nav-caret"/>
-						</summary>
-						<div class="ncp-nav-dropdown">
-							<t t-foreach="prevNav.options" t-as="opt" t-key="opt.key">
-								<button type="button" class="ncp-nav-dd-item" t-on-click="() => this.onNavigateToNode(opt.nodeId)">
-									<span class="ncp-nav-dd-title" t-esc="opt.title"/>
-									<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
-								</button>
-							</t>
-						</div>
-					</details>
-				</t>
-				<button t-elif="prevNav.primary" type="button" class="ncp-nav-btn" title="Previous node" t-on-click="() => this.onNavigateToNode(prevNav.primary.nodeId)">
-					<i class="fa fa-arrow-left"/>
-				</button>
-				<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No previous node">
-					<i class="fa fa-arrow-left"/>
-				</button>
-				<div class="ncp-header-sep"/>
-			</t>
 
 			<!-- IDENTITY: node icon + title -->
 			<div class="ncp-header-identity d-flex align-items-center gap-2 flex-grow-1 min-w-0 px-3 py-2">
@@ -57,7 +29,6 @@
 							<span class="text-truncate d-block" t-esc="nodeTitle"/>
 						</t>
 					</div>
-					<div t-if="isTriggerNode and triggerHeaderSummary" class="ncp-subtitle" t-esc="triggerHeaderSummary"/>
 				</div>
 			</div>
 
@@ -70,58 +41,85 @@
 				</button>
 			</t>
 
-			<!-- ACTIONS: status labels + trigger btns + close -->
-			<div class="ncp-header-sep"/>
-			<div class="ncp-header-actions d-flex align-items-center gap-2 px-2">
-				<t t-if="isTriggerNode and triggerHeaderStatusLabel">
-					<span class="trigger-badge" t-att-class="triggerHeaderStatusClass" t-esc="triggerHeaderStatusLabel"/>
-				</t>
-				<t t-if="isTriggerNode">
+			<!-- ACTIONS: trigger-only controls -->
+			<t t-if="isTriggerNode">
+				<div class="ncp-header-sep"/>
+				<div class="ncp-header-actions d-flex align-items-stretch">
 					<t t-foreach="triggerHeaderButtons" t-as="button" t-key="button.id">
-						<button class="btn btn-sm" t-att-class="button.className" t-on-click="button.onClick" t-att-disabled="button.disabled ? 'disabled' : undefined" type="button">
+						<button class="ncp-execute-btn ncp-trigger-action-btn btn d-flex align-items-center gap-2" t-att-class="button.className" t-on-click="button.onClick" t-att-disabled="button.disabled ? 'disabled' : undefined" type="button">
 							<i t-if="button.icon" t-att-class="'fa ' + button.icon + ' me-1'"/>
 							<t t-esc="button.label"/>
 						</button>
 					</t>
+				</div>
+			</t>
+
+			<div class="ncp-header-sep"/>
+			<div class="ncp-header-nav-cluster d-flex align-items-stretch">
+				<t t-if="props.onNavigateToNode">
+					<t t-set="prevNav" t-value="previousNavigation"/>
+					<t t-if="prevNav.hasMultiple">
+						<Dropdown manual="true" holdOnHover="true" state="getNavDropdownState('previous')" menuClass="'ncp-nav-popover ncp-nav-popover--previous'" position="'bottom-start'" onOpened="() => this.onNavDropdownOpened('previous')">
+							<button type="button" class="ncp-nav-btn" t-att-class="{ 'is-open': getNavDropdownState('previous').isOpen }" title="Previous nodes" t-on-click="(ev) => this.onPrimaryNavClick('previous', ev)" t-on-mouseenter="(ev) => this.onNavTriggerMouseEnter('previous', ev)" t-on-mouseleave="() => this.onNavTriggerMouseLeave('previous')">
+								<i class="fa fa-arrow-left"/>
+								<i class="fa fa-caret-down ncp-nav-caret"/>
+							</button>
+							<t t-set-slot="content">
+								<div class="ncp-nav-dropdown" t-att-style="getNavMenuStyle('previous')" t-on-mouseenter="() => this.onNavMenuMouseEnter('previous')" t-on-mouseover="(ev) => this.onNavMenuMouseOver('previous', ev)" t-on-mouseleave="() => this.onNavMenuMouseLeave('previous')">
+									<t t-foreach="prevNav.options" t-as="opt" t-key="opt.key">
+										<DropdownItem class="getNavItemClass('previous', opt)" attrs="getNavItemAttrs('previous', opt)" onSelected="() => this.onNavOptionSelected('previous', opt)">
+											<span class="ncp-nav-dd-main">
+												<span class="ncp-nav-dd-title" t-esc="opt.title"/>
+												<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
+											</span>
+											<span t-if="isPrimaryNavOption('previous', opt)" class="ncp-nav-dd-default">Default</span>
+										</DropdownItem>
+									</t>
+								</div>
+							</t>
+						</Dropdown>
+					</t>
+					<button t-elif="prevNav.primary" type="button" class="ncp-nav-btn" title="Previous node" t-on-click="() => this.onNavigateToNode(prevNav.primary.nodeId)">
+						<i class="fa fa-arrow-left"/>
+					</button>
+					<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No previous node">
+						<i class="fa fa-arrow-left"/>
+					</button>
+					<div class="ncp-header-sep"/>
+					<t t-set="nextNav" t-value="nextNavigation"/>
+					<t t-if="nextNav.hasMultiple">
+						<Dropdown manual="true" holdOnHover="true" state="getNavDropdownState('next')" menuClass="'ncp-nav-popover ncp-nav-popover--next'" position="'bottom-end'" onOpened="() => this.onNavDropdownOpened('next')">
+							<button type="button" class="ncp-nav-btn" t-att-class="{ 'is-open': getNavDropdownState('next').isOpen }" title="Next nodes" t-on-click="(ev) => this.onPrimaryNavClick('next', ev)" t-on-mouseenter="(ev) => this.onNavTriggerMouseEnter('next', ev)" t-on-mouseleave="() => this.onNavTriggerMouseLeave('next')">
+								<i class="fa fa-arrow-right"/>
+								<i class="fa fa-caret-down ncp-nav-caret"/>
+							</button>
+							<t t-set-slot="content">
+								<div class="ncp-nav-dropdown" t-att-style="getNavMenuStyle('next')" t-on-mouseenter="() => this.onNavMenuMouseEnter('next')" t-on-mouseover="(ev) => this.onNavMenuMouseOver('next', ev)" t-on-mouseleave="() => this.onNavMenuMouseLeave('next')">
+									<t t-foreach="nextNav.options" t-as="opt" t-key="opt.key">
+										<DropdownItem class="getNavItemClass('next', opt)" attrs="getNavItemAttrs('next', opt)" onSelected="() => this.onNavOptionSelected('next', opt)">
+											<span class="ncp-nav-dd-main">
+												<span class="ncp-nav-dd-title" t-esc="opt.title"/>
+												<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
+											</span>
+											<span t-if="isPrimaryNavOption('next', opt)" class="ncp-nav-dd-default">Default</span>
+										</DropdownItem>
+									</t>
+								</div>
+							</t>
+						</Dropdown>
+					</t>
+					<button t-elif="nextNav.primary" type="button" class="ncp-nav-btn" title="Next node" t-on-click="() => this.onNavigateToNode(nextNav.primary.nodeId)">
+						<i class="fa fa-arrow-right"/>
+					</button>
+					<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No next node">
+						<i class="fa fa-arrow-right"/>
+					</button>
+					<div class="ncp-header-sep"/>
 				</t>
-				<t t-if="executionStatus !== 'idle'">
-					<span class="execution-status-badge" t-att-class="'status-' + executionStatus">
-						<i t-att-class="executionStatus === 'success' ? 'fa fa-check-circle' : executionStatus === 'error' ? 'fa fa-exclamation-circle' : 'fa fa-spinner fa-spin'"/>
-						<span t-esc="executionStatus === 'success' ? 'Success' : executionStatus === 'error' ? 'Error' : 'Running'"/>
-					</span>
-				</t>
-				<button class="node-config-icon-btn btn btn-sm btn-link p-0 border-0" t-on-click="onClose" title="Close" type="button">
+				<button class="ncp-nav-btn ncp-nav-btn--close" t-on-click="onClose" title="Close" type="button">
 					<i class="fa fa-times"/>
 				</button>
 			</div>
-
-			<!-- NEXT NAV -->
-			<t t-if="props.onNavigateToNode">
-				<div class="ncp-header-sep"/>
-				<t t-set="nextNav" t-value="nextNavigation"/>
-				<t t-if="nextNav.hasMultiple">
-					<details class="ncp-nav-menu">
-						<summary class="ncp-nav-btn" title="Next nodes">
-							<i class="fa fa-caret-down ncp-nav-caret"/>
-							<i class="fa fa-arrow-right"/>
-						</summary>
-						<div class="ncp-nav-dropdown ncp-nav-dropdown--right">
-							<t t-foreach="nextNav.options" t-as="opt" t-key="opt.key">
-								<button type="button" class="ncp-nav-dd-item" t-on-click="() => this.onNavigateToNode(opt.nodeId)">
-									<span class="ncp-nav-dd-title" t-esc="opt.title"/>
-									<span t-if="opt.socketLabel" class="ncp-nav-dd-meta" t-esc="opt.socketLabel"/>
-								</button>
-							</t>
-						</div>
-					</details>
-				</t>
-				<button t-elif="nextNav.primary" type="button" class="ncp-nav-btn" title="Next node" t-on-click="() => this.onNavigateToNode(nextNav.primary.nodeId)">
-					<i class="fa fa-arrow-right"/>
-				</button>
-				<button t-else="" type="button" class="ncp-nav-btn is-disabled" disabled="disabled" title="No next node">
-					<i class="fa fa-arrow-right"/>
-				</button>
-			</t>
 
 		</div>
 	</t>
@@ -234,7 +232,7 @@
 	<div class="trigger-config-panel d-flex flex-column h-100">
 		<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
 			<div class="tab-content trigger-config-tab-content p-0 d-flex flex-column h-100">
-				<div class="trigger-config-panel__body flex-grow-1 overflow-auto px-4 py-4">
+					<div class="trigger-config-panel__body flex-grow-1 overflow-auto">
 					<t t-if="state.activeTab === 'parameters'">
 						<div t-if="state.triggerLoading" class="trigger-panel-state text-center text-muted py-5">
 							<i class="fa fa-spinner fa-spin me-2"/>
@@ -385,14 +383,14 @@
 <t t-name="workflow_studio.ConfigPanel.Output">
 	<t t-if="isTriggerNode">
 		<div class="trigger-config-panel__output node-config-col-output col-5 d-flex flex-column border-start">
-			<div class="col-panel-header d-flex align-items-start justify-content-between gap-3 text-uppercase small fw-bold">
-				<div>
+				<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
 					<div class="d-flex align-items-center gap-2">
 						<i class="fa fa-terminal"/>
 						<span t-esc="triggerOutputTitle"/>
+						<t t-if="triggerHeaderStatusLabel">
+							<span class="trigger-badge" t-att-class="triggerHeaderStatusClass" t-esc="triggerHeaderStatusLabel"/>
+						</t>
 					</div>
-					<div class="trigger-output-subtitle text-muted text-lowercase fw-normal mt-1" t-esc="triggerOutputSubtitle"/>
-				</div>
 			</div>
 			<div class="col-panel-content trigger-output-panel">
 				<t t-if="isWebhookTrigger">
@@ -420,14 +418,20 @@
 		</div>
 	</t>
 	<t t-else="">
-		<div class="node-config-col-output d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
+		<div class="node-config-col-output wf-container d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
 			<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
 				<div class="d-flex align-items-center gap-2">
 					<i class="fa fa-terminal"/>
 					<span>OUTPUT</span>
+					<t t-if="executionStatus !== 'idle'">
+						<span class="execution-status-badge" t-att-class="'status-' + executionStatus">
+							<i t-att-class="executionStatus === 'success' ? 'fa fa-check-circle' : executionStatus === 'error' ? 'fa fa-exclamation-circle' : 'fa fa-spinner fa-spin'"/>
+							<span t-esc="executionStatus === 'success' ? 'Success' : executionStatus === 'error' ? 'Failed' : 'Running'"/>
+						</span>
+					</t>
 				</div>
 				<div class="d-flex align-items-center gap-2">
-					<button t-if="!isExecutionView" class="btn btn-sm pin-toggle-btn" t-att-class="{ 'pin-active': isNodePinned }" t-on-click="onTogglePin" t-att-disabled="isPinButtonDisabled ? 'disabled' : undefined" t-att-title="isNodePinned ? 'Unpin data (resume live execution)' : 'Pin output data (skip execution)'" type="button">
+					<button t-if="!isExecutionView" class="pin-toggle-btn wf-btn wf-btn-ghost wf-btn-icon" t-att-class="{ 'pin-active': isNodePinned }" t-on-click="onTogglePin" t-att-disabled="isPinButtonDisabled ? 'disabled' : undefined" t-att-title="isNodePinned ? 'Unpin data (resume live execution)' : 'Pin output data (skip execution)'" type="button">
 						<i t-if="state.pinBusy" class="fa fa-spinner fa-spin"/>
 						<i t-else="" t-att-class="'fa ' + (isNodePinned ? 'fa-thumb-tack text-warning' : 'fa-thumb-tack')"/>
 					</button>
@@ -447,19 +451,24 @@
 					</t>
 				</div>
 			</div>
-			<div t-if="isNodePinned" class="pinned-data-banner d-flex align-items-center gap-2 px-3 py-2 border-bottom">
-				<i class="fa fa-thumb-tack text-warning"/>
-				<span class="small">Pinned to saved run data — this node will skip runner execution in editor runs</span>
-				<button class="btn btn-sm btn-link p-0 ms-auto text-muted" t-on-click="onTogglePin" t-att-disabled="state.pinBusy ? 'disabled' : undefined" title="Unpin" type="button">
+			<div t-if="isNodePinned" class="pinned-data-banner wf-banner wf-banner-warning">
+				<i class="pinned-data-banner__icon wf-banner-icon fa fa-thumb-tack"/>
+				<div class="pinned-data-banner__body wf-banner-body">
+					<span class="wf-banner-title">Pinned to saved run data</span>
+					<p class="wf-banner-text">This node will skip runner execution in editor runs</p>
+				</div>
+				<button class="pinned-data-banner__dismiss wf-btn wf-btn-ghost wf-btn-icon wf-btn-sm" t-on-click="onTogglePin" t-att-disabled="state.pinBusy ? 'disabled' : undefined" title="Unpin" type="button">
 					<i class="fa fa-times"/>
 				</button>
 			</div>
-			<div t-if="outputSocketTabs.length > 0" class="output-socket-tabs d-flex border-bottom">
-				<t t-foreach="outputSocketTabs" t-as="tab" t-key="tab.id">
-					<button type="button" class="output-socket-tab btn btn-sm btn-link text-decoration-none px-3 py-1 rounded-0 border-0" t-att-class="{ 'active fw-semibold border-bottom border-primary': tab.id === activeOutputSocket }" t-on-click="() => this.onOutputSocketClick(tab.id)">
-						<t t-esc="tab.label"/>
-					</button>
-				</t>
+			<div t-if="outputSocketTabs.length > 0" class="output-socket-tabs">
+				<div class="wf-toggle wf-toggle-sm">
+					<t t-foreach="outputSocketTabs" t-as="tab" t-key="tab.id">
+						<button type="button" class="output-socket-tab wf-toggle-item" t-att-class="{ active: tab.id === activeOutputSocket, 'is-active': tab.id === activeOutputSocket }" t-on-click="() => this.onOutputSocketClick(tab.id)">
+							<t t-esc="tab.label"/>
+						</button>
+					</t>
+				</div>
 			</div>
 			<div class="col-panel-content">
 				<t t-if="executionDisplayResult">

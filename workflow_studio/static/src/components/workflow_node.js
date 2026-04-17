@@ -472,22 +472,18 @@ export class WorkflowNode extends Component {
             }
         }
 
-        if (dimensionConfig && typeof dimensionConfig.getSocketStartRow === "function") {
-            styles += `--input-socket-start-row:${dimensionConfig.getSocketStartRow(this.props.node, "input")};`;
-            styles += `--output-socket-start-row:${dimensionConfig.getSocketStartRow(this.props.node, "output")};`;
-        }
-
-        // min-height: ensures node extends to cover all socket positions
-        const maxSockets = Math.max(this.inputEntries.length, this.outputEntries.length);
-        if (maxSockets > 0) {
-            const dc = dimensionConfig || {};
-            const layoutRowCount = Math.max(maxSockets, 2);
-            const bodyPad = dc.nodeBodyPadding || 10;
-            const sockOffY = dc.socketOffsetY || 12;
-            const sockSpacing = dc.socketSpacing || 24;
-            const minH = bodyPad + sockOffY + ((layoutRowCount - 1) * sockSpacing) + sockOffY + bodyPad;
-            styles += `min-height:${minH}px;`;
-        }
+        const dc = dimensionConfig || {};
+        const maxSockets = Math.max(this.inputEntries.length, this.outputEntries.length, 0);
+        const socketPitch = dc.socketPitch ?? 24;
+        const socketMinRows = dc.socketMinRows ?? 2;
+        const socketClearanceY = dc.socketClearanceY ?? 10;
+        const nodeChromeMinHeight = dc.nodeChromeMinHeight ?? 68;
+        const layoutRowCount = maxSockets ? Math.max(maxSockets, socketMinRows) : 0;
+        const socketDrivenMinHeight = layoutRowCount
+            ? (layoutRowCount * socketPitch) + (socketClearanceY * 2)
+            : 0;
+        const minHeight = Math.max(nodeChromeMinHeight, socketDrivenMinHeight);
+        styles += `min-height:${minHeight}px;`;
 
         return styles;
     }
