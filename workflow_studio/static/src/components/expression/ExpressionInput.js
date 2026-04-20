@@ -23,6 +23,24 @@ import {
 
 let nextSuggestionMenuId = 1;
 
+// Matches {paramName} — single-brace path parameter placeholders
+const PATH_PARAM_REGEX = /\{(\w+)\}/g;
+
+/**
+ * Extract path parameter segments from a string value.
+ * Returns array of { start, end, full, name }.
+ */
+function extractPathParams(value) {
+    const str = typeof value === "string" ? value : "";
+    const result = [];
+    PATH_PARAM_REGEX.lastIndex = 0;
+    let match;
+    while ((match = PATH_PARAM_REGEX.exec(str)) !== null) {
+        result.push({ start: match.index, end: match.index + match[0].length, full: match[0], name: match[1] });
+    }
+    return result;
+}
+
 /**
  * ExpressionInput Component
  *
@@ -188,33 +206,62 @@ export class ExpressionInput extends Component {
         return this.isExpression && extractExpressions(this.currentValue).length > 0;
     }
 
+    get hasPathParamHighlights() {
+        return extractPathParams(this.currentValue).length > 0;
+    }
+
+    get hasAnyHighlights() {
+        return this.hasExpressionHighlights || this.hasPathParamHighlights;
+    }
+
     get highlightSegments() {
         const value = this.currentValue || "";
-        const expressions = extractExpressions(value);
 
-        if (!expressions.length) {
-            return [{ id: 0, text: value, isExpression: false }];
+        // Collect all markers: expression segments (green) + path param segments (blue)
+        const allMarkers = [];
+
+        if (this.isExpression) {
+            for (const match of extractExpressions(value)) {
+                allMarkers.push({ start: match.start, end: match.end, full: match.full, isExpression: true, isPathParam: false });
+            }
+        }
+
+        // Add path param markers only for positions not already covered by an expression marker
+        const expressionRanges = allMarkers.map((m) => [m.start, m.end]);
+        for (const param of extractPathParams(value)) {
+            const overlaps = expressionRanges.some(([s, e]) => param.start >= s && param.end <= e);
+            if (!overlaps) {
+                allMarkers.push({ start: param.start, end: param.end, full: param.full, isExpression: false, isPathParam: true });
+            }
+        }
+
+        allMarkers.sort((a, b) => a.start - b.start);
+
+        if (!allMarkers.length) {
+            return [{ id: 0, text: value, isExpression: false, isPathParam: false }];
         }
 
         const segments = [];
         let cursor = 0;
 
-        for (let index = 0; index < expressions.length; index++) {
-            const match = expressions[index];
-            if (match.start > cursor) {
+        for (let index = 0; index < allMarkers.length; index++) {
+            const marker = allMarkers[index];
+            if (marker.start > cursor) {
                 segments.push({
                     id: `${index}-plain-${cursor}`,
-                    text: value.slice(cursor, match.start),
+                    text: value.slice(cursor, marker.start),
                     isExpression: false,
+                    isPathParam: false,
                 });
             }
 
             segments.push({
-                id: `${index}-expr-${match.start}`,
-                text: match.full,
-                isExpression: true,
+                id: `${index}-${marker.isExpression ? "expr" : "param"}-${marker.start}`,
+                text: marker.full,
+                isExpression: marker.isExpression,
+                isPathParam: marker.isPathParam,
             });
-            cursor = match.end;
+            cursor = marker.end;
         }
 
         if (cursor < value.length) {
@@ -222,11 +269,12 @@ export class ExpressionInput extends Component {
                 id: `tail-${cursor}`,
                 text: value.slice(cursor),
                 isExpression: false,
+                isPathParam: false,
             });
         }
 
         if (!segments.length) {
-            segments.push({ id: 0, text: value, isExpression: false });
+            segments.push({ id: 0, text: value, isExpression: false, isPathParam: false });
         }
 
         return segments;

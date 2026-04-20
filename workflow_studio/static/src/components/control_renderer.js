@@ -66,6 +66,10 @@ export class ControlRenderer extends Component {
         return this.props.control?.type || 'text';
     }
 
+    get isReadonly() {
+        return !!(this.props.readonly || this.props.control?.readonly);
+    }
+
     // Phase 3: Read value directly from plain object
     get value() {
         const rawValue = this.props.control?.value ?? '';
@@ -106,6 +110,11 @@ export class ControlRenderer extends Component {
             return map;
         }
         return {};
+    }
+
+    get lockedKeys() {
+        const keys = this.props.control?.locked_keys;
+        return Array.isArray(keys) ? keys : [];
     }
 
     /**

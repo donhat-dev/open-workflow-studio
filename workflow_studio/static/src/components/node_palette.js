@@ -64,8 +64,12 @@ class NodePalette extends Component {
         <div class="sidebar">
             <h3 class="sidebar__title"><t t-esc="('Nodes')"/></h3>
             <div class="node-palette">
-                <t t-foreach="items" t-as="item" t-key="item.name">
-                    <NodePaletteItem
+                <t t-foreach="items" t-as="item" t-key="item.name || item.groupHeader">
+                    <div t-if="item.isGroupHeader" class="node-palette__group-header">
+                        <i class="fa fa-plug me-1"/>
+                        <span t-esc="item.groupHeader"/>
+                    </div>
+                    <NodePaletteItem t-else=""
                         name="item.name"
                         title="item.title"
                         icon="item.icon"
@@ -92,14 +96,37 @@ class NodePalette extends Component {
             icon: node.icon,
             className: `node-palette__item--${node.key}`,
             category: node.category || "",
+            group: node.group || "",
         }));
+        // Sort: by category, then ungrouped first, then by group, then by title
         items.sort((a, b) => {
-            if (a.category === b.category) {
-                return a.title.localeCompare(b.title);
+            if (a.category !== b.category) {
+                return a.category.localeCompare(b.category);
             }
-            return a.category.localeCompare(b.category);
+            // Ungrouped items first within same category
+            if (!a.group && b.group) return -1;
+            if (a.group && !b.group) return 1;
+            if (a.group !== b.group) {
+                return a.group.localeCompare(b.group);
+            }
+            return a.title.localeCompare(b.title);
         });
-        return items;
+
+        // Insert group headers
+        const result = [];
+        let lastGroup = null;
+        for (const item of items) {
+            if (item.group && item.group !== lastGroup) {
+                result.push({
+                    isGroupHeader: true,
+                    groupHeader: item.group,
+                    name: null,
+                });
+                lastGroup = item.group;
+            }
+            result.push(item);
+        }
+        return result;
     }
 }
 

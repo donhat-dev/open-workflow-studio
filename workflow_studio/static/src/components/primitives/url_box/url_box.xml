@@ -3,7 +3,12 @@
     <t t-name="workflow_studio.url_box">
         <div class="wf-url-box d-flex align-items-center gap-3" t-att-class="toneClass" t-att-title="props.value || ''">
             <div class="wf-url-box__value flex-grow-1">
-                <code t-esc="displayValue"/>
+                <code>
+                    <t t-foreach="segments" t-as="seg" t-key="seg_index">
+                        <span t-if="seg.isParam" class="wf-url-box__param" t-att-title="'Path parameter: ' + (seg.paramName or '')" t-esc="seg.text"/>
+                        <t t-else="" t-esc="seg.text"/>
+                    </t>
+                </code>
             </div>
             <button
                 type="button"

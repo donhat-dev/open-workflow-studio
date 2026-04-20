@@ -791,6 +791,79 @@ $ncp-rail-width: 52px;
   max-width: 720px;
 }
 
+.connector-config-tab-content {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.connector-config-panel__body {
+  min-height: 0;
+  padding: 16px;
+}
+
+.connector-card + .connector-card {
+  margin-top: 0.75rem;
+}
+
+.connector-card__body {
+  display: grid;
+  gap: 16px;
+}
+
+.connector-fact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.connector-fact-grid--runtime {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.connector-fact-tile {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid $wf-border-base;
+  border-radius: $wf-radius-md;
+  background: $wf-surface-subtle;
+}
+
+.connector-fact-tile__label {
+  font-size: 0.688rem;
+  font-weight: 700;
+  color: $wf-text-muted;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.connector-fact-tile__value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $wf-text-base;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.connector-fact-tile__meta {
+  font-size: 0.75rem;
+  color: $wf-text-muted;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.connector-inline-note {
+  margin-bottom: 0;
+}
+
+.connector-inline-note strong {
+  color: $wf-text-base;
+}
+
+.connector-control-section + .connector-control-section {
+  margin-top: 20px;
+}
+
 .trigger-control-group + .trigger-control-group {
   margin-top: 16px;
 }
@@ -1342,6 +1415,18 @@ $ncp-rail-width: 52px;
   }
 }
 
+// Locked row (path parameter): blue tint, non-removable
+.ncp-table-shell__row--locked {
+  .ncp-table-shell__cell--key .expression-input__field {
+    background: var(--param--color--background);
+    border-color: var(--param--color--border);
+  }
+  .ncp-table-shell__cell--key .expression-input__text {
+    color: var(--param--color--foreground);
+    font-weight: 500;
+  }
+}
+
 .ncp-control-grid__cell {
   min-width: 0;
   grid-column: span 6;
@@ -1874,6 +1959,11 @@ $ncp-rail-width: 52px;
 }
 
 @media (max-width: 1180px) {
+  .connector-fact-grid,
+  .connector-fact-grid--runtime {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .node-config-parameter-toolbar {
     flex-direction: column;
     align-items: stretch;

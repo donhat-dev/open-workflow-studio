@@ -18,6 +18,7 @@
         "views/workflow_run_views.xml",
         "views/ir_logging_views.xml",
         "views/workflow_trigger_views.xml",
+        "views/workflow_connector_views.xml",
     ],
     "assets": {
         # Core libs bundle - can be lazy-loaded or included separately

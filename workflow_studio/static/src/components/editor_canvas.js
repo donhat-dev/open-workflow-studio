@@ -146,6 +146,7 @@ export class EditorCanvas extends Component {
             saveWorkflow: () => this.editor.saveWorkflow(),
             getNodeRunDetails: (nodeRunId) => this.editor.getNodeRunDetails(nodeRunId),
             getTriggerPanelData: (nodeId) => this.editor.getTriggerPanelData(nodeId),
+            getConnectorRequestPanelData: (nodeId) => this.editor.getConnectorRequestPanelData(nodeId),
             activateTriggerNode: (nodeId) => this.editor.activateTriggerNode(nodeId),
             deactivateTriggerNode: (nodeId) => this.editor.deactivateTriggerNode(nodeId),
             rotateTriggerWebhook: (nodeId) => this.editor.rotateTriggerWebhook(nodeId),
@@ -153,6 +154,12 @@ export class EditorCanvas extends Component {
             stopTriggerWebhookTest: (nodeId) => this.editor.stopTriggerWebhookTest(nodeId),
             openTriggerNodeRecord: async (nodeId) => {
                 const action = await this.editor.getTriggerNodeAction(nodeId);
+                if (action) {
+                    this.actionService.doAction(action);
+                }
+            },
+            openConnectorNodeRecord: async (nodeId) => {
+                const action = await this.editor.getConnectorNodeAction(nodeId);
                 if (action) {
                     this.actionService.doAction(action);
                 }

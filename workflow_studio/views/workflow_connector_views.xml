@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+	<!-- ================================================================
+         Workflow Workspace Views
+         ================================================================ -->
+	<record id="view_workflow_workspace_list" model="ir.ui.view">
+		<field name="name">workflow.workspace.list</field>
+		<field name="model">workflow.workspace</field>
+		<field name="arch" type="xml">
+			<list string="Workspaces">
+				<field name="name"/>
+				<field name="code"/>
+				<field name="workflow_count" string="Workflows"/>
+				<field name="company_id" groups="base.group_multi_company"/>
+				<field name="active" column_invisible="True"/>
+			</list>
+		</field>
+	</record>
+	<record id="view_workflow_workspace_form" model="ir.ui.view">
+		<field name="name">workflow.workspace.form</field>
+		<field name="model">workflow.workspace</field>
+		<field name="arch" type="xml">
+			<form string="Workflow Workspace">
+				<sheet>
+					<widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+					<div class="oe_button_box" name="button_box">
+						<button name="action_view_workflows" type="object" class="oe_stat_button" icon="fa-sitemap" groups="workflow_studio.group_workflow_user">
+							<field name="workflow_count" widget="statinfo" string="Workflows"/>
+						</button>
+					</div>
+					<div class="oe_title">
+						<h1>
+							<field name="name" placeholder="Workspace Name"/>
+						</h1>
+					</div>
+					<group>
+						<group string="Identity">
+							<field name="code" readonly="1"/>
+							<field name="company_id" groups="base.group_multi_company"/>
+							<field name="active"/>
+						</group>
+						<group string="Notes">
+							<field name="notes" nolabel="1" placeholder="Describe how this workspace is used across related workflows…"/>
+						</group>
+					</group>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<record id="action_workflow_workspace" model="ir.actions.act_window">
+		<field name="name">Workspaces</field>
+		<field name="path">workflow-workspaces</field>
+		<field name="res_model">workflow.workspace</field>
+		<field name="view_mode">list,form</field>
+		<field name="context">{"active_test": False}</field>
+	</record>
+	<!-- ================================================================
+         Workflow Connector Views
+         ================================================================ -->
+	<record id="view_workflow_connector_list" model="ir.ui.view">
+		<field name="name">workflow.connector.list</field>
+		<field name="model">workflow.connector</field>
+		<field name="arch" type="xml">
+			<list string="Connectors">
+				<field name="name"/>
+				<field name="provider_key"/>
+				<field name="connector_type"/>
+				<field name="environment"/>
+				<field name="code"/>
+				<field name="base_url"/>
+				<field name="active" column_invisible="True"/>
+			</list>
+		</field>
+	</record>
+	<record id="action_workflow_endpoint_by_connector" model="ir.actions.act_window">
+		<field name="name">Endpoints</field>
+		<field name="res_model">workflow.endpoint</field>
+		<field name="view_mode">list,form</field>
+		<field name="domain">[('connector_id', '=', active_id)]</field>
+		<field name="context">{'default_connector_id': active_id, 'active_test': False}</field>
+	</record>
+	<record id="action_workflow_auth_profile_by_connector" model="ir.actions.act_window">
+		<field name="name">Auth Profiles</field>
+		<field name="res_model">workflow.auth.profile</field>
+		<field name="view_mode">list,form</field>
+		<field name="domain">[('connector_id', '=', active_id)]</field>
+		<field name="context">{'default_connector_id': active_id, 'active_test': False}</field>
+	</record>
+	<record id="action_workflow_http_request_by_connector" model="ir.actions.act_window">
+		<field name="name">Connector Nodes</field>
+		<field name="res_model">workflow.http.request</field>
+		<field name="view_mode">list,form</field>
+		<field name="domain">[('connector_id', '=', active_id)]</field>
+		<field name="context">{'default_connector_id': active_id, 'active_test': False}</field>
+	</record>
+
+	<record id="view_workflow_connector_form" model="ir.ui.view">
+		<field name="name">workflow.connector.form</field>
+		<field name="model">workflow.connector</field>
+		<field name="arch" type="xml">
+			<form string="Connector">
+				<sheet>
+					<widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+					<div class="oe_button_box" name="button_box">
+						<button name="%(workflow_studio.action_workflow_endpoint_by_connector)d" type="action" class="oe_stat_button" icon="fa-link" groups="workflow_studio.group_workflow_user">
+							<field name="endpoint_count" widget="statinfo" string="Endpoints"/>
+						</button>
+						<button name="%(workflow_studio.action_workflow_auth_profile_by_connector)d" type="action" class="oe_stat_button" icon="fa-key" groups="workflow_studio.group_workflow_user">
+							<field name="auth_profile_count" widget="statinfo" string="Auth Profiles"/>
+						</button>
+						<button name="action_view_workflows" type="object" class="oe_stat_button" icon="fa-sitemap" groups="workflow_studio.group_workflow_user">
+							<field name="workflow_count" widget="statinfo" string="Workflows"/>
+						</button>
+						<button name="%(workflow_studio.action_workflow_http_request_by_connector)d" type="action" class="oe_stat_button" icon="fa-plug" groups="workflow_studio.group_workflow_user">
+							<field name="http_request_count" widget="statinfo" string="Connector Nodes"/>
+						</button>
+					</div>
+					<div class="oe_title">
+						<h1>
+							<field name="name" placeholder="Connector Name"/>
+						</h1>
+					</div>
+					<group>
+						<group string="Identity">
+							<field name="provider_key"/>
+							<field name="connector_type"/>
+							<field name="environment"/>
+							<field name="code" readonly="1"/>
+							<field name="node_type_tmpl_id"/>
+							<field name="company_id" groups="base.group_multi_company"/>
+						</group>
+						<group string="HTTP Configuration">
+							<field name="base_url" placeholder="https://api.example.com"/>
+							<field name="default_auth_profile_id" domain="['|', ('connector_id', '=', False), ('connector_id', '=', id)]"/>
+							<field name="active"/>
+						</group>
+					</group>
+					<group>
+						<field name="notes" placeholder="Describe what this connector is for and which provider contract it targets…"/>
+					</group>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<record id="action_workflow_connector" model="ir.actions.act_window">
+		<field name="name">Connectors</field>
+		<field name="path">workflow-connectors</field>
+		<field name="res_model">workflow.connector</field>
+		<field name="view_mode">list,form</field>
+		<field name="context">{"active_test": False}</field>
+	</record>
+	<!-- ================================================================
+         Workflow Endpoint Views
+         ================================================================ -->
+	<record id="view_workflow_endpoint_list" model="ir.ui.view">
+		<field name="name">workflow.endpoint.list</field>
+		<field name="model">workflow.endpoint</field>
+		<field name="arch" type="xml">
+			<list string="Endpoints">
+				<field name="name"/>
+				<field name="method"/>
+				<field name="path"/>
+				<field name="connector_id"/>
+				<field name="category"/>
+				<field name="active" column_invisible="True"/>
+			</list>
+		</field>
+	</record>
+	<record id="view_workflow_endpoint_form" model="ir.ui.view">
+		<field name="name">workflow.endpoint.form</field>
+		<field name="model">workflow.endpoint</field>
+		<field name="arch" type="xml">
+			<form string="Endpoint">
+				<sheet>
+					<widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+					<div class="oe_title">
+						<h1>
+							<field name="name" placeholder="e.g. GET /api/v1/orders"/>
+						</h1>
+					</div>
+					<group>
+						<group string="Identity">
+							<div class="d-flex align-items-center gap-2 mb-3 px-1 py-2 border-bottom">
+								<span class="badge text-bg-secondary fw-bold fs-6 text-uppercase" style="min-width: 72px; text-align: center; letter-spacing: 0.04em;">
+									<field name="method" class="d-inline" style="color: inherit;"/>
+								</span>
+								<code class="text-muted fw-normal fs-6" style="flex:1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+									<field name="path" placeholder="/api/v1/resource" class="d-inline border-0 p-0 bg-transparent" style="font-family: monospace; font-size: inherit; color: inherit; min-width: 200px;"/>
+								</code>
+							</div>
+							<field name="connector_id" readonly="1" required="1"/>
+							<field name="category"/>
+							<field name="code"/>
+							<field name="requires_auth"/>
+						</group>
+						<group string="HTTP">
+							<field name="method" invisible="1"/>
+							<field name="path" placeholder="/v1/orders" invisible="1"/>
+							<field name="base_url" readonly="1" invisible="1"/>
+							<field name="url" readonly="1"/>
+							<field name="timeout_seconds"/>
+						</group>
+					</group>
+					<notebook>
+						<page string="Headers Template">
+							<field name="headers_template" widget="ace" options="{'mode': 'python'}" placeholder='{"Content-Type": "application/json"}'/>
+						</page>
+						<page string="Query Template">
+							<field name="query_template" widget="ace" options="{'mode': 'python'}" placeholder='{"format": "json"}'/>
+						</page>
+						<page string="Body Template">
+							<field name="body_template" widget="ace" options="{'mode': 'python'}" placeholder='{"order_id": "{{order_id}}"}'/>
+						</page>
+					</notebook>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<record id="action_workflow_endpoint" model="ir.actions.act_window">
+		<field name="name">Endpoints</field>
+		<field name="path">workflow-endpoints</field>
+		<field name="res_model">workflow.endpoint</field>
+		<field name="view_mode">list,form</field>
+		<field name="context">{"active_test": False}</field>
+	</record>
+
+	<!-- ================================================================
+         Workflow Auth Profile Views
+         ================================================================ -->
+	<record id="view_workflow_auth_profile_list" model="ir.ui.view">
+		<field name="name">workflow.auth.profile.list</field>
+		<field name="model">workflow.auth.profile</field>
+		<field name="arch" type="xml">
+			<list string="Auth Profiles">
+				<field name="name"/>
+				<field name="connector_id"/>
+				<field name="auth_type"/>
+				<field name="active" column_invisible="True"/>
+			</list>
+		</field>
+	</record>
+	<record id="view_workflow_auth_profile_form" model="ir.ui.view">
+		<field name="name">workflow.auth.profile.form</field>
+		<field name="model">workflow.auth.profile</field>
+		<field name="arch" type="xml">
+			<form string="Auth Profile">
+				<sheet>
+					<widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+					<div class="oe_title">
+						<h1>
+							<field name="name" placeholder="Auth Profile Name"/>
+						</h1>
+					</div>
+					<group>
+						<group string="Identity">
+							<field name="connector_id"/>
+							<field name="auth_type"/>
+						</group>
+						<group string="OAuth2 / Token Refresh" invisible="auth_type not in ('oauth2_client_credentials', 'oauth2_refresh_token')">
+							<field name="token_endpoint_id" domain="['|', ('connector_id', '=', False), ('connector_id', '=', connector_id)]"/>
+							<field name="scope"/>
+							<field name="audience"/>
+							<field name="token_expires_at" readonly="1"/>
+							<field name="last_refresh_at" readonly="1"/>
+						</group>
+					</group>
+					<notebook>
+						<page string="Secret References">
+							<div class="alert alert-info" role="status">                                Store secret broker keys here, not raw credentials.                            </div>
+							<field name="secret_refs_json" widget="ace" options="{'mode': 'python'}" placeholder='{"token": "my_token_secret", "username": "api_user"}'/>
+						</page>
+						<page string="Header Template" invisible="auth_type in ('basic', 'none')">
+							<div class="alert alert-info" role="status">                                Use 
+								<code>{{secret_key}}</code> placeholders.                                Values are resolved at runtime via the SecretBroker.                            
+							</div>
+							<field name="header_template_json" widget="ace" options="{'mode': 'python'}" placeholder='{"Authorization": "Bearer {{my_token_secret}}"}'/>
+						</page>
+						<page string="Query Param Template" invisible="auth_type not in ('api_key', 'custom')">
+							<field name="query_template_json" widget="ace" options="{'mode': 'python'}" placeholder='{"api_key": "{{my_api_key}}"}'/>
+						</page>
+						<page string="Signature" invisible="auth_type not in ('hmac', 'jwt_assertion', 'custom')">
+							<field name="signature_template" widget="text" placeholder="Describe signature recipe or provider-specific contract"/>
+						</page>
+					</notebook>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<record id="action_workflow_auth_profile" model="ir.actions.act_window">
+		<field name="name">Auth Profiles</field>
+		<field name="path">workflow-auth-profiles</field>
+		<field name="res_model">workflow.auth.profile</field>
+		<field name="view_mode">list,form</field>
+		<field name="context">{"active_test": False}</field>
+	</record>
+
+	<!-- ================================================================
+         Workflow HTTP Request (Bridge) Views
+         ================================================================ -->
+	<record id="view_workflow_http_request_list" model="ir.ui.view">
+		<field name="name">workflow.http.request.list</field>
+		<field name="model">workflow.http.request</field>
+		<field name="arch" type="xml">
+			<list string="Connector Nodes">
+				<field name="workflow_id"/>
+				<field name="workspace_id"/>
+				<field name="connector_id"/>
+				<field name="node_id"/>
+				<field name="endpoint_id"/>
+				<field name="last_run_at"/>
+				<field name="last_status_code"/>
+				<field name="last_duration_ms"/>
+				<field name="active" column_invisible="True"/>
+			</list>
+		</field>
+	</record>
+	<record id="view_workflow_http_request_form" model="ir.ui.view">
+		<field name="name">workflow.http.request.form</field>
+		<field name="model">workflow.http.request</field>
+		<field name="arch" type="xml">
+			<form string="Connector Node Binding">
+				<sheet>
+					<widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+					<group>
+						<group string="Canvas Node">
+							<field name="workflow_id"/>
+							<field name="workspace_id" readonly="1"/>
+							<field name="node_id" readonly="1"/>
+							<field name="operation_code" readonly="1"/>
+						</group>
+						<group string="Connector Config">
+							<field name="connector_id"/>
+							<field name="endpoint_id" domain="['|', ('connector_id', '=', False), ('connector_id', '=', connector_id)]"/>
+							<field name="auth_profile_id" domain="['|', ('connector_id', '=', False), ('connector_id', '=', connector_id)]"/>
+						</group>
+					</group>
+					<group string="Health">
+						<group>
+							<field name="resolved_url_preview" readonly="1"/>
+							<field name="last_run_at" readonly="1"/>
+							<field name="last_status_code" readonly="1"/>
+							<field name="last_duration_ms" readonly="1"/>
+						</group>
+						<group>
+							<field name="config_hash" readonly="1"/>
+							<field name="last_error" readonly="1"/>
+						</group>
+					</group>
+					<group string="Backend Config Overrides">
+						<field name="backend_config_json" nolabel="1" widget="ace" options="{'mode': 'python'}" placeholder='{"timeout": 60}'/>
+					</group>
+					<group string="Snapshot Cache">
+						<field name="snapshot_config_json" nolabel="1" readonly="1" widget="ace" options="{'mode': 'python'}"/>
+					</group>
+				</sheet>
+			</form>
+		</field>
+	</record>
+	<record id="action_workflow_http_request" model="ir.actions.act_window">
+		<field name="name">Connector Nodes</field>
+		<field name="path">workflow-connector-nodes</field>
+		<field name="res_model">workflow.http.request</field>
+		<field name="view_mode">list,form</field>
+		<field name="context">{"active_test": False}</field>
+	</record>
+
+	<!-- ================================================================
+         Inherit ir.workflow form to add workspace selector
+         ================================================================ -->
+	<record id="view_ir_workflow_inherit_workspace" model="ir.ui.view">
+		<field name="name">ir.workflow.inherit.workspace</field>
+		<field name="model">ir.workflow</field>
+		<field name="inherit_id" ref="workflow_studio.view_ir_workflow_form"/>
+		<field name="arch" type="xml">
+			<xpath expr="//field[@name='description']" position="after">
+				<field name="workspace_id" options="{'no_create': True}" placeholder="Optional: group this workflow into a workspace"/>
+			</xpath>
+		</field>
+	</record>
+	<!-- ================================================================
+         Menu Items
+         ================================================================ -->
+	<menuitem id="menu_workflow_workspace" name="Workspaces" parent="workflow_studio.menu_workflow_pilot_root" action="action_workflow_workspace" sequence="30" groups="workflow_studio.group_workflow_manager"/>
+	<menuitem id="menu_workflow_connector" name="Connectors" parent="workflow_studio.menu_workflow_pilot_root" sequence="40" groups="workflow_studio.group_workflow_manager"/>
+	<menuitem id="menu_workflow_connector_record" name="Connectors" parent="menu_workflow_connector" action="action_workflow_connector" sequence="10"/>
+	<menuitem id="menu_workflow_endpoint" name="Endpoints" parent="menu_workflow_connector" action="action_workflow_endpoint" sequence="20"/>
+	<menuitem id="menu_workflow_auth_profile" name="Auth Profiles" parent="menu_workflow_connector" action="action_workflow_auth_profile" sequence="30"/>
+	<menuitem id="menu_workflow_http_request" name="Connector Nodes" parent="menu_workflow_connector" action="action_workflow_http_request" sequence="40"/>
+</odoo>

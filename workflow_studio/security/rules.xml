@@ -128,4 +128,100 @@
         ]</field>
         <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
     </record>
+
+    <!-- workflow.workspace: company-scoped records -->
+    <record id="rule_workflow_workspace_user" model="ir.rule">
+        <field name="name">Workflow Workspace: User Company</field>
+        <field name="model_id" ref="model_workflow_workspace"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
+    </record>
+
+    <record id="rule_workflow_workspace_manager" model="ir.rule">
+        <field name="name">Workflow Workspace: Manager Company</field>
+        <field name="model_id" ref="model_workflow_workspace"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
+    </record>
+
+    <!-- workflow.connector: company-scoped records -->
+    <record id="rule_workflow_connector_user" model="ir.rule">
+        <field name="name">Workflow Connector: User Company</field>
+        <field name="model_id" ref="model_workflow_connector"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
+    </record>
+
+    <record id="rule_workflow_connector_manager" model="ir.rule">
+        <field name="name">Workflow Connector: Manager Company</field>
+        <field name="model_id" ref="model_workflow_connector"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
+    </record>
+
+    <!-- workflow.endpoint: visible inside company or global presets -->
+    <record id="rule_workflow_endpoint_user" model="ir.rule">
+        <field name="name">Workflow Endpoint: User Company</field>
+        <field name="model_id" ref="model_workflow_endpoint"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
+    </record>
+
+    <record id="rule_workflow_endpoint_manager" model="ir.rule">
+        <field name="name">Workflow Endpoint: Manager Company</field>
+        <field name="model_id" ref="model_workflow_endpoint"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
+    </record>
+
+    <!-- workflow.auth.profile: visible inside company or global profiles -->
+    <record id="rule_workflow_auth_profile_user" model="ir.rule">
+        <field name="name">Workflow Auth Profile: User Company</field>
+        <field name="model_id" ref="model_workflow_auth_profile"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
+    </record>
+
+    <record id="rule_workflow_auth_profile_manager" model="ir.rule">
+        <field name="name">Workflow Auth Profile: Manager Company</field>
+        <field name="model_id" ref="model_workflow_auth_profile"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
+    </record>
+
+    <!-- workflow.http.request: same visibility as parent workflow -->
+    <record id="rule_workflow_http_request_user" model="ir.rule">
+        <field name="name">Workflow HTTP Request: User Own Company</field>
+        <field name="model_id" ref="model_workflow_http_request"/>
+        <field name="domain_force">[
+            ('workflow_id.user_id', '=', user.id),
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_user'))]"/>
+    </record>
+
+    <record id="rule_workflow_http_request_manager" model="ir.rule">
+        <field name="name">Workflow HTTP Request: Manager Company</field>
+        <field name="model_id" ref="model_workflow_http_request"/>
+        <field name="domain_force">[
+            '|', ('company_id', '=', False), ('company_id', 'in', company_ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_workflow_manager'))]"/>
+    </record>
 </odoo>

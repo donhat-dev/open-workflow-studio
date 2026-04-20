@@ -253,6 +253,13 @@
   color: $wf-expression-highlight-fg;
 }
 
+.expression-input__highlight--param {
+  background: $wf-param-bg;
+  box-shadow: $wf-param-ring;
+  border-radius: 4px;
+  color: $wf-param-fg;
+}
+
 .expression-input__input-layer.has-highlight {
   .expression-input__text,
   .expression-input__textarea {

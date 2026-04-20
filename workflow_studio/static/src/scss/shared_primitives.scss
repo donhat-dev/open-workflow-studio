@@ -95,6 +95,17 @@ $wf-url-box-bg-live:     rgba($o-success, 0.05) !default;
     }
 }
 
+// Path parameter highlight within URL
+.wf-url-box__param {
+    display: inline;
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: $wf-radius-sm;
+    background: $wf-param-bg;
+    color: $wf-param-fg;
+    font-weight: 500;
+}
+
 .wf-url-box__copy {
     flex: 0 0 auto;
 }

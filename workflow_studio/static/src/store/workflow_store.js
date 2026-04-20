@@ -34,6 +34,7 @@ import {
     trackNodeUsage,
 } from "../utils/node_registry";
 import { registerBackendNodeTypes } from "../utils/dynamic_node_factory";
+import { sanitizeConnectorRequestSnapshot } from "../utils/connector_request_config";
 
 const DEFAULT_UI_STATE = () => ({
     selection: { nodeIds: [], connectionIds: [] },
@@ -175,7 +176,7 @@ export const workflowEditorService = {
             } else {
                 delete metadata.pin_data;
             }
-            return { ...base, metadata };
+            return sanitizeConnectorRequestSnapshot({ ...base, metadata });
         }
 
         /**
@@ -1400,6 +1401,28 @@ export const workflowEditorService = {
                 return await rpc('/web/dataset/call_kw', {
                     model: 'ir.workflow',
                     method: 'get_trigger_panel_data',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async getConnectorRequestPanelData(nodeId) {
+                if (!workflowId) {
+                    throw new Error('No workflow ID loaded');
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'get_connector_request_panel_data',
+                    args: [[workflowId], nodeId],
+                    kwargs: {},
+                });
+            },
+            async getConnectorNodeAction(nodeId) {
+                if (!workflowId) {
+                    return false;
+                }
+                return await rpc('/web/dataset/call_kw', {
+                    model: 'ir.workflow',
+                    method: 'get_connector_node_action',
                     args: [[workflowId], nodeId],
                     kwargs: {},
                 });

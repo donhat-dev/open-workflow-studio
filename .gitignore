@@ -199,3 +199,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Worktree management
+.wt-registry
+.env.wt

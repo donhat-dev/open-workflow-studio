@@ -45,6 +45,9 @@ class HttpNodeRunner(BaseNodeRunner):
         url = node_config.get("url", "")
         url = self.resolver.resolve_str(url, eval_context)
 
+        # Resolve path parameters ({param} placeholders in URL)
+        url = self._resolve_path_params(url, node_config, eval_context)
+
         if not url:
             raise ValueError("HTTP node requires a URL")
 
@@ -196,6 +199,69 @@ class HttpNodeRunner(BaseNodeRunner):
         return {}, {}, None
 
     # ------------------------------------------------------------------
+    # Path params
+    # ------------------------------------------------------------------
+    def _resolve_path_params(self, url, node_config, eval_context):
+        """Resolve {param} placeholders in URL using path_params config.
+
+        Args:
+            url: URL string with optional {param} placeholders
+            node_config: Node config dict
+            eval_context: Expression evaluation context
+
+        Returns:
+            URL with path params substituted
+        """
+        if not url:
+            return url
+
+        path_params = node_config.get("path_params", [])
+        if not path_params or not isinstance(path_params, list):
+            return url
+
+        # Build param dict from path_params array
+        # Only include enabled params with non-empty values
+        param_dict = {}
+        for p in path_params:
+            if not isinstance(p, dict):
+                continue
+            if not p.get("enabled", True):
+                continue
+            key = p.get("key", "")
+            if not key:
+                continue
+            value = p.get("value", "")
+            # Resolve expression in value
+            resolved_value = self.resolver.resolve_str(value, eval_context)
+            if resolved_value:  # Only substitute if value is non-empty
+                param_dict[key] = resolved_value
+            else:
+                _logger.warning(
+                    "Path parameter '%s' has empty value, will not be substituted", key
+                )
+
+        if not param_dict:
+            return url
+
+        # Apply path param substitution using str.format_map
+        # This handles {param} placeholders safely
+        try:
+            # Use format_map with a dict that returns the original placeholder
+            # for any missing keys (to avoid KeyError)
+            class SafeDict(dict):
+                def __missing__(self, key):
+                    _logger.warning(
+                        "Path parameter '{%s}' not found in path_params", key
+                    )
+                    return "{" + key + "}"
+
+            resolved_url = url.format_map(SafeDict(param_dict))
+            return resolved_url
+        except (ValueError, KeyError) as e:
+            _logger.warning("Failed to resolve path params in URL: %s", e)
+            return url
+
+    # ------------------------------------------------------------------
     # Query params
     # ------------------------------------------------------------------
     def _build_query_params(self, node_config, eval_context):
@@ -229,6 +295,8 @@ class HttpNodeRunner(BaseNodeRunner):
 
         for h in headers:
             if not isinstance(h, dict):
+                continue
+            if not h.get("enabled", True):
                 continue
             key = h.get("key", "")
             if not key:

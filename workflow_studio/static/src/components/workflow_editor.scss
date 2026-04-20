@@ -352,6 +352,45 @@
   border-radius: 3px;
 }
 
+.node-palette__group-header {
+  width: 100%;
+  padding: 6px 8px 2px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+
+  .fa {
+    font-size: 0.7rem;
+  }
+}
+
+.endpoint-binding-indicator {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+
+  .fa-plug {
+    color: rgba(0, 0, 0, 0.35);
+  }
+
+  &__group {
+    font-weight: 600;
+  }
+
+  &__desc {
+    font-style: italic;
+  }
+}
+
 .workflow-node__icon-box [class^="icon-"],
 .workflow-node__icon-box [class*=" icon-"] {
   color: inherit;

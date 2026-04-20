@@ -16,6 +16,7 @@ export { HttpRequestNode } from './http_request';
 export { ManualTriggerNode } from './manual_trigger';
 export { LoopNode, IfNode, CodeNode, NoOpNode } from './flow_nodes';
 export { DataValidationNode, DataMappingNode } from './data_nodes';
+export { ConnectorRequestNode } from './connector_request';
 
 // Import for building legacy object
 import { HttpRequestNode } from './http_request';

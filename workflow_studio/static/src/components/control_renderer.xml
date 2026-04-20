@@ -6,11 +6,11 @@
 			<label t-if="label and controlType !== 'text' and controlType !== 'expression'" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text' or controlType === 'expression'">
-				<ExpressionInput value="value" placeholder="placeholder" label="label" context="props.inputContext" multiline="isMultiline" mode="props.mode" toggleMode="'side'" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
+				<ExpressionInput value="value" placeholder="placeholder" label="label" context="props.inputContext" multiline="isMultiline" mode="props.mode" toggleMode="'side'" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="isReadonly"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
-				<select class="control-select" t-on-change="onSelectChange" t-att-disabled="props.readonly ? 'disabled' : undefined">
+				<select class="control-select" t-on-change="onSelectChange" t-att-disabled="isReadonly ? 'disabled' : undefined">
 					<t t-foreach="options" t-as="opt" t-key="opt.value">
 						<option t-att-value="opt.value" t-att-selected="opt.value === value" t-esc="opt.label" />
 					</t>
@@ -18,11 +18,11 @@
 			</t>
 			<!-- NUMBER -->
 			<t t-elif="controlType === 'number'">
-				<input type="number" class="control-input control-number" t-att-value="value" t-att-min="props.control.min" t-att-max="props.control.max" t-att-step="props.control.step" t-on-input="onInput" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+				<input type="number" class="control-input control-number" t-att-value="value" t-att-min="props.control.min" t-att-max="props.control.max" t-att-step="props.control.step" t-on-input="onInput" t-att-disabled="isReadonly ? 'disabled' : undefined"/>
 			</t>
 			<!-- CHECKBOX -->
 			<t t-elif="controlType === 'checkbox'">
-				<input type="checkbox" class="control-checkbox" t-att-checked="value" t-on-change="onCheckboxChange" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+				<input type="checkbox" class="control-checkbox" t-att-checked="value" t-on-change="onCheckboxChange" t-att-disabled="isReadonly ? 'disabled' : undefined"/>
 			</t>
 			<!-- KEY-VALUE PAIRS -->
 			<t t-elif="controlType === 'keyvalue'">
@@ -38,9 +38,10 @@
 						valueSuggestions="valueSuggestions"
 						expressionSuggestions="expressionSuggestions"
 						suggestionsByKey="suggestionsByKey"
+						lockedKeys="lockedKeys"
 						pairModes="props.pairModes"
 						onPairModeChange="onKeyValuePairModeChange"
-						readonly="props.readonly"
+						readonly="isReadonly"
 					/>
 				</div>
 			</t>
@@ -53,7 +54,7 @@
 					placeholder="props.control.placeholder || ''"
 					completionContext="props.inputContext"
 					onChange="(v) => this.onCodeChange(v)"
-					readonly="props.readonly"
+					readonly="isReadonly"
 				/>
 			</t>
 			<!-- AUTH CONTROL (composite) -->
@@ -63,7 +64,7 @@
 					onChange.bind="onAuthChange"
 					inputContext="props.inputContext"
 					suggestionsByKey="suggestionsByKey"
-					readonly="props.readonly"
+					readonly="isReadonly"
 				/>
 			</t>
 			<!-- BODY TYPE CONTROL (composite) -->
@@ -73,7 +74,7 @@
 					onChange.bind="onBodyTypeChange"
 					inputContext="props.inputContext"
 					suggestionsByKey="suggestionsByKey"
-					readonly="props.readonly"
+					readonly="isReadonly"
 				/>
 			</t>
 			<!-- QUERY PARAMS CONTROL (keyvalue with toggle) -->
@@ -89,9 +90,10 @@
 						valueSuggestions="valueSuggestions"
 						expressionSuggestions="expressionSuggestions"
 						suggestionsByKey="suggestionsByKey"
+						lockedKeys="lockedKeys"
 						pairModes="props.pairModes"
 						onPairModeChange="onKeyValuePairModeChange"
-						readonly="props.readonly"
+						readonly="isReadonly"
 					/>
 				</div>
 			</t>
@@ -105,7 +107,7 @@
 					suggestions="suggestions"
 					valueSuggestions="valueSuggestions"
 					onChange="(v) => this.onExpressionChange(v)"
-					readonly="props.readonly"
+					readonly="isReadonly"
 				/>
 			</t>
 			<!-- DOMAIN — Odoo DomainSelector (field-aware, type-safe operators) -->
@@ -114,7 +116,7 @@
 					resModel="resModel"
 					value="value"
 					onChange="(v) => this.onExpressionChange(v)"
-					readonly="props.readonly"
+					readonly="isReadonly"
 					inputContext="props.inputContext"
 				/>
 			</t>
@@ -125,7 +127,7 @@
 					operation="operation"
 					value="value"
 					onChange="(v) => this.onExpressionChange(v)"
-					readonly="props.readonly"
+					readonly="isReadonly"
 					inputContext="props.inputContext"
 				/>
 			</t>
@@ -135,7 +137,7 @@
 					value="value"
 					suggestions="suggestions"
 					onChange.bind="onTriggerFieldsChange"
-					readonly="props.readonly"
+					readonly="isReadonly"
 				/>
 			</t>
 		</div>

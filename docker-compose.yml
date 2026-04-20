@@ -3,7 +3,7 @@ services:
     build:
       context: ./docker
       dockerfile: Dockerfile
-    container_name: odoo-workflow-dev
+    container_name: ${CONTAINER_NAME:-odoo-workflow-dev}
     restart: unless-stopped
     ports:
       - "${ODOO_PORT:-8069}:8069"

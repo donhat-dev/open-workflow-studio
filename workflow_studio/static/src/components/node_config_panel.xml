@@ -54,6 +54,18 @@
 				</div>
 			</t>
 
+			<t t-if="isConnectorRequestNode and !isExecutionView and connectorHeaderButtons.length">
+				<div class="ncp-header-sep"/>
+				<div class="ncp-header-actions d-flex align-items-stretch">
+					<t t-foreach="connectorHeaderButtons" t-as="button" t-key="button.id">
+						<button class="ncp-execute-btn ncp-trigger-action-btn btn d-flex align-items-center gap-2" t-att-class="button.className" t-on-click="button.onClick" t-att-disabled="button.disabled ? 'disabled' : undefined" type="button">
+							<i t-if="button.icon" t-att-class="'fa ' + button.icon + ' me-1'"/>
+							<t t-esc="button.label"/>
+						</button>
+					</t>
+				</div>
+			</t>
+
 			<div class="ncp-header-sep"/>
 			<div class="ncp-header-nav-cluster d-flex align-items-stretch">
 				<t t-if="props.onNavigateToNode">
@@ -198,12 +210,142 @@
 	</t>
 	<t t-else="">
 		<div class="node-config-col-config wf-container d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView, 'readonly-config': isExecutionView }">
-			<t t-call="{{ constructor.subTemplates.genericConfig }}"/>
+			<t t-if="isConnectorRequestNode" t-call="{{ constructor.subTemplates.connectorConfig }}"/>
+			<t t-else="" t-call="{{ constructor.subTemplates.genericConfig }}"/>
 		</div>
 	</t>
 </t>
 
+<t t-name="workflow_studio.ConfigPanel.ConnectorConfig">
+	<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
+		<div class="tab-content connector-config-tab-content p-0 d-flex flex-column h-100">
+			<div class="connector-config-panel__body flex-grow-1 overflow-auto">
+				<t t-if="state.activeTab === 'parameters'">
+					<div t-if="state.connectorLoading" class="trigger-panel-state text-center text-muted py-5">
+						<i class="fa fa-spinner fa-spin me-2"/> Loading connector details...
+					</div>
+					<t t-else="">
+						<div t-if="state.connectorErrorMessage" class="alert alert-danger" role="alert">
+							<i class="fa fa-exclamation-circle me-2"/>
+							<span t-esc="state.connectorErrorMessage"/>
+						</div>
+						<t t-foreach="connectorWarnings" t-as="warning" t-key="warning">
+							<div class="alert alert-warning" role="alert">
+								<i class="fa fa-exclamation-triangle me-2"/>
+								<span t-esc="warning"/>
+							</div>
+						</t>
+						<section class="trigger-card connector-card">
+							<div class="trigger-card__header d-flex align-items-center justify-content-between gap-3 flex-wrap">
+								<div>
+									<h4>Connector binding</h4>
+									<p>Backend-managed connector, endpoint preset, and auth profile for this managed request.</p>
+								</div>
+								<div class="d-flex align-items-center gap-2 flex-wrap">
+									<span class="trigger-badge" t-att-class="connectorBindingStatusClass" t-esc="connectorBindingStatusLabel"/>
+									<span t-if="connectorHeaderSummary" class="trigger-badge trigger-badge--soft" t-esc="connectorHeaderSummary"/>
+								</div>
+							</div>
+							<div class="trigger-card__body connector-card__body">
+								<div class="connector-fact-grid">
+									<t t-foreach="connectorBindingFacts" t-as="fact" t-key="fact.key">
+										<div class="connector-fact-tile">
+											<div class="connector-fact-tile__label" t-esc="fact.label"/>
+											<div class="connector-fact-tile__value" t-esc="fact.value"/>
+											<div t-if="fact.meta" class="connector-fact-tile__meta" t-esc="fact.meta"/>
+										</div>
+									</t>
+								</div>
+								<UrlBox value="connectorResolvedUrl" placeholder="'No endpoint URL resolved yet.'" label="'Resolved URL'"/>
+							</div>
+						</section>
+
+						<section class="trigger-card connector-card">
+							<div class="trigger-card__header">
+								<h4>Last runtime snapshot</h4>
+								<p>Most recent execution health written back to the connector bridge record.</p>
+							</div>
+							<div class="trigger-card__body connector-card__body">
+								<div class="connector-fact-grid connector-fact-grid--runtime">
+									<t t-foreach="connectorRuntimeFacts" t-as="fact" t-key="fact.key">
+										<div class="connector-fact-tile connector-fact-tile--runtime">
+											<div class="connector-fact-tile__label" t-esc="fact.label"/>
+											<div class="connector-fact-tile__value" t-esc="fact.value"/>
+											<div t-if="fact.meta" class="connector-fact-tile__meta" t-esc="fact.meta"/>
+										</div>
+									</t>
+								</div>
+								<div t-if="connectorBackendState.last_error" class="trigger-inline-note connector-inline-note mt-3">
+									<strong>Last error:</strong>
+									<span t-esc="connectorBackendState.last_error"/>
+								</div>
+							</div>
+						</section>
+
+						<section class="trigger-card connector-card">
+							<div class="trigger-card__header">
+								<h4>Request overrides</h4>
+								<p>Canvas-level overrides that layer on top of endpoint presets and backend connector configuration.</p>
+							</div>
+							<div class="trigger-card__body connector-card__body">
+								<t t-foreach="connectorEditableGroupedControls" t-as="group" t-key="group.key">
+									<div class="node-config-section connector-control-section">
+										<div class="node-config-section-title">
+											<i t-att-class="'fa ' + (group.icon || 'fa-cube')"/>
+											<span t-esc="group.name"/>
+										</div>
+										<t t-foreach="group.rows" t-as="row" t-key="row.id">
+											<div class="ncp-control-row" t-att-class="row.className">
+												<t t-if="row.kind === 'url-shell'">
+													<div class="ncp-url-control__meta">
+														<t t-foreach="row.cells" t-as="cell" t-key="cell.id + ':meta'">
+															<div class="ncp-url-control__meta-item" t-att-class="cell.className">
+																<span class="ncp-url-control__meta-label" t-esc="cell.control.label"/>
+															</div>
+														</t>
+													</div>
+												</t>
+												<div class="ncp-control-row__body" t-att-class="row.kind === 'url-shell' ? 'ncp-url-control__body' : ''">
+													<t t-foreach="row.cells" t-as="cell" t-key="cell.id">
+														<div class="ncp-control-cell" t-att-class="cell.className">
+															<ControlRenderer control="cell.control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(cell.control.key)" pairModes="getPairModes(cell.control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
+														</div>
+													</t>
+												</div>
+											</div>
+										</t>
+									</div>
+								</t>
+							</div>
+						</section>
+					</t>
+				</t>
+				<t t-if="state.activeTab === 'settings'">
+					<div class="node-config-section trigger-config-settings-section mb-0 border-0 pb-0">
+						<div class="node-config-section-title">Connector Settings</div>
+						<div class="kv-row kv-row--stack trigger-control-stack mb-0">
+							<div class="control-renderer mb-0">
+								<label class="control-label">Node Name</label>
+								<div class="d-flex align-items-center gap-2">
+									<input type="text" class="control-input" t-att-value="nodeNameInputValue" placeholder="Enter node name..." t-on-input="onNodeNameChange" t-att-disabled="isExecutionView ? 'disabled' : undefined" t-att-readonly="isExecutionView ? 'readonly' : undefined"/>
+									<button t-if="isAutoTitleNode and props.node.titleIsCustom and !isExecutionView" class="btn btn-outline-secondary btn-sm" type="button" t-on-click="onResetNodeName">Reset</button>
+								</div>
+							</div>
+						</div>
+					</div>
+				</t>
+			</div>
+		</div>
+	</TabNav>
+</t>
+
 <t t-name="workflow_studio.ConfigPanel.GenericConfig">
+	<div t-if="isEndpointDerivedNode and endpointBindingSummary" class="endpoint-binding-indicator">
+		<i class="fa fa-plug me-1"/>
+		<span class="endpoint-binding-indicator__group" t-if="endpointBindingSummary.group" t-esc="endpointBindingSummary.group"/>
+		<span class="endpoint-binding-indicator__sep" t-if="endpointBindingSummary.group"> · </span>
+		<span class="endpoint-binding-indicator__desc" t-if="endpointBindingSummary.description" t-esc="endpointBindingSummary.description"/>
+	</div>
 	<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
 		<div class="tab-content p-3">
 			<t t-if="state.activeTab === 'parameters'">

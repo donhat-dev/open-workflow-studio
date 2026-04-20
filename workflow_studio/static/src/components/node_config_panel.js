@@ -11,6 +11,7 @@ import { TabNav } from "./primitives/tab_nav/tab_nav";
 import { UrlBox } from "./primitives/url_box/url_box";
 import { useOdooModels } from "@workflow_studio/utils/use_odoo_models";
 import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
+import { sanitizeConnectorRequestConfig } from "@workflow_studio/utils/connector_request_config";
 import {
     getLatestNodeResultsByNodeIds,
     getStructuralPredecessorIds,
@@ -60,6 +61,29 @@ const SCHEDULE_INTERVAL_OPTIONS = ["minutes", "hours", "days", "weeks", "months"
 const WEBHOOK_METHOD_OPTIONS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const WEBHOOK_RESPONSE_OPTIONS = ["immediate", "last_node"];
 const RECORD_EVENT_OPTIONS = ["on_create_or_write", "on_create", "on_write", "on_unlink"];
+const CONNECTOR_PANEL_HIDE_CONTROL_KEYS = new Set([
+    "connector_id",
+    "workspace_id",
+    "endpoint_id",
+    "auth_profile_id",
+]);
+
+function formatDurationMs(value) {
+    if (value === undefined || value === null || value === false || value === "") {
+        return "—";
+    }
+
+    const numericValue = Number(value);
+    if (Number.isNaN(numericValue)) {
+        return String(value);
+    }
+
+    if (numericValue < 1000) {
+        return `${numericValue} ms`;
+    }
+
+    return `${(numericValue / 1000).toFixed(2)} s`;
+}
 
 const PANEL_TOOLBAR_DESCRIPTION_FALLBACKS = {
     http: "Make HTTP API calls to external services.",
@@ -173,6 +197,7 @@ export class NodeConfigPanel extends Component {
         config: "workflow_studio.ConfigPanel.Config",
         output: "workflow_studio.ConfigPanel.Output",
         genericConfig: "workflow_studio.ConfigPanel.GenericConfig",
+        connectorConfig: "workflow_studio.ConfigPanel.ConnectorConfig",
         triggerConfig: "workflow_studio.ConfigPanel.TriggerConfig",
         triggerManual: "workflow_studio.ConfigPanel.TriggerConfig.Manual",
         triggerSchedule: "workflow_studio.ConfigPanel.TriggerConfig.Schedule",
@@ -243,6 +268,10 @@ export class NodeConfigPanel extends Component {
             triggerPanelData: null,
             triggerFieldSuggestions: [],
             triggerErrorMessage: "",
+            connectorLoading: false,
+            connectorBusy: false,
+            connectorPanelData: null,
+            connectorErrorMessage: "",
             execution: this.props.execution || null,
             navActiveOptionKeys: {
                 previous: null,
@@ -267,8 +296,11 @@ export class NodeConfigPanel extends Component {
             this.initControlValues();
             if (this.isTriggerNode) {
                 await this._bootstrapTriggerPanel(this.props.node);
+            } else if (this.isConnectorRequestNode) {
+                await this._bootstrapConnectorPanel(this.props.node);
             } else {
                 this._resetTriggerState();
+                this._resetConnectorState();
             }
         });
 
@@ -294,8 +326,13 @@ export class NodeConfigPanel extends Component {
                 this.initControlValues(nextProps.node);
                 if (TRIGGER_NODE_TYPES.has(nextProps.node.type)) {
                     await this._bootstrapTriggerPanel(nextProps.node);
+                    this._resetConnectorState();
+                } else if (nextProps.node.type === "connector_request") {
+                    this._resetTriggerState();
+                    await this._bootstrapConnectorPanel(nextProps.node);
                 } else {
                     this._resetTriggerState();
+                    this._resetConnectorState();
                 }
                 return;
             }
@@ -506,6 +543,11 @@ export class NodeConfigPanel extends Component {
                     kind: "url-shell",
                     className: "ncp-control-row--url-shell",
                     cellClasses: ["ncp-control-cell--span-2", "ncp-control-cell--span-10"],
+                },
+                {
+                    id: "path-params",
+                    keys: ["path_params"],
+                    cellClasses: ["ncp-control-cell--full"],
                 },
             ],
             trigger: [
@@ -855,6 +897,39 @@ export class NodeConfigPanel extends Component {
         return TRIGGER_NODE_TYPES.has(this.props.node.type);
     }
 
+    get isConnectorRequestNode() {
+        return this.props.node.type === "connector_request";
+    }
+
+    /**
+     * True when the node is an endpoint-derived virtual node (ep_* type).
+     */
+    get isEndpointDerivedNode() {
+        const config = this.props.node.config || (this.props.node.getConfig ? this.props.node.getConfig() : {});
+        return config._runtime_node_type === "connector_request" && this.props.node.type !== "connector_request";
+    }
+
+    _isEndpointDerivedNode(node) {
+        if (!node) return false;
+        const config = node.config || (node.getConfig ? node.getConfig() : {});
+        return config._runtime_node_type === "connector_request" && node.type !== "connector_request";
+    }
+
+    /**
+     * Returns the endpoint binding summary for endpoint-derived nodes.
+     */
+    get endpointBindingSummary() {
+        if (!this.isEndpointDerivedNode) return null;
+        const node = this.props.node;
+        const backendTypes = this.workflowEditor.state.nodeTypes || [];
+        const typeDef = backendTypes.find(t => t.node_type === node.type);
+        return {
+            group: typeDef ? (typeDef.group || "") : "",
+            name: typeDef ? (typeDef.name || node.type) : node.type,
+            description: typeDef ? (typeDef.description || "") : "",
+        };
+    }
+
     get isManualTrigger() {
         return this.props.node.type === "manual_trigger";
     }
@@ -1064,6 +1139,197 @@ export class NodeConfigPanel extends Component {
 
     get showHeaderExecute() {
         return !this.isExecutionView && !this.isTriggerNode;
+    }
+
+    get connectorPanelData() {
+        return this.state.connectorPanelData;
+    }
+
+    get connectorBackendState() {
+        const panelData = this.connectorPanelData;
+        if (panelData && panelData.backend) {
+            return panelData.backend;
+        }
+        return {
+            active: false,
+            workspace: false,
+            connector: false,
+            endpoint: false,
+            auth_profile: false,
+            operation_code: false,
+            last_status_code: false,
+            last_duration_ms: false,
+            last_error: false,
+            last_run_at: false,
+        };
+    }
+
+    get connectorWarnings() {
+        const panelData = this.connectorPanelData;
+        if (panelData && Array.isArray(panelData.warnings)) {
+            return panelData.warnings;
+        }
+        return [];
+    }
+
+    get connectorHeaderButtons() {
+        if (!this.isConnectorRequestNode || this.isExecutionView) {
+            return [];
+        }
+        const isDisabled = this.state.connectorBusy || this.state.connectorLoading;
+        return [
+            {
+                id: "refresh-connector",
+                label: "Refresh backend state",
+                icon: "fa-refresh",
+                className: "btn-outline-secondary",
+                disabled: isDisabled,
+                onClick: () => this.onRefreshConnectorPanel(),
+            },
+            {
+                id: "open-connector-record",
+                label: "Open backend record",
+                icon: "fa-external-link",
+                className: "btn-outline-secondary",
+                disabled: isDisabled,
+                onClick: () => this.onOpenConnectorRecord(),
+            },
+        ];
+    }
+
+    get connectorHeaderSummary() {
+        if (!this.isConnectorRequestNode) {
+            return "";
+        }
+        const connector = this.connectorBackendState.connector;
+        const endpoint = this.connectorBackendState.endpoint;
+        const parts = [];
+        if (connector && connector.code) {
+            parts.push(connector.code);
+        }
+        if (endpoint && endpoint.code) {
+            parts.push(endpoint.code);
+        }
+        if (this.connectorBackendState.operation_code) {
+            parts.push(this.connectorBackendState.operation_code);
+        }
+        return parts.join(" • ");
+    }
+
+    get connectorBindingStatusLabel() {
+        if (!this.isConnectorRequestNode) {
+            return "";
+        }
+        return this.connectorBackendState.active ? "Bound" : "Inactive";
+    }
+
+    get connectorBindingStatusClass() {
+        return this.connectorBackendState.active ? "is-active" : "is-inactive";
+    }
+
+    get connectorBindingFacts() {
+        if (!this.isConnectorRequestNode) {
+            return [];
+        }
+
+        const backend = this.connectorBackendState;
+        const workspace = backend.workspace;
+        const connector = backend.connector;
+        const endpoint = backend.endpoint;
+        const authProfile = backend.auth_profile;
+        return [
+            {
+                key: "workspace",
+                label: "Workflow Workspace",
+                value: workspace ? `${workspace.name}${workspace.code ? ` (${workspace.code})` : ""}` : "No workspace assigned",
+                meta: "",
+            },
+            {
+                key: "connector",
+                label: "Connector",
+                value: connector ? `${connector.name}${connector.code ? ` (${connector.code})` : ""}` : "Not linked yet",
+                meta: connector ? [connector.provider_key, connector.environment].filter(Boolean).join(" • ") : "",
+            },
+            {
+                key: "endpoint",
+                label: "Endpoint",
+                value: endpoint ? `${endpoint.name}${endpoint.code ? ` (${endpoint.code})` : ""}` : "No endpoint preset",
+                meta: endpoint && endpoint.method ? `${endpoint.method}${endpoint.path ? ` • ${endpoint.path}` : ""}` : "",
+            },
+            {
+                key: "auth",
+                label: "Auth Profile",
+                value: authProfile ? authProfile.name : "Connector default / none",
+                meta: authProfile && authProfile.auth_type ? authProfile.auth_type : "",
+            },
+            {
+                key: "operation",
+                label: "Operation Code",
+                value: backend.operation_code || this.state.controlValues.operation_code || "Not set",
+                meta: "",
+            },
+        ];
+    }
+
+    get connectorRuntimeFacts() {
+        if (!this.isConnectorRequestNode) {
+            return [];
+        }
+        const backend = this.connectorBackendState;
+        return [
+            {
+                key: "status",
+                label: "Last Status",
+                value: backend.last_status_code || backend.last_status_code === 0
+                    ? String(backend.last_status_code)
+                    : "Never run",
+                meta: backend.last_run_at ? formatDateTime(backend.last_run_at) : "",
+            },
+            {
+                key: "duration",
+                label: "Last Duration",
+                value: formatDurationMs(backend.last_duration_ms),
+                meta: "",
+            },
+        ];
+    }
+
+    get connectorResolvedUrl() {
+        const endpoint = this.connectorBackendState.endpoint;
+        return endpoint && endpoint.effective_url ? endpoint.effective_url : "";
+    }
+
+    get connectorEditableGroupedControls() {
+        if (!this.isConnectorRequestNode) {
+            return [];
+        }
+        return this.groupedControls
+            .map((group) => {
+                const controls = group.controls
+                    .filter((control) => !CONNECTOR_PANEL_HIDE_CONTROL_KEYS.has(control.key))
+                    .map((control) => {
+                        if (
+                            control.key === "method"
+                            && control.type === "select"
+                            && !(Array.isArray(control.options) && control.options.some((option) => option && option.value === ""))
+                        ) {
+                            return {
+                                ...control,
+                                options: [
+                                    { value: "", label: "— Use endpoint preset —" },
+                                    ...(Array.isArray(control.options) ? control.options : []),
+                                ],
+                            };
+                        }
+                        return control;
+                    });
+                return {
+                    ...group,
+                    controls,
+                    rows: this._buildControlRows(group.key, controls),
+                };
+            })
+            .filter((group) => group.controls.length > 0);
     }
 
     get showHeaderRail() {
@@ -1529,6 +1795,13 @@ export class NodeConfigPanel extends Component {
         this.state.triggerErrorMessage = "";
     }
 
+    _resetConnectorState() {
+        this.state.connectorLoading = false;
+        this.state.connectorBusy = false;
+        this.state.connectorPanelData = null;
+        this.state.connectorErrorMessage = "";
+    }
+
     async _bootstrapTriggerPanel(node) {
         this._resetTriggerState();
         this.state.triggerLoading = true;
@@ -1536,6 +1809,13 @@ export class NodeConfigPanel extends Component {
         this.state.triggerErrorMessage = "";
         await this._loadTriggerFieldSuggestions(this.state.controlValues.model_name);
         await this._reloadTriggerPanelData(node.id);
+    }
+
+    async _bootstrapConnectorPanel(node) {
+        this._resetConnectorState();
+        this.state.connectorLoading = true;
+        this.state.connectorErrorMessage = "";
+        await this._reloadConnectorPanelData(node.id);
     }
 
     async _reloadTriggerPanelData(nodeId) {
@@ -1550,6 +1830,19 @@ export class NodeConfigPanel extends Component {
             this._stopTriggerPolling();
         } finally {
             this.state.triggerLoading = false;
+        }
+    }
+
+    async _reloadConnectorPanelData(nodeId) {
+        try {
+            const data = await this.actions.getConnectorRequestPanelData(nodeId);
+            this.state.connectorPanelData = data;
+            this.state.connectorErrorMessage = "";
+        } catch (error) {
+            this.state.connectorErrorMessage = error && error.message ? error.message : "Failed to load connector backend state.";
+            this.state.connectorPanelData = null;
+        } finally {
+            this.state.connectorLoading = false;
         }
     }
 
@@ -1689,6 +1982,42 @@ export class NodeConfigPanel extends Component {
         } catch (error) {
             this.state.triggerErrorMessage = error && error.message ? error.message : "Failed to open backend record.";
             this.notification.add(this.state.triggerErrorMessage, { type: "danger" });
+        }
+    }
+
+    async onRefreshConnectorPanel() {
+        if (this.state.connectorBusy || this.isExecutionView) {
+            return;
+        }
+        this.state.connectorBusy = true;
+        this.state.connectorErrorMessage = "";
+        try {
+            this._syncToAdapter();
+            await this.actions.saveWorkflow();
+            await this._reloadConnectorPanelData(this.props.node.id);
+        } catch (error) {
+            this.state.connectorErrorMessage = error && error.message ? error.message : "Failed to refresh connector backend state.";
+            this.notification.add(this.state.connectorErrorMessage, { type: "danger" });
+        } finally {
+            this.state.connectorBusy = false;
+        }
+    }
+
+    async onOpenConnectorRecord() {
+        if (this.isExecutionView || this.state.connectorBusy) {
+            return;
+        }
+        this.state.connectorBusy = true;
+        this.state.connectorErrorMessage = "";
+        try {
+            this._syncToAdapter();
+            await this.actions.saveWorkflow();
+            await this.actions.openConnectorNodeRecord(this.props.node.id);
+        } catch (error) {
+            this.state.connectorErrorMessage = error && error.message ? error.message : "Failed to open connector backend record.";
+            this.notification.add(this.state.connectorErrorMessage, { type: "danger" });
+        } finally {
+            this.state.connectorBusy = false;
         }
     }
 
@@ -2182,8 +2511,11 @@ export class NodeConfigPanel extends Component {
         this._syncToAdapter();
 
         const nodeId = this.props.node.id;
-        const configOverrides = this.state.controlValues
-            ? { [nodeId]: this.state.controlValues }
+        const nodeConfig = this.isConnectorRequestNode
+            ? sanitizeConnectorRequestConfig(this.state.controlValues)
+            : this.state.controlValues;
+        const configOverrides = nodeConfig
+            ? { [nodeId]: nodeConfig }
             : null;
 
         try {

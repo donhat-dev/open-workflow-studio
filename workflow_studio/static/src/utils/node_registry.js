@@ -44,6 +44,7 @@ export function getAllNodeTypes(backendTypes = null) {
                 icon: entry.icon || NodeClass.icon || value.icon || "fa-cube",
                 category: entry.category || NodeClass.category || value.category || "action",
                 description: entry.description || NodeClass.description || value.description || "",
+                group: entry.group || NodeClass.group || value.group || "",
             };
         }).filter(Boolean);
     }
@@ -64,6 +65,7 @@ export function getAllNodeTypes(backendTypes = null) {
             icon: NodeClass.icon || value.icon || "fa-cube",
             category: NodeClass.category || value.category || "action",
             description: NodeClass.description || value.description || "",
+            group: NodeClass.group || value.group || "",
         };
     }).filter(Boolean);
 }
@@ -83,6 +85,7 @@ export function getNodeType(key, backendTypes = null) {
         icon: (backend && backend.icon) || NodeClass.icon || value.icon || "fa-cube",
         category: (backend && backend.category) || NodeClass.category || value.category || "action",
         description: (backend && backend.description) || NodeClass.description || value.description || "",
+        group: (backend && backend.group) || NodeClass.group || value.group || "",
     };
 }
 

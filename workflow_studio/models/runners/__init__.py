@@ -11,6 +11,7 @@ Provides runner implementations for different node types:
     - ValidationNodeRunner: Data validation
     - CodeNodeRunner: Safe expression execution
     - SwitchNodeRunner: Multi-branch routing
+    - ConnectorRequestNodeRunner: Managed connector HTTP node (ADR-010)
 """
 
 from .base import BaseNodeRunner, SmartExpressionResolver
@@ -26,6 +27,7 @@ from .record_operation_runner import RecordOperationNodeRunner
 from .schedule_trigger_runner import ScheduleTriggerNodeRunner
 from .webhook_trigger_runner import WebhookTriggerNodeRunner
 from .record_event_trigger_runner import RecordEventTriggerNodeRunner
+from .connector_runner import ConnectorRequestNodeRunner
 
 __all__ = [
     "BaseNodeRunner",
@@ -42,4 +44,5 @@ __all__ = [
     "ScheduleTriggerNodeRunner",
     "WebhookTriggerNodeRunner",
     "RecordEventTriggerNodeRunner",
+    "ConnectorRequestNodeRunner",
 ]

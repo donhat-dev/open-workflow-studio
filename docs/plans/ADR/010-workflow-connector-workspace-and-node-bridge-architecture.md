@@ -1,334 +1,149 @@
-# ADR-010: Workflow Connector Workspace and Node-Bridge Architecture
+# ADR-010: Connector Boundary and Workspace Separation for Managed Connector Nodes
 
-> Proposed foundation for external-system connector nodes in `workflow_studio`
+> Accepted foundation for reusable external-system connectors in `workflow_studio`
 
 ---
 
 ## Status
 
-**Proposed 🟡**
+**Accepted ✅**
 
 ---
 
 ## Context
 
-`workflow_studio` already supports three important architectural ideas that are
-worth preserving:
+`workflow_studio` already has two architectural rules worth preserving:
 
-1. **Snapshot-first workflow state** — `ir.workflow.draft_snapshot` and
-   `published_snapshot` remain the source of truth for graph structure and node
-   configuration. Persisted relational records such as `workflow.node` and
-   `workflow.connection` are mirrors for querying, validation, and audit, not
-   the primary runtime source.
+1. **Snapshot-first workflow state** — `draft_snapshot` and `published_snapshot`
+   remain the source of truth for graph structure and node configuration.
 2. **Bridge records for graph-backed infrastructure** — `workflow.trigger`
-   maps a graph node (`workflow_id + node_id`) to backend infrastructure such as
-   `ir.cron`, `base.automation`, and webhook UUID routes.
-3. **Security-first execution context** — the executor already injects a
-   `SecretBroker` (`secret.get(key)`) and applies output masking / audit rules.
+   proved that graph nodes can stay in snapshots while backend bridge records
+   store management metadata, health, and linked Odoo infrastructure.
 
-The research target is a standard connector-node architecture that can support
-real external-system integrations — starting with shipping connectors such as
-Viettel Post and Lalamove, but extensible to marketplaces, CRM, finance, or any
-REST-backed provider.
+The initial ADR-010 implementation used `workflow.workspace` for two unrelated
+concerns at the same time:
 
-The `tangerine-shipping-methods` repository demonstrates a production-shaped
-pattern that `workflow_studio` currently lacks:
+- organizing workflows for humans (`ir.workflow.workspace_id`)
+- storing provider/integration configuration such as `base_url`, auth defaults,
+  endpoint presets, and managed connector node bindings
 
-- a provider-scoped configuration boundary (`delivery.carrier` extension)
-- endpoint registry records (`delivery.route.api`)
-- status registries and status mappings
-- operational transaction records (`carrier.ref.order`)
-- webhook audit logs (`delivery.webhook.log`)
-- service catalogs, regional presets, and reconciliation extensions
+That coupling created three long-term problems:
 
-The current `workflow_studio` HTTP node is intentionally generic and useful for
-ad-hoc calls, but it is not enough for a reusable connector framework because it
-does not provide:
+1. **Provider configuration leaked into workflow organization** — a workspace
+   record was forced to mean both “folder/group” and “integration profile”.
+2. **The model blocked future organization improvements** — adding folders,
+   collections, or richer workspace governance would still leave provider config
+   tangled into the same table.
+3. **Connector reuse stayed awkward** — multiple workflows can share the same
+   provider configuration, but provider configuration should not define the
+   primary workflow hierarchy.
 
-- a shared configuration scope for related workflows
-- backend-manageable endpoint presets and auth profiles
-- relational records for node-specific metadata, health, and admin-side config
-- a clean boundary between generic connector infrastructure and provider-specific
-  runtime rules
+We considered three directions for the refactor:
 
-### Requirements gathered from research
-
-The standard connector architecture must support:
-
-- grouping related workflows under a shared connector scope
-- storing shared endpoint presets, credentials, and environment choices once
-- preserving snapshot-first execution rather than moving workflow truth into DB
-- treating connector-aware nodes like trigger nodes: graph node in snapshot,
-  backend bridge record for management and metadata
-- supporting both outbound requests and inbound webhook-driven updates
-- leaving room for provider-specific extensions such as token dances, catalog
-  sync, reconciliation, label printing, and custom signature logic
-
-### Constraints from existing ADRs and implementation
-
-- ADR-004 favors the editor service as the single frontend source of truth.
-- ADR-005 requires zero-trust execution, masked outputs, and brokered secret
-  access.
-- ADR-008 establishes the bridge-record pattern via `workflow.trigger`.
-- ADR-009 reinforces snapshot/runtime separation and avoids inflating stored
-  workflow structures with heavy duplicated payloads.
+1. Add `workflow.connector` and decouple provider integration from workflow
+   organization.
+2. Keep the current connector model and only add `workflow.collection` /
+   `workflow.folder` for workflow grouping.
+3. Keep the backend model as-is and improve only frontend preset UX.
 
 ---
 
 ## Decision
 
-Adopt a **workspace-centered connector architecture** for `workflow_studio`.
+Adopt a **connector-first boundary with a separate workflow workspace model**.
 
-This ADR defines the core configuration scope and bridge-record pattern. More
-specialized mapping and transaction/logging decisions are split into ADR-011 and
-ADR-012.
+### 1. `workflow.workspace` is the organizational boundary for workflows
 
-### 1. Introduce `workflow.workspace` as the connector configuration boundary
+`workflow.workspace` is now the primary management level for `ir.workflow`.
 
-`workflow.workspace` becomes the shared scope for connector-oriented workflows.
-Conceptually, it plays the same role that the delivery-carrier record plays in
-`tangerine`: a mutable configuration boundary for one integration profile.
-
-#### Responsibilities
+Its responsibility is intentionally narrow:
 
 - group related workflows
-- scope connector presets and overrides by company / environment
-- own shared endpoint presets, auth profiles, mapping presets, and operational
-  records
-- provide a stable anchor for backend configuration outside the canvas
+- provide a human-friendly organizational label/code
+- support workspace-level filtering, ownership, and future hierarchy features
 
-#### Proposed shape
+`workflow.workspace` no longer owns endpoint presets, auth profiles, or managed
+connector runtime configuration.
 
-| Field | Purpose |
-| --- | --- |
-| `name` | Human-facing identity |
-| `code` | Technical identity, auto-generated from name if blank |
-| `company_id` | Company scope |
-| `provider_key` / `connector_type` | `viettelpost`, `lalamove`, `shopee`, `generic_rest`, etc. |
-| `environment` | `sandbox`, `production`, `custom` |
-| `base_url` | Default API host |
-| `active` | Archive support |
-| `default_auth_profile_id` | Shared auth default |
-| `notes` | Admin documentation |
+### 2. `workflow.connector` is the provider/integration boundary
 
-#### Constraints
+Add `workflow.connector` as the reusable integration profile model.
 
-- **Unique naming**: `(company_id, provider_key, code)` must be unique to prevent
-  naming collisions when the same provider is used with different configurations
-- **Code generation**: If `code` is not provided on create, auto-generate from
-  `name` using slugify with collision suffix (e.g., `viettelpost-hcm`,
-  `viettelpost-hcm-2`)
-- **Provider key vocabulary**: `provider_key` values should follow a registry
-  pattern (similar to `workflow.type`) to enable provider-specific dispatching
+Its responsibility is to hold provider-scoped configuration that should be
+shared across workflows and managed outside the canvas:
 
-#### Relationships
+- `provider_key`
+- `connector_type`
+- `environment`
+- `base_url`
+- `default_auth_profile_id`
+- connector-scoped notes and operational metadata
 
-- `ir.workflow.workspace_id -> workflow.workspace` (optional Many2one)
-- `workflow.workspace.endpoint_ids -> workflow.endpoint`
-- `workflow.workspace.auth_profile_ids -> workflow.auth.profile`
-- `workflow.workspace.mapping_ids -> workflow.data.mapping`
-- `workflow.workspace.transaction_ids -> workflow.connector.transaction`
+This is the model that conceptually matches `delivery.carrier`-style integration
+configuration from the Tangerine shipping codebase.
 
-#### Workflow-to-Workspace cardinality
+### 3. Connector-owned presets and bindings hang off `workflow.connector`
 
-`ir.workflow.workspace_id` is **optional**:
+The following models now belong to the connector boundary:
 
-- workflows not using connector features leave it blank
-- one workflow may belong to exactly one workspace
-- multiple workflows may share the same workspace
-- changing workspace does not affect snapshot content, only backend-side defaults
-  and preset resolution
+- `workflow.endpoint.connector_id`
+- `workflow.auth.profile.connector_id`
+- `workflow.http.request.connector_id`
 
-### 2. Keep snapshots as the source of truth for node configuration
+`workflow.http.request.workspace_id` remains useful only as a related field from
+the parent workflow for reporting and filtering. It is **not** the provider
+configuration source anymore.
 
-The new connector architecture must **not** move canonical node config into
-relational models.
+### 4. Keep snapshot-first execution and bridge-record semantics
 
-Instead, the repo should continue using the same contract as `workflow.trigger`:
+This ADR does **not** move canonical node configuration into relational models.
 
-- graph node config lives in `draft_snapshot` / `published_snapshot`
-- relational bridge records cache derived metadata, extra backend config, search
-  fields, and admin-facing state
-- runtime resolves effective config by merging snapshot config + backend-side
-  managed fields when allowed
+The contract remains:
 
-This keeps execution aligned with the current architecture and avoids split
-brain between graph JSON and backend records.
+- graph node config lives in workflow snapshots
+- bridge records cache derived metadata, health, and additive admin-managed
+  configuration
+- runtime merges snapshot config + connector preset + backend bridge overrides
 
-### 3. Introduce `workflow.endpoint` as the reusable endpoint registry
+This keeps connector support aligned with ADR-008 and ADR-009 instead of
+creating a DB-first exception.
 
-The endpoint registry generalizes the `delivery.route.api` pattern from
-`tangerine`.
+### 5. Keep `connector_request` as a distinct managed node type
 
-#### Responsibilities
-
-- define named API operations as records
-- allow endpoint presets to be seeded by data files and adjusted in backend UI
-- centralize route, method, timeout, and auth requirements
-- let multiple workflows reference the same logical operation without repeating
-  low-level HTTP details
-
-#### Proposed shape
-
-| Field | Purpose |
-| --- | --- |
-| `workspace_id` (nullable) | Scoped preset or global preset |
-| `name`, `code` | Human + technical endpoint key |
-| `category` | `auth`, `quote`, `create`, `cancel`, `status_sync`, `webhook_register`, etc. |
-| `method` | HTTP verb |
-| `path` | Relative path |
-| `headers_template` | Default headers |
-| `query_template` | Default query params |
-| `body_template` | Default request body skeleton |
-| `requires_auth` | Whether an auth profile is expected |
-| `timeout_seconds` | Timeout override |
-| `retry_policy_json` | Per-endpoint retry hints |
-| `active` | Archive support |
-
-Presets may be seeded globally, then copied or overridden per workspace.
-
-### 4. Introduce `workflow.auth.profile` as the reusable auth strategy record
-
-Connector nodes should not hardcode auth mechanics inside every workflow.
-
-`workflow.auth.profile` becomes the reusable record for auth behavior and token
-metadata, while raw secrets remain brokered through the existing
-`SecretBroker`.
-
-#### Proposed shape
-
-| Field | Purpose |
-| --- | --- |
-| `workspace_id` | Scope |
-| `name` | Admin-facing profile name |
-| `auth_type` | `api_key`, `bearer`, `basic`, `oauth2_client_credentials`, `oauth2_refresh_token`, `hmac`, `jwt_assertion`, `custom` |
-| `token_endpoint_id` | Optional endpoint used for token acquisition |
-| `secret_refs_json` | References to `secret.get(key)` keys |
-| `header_template_json` | Header-level auth template |
-| `query_template_json` | Query-param auth template |
-| `signature_template` | Optional signature recipe |
-| `scope`, `audience` | Auth metadata |
-| `token_expires_at`, `last_refresh_at` | Cached lifecycle metadata |
-| `active` | Archive support |
-
-#### Secret handling rule
-
-Raw credentials must not become the default storage path for connector models.
-The preferred pattern is:
-
-- backend records store metadata and broker references
-- runtime resolves secrets via `secret.get(key)`
-- masked values are shown in display flows using the same security rules already
-  present in the executor
-
-### 5. Introduce `workflow.http.request` as the connector-aware bridge record
-
-The repo should add a relational bridge model for connector-aware outbound HTTP
-nodes, using `workflow.trigger` as the direct design precedent.
-
-#### Naming decision
-
-Use `workflow.http.request`, not `ir.workflow.http.request`, to stay aligned
-with the model naming style already used by:
-
-- `workflow.trigger`
-- `workflow.node`
-- `workflow.connection`
-- `workflow.run`
-
-#### Responsibilities
-
-- bind a graph node to backend-managed connector metadata
-- store endpoint binding, health summary, hashes, and optional admin overrides
-- support backend search/filter/reporting for connector nodes
-- provide a stable home for panel state and future operational links
-
-#### Proposed shape
-
-| Field | Purpose |
-| --- | --- |
-| `workflow_id` | Parent workflow |
-| `node_id` | Graph node ID |
-| `workspace_id` | Effective workspace |
-| `endpoint_id` | Selected endpoint preset |
-| `operation_code` | Stable logical action key |
-| `active` | Enable / disable backend-side behavior |
-| `config_hash` | Change detection |
-| `snapshot_config_json` | Cached node config view |
-| `backend_config_json` | Backend-managed additive config |
-| `resolved_url_preview` | UI preview |
-| `last_status_code` | Last execution summary |
-| `last_duration_ms` | Performance summary |
-| `last_error` | Last known failure summary |
-| `last_run_at` | Last execution timestamp |
-
-#### Constraints
-
-- unique `(workflow_id, node_id)`
-- source-of-truth remains the graph snapshot
-- backend config can augment, but must not silently replace, the snapshot schema
-
-### 6. Distinguish two outbound request modes at the node layer
-
-The current `http` node remains supported as the **ad-hoc / low-ceremony** HTTP
-node.
-
-Add a new connector-oriented node category for **managed connector calls**.
-
-#### Proposed split
+The repo keeps two outbound request modes:
 
 | Node | Role |
 | --- | --- |
 | `http` | Ad-hoc raw request builder |
-| `connector_request` | Managed request bound to workspace + endpoint + auth profile |
+| `connector_request` | Managed request bound to connector presets and bridge metadata |
 
-This avoids overloading the existing `http` node with connector-specific admin
-behavior while keeping it available for quick integrations and experiments.
+We explicitly do **not** collapse `connector_request` into the generic `http`
+node in this refactor. The managed node still earns its own type because it has
+different runtime semantics:
 
-### 7. Provider-specific logic stays behind a capability/plugin boundary
+- backend bridge lifecycle
+- connector-owned endpoint/auth resolution
+- runtime health tracking
+- backend record inspection from the editor
 
-Some behaviors must remain provider-specific:
+Palette categories remain backend-driven through `workflow.type.category`.
+Connector preset binding stays panel/backend-driven for now; dynamic
+connector-specific palette categories can be layered later without re-coupling
+the data model.
 
-- Viettel Post's multi-step token exchange
-- Lalamove's HMAC signature + nonce + request ID generation
-- catalog synchronization shapes (`service` vs `service_extend` vs `specialRequests`)
-- label-printing mechanics
-- reconciliation parsers and settlement logic
+### 6. Migration rule for the Phase-A workspace-centered implementation
 
-Therefore, the connector core should expose provider-specific extension points
-instead of trying to flatten everything into generic JSON fields on day one.
+When upgrading from the earlier Phase-A implementation:
 
-#### Allowed extension mechanisms
+- legacy connector-style `workflow.workspace` rows are duplicated into
+  `workflow.connector`
+- legacy `workspace_id` bindings on endpoint/auth/request tables are copied into
+  `connector_id` where possible
+- legacy snapshot configs that still contain `workspace_id` are tolerated as a
+  temporary binding alias during bridge resolution
 
-- registered Python callables (similar to decorated workflow nodes)
-- provider-key-dispatched helpers
-- vertical addon models layered on top of the connector core
-
-### 8. Phase the rollout instead of building the entire connector universe at once
-
-#### Phase A — foundation
-
-- `workflow.workspace`
-- `workflow.endpoint`
-- `workflow.auth.profile`
-- `workflow.http.request`
-- `connector_request` node type and config panel
-- snapshot/runtime merge rules
-
-#### Phase B — semantic translation
-
-- mapping presets and the data-mapping node (see ADR-011)
-- workspace-scoped preset loading and override rules
-
-#### Phase C — runtime lifecycle and observability
-
-- transaction correlation, exchange logs, webhook subscriptions (see ADR-012)
-
-#### Phase D — vertical connector packs
-
-- shipping connectors (Viettel Post, Lalamove)
-- service catalogs, regional presets, settlement/reconciliation
-- marketplace / ERP / finance verticals with provider-specific plugins
+This keeps upgrades practical without preserving the old architecture as the
+future design.
 
 ---
 
@@ -336,96 +151,78 @@ instead of trying to flatten everything into generic JSON fields on day one.
 
 ### Positive
 
-- introduces a real configuration scope for connector-oriented workflows
-- preserves the repo's existing snapshot-first architecture
-- reuses the proven bridge-record pattern already established by
-  `workflow.trigger`
-- separates ad-hoc HTTP usage from managed connector usage
-- aligns secrets/auth with the existing zero-trust execution model
-- creates a clean place to seed presets and manage them outside the editor
+- removes the root coupling between workflow organization and provider config
+- makes `workflow.workspace` safe to evolve into richer workflow management
+  features later
+- gives connectors a clean, reusable provider boundary
+- preserves snapshot-first execution and bridge-record architecture
+- keeps `connector_request` focused on managed connector behavior instead of
+  polluting the generic `http` node
 
 ### Negative
 
-- adds several new relational models and admin UIs
-- creates a second integration path (`http` vs `connector_request`) that must be
-  explained clearly to users
-- requires disciplined runtime merge rules to avoid hidden divergence between
-  snapshots and bridge records
+- adds a new top-level model and admin surface (`workflow.connector`)
+- requires migration logic for existing Phase-A data
+- keeps two outbound request concepts (`http` and `connector_request`) that must
+  be explained clearly in UX copy and docs
 
 ### Neutral
 
-- provider-specific integrations will still need vertical add-ons or callables
-- current workflows can continue using the generic HTTP node without migration
-- the new architecture does not immediately solve mapping or transaction
-  correlation; those are addressed in companion ADRs
+- provider-specific shipping/marketplace quirks still belong in vertical
+  extensions or provider-dispatched helpers
+- folder/collection hierarchy is not solved here; it can now be added later on
+  top of a clean organizational workspace model
+- ADR-011 and ADR-012 still own mapping translation and transaction/exchange
+  lifecycle concerns
 
 ---
 
 ## Alternatives Considered
 
-### Option A: Keep only the generic `http` node
+### Option A — Add `workflow.connector` and decouple provider integration from workflow organization
 
-Use the existing `http` node for all integrations and store everything directly
-inside snapshot config.
+**Chosen.**
 
-**Pros**:
+Why it wins:
 
-- no new backend models
-- lowest initial implementation cost
-- preserves maximum node simplicity
+- fixes the real coupling instead of renaming around it
+- supports multiple workflows reusing the same provider config cleanly
+- leaves room for future workspace/folder/collection features without dragging
+  provider state through them
+- matches production-shaped integration architecture more closely
 
-**Cons**:
+### Option B — Keep the current connector model and add `workflow.collection` / `workflow.folder`
 
-- no shared workspace/grouping scope
-- no reusable endpoint/auth presets
-- poor backend discoverability and admin management
-- no clean place for connector-specific metadata, health, or lifecycle
+Why rejected:
 
-### Option B: Hardcode provider-specific models directly into `workflow_studio`
+- improves workflow organization but leaves the provider/workspace coupling intact
+- creates one more abstraction layer while the wrong boundary still owns
+  endpoint/auth/runtime state
+- makes future cleanup harder because organization models would grow around the
+  old coupling instead of replacing it
 
-Model each provider the way `tangerine` does and bind workflows to those models
-directly.
+### Option C — Keep the backend model and improve frontend preset UX only
 
-**Pros**:
+Why rejected:
 
-- closer to the reference implementation
-- straightforward for the first shipping connector
-
-**Cons**:
-
-- too narrow for a standard connector framework
-- quickly creates a collection of unrelated provider implementations
-- weak reuse for non-shipping domains
-
-### Option C: Store all connector state exclusively in relational tables
-
-Turn connector nodes into DB-first records and use snapshots only for layout.
-
-**Pros**:
-
-- easy relational querying
-- admin-side edits are straightforward
-
-**Cons**:
-
-- violates the repo's established snapshot-first architecture
-- increases risk of graph/DB divergence
-- makes publishing/versioning harder to reason about
+- treats a data-model problem as a presentation problem
+- still leaves `workflow.workspace` overloaded with provider concerns
+- makes the UI nicer while preserving the architecture that caused the problem
 
 ---
 
 ## References
 
 - `workflow_studio/models/ir_workflow.py`
-- `workflow_studio/models/workflow_trigger.py`
-- `workflow_studio/models/workflow_type.py`
-- `workflow_studio/models/security/secret_broker.py`
-- `workflow_studio/models/workflow_executor.py`
+- `workflow_studio/models/workflow_workspace.py`
+- `workflow_studio/models/workflow_connector.py`
+- `workflow_studio/models/workflow_endpoint.py`
+- `workflow_studio/models/workflow_auth_profile.py`
+- `workflow_studio/models/workflow_http_request.py`
+- `workflow_studio/models/runners/connector_runner.py`
+- `workflow_studio/views/workflow_connector_views.xml`
 - `tangerine_delivery_base/models/delivery_base.py`
 - `tangerine_delivery_base/models/carrier_ref_order.py`
-- `tangerine_delivery_base/models/delivery_webhook_log.py`
-- `tangerine_delivery_viettelpost/data/viettelpost_route_api_data.xml`
-- `tangerine_delivery_lalamove/data/lalamove_route_api_data.xml`
 - [ADR-004](./004-editor-state-architecture.md)
 - [ADR-005](./005-zero-trust-polp.md)
 - [ADR-008](./008-hybrid-trigger-architecture.md)
@@ -438,8 +235,8 @@ Turn connector nodes into DB-first records and use snapshots only for layout.
 
 | Field | Value |
 | --- | --- |
-| **Date** | 2026-04-15 |
+| **Date** | 2026-04-20 |
 | **Author** | GitHub Copilot |
 | **Reviewers** | - |
 | **Related ADRs** | ADR-004, ADR-005, ADR-008, ADR-011, ADR-012 |
-| **Related Tasks** | Connector architecture research, external integration foundation |
+| **Related Tasks** | ADR-010 architectural comparison, connector/workspace refactor |

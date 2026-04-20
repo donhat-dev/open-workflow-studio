@@ -38,6 +38,35 @@
 }</field>
         </record>
 
+        <record id="workflow_type_connector_request" model="workflow.type">
+            <field name="name">Connector Request</field>
+            <field name="node_type">connector_request</field>
+            <field name="category">integration</field>
+            <field name="icon">icon-plug</field>
+            <field name="description">Managed HTTP call via a reusable connector with shared endpoint and auth profile</field>
+            <field name="config_schema">{
+    "connector_id": {"type": "number", "default": "", "label": "Connector ID", "section": "connector", "readonly": true},
+    "endpoint_id": {"type": "number", "default": "", "label": "Endpoint ID", "section": "connector", "readonly": true},
+    "auth_profile_id": {"type": "number", "default": "", "label": "Auth Profile ID", "section": "connector", "readonly": true},
+    "operation_code": {"type": "string", "label": "Operation Code", "section": "connector", "placeholder": "e.g. create_order"},
+    "url": {"type": "string", "label": "URL Override", "section": "request", "placeholder": "Leave empty to use endpoint preset"},
+    "method": {"type": "select", "options": [{"value": "", "label": "— Use endpoint preset —"}, "GET", "POST", "PUT", "PATCH", "DELETE"], "default": "", "section": "request"},
+    "query_params": {"type": "query_params", "label": "Extra Query Params", "section": "request"},
+    "body_config": {"type": "body_type", "label": "Body", "section": "body", "visibleWhen": {"method": ["POST", "PUT", "PATCH"]}},
+    "headers": {"type": "keyvalue", "label": "Extra Headers", "section": "headers"},
+    "timeout": {"type": "number", "default": "", "min": 1, "max": 300, "label": "Timeout (seconds)", "section": "settings"},
+    "follow_redirects": {"type": "boolean", "default": true, "label": "Follow Redirects", "section": "settings"},
+    "raw_response": {"type": "boolean", "default": false, "label": "Raw Response", "section": "settings"}
+}</field>
+            <field name="input_schema">{
+    "data": {"type": "DataSocket"}
+}</field>
+            <field name="output_schema">{
+    "response": {"type": "DataSocket", "label": "response"},
+    "error": {"type": "ErrorSocket", "label": "error"}
+}</field>
+        </record>
+
         <!-- Flow Control Nodes -->
         <record id="workflow_type_loop" model="workflow.type">
             <field name="name">Loop Over Items</field>

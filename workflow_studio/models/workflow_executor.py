@@ -27,6 +27,7 @@ from ..workflow import WorkflowNodeRegistry
 from .context_objects import ExecutionContext, to_plain, wrap_mutable
 from .runners import (
     CodeNodeRunner,
+    ConnectorRequestNodeRunner,
     HttpNodeRunner,
     IfNodeRunner,
     LoopNodeRunner,
@@ -87,6 +88,7 @@ class WorkflowExecutor:
     # Node runner registry
     NODE_RUNNERS = {
         "http": HttpNodeRunner,
+        "connector_request": ConnectorRequestNodeRunner,
         "if": IfNodeRunner,
         "loop": LoopNodeRunner,
         "noop": NoOpNodeRunner,
@@ -859,6 +861,11 @@ class WorkflowExecutor:
 
         # Get runner for node type
         runner = self.runners.get(node_type)
+        if not runner:
+            # Fallback: check for virtual node types (e.g. endpoint-derived ep_* nodes)
+            runtime_type = config.get("_runtime_node_type")
+            if runtime_type:
+                runner = self.runners.get(runtime_type)
         if not runner:
             return {
                 "outputs": [[input_data]],

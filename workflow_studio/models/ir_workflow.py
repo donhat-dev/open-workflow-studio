@@ -114,6 +114,15 @@ class Workflow(models.Model):
         help="Company that owns this workflow",
     )
 
+    # === Workflow Workspace ===
+    workspace_id = fields.Many2one(
+        "workflow.workspace",
+        string="Workspace",
+        ondelete="set null",
+        index=True,
+        help="Optional organizational workspace used to group related workflows.",
+    )
+
     # === Ownership ===
     user_id = fields.Many2one(
         "res.users",
@@ -336,6 +345,7 @@ class Workflow(models.Model):
                 "published_at": fields.Datetime.now(),
             }
         )
+        self._sync_http_request_records(published_snapshot)
         return True
 
     def action_unpublish(self):
@@ -424,6 +434,7 @@ class Workflow(models.Model):
 
         # Save draft_snapshot (pin_data is preserved for editor use)
         self.write({"draft_snapshot": snapshot})
+        self._sync_http_request_records(snapshot)
 
         # Also publish (save to both draft and published)
         if snapshot.get("nodes"):
@@ -441,6 +452,7 @@ class Workflow(models.Model):
                     "published_at": fields.Datetime.now(),
                 }
             )
+            self._sync_http_request_records(published)
 
         return {
             "id": self.id,
@@ -1583,6 +1595,205 @@ class Workflow(models.Model):
             "warnings": warnings,
             "backend": trigger.get_panel_state(),
         }
+
+    def _ensure_http_request_record(self, node_id, snapshot=None):
+        """Return connector bridge record for a graph node, creating it if needed."""
+        self.ensure_one()
+        node = self._get_graph_node(node_id)
+        if not node and snapshot:
+            for snapshot_node in (snapshot.get("nodes") or []):
+                if snapshot_node.get("id") == node_id:
+                    node = snapshot_node
+                    break
+        if not node:
+            raise UserError(_("Connector node '%s' was not found.") % node_id)
+        if node.get("type") != "connector_request":
+            raise UserError(_("Node '%s' is not a connector request node.") % node_id)
+
+        bridge_model = self.env["workflow.http.request"].with_context(active_test=False)
+        bridge = bridge_model.search(
+            [("workflow_id", "=", self.id), ("node_id", "=", node_id)],
+            limit=1,
+        )
+        if bridge:
+            vals = self._prepare_http_request_bridge_sync_vals(
+                node_id,
+                node.get("config") or {},
+                bridge,
+            )
+            bridge.write(vals)
+            bridge.update_from_snapshot_config(node.get("config") or {})
+            return bridge
+
+        config = node.get("config") or {}
+        vals = self._prepare_http_request_bridge_create_vals(node_id, config)
+        try:
+            with self.env.cr.savepoint():
+                bridge = bridge_model.create(vals)
+        except Exception:
+            bridge = bridge_model.search(
+                [("workflow_id", "=", self.id), ("node_id", "=", node_id)],
+                limit=1,
+            )
+            if not bridge:
+                raise
+
+        bridge.update_from_snapshot_config(config)
+        return bridge
+
+    def get_connector_request_panel_data(self, node_id):
+        """Return backend state for a connector_request node."""
+        self.ensure_one()
+        node = self._get_graph_node(node_id)
+        if not node:
+            raise UserError(_("Connector node '%s' was not found.") % node_id)
+        if node.get("type") != "connector_request":
+            raise UserError(_("Node '%s' is not a connector request node.") % node_id)
+
+        bridge = self._ensure_http_request_record(node_id)
+        config = copy.deepcopy(node.get("config") or {})
+        warnings = []
+        if not bridge.connector_id:
+            warnings.append(
+                _(
+                    "This connector node is not linked to a connector yet, so only direct URL overrides can run reliably."
+                )
+            )
+
+        return {
+            "node_id": node_id,
+            "node_type": node.get("type"),
+            "node_title": node.get("label") or node.get("title") or node.get("type"),
+            "config": config,
+            "warnings": warnings,
+            "backend": bridge.get_panel_state(),
+        }
+
+    def get_connector_node_action(self, node_id):
+        """Return an action that opens the connector bridge record for a node."""
+        self.ensure_one()
+        bridge = self._ensure_http_request_record(node_id)
+        view_id = self.env.ref(
+            "workflow_studio.view_workflow_http_request_form",
+            raise_if_not_found=False,
+        )
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Connector Node Binding"),
+            "res_model": "workflow.http.request",
+            "res_id": bridge.id,
+            "view_mode": "form",
+            "views": [(view_id and view_id.id or False, "form")],
+            "target": "new",
+        }
+
+    def _resolve_connector_binding_id(self, config):
+        """Resolve the connector binding from snapshot config and related presets."""
+
+        connector_id = config.get("connector_id") or config.get("workspace_id") or False
+        endpoint_id = config.get("endpoint_id") or False
+        auth_profile_id = config.get("auth_profile_id") or False
+        if not connector_id and endpoint_id:
+            connector_id = (
+                self.env["workflow.endpoint"].browse(endpoint_id).connector_id.id or False
+            )
+        if not connector_id and auth_profile_id:
+            connector_id = (
+                self.env["workflow.auth.profile"].browse(auth_profile_id).connector_id.id
+                or False
+            )
+        return connector_id
+
+    def _prepare_http_request_bridge_create_vals(self, node_id, config):
+        """Build create values for a connector bridge from node config."""
+        return {
+            "workflow_id": self.id,
+            "node_id": node_id,
+            "connector_id": self._resolve_connector_binding_id(config),
+            "endpoint_id": config.get("endpoint_id") or False,
+            "auth_profile_id": config.get("auth_profile_id") or False,
+            "operation_code": config.get("operation_code") or False,
+            "active": True,
+        }
+
+    def _prepare_http_request_bridge_sync_vals(self, node_id, config, bridge):
+        """Build non-destructive sync values for an existing connector bridge.
+
+        Snapshot config owns the operation code and cached config view, but the
+        connector/endpoint/auth bindings can be curated from the backend form
+        and must not be cleared just because the canvas keeps those fields
+        hidden or blank.
+        """
+
+        vals = {
+            "workflow_id": self.id,
+            "node_id": node_id,
+            "operation_code": config.get("operation_code") or False,
+            "active": True,
+        }
+
+        if not bridge.connector_id:
+            connector_id = self._resolve_connector_binding_id(config)
+            if connector_id:
+                vals["connector_id"] = connector_id
+
+        if not bridge.endpoint_id and config.get("endpoint_id"):
+            vals["endpoint_id"] = config.get("endpoint_id")
+
+        if not bridge.auth_profile_id and config.get("auth_profile_id"):
+            vals["auth_profile_id"] = config.get("auth_profile_id")
+
+        return vals
+
+    def _extract_connector_request_nodes(self, snapshot):
+        """Return connector_request nodes from a snapshot.
+
+        Matches both native ``connector_request`` nodes and endpoint-derived
+        virtual nodes (those carrying ``_runtime_node_type`` = ``connector_request``
+        in their config).
+        """
+        result = []
+        for node in (snapshot or {}).get("nodes", []):
+            if node.get("type") == "connector_request":
+                result.append(node)
+            elif (node.get("config") or {}).get("_runtime_node_type") == "connector_request":
+                result.append(node)
+        return result
+
+    def _sync_http_request_records(self, snapshot):
+        """Keep connector bridge records aligned with the latest workflow snapshot."""
+        self.ensure_one()
+        bridge_model = self.env["workflow.http.request"].with_context(active_test=False)
+        existing = {
+            rec.node_id: rec
+            for rec in bridge_model.search([("workflow_id", "=", self.id)])
+        }
+        seen_node_ids = set()
+
+        for node in self._extract_connector_request_nodes(snapshot or {}):
+            node_id = node.get("id")
+            if not node_id:
+                continue
+            seen_node_ids.add(node_id)
+            config = node.get("config") or {}
+            create_vals = self._prepare_http_request_bridge_create_vals(node_id, config)
+            bridge = existing.get(node_id)
+            if bridge:
+                bridge.write(
+                    self._prepare_http_request_bridge_sync_vals(
+                        node_id,
+                        config,
+                        bridge,
+                    )
+                )
+            else:
+                bridge = bridge_model.create(create_vals)
+                existing[node_id] = bridge
+            bridge.update_from_snapshot_config(config)
+
+        for node_id, bridge in existing.items():
+            if node_id not in seen_node_ids:
+                bridge.write({"active": False})
 
     def activate_trigger_node(self, node_id):
         """Activate a single trigger node from the dedicated editor panel."""

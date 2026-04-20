@@ -514,7 +514,7 @@ class WorkflowType(models.Model):
                 return parsed if isinstance(parsed, dict) else {}
             return {}
 
-        return [
+        result = [
             {
                 "id": t.id,
                 "node_type": t.node_type,
@@ -537,6 +537,16 @@ class WorkflowType(models.Model):
             }
             for t in types
         ]
+
+        # Append virtual endpoint-derived node types from active connectors
+        connectors = self.env["workflow.connector"].search([
+            ("active", "=", True),
+            ("endpoint_ids", "!=", False),
+        ])
+        for connector in connectors:
+            result.extend(connector.build_endpoint_node_types())
+
+        return result
 
     @api.model
     def sync_decorated_nodes(self):

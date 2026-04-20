@@ -86,6 +86,18 @@ $wf-shadow-focus: 0 0 0 2px rgba($o-action, 0.15) !default;
 	--color--mint-800: hsl(147, 83%, 20%);
 	--color--mint-900: hsl(147, 83%, 10%);
 
+	// ── Blue scale — path parameter tint ──
+	--color--blue-50: hsl(210, 70%, 97%);
+	--color--blue-100: hsl(210, 70%, 93%);
+	--color--blue-200: hsl(210, 70%, 85%);
+	--color--blue-300: hsl(210, 70%, 75%);
+	--color--blue-400: hsl(210, 70%, 62%);
+	--color--blue-500: hsl(210, 70%, 50%);
+	--color--blue-600: hsl(210, 70%, 42%);
+	--color--blue-700: hsl(210, 70%, 34%);
+	--color--blue-alpha-100: hsla(210, 70%, 50%, 0.1);
+	--color--blue-alpha-200: hsla(210, 70%, 50%, 0.25);
+
 	// Odoo brand co-branding token
 	--wf-o-primary: #{$wf-o-primary};
 }

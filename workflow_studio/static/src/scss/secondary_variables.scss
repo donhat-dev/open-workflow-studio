@@ -35,6 +35,12 @@ $wf-expression-highlight-fg: var(--expression-editor--resolvable--color--foregro
 $wf-expression-highlight-ring: inset 0 0 0 1px
 	var(--expression-editor--resolvable--color--border--valid) !default;
 
+// Path parameter tint — blue, distinct from expression purple/green
+$wf-param-bg: var(--param--color--background) !default;
+$wf-param-fg: var(--param--color--foreground) !default;
+$wf-param-border: var(--param--color--border) !default;
+$wf-param-ring: var(--param--color--ring) !default;
+
 $wf-field-row-bg: mix($wf-surface-subtle, $wf-surface-base, 35%) !default;
 $wf-field-row-border: mix($wf-border-base, $wf-surface-base, 85%) !default;
 $wf-field-placeholder-bg: mix($wf-surface-subtle, $wf-surface-base, 35%) !default;
@@ -49,4 +55,10 @@ $wf-field-placeholder-border: mix($wf-border-strong, $wf-surface-base, 80%) !def
 	--expression-editor--resolvable--color--foreground--valid: var(--color--green-600);
 	--expression-editor--resolvable--color--background--valid: var(--color--green-100);
 	--expression-editor--resolvable--color--border--valid: var(--color--green-alpha-200);
+
+	// Path parameter tint — blue, distinct from expression purple/green
+	--param--color--foreground: var(--color--blue-700);
+	--param--color--background: var(--color--blue-100);
+	--param--color--border: var(--color--blue-400);
+	--param--color--ring: var(--color--blue-alpha-200);
 }

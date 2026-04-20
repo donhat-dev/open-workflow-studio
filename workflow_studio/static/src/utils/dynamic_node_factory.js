@@ -479,6 +479,9 @@ function createDynamicNodeClass(typeDef) {
         constructor() {
             super();
 
+            // Hidden defaults: values stored in config but not rendered as controls
+            this._hiddenDefaults = {};
+
             for (const [socketKey, socketDef] of Object.entries(inputSchema)) {
                 if (!socketKey) {
                     continue;
@@ -506,7 +509,33 @@ function createDynamicNodeClass(typeDef) {
                 if (!controlKey) {
                     continue;
                 }
+                const schema = normalizeControlSchema(controlDef);
+                if (schema.hidden) {
+                    this._hiddenDefaults[controlKey] = getDefaultValue(schema, "");
+                    continue;
+                }
                 this.addControl(controlKey, createControl(controlKey, controlDef));
+            }
+        }
+
+        getConfig() {
+            const config = super.getConfig();
+            // Merge hidden defaults into config output
+            for (const [key, value] of Object.entries(this._hiddenDefaults)) {
+                if (!(key in config)) {
+                    config[key] = value;
+                }
+            }
+            return config;
+        }
+
+        setConfig(config) {
+            super.setConfig(config);
+            // Update hidden defaults from incoming config
+            for (const key of Object.keys(this._hiddenDefaults)) {
+                if (key in config) {
+                    this._hiddenDefaults[key] = config[key];
+                }
             }
         }
     }
@@ -516,6 +545,7 @@ function createDynamicNodeClass(typeDef) {
     DynamicNode.icon = nodeIcon;
     DynamicNode.category = nodeCategory;
     DynamicNode.description = nodeDescription;
+    DynamicNode.group = typeof typeDef.group === "string" ? typeDef.group : "";
 
     return DynamicNode;
 }
@@ -550,6 +580,7 @@ export function registerBackendNodeTypes(typeDefs = []) {
                 icon: DynamicNodeClass.icon,
                 category: DynamicNodeClass.category,
                 description: DynamicNodeClass.description || "",
+                group: DynamicNodeClass.group || "",
             },
             { force: true }
         );

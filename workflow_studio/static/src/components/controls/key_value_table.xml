@@ -16,21 +16,21 @@
                 <!-- Body -->
                 <div class="ncp-table-shell__body">
                     <t t-foreach="state.rows" t-as="row" t-key="row.id">
-                        <div t-att-class="'ncp-table-shell__row' + (row._placeholder ? ' ncp-table-shell__row--placeholder' : '') + (withToggle and !row.enabled and !row._placeholder ? ' ncp-table-shell__row--disabled' : '')">
+                        <div t-att-class="'ncp-table-shell__row' + (row._placeholder ? ' ncp-table-shell__row--placeholder' : '') + (row._locked ? ' ncp-table-shell__row--locked' : '') + (withToggle and !row.enabled and !row._placeholder ? ' ncp-table-shell__row--disabled' : '')">
                             <!-- Toggle cell -->
                             <t t-if="withToggle">
                                 <div class="ncp-table-shell__toggle-cell">
-                                    <input t-if="!row._placeholder" type="checkbox" class="qp-toggle" t-att-checked="row.enabled" t-on-change="() => this.onToggleRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                                    <input t-if="!row._placeholder and !row._locked" type="checkbox" class="qp-toggle" t-att-checked="row.enabled" t-on-change="() => this.onToggleRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
                                 </div>
                             </t>
                             <!-- Key cell -->
                             <div class="ncp-table-shell__cell ncp-table-shell__cell--key">
-                                <ExpressionInput label="''" value="row.key" placeholder="props.keyPlaceholder or 'Key'" context="props.inputContext" toggleMode="'side'" mode="this.getPairKeyMode(row.id)" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" expressionSuggestions="props.expressionSuggestions or []" onModeChange="(m) => this.onPairKeyModeChange(row.id, m)" onChange="(v) => this.onKeyChange(row_index, v)" readonly="props.readonly"/>
+                                <ExpressionInput label="''" value="row.key" placeholder="props.keyPlaceholder or 'Key'" context="props.inputContext" toggleMode="'side'" mode="this.getPairKeyMode(row.id)" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" expressionSuggestions="props.expressionSuggestions or []" onModeChange="(m) => this.onPairKeyModeChange(row.id, m)" onChange="(v) => this.onKeyChange(row_index, v)" readonly="props.readonly or row._locked"/>
                             </div>
                             <!-- Value cell -->
                             <div class="ncp-table-shell__cell ncp-table-shell__cell--value">
                                 <ExpressionInput label="''" value="row.value" placeholder="props.valuePlaceholder or 'Value'" context="props.inputContext" toggleMode="'side'" mode="this.getPairValueMode(row.id)" suggestions="getValueSuggestions(row)" valueSuggestions="getValueSuggestions(row)" expressionSuggestions="props.expressionSuggestions or []" onModeChange="(m) => this.onPairValueModeChange(row.id, m)" onChange="(v) => this.onValueChange(row_index, v)" readonly="props.readonly"/>
-                                <button t-if="!row._placeholder" class="kv-remove" t-on-click="() => this.removeRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"><i class="fa fa-trash"/></button>
+                                <button t-if="!row._placeholder and !row._locked" class="kv-remove" t-on-click="() => this.removeRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"><i class="fa fa-trash"/></button>
                             </div>
                         </div>
                     </t>

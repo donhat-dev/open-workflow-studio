@@ -32,11 +32,11 @@
 					</button>
 					<!-- Expression mode prefix -->
 					<span t-if="isExpression and !showSideToggle" class="expression-input__fx">ƒx</span>
-					<div class="expression-input__input-layer" t-att-class="{ 'has-highlight': hasExpressionHighlights, 'expression-input__input-layer--singleline': !props.multiline }">
-						<div t-if="hasExpressionHighlights" class="expression-input__highlights">
+					<div class="expression-input__input-layer" t-att-class="{ 'has-highlight': hasAnyHighlights, 'expression-input__input-layer--singleline': !props.multiline }">
+							<div t-if="hasAnyHighlights" class="expression-input__highlights">
 							<div class="expression-input__highlights-content" t-att-style="highlightContentStyle">
 								<t t-foreach="highlightSegments" t-as="segment" t-key="segment.id">
-									<span class="expression-input__highlight-fragment" t-att-class="{ 'expression-input__highlight': segment.isExpression}" t-esc="segment.text" />
+									<span class="expression-input__highlight-fragment" t-att-class="{ 'expression-input__highlight': segment.isExpression, 'expression-input__highlight--param': segment.isPathParam}" t-esc="segment.text" />
 								</t>
 							</div>
 						</div>

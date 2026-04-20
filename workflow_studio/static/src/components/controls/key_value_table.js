@@ -39,6 +39,8 @@ export class KeyValueTable extends Component {
         // Per-pair expression modes: { [pairId]: { key: 'fixed'|'expression', value: 'fixed'|'expression' } }
         pairModes: { type: Object, optional: true },
         onPairModeChange: { type: Function, optional: true },
+        // Keys that are locked (non-deletable, non-editable key, non-toggleable)
+        lockedKeys: { type: Array, optional: true },
     };
 
     setup() {
@@ -69,6 +71,7 @@ export class KeyValueTable extends Component {
      */
     _normalize(val) {
         const arr = Array.isArray(val) ? val : [];
+        const locked = new Set(this.props.lockedKeys || []);
         if (arr.length > 0) {
             const maxId = arr.reduce((m, p) => Math.max(m, p.id || 0), 0);
             this._nextId = Math.max(this._nextId, maxId + 1);
@@ -79,6 +82,7 @@ export class KeyValueTable extends Component {
             value: p.value || "",
             enabled: p.enabled !== false,
             _placeholder: false,
+            _locked: locked.has(p.key || ""),
         }));
         rows.push(this._makePlaceholder());
         return rows;
@@ -142,7 +146,7 @@ export class KeyValueTable extends Component {
 
     onToggleRow(index) {
         const row = this.state.rows[index];
-        if (!row || row._placeholder) return;
+        if (!row || row._placeholder || row._locked) return;
         row.enabled = !row.enabled;
         this._emit();
     }
@@ -151,7 +155,7 @@ export class KeyValueTable extends Component {
 
     onKeyChange(index, value) {
         const row = this.state.rows[index];
-        if (!row) return;
+        if (!row || row._locked) return;
         row.key = value;
         // If this was the placeholder row, promote it and add new placeholder
         if (row._placeholder && value) {
@@ -177,7 +181,7 @@ export class KeyValueTable extends Component {
 
     removeRow(index) {
         const row = this.state.rows[index];
-        if (!row || row._placeholder) return;
+        if (!row || row._placeholder || row._locked) return;
         this.state.rows.splice(index, 1);
         this._emit();
     }
