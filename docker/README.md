@@ -157,8 +157,13 @@ ODOO_SOURCE_PATH="/home/odoo/workspace/18EE-NS" docker compose up
 
 1. Verify PostgreSQL đang chạy: `Get-Service postgresql*`
 2. Test từ container: `docker compose exec odoo pg_isready -h host.docker.internal -p 5432`
-3. Check `pg_hba.conf` có allow Docker subnet
-4. Check Windows Firewall
+3. Nếu lỗi `could not translate host name "host.docker.internal"`, resolve IP thật trên host:
+    `getent hosts host.docker.internal | awk '{print $1; exit}'`
+4. Ghi IP đó vào `docker/.env` dưới `DB_HOST=...` rồi recreate container.
+    `supervisor-lite.py` sẽ forward `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`
+    thành CLI args để override `docker/odoo.conf`.
+5. Check `pg_hba.conf` có allow Docker subnet
+6. Check Windows Firewall
 
 ### debugpy timeout / VS Code không attach được
 

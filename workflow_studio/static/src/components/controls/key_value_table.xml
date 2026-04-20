@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="workflow_studio.key_value_table">
+        <div class="key-value-table">
+            <div t-att-class="'ncp-table-shell ncp-table-shell--http' + (withToggle ? ' ncp-table-shell--with-active' : ' ncp-table-shell--pair')">
+                <!-- Header -->
+                <div class="ncp-table-shell__header">
+                    <t t-if="withToggle">
+                        <span class="ncp-table-shell__heading ncp-table-shell__heading--active">
+                            <input type="checkbox" class="qp-toggle qp-toggle--global" t-att-checked="allEnabled" t-att-indeterminate="someEnabled ? 'indeterminate' : undefined" t-on-change="() => this.onToggleAll()" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                        </span>
+                    </t>
+                    <span class="ncp-table-shell__heading">Key</span>
+                    <span class="ncp-table-shell__heading">Value</span>
+                </div>
+                <!-- Body -->
+                <div class="ncp-table-shell__body">
+                    <t t-foreach="state.rows" t-as="row" t-key="row.id">
+                        <div t-att-class="'ncp-table-shell__row' + (row._placeholder ? ' ncp-table-shell__row--placeholder' : '') + (withToggle and !row.enabled and !row._placeholder ? ' ncp-table-shell__row--disabled' : '')">
+                            <!-- Toggle cell -->
+                            <t t-if="withToggle">
+                                <div class="ncp-table-shell__toggle-cell">
+                                    <input t-if="!row._placeholder" type="checkbox" class="qp-toggle" t-att-checked="row.enabled" t-on-change="() => this.onToggleRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"/>
+                                </div>
+                            </t>
+                            <!-- Key cell -->
+                            <div class="ncp-table-shell__cell ncp-table-shell__cell--key">
+                                <ExpressionInput label="''" value="row.key" placeholder="props.keyPlaceholder or 'Key'" context="props.inputContext" toggleMode="'side'" mode="this.getPairKeyMode(row.id)" suggestions="getKeySuggestions()" valueSuggestions="getKeySuggestions()" expressionSuggestions="props.expressionSuggestions or []" onModeChange="(m) => this.onPairKeyModeChange(row.id, m)" onChange="(v) => this.onKeyChange(row_index, v)" readonly="props.readonly"/>
+                            </div>
+                            <!-- Value cell -->
+                            <div class="ncp-table-shell__cell ncp-table-shell__cell--value">
+                                <ExpressionInput label="''" value="row.value" placeholder="props.valuePlaceholder or 'Value'" context="props.inputContext" toggleMode="'side'" mode="this.getPairValueMode(row.id)" suggestions="getValueSuggestions(row)" valueSuggestions="getValueSuggestions(row)" expressionSuggestions="props.expressionSuggestions or []" onModeChange="(m) => this.onPairValueModeChange(row.id, m)" onChange="(v) => this.onValueChange(row_index, v)" readonly="props.readonly"/>
+                                <button t-if="!row._placeholder" class="kv-remove" t-on-click="() => this.removeRow(row_index)" t-att-disabled="props.readonly ? 'disabled' : undefined"><i class="fa fa-trash"/></button>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

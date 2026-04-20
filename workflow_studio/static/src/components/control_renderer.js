@@ -1,16 +1,15 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillUpdateProps } from "@odoo/owl";
+import { Component } from "@odoo/owl";
 import { ExpressionInput } from "./expression/ExpressionInput";
 import { CodeEditor } from "./code_editor";
 import { AuthControl } from "./controls/auth_control";
 import { BodyTypeControl } from "./controls/body_type_control";
-import { QueryParamsControl } from "./controls/query_params_control";
+import { KeyValueTable } from "./controls/key_value_table";
 import { getSuggestionsByKey } from "@workflow_studio/utils/input_suggestion_utils";
 import { DomainControl } from "./domain_control/domain_control";
 import { FieldValuesControl } from "./field_values_control/field_values_control";
 import { TriggerFieldsControl } from "./controls/trigger_fields_control";
-import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_utils";
 
 /**
  * ControlRenderer Component
@@ -41,7 +40,7 @@ import { inferExpressionModeFromValue } from "@workflow_studio/utils/expression_
  */
 export class ControlRenderer extends Component {
     static template = "workflow_studio.control_renderer";
-    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, QueryParamsControl, DomainControl, FieldValuesControl, TriggerFieldsControl };
+    static components = { ExpressionInput, CodeEditor, AuthControl, BodyTypeControl, KeyValueTable, DomainControl, FieldValuesControl, TriggerFieldsControl };
 
     static props = {
         control: Object,  // Plain object, not Control instance
@@ -60,64 +59,7 @@ export class ControlRenderer extends Component {
     };
 
     setup() {
-        // For keyvalue controls, maintain reactive state
-        this._nextPairId = 1;
-
-        const initialPairs = this.props.control?.type === 'keyvalue'
-            ? this._normalizePairs(this.props.control.value || [])
-            : [];
-
-        this.state = useState({ pairs: initialPairs });
-
-        // Option 2: sync internal state when props update (avoid stale state if panel/control is reused)
-        onWillUpdateProps((nextProps) => {
-            const nextControl = nextProps?.control;
-            const prevControl = this.props?.control;
-
-            const nextType = nextControl?.type;
-            const prevType = prevControl?.type;
-
-            // Only keyvalue uses internal state
-            if (nextType !== 'keyvalue') {
-                if (prevType === 'keyvalue' && this.state.pairs.length) {
-                    this.state.pairs = [];
-                }
-                return;
-            }
-
-            const nextPairsRaw = nextControl?.value || [];
-            const nextPairs = this._normalizePairs(nextPairsRaw);
-
-            // Avoid clobbering local edits when parent re-renders with same data.
-            const nextSig = this._pairsSignature(nextPairs);
-            const currentSig = this._pairsSignature(this.state.pairs);
-
-            if (nextSig !== currentSig) {
-                this.state.pairs = nextPairs;
-            }
-        });
-    }
-
-    _normalizePairs(pairs) {
-        const safePairs = Array.isArray(pairs) ? pairs : [];
-        const maxId = safePairs.reduce((max, p) => Math.max(max, p?.id || 0), 0);
-        this._nextPairId = Math.max(1, maxId + 1);
-
-        return safePairs.map((p) => {
-            const id = p?.id || this._nextPairId++;
-            return {
-                id,
-                key: p?.key || '',
-                value: p?.value || '',
-            };
-        });
-    }
-
-    _pairsSignature(pairs) {
-    const safe = Array.isArray(pairs) ? pairs : [];
-        return safe
-            .map((p) => `${p?.id || ''}:${p?.key || ''}=${p?.value || ''}`)
-            .join('|');
+        // No internal keyvalue state — delegated to KeyValueTable component
     }
 
     get controlType() {
@@ -194,11 +136,6 @@ export class ControlRenderer extends Component {
         return byKey;
     }
 
-    get pairs() {
-        // Return reactive state for keyvalue controls
-        return this.state.pairs;
-    }
-
     /**
      * Handle text/number input change
      * Phase 3: Only call onChange, no setValue()
@@ -221,54 +158,18 @@ export class ControlRenderer extends Component {
         }
     }
 
-    getPairMode(pairId) {
-        const modes = this.props.pairModes || {};
-        return modes[pairId] || 'fixed';
-    }
+    /**
+     * Handle KeyValueTable change — wraps pairs array with control key
+     */
+    onKeyValueChange = (pairs) => {
+        this.props.onChange(this.props.control.key, pairs);
+    };
 
-    onPairValueModeChange(pairId, mode) {
+    onKeyValuePairModeChange = (pairId, field, mode) => {
         if (this.props.onPairModeChange) {
-            this.props.onPairModeChange(this.props.control.key, pairId, 'value', mode);
+            this.props.onPairModeChange(this.props.control.key, pairId, field, mode);
         }
-    }
-
-    onPairKeyModeChange(pairId, mode) {
-        if (this.props.onPairModeChange) {
-            this.props.onPairModeChange(this.props.control.key, pairId, 'key', mode);
-        }
-    }
-
-    getPairKeyMode(pairId) {
-        const pair = this.state.pairs.find((item) => item.id === pairId);
-        const currentValue = pair && typeof pair.key === "string" ? pair.key : "";
-        if (inferExpressionModeFromValue(currentValue)) {
-            return "expression";
-        }
-
-        const modes = this.props.pairModes || {};
-        const pairMode = modes[pairId];
-        if (!currentValue && typeof pairMode === "string") return "fixed"; // Legacy normalization
-        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.key || 'fixed';
-        if (typeof pairMode === "string") return "fixed"; // Legacy normalization
-        if (!pairMode || typeof pairMode !== 'object') return 'fixed';
-        return pairMode.key || 'fixed';
-    }
-
-    getPairValueMode(pairId) {
-        const pair = this.state.pairs.find((item) => item.id === pairId);
-        const currentValue = pair && typeof pair.value === "string" ? pair.value : "";
-        if (inferExpressionModeFromValue(currentValue)) {
-            return "expression";
-        }
-
-        const modes = this.props.pairModes || {};
-        const pairMode = modes[pairId];
-        if (!currentValue && typeof pairMode === "string") return pairMode;
-        if (!currentValue && pairMode && typeof pairMode === 'object') return pairMode.value || 'fixed';
-        if (typeof pairMode === "string") return pairMode; // Legacy support
-        if (!pairMode || typeof pairMode !== 'object') return 'fixed';
-        return pairMode.value || 'fixed';
-    }
+    };
 
     /**
      * Handle select change
@@ -314,65 +215,5 @@ export class ControlRenderer extends Component {
         this.props.onChange(this.props.control.key, value);
     };
 
-    /**
-     * Handle query params control change (array value)
-     */
-    onQueryParamsChange = (value) => {
-        this.props.onChange(this.props.control.key, value);
-    };
 
-    // ============================================
-    // KEY-VALUE CONTROL HANDLERS
-    // ============================================
-
-    onKeyChange(index, value) {
-        const control = this.props.control;
-        if (!this.state.pairs[index]) {
-            throw new Error(`[ControlRenderer] Pair at index ${index} not found for key change`);
-        }
-        this.state.pairs[index].key = value;
-        // Notify parent with updated pairs
-        this.props.onChange(control.key, [...this.state.pairs]);
-    }
-
-    onValueChange(index, ev) {
-        const control = this.props.control;
-        if (!this.state.pairs[index]) {
-            throw new Error(`[ControlRenderer] Pair at index ${index} not found for value change`);
-        }
-        this.state.pairs[index].value = ev.target.value;
-        // Notify parent with updated pairs
-        this.props.onChange(control.key, [...this.state.pairs]);
-    }
-
-    /**
-     * Handle ExpressionInput change for keyvalue value cell
-     * @param {number} index
-     * @param {string} value
-     */
-    onValueExpressionChange(index, value) {
-        const control = this.props.control;
-        if (!this.state.pairs[index]) {
-            throw new Error(`[ControlRenderer] Pair at index ${index} not found for value expression change`);
-        }
-        this.state.pairs[index].value = value;
-        this.props.onChange(control.key, [...this.state.pairs]);
-    }
-
-    addPair() {
-        const control = this.props.control;
-        // Add new pair to reactive state
-        this.state.pairs.push({ id: this._nextPairId++, key: '', value: '' });
-        // Notify parent with updated pairs
-        this.props.onChange(control.key, [...this.state.pairs]);
-    }
-
-    removePair(index) {
-        const control = this.props.control;
-        if (this.state.pairs.length <= 1) return;
-        // Remove pair from reactive state
-        this.state.pairs.splice(index, 1);
-        // Notify parent with updated pairs
-        this.props.onChange(control.key, [...this.state.pairs]);
-    }
 }

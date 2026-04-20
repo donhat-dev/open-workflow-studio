@@ -21,14 +21,14 @@
 .expression-input__label {
   font-size: 0.813rem;
   font-weight: 500;
-  color: $o-gray-700;
+  color: $wf-text-muted-strong;
 }
 
 // Mode Toggle Buttons
 .expression-input__mode-toggle {
   display: flex;
   gap: 0;
-  border: 1px solid $o-gray-400;
+  border: 1px solid $wf-border-strong;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -38,18 +38,18 @@
   border: none;
   padding: 3px 10px;
   font-size: 11px;
-  color: $o-gray-600;
+  color: $wf-text-muted;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .mode-btn:hover {
-  background: rgba($o-black, 0.05);
+  background: rgba($wf-text-base, 0.05);
 }
 
 .mode-btn.active {
-  background: $o-gray-300;
-  color: $o-gray-900;
+  background: $wf-border-base;
+  color: $wf-text-base;
 }
 
 .mode-btn--expression.active {
@@ -65,15 +65,9 @@
   position: relative;
   display: flex;
   align-items: stretch;
-}
-
-.expression-input__input-layer {
-  position: relative;
-  flex: 1;
-  display: flex;
-  background: $wf-surface-base;
   border: 1px solid $wf-border-strong;
   border-radius: $wf-control-border-radius;
+  background: $wf-surface-base;
   overflow: hidden;
   transition:
     border-color 0.15s ease,
@@ -81,30 +75,58 @@
     background-color 0.15s ease;
 }
 
+.expression-input__input-layer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.expression-input__input-layer--singleline {
+  align-items: center;
+}
+
 .expression-input__side-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  padding: 0 8px;
-  background: $wf-surface-base;
-  border: 1px solid $wf-border-strong;
-  border-right: none;
-  border-radius: $wf-control-border-radius 0 0 $wf-control-border-radius;
+  position: relative;
+  width: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   font-size: 11px;
-  color: $o-gray-600;
+  color: $wf-text-faint;
   cursor: pointer;
   flex-shrink: 0;
+  transition: color 0.12s ease, opacity 0.12s ease;
 }
 
-.expression-input__side-toggle:hover {
-  background: rgba($o-black, 0.05);
+.expression-input__side-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, color 0.12s ease;
 }
 
 .expression-input__side-toggle.active {
-  background: $wf-expression-mode-bg;
   color: $wf-expression-mode-fg;
-  border-color: $wf-expression-border-color;
+}
+
+.expression-input__side-toggle.active .expression-input__side-toggle-label {
+  opacity: 1;
 }
 
 .expression-input__fx {
@@ -112,38 +134,51 @@
   align-items: center;
   justify-content: center;
   width: 28px;
-  background: $wf-surface-emphasis;
-  border: 1px solid $wf-border-strong;
-  border-right: none;
-  border-radius: $wf-control-border-radius 0 0 $wf-control-border-radius;
+  background: rgba($wf-expression-border-color, 0.08);
+  border: none;
+  border-right: 1px solid rgba($wf-expression-border-color, 0.18);
+  border-radius: 0;
   font-size: 12px;
   font-weight: 600;
   color: $wf-expression-mode-fg;
   flex-shrink: 0;
 }
 
+.expression-input__field:hover .expression-input__side-toggle:not(.active),
+.expression-input__field:focus-within .expression-input__side-toggle:not(.active) {
+  color: $wf-expression-mode-fg;
+  opacity: 0.5;
+}
+
+.expression-input__field:hover .expression-input__side-toggle.active,
+.expression-input__field:focus-within .expression-input__side-toggle.active {
+  color: $wf-expression-mode-fg;
+  opacity: 1;
+}
+
+.expression-input__field:hover .expression-input__side-toggle-label,
+.expression-input__field:focus-within .expression-input__side-toggle-label {
+  opacity: 1;
+}
+
 .expression-input__text,
 .expression-input__textarea {
   flex: 1;
-  padding: 8px 10px;
   font-size: 13px;
-  color: $o-main-text-color;
+  color: $wf-text-base;
+  width: 100%;
+  box-sizing: border-box;
   transition: color 0.15s ease;
 }
 
-.expression-input__field:has(.expression-input__fx) .expression-input__input-layer,
-.expression-input__field:has(.expression-input__fx) .expression-input__text,
-.expression-input__field:has(.expression-input__fx) .expression-input__textarea {
-  border-radius: 0 6px 6px 0;
+.expression-input__text {
+  height: 36px;
+  font-family: $wf-font-mono;
+  font-size: 12px;
+  line-height: 36px;
 }
 
-.expression-input__field:has(.expression-input__side-toggle) .expression-input__input-layer,
-.expression-input__field:has(.expression-input__side-toggle) .expression-input__text,
-.expression-input__field:has(.expression-input__side-toggle) .expression-input__textarea {
-  border-radius: 0 6px 6px 0;
-}
-
-.expression-input__input-layer:focus-within {
+.expression-input__field:focus-within {
   border-color: $wf-control-focus-border-color;
   box-shadow: $wf-control-focus-ring;
 }
@@ -163,9 +198,10 @@
 }
 
 .expression-input__textarea {
+  padding: 8px 10px;
   resize: vertical;
   min-height: 36px;
-  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-family: $wf-font-mono;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -188,7 +224,22 @@
   white-space: pre-wrap;
   word-break: break-word;
   will-change: transform;
-  color: $o-main-text-color;
+  color: $wf-text-base;
+}
+
+.expression-input__input-layer--singleline .expression-input__highlights {
+  display: flex;
+  align-items: center;
+}
+
+.expression-input__input-layer--singleline .expression-input__highlights-content {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  line-height: 36px;
+  white-space: pre;
+  overflow: hidden;
 }
 
 .expression-input__highlight-fragment {
@@ -207,31 +258,33 @@
   .expression-input__textarea {
     color: transparent;
     -webkit-text-fill-color: transparent;
-    caret-color: $o-main-text-color;
+    caret-color: $wf-text-base;
   }
 }
 
 // Expression mode styling - Warning/Orange border
-.expression-input.expression-mode .expression-input__input-layer {
+.expression-input.expression-mode .expression-input__field {
   border-color: $wf-expression-border-color;
   background: $wf-expression-mode-bg;
 }
 
 .expression-input.expression-mode .expression-input__fx {
-  border-color: $wf-expression-border-color;
+  background: $wf-expression-mode-bg;
+  border-right-color: rgba($wf-expression-border-color, 0.48);
 }
 
 .expression-input.expression-mode .expression-input__side-toggle {
-  border-color: $wf-expression-border-color;
+  color: $wf-expression-mode-fg;
 }
 
-.expression-input.expression-mode .expression-input__input-layer:focus-within {
+.expression-input.expression-mode .expression-input__field:focus-within {
   box-shadow: $wf-expression-focus-ring;
 }
 
 // Drag-over state
-.expression-input.drag-over .expression-input__input-layer {
-  border: 2px dashed $o-action;
+.expression-input.drag-over .expression-input__field {
+  border-color: $wf-action-color;
+  box-shadow: inset 0 0 0 1px $wf-action-color;
   background: $wf-action-soft-bg;
 }
 
@@ -240,8 +293,8 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba($o-action, 0.95);
-  color: $o-black;
+  background: rgba($wf-action-color, 0.95);
+  color: $wf-white;
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 11px;
@@ -257,13 +310,12 @@
 // SUGGESTIONS
 // ============================================
 
-.expression-input__suggestions {
-  // Position is set via inline style (position: fixed + JS rect)
-  // to escape overflow:hidden ancestors in node config panel.
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
+.expression-input__suggestions-menu {
+  width: max-content;
+  min-width: 220px;
+  max-width: calc(100vw - 24px);
   max-height: 220px;
+  padding: 0;
   overflow-y: auto;
   border: 1px solid $wf-border-strong;
   border-radius: $wf-control-border-radius;
@@ -271,17 +323,24 @@
   box-shadow: $wf-popover-shadow;
 }
 
+.expression-input__suggestions {
+  display: flex;
+  flex-direction: column;
+}
+
 .expression-input__suggestion-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  width: 100%;
   padding: 7px 10px;
   background: transparent;
   border: none;
-  border-bottom: 1px solid $o-gray-300;
+  border-bottom: 1px solid $wf-border-base;
   text-align: left;
   cursor: pointer;
+  white-space: normal;
 }
 
 .expression-input__suggestion-item:last-child {
@@ -296,12 +355,12 @@
 .suggestion-label {
   font-size: 12px;
   font-weight: 500;
-  color: $o-main-text-color;
+  color: $wf-text-base;
 }
 
 .suggestion-description {
   font-size: 11px;
-  color: $o-gray-600;
+  color: $wf-text-muted;
 }
 
 // ============================================
@@ -309,38 +368,18 @@
 // ============================================
 
 .expression-input__result {
-  background: $o-gray-100;
-  border: 1px solid $o-gray-300;
+  background: $wf-surface-subtle;
+  border: 1px solid $wf-border-base;
   border-top: none;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 $wf-radius-md $wf-radius-md;
   overflow: hidden;
-}
-
-.result-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: $o-gray-200;
-  border-bottom: 1px solid $o-gray-300;
-}
-
-.result-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: $o-gray-800;
-}
-
-.result-tip {
-  font-size: 10px;
-  color: $o-gray-600;
 }
 
 .result-value {
   padding: 8px 10px;
-  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-family: $wf-font-mono;
   font-size: 12px;
-  color: $o-main-text-color;
+  color: $wf-text-base;
   min-height: 20px;
   max-height: 60px;
   overflow-y: auto;
@@ -348,11 +387,11 @@
 }
 
 .result-value .empty {
-  color: $o-gray-600;
+  color: $wf-text-muted;
   font-style: italic;
   font-family: inherit;
 }
 
 .result-value .error {
-  color: $o-danger;
+  color: $wf-danger-color;
 }

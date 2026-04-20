@@ -1,6 +1,10 @@
 /** @odoo-module **/
 
-import { Component, useState, onWillUpdateProps, useRef } from "@odoo/owl";
+import { Component, useEffect, useState, onWillUpdateProps, useRef } from "@odoo/owl";
+import { Dropdown } from "@web/core/dropdown/dropdown";
+import { DropdownItem } from "@web/core/dropdown/dropdown_item";
+import { useDropdownState } from "@web/core/dropdown/dropdown_hooks";
+import { useChildRef } from "@web/core/utils/hooks";
 import {
     wrapExpression,
     evaluateExpression,
@@ -17,6 +21,8 @@ import {
     mergeUniqueSuggestions,
 } from "@workflow_studio/utils/input_suggestion_utils";
 
+let nextSuggestionMenuId = 1;
+
 /**
  * ExpressionInput Component
  *
@@ -25,6 +31,7 @@ import {
  */
 export class ExpressionInput extends Component {
     static template = "workflow_studio.expression_input";
+    static components = { Dropdown, DropdownItem };
 
     static props = {
         value: { type: String, optional: true },
@@ -32,7 +39,7 @@ export class ExpressionInput extends Component {
         label: { type: String, optional: true },
         // Expression evaluation context for preview, e.g. { _vars, _node, _json, _loop, _input }
         context: { type: Object, optional: true },
-        multiline: { type: Boolean, optional: true },  // Use textarea
+        multiline: { type: Boolean, optional: true }, // Use textarea
         // Controlled mode: 'fixed' | 'expression'
         mode: { type: String, optional: true },
         // Toggle UI placement: 'top' | 'side' | 'none'
@@ -57,7 +64,11 @@ export class ExpressionInput extends Component {
         const initialValue = this._toDisplayValue(initialStoredValue, initialMode);
 
         this.fieldRef = useRef("fieldRef");
+        this.dropdownMenuRef = useChildRef();
+        this.suggestionsDropdownState = useDropdownState();
+        this.suggestionIdPrefix = `expression-input-suggestion-${nextSuggestionMenuId++}`;
         this._dragEnterCount = 0;
+        this._ignoreBlur = false;
 
         this.state = useState({
             isFocused: false,
@@ -101,6 +112,17 @@ export class ExpressionInput extends Component {
                 this.state.localMode = inferredNextMode;
             }
         });
+
+        useEffect(
+            (shouldShowSuggestions) => {
+                if (shouldShowSuggestions) {
+                    this.suggestionsDropdownState.open();
+                } else {
+                    this.suggestionsDropdownState.close();
+                }
+            },
+            () => [this.shouldShowSuggestions]
+        );
     }
 
     _normalizeMode(mode) {
@@ -227,7 +249,7 @@ export class ExpressionInput extends Component {
     }
 
     get isExpression() {
-        return this.mode === 'expression';
+        return this.mode === "expression";
     }
 
     get textAreaRows() {
@@ -271,13 +293,6 @@ export class ExpressionInput extends Component {
         return this.filteredSuggestions.length > 0;
     }
 
-    get suggestionsStyle() {
-        const el = this.fieldRef.el;
-        if (!el) return "";
-        const rect = el.getBoundingClientRect();
-        return `position: fixed; top: ${rect.bottom + 4}px; left: ${rect.left}px; width: ${rect.width}px; z-index: 10000;`;
-    }
-
     get previewResult() {
         if (!this.isExpression || !this.props.context) {
             return null;
@@ -289,17 +304,17 @@ export class ExpressionInput extends Component {
 
     get previewDisplay() {
         const result = this.previewResult;
-        if (!result) return '';
+        if (!result) return "";
 
         if (result.error) {
             return `Error: ${result.error}`;
         }
 
         if (result.value === undefined) {
-            return 'undefined';
+            return "undefined";
         }
 
-        if (typeof result.value === 'object') {
+        if (typeof result.value === "object") {
             return this._safeStringify(result.value);
         }
 
@@ -308,15 +323,15 @@ export class ExpressionInput extends Component {
 
     get previewType() {
         const result = this.previewResult;
-        if (!result || result.error || result.type === null) return '';
-        return result.type || '';
+        if (!result || result.error || result.type === null) return "";
+        return result.type || "";
     }
 
     _safeStringify(value) {
         try {
             return JSON.stringify(value, null, 2);
         } catch {
-            return '[Unserializable value]';
+            return "[Unserializable value]";
         }
     }
 
@@ -326,6 +341,36 @@ export class ExpressionInput extends Component {
 
     onInput(ev) {
         const value = ev.target.value;
+
+        // Auto-switch to expression mode when user types '=' as the sole character
+        // in a fixed-mode input that has an expression toggle available.
+        if (
+            !this.isExpression &&
+            value === "=" &&
+            (this.showSideToggle || this.showTopToggle)
+        ) {
+            // For uncontrolled mode, flip local state immediately.
+            // For controlled mode, the parent will re-render with mode="expression"
+            // once onModeChange propagates — so we only touch localMode when safe.
+            if (!this.hasControlledMode) {
+                this.state.localMode = "expression";
+            }
+            this.state.localValue = "";
+            this.state.showSuggestions = true;
+            this.state.activeSuggestionIndex = -1;
+            this.props.onChange("="); // expression prefix with empty body
+            if (this.props.onModeChange) {
+                this.props.onModeChange("expression");
+            }
+            // Reset cursor to start of the now-empty input
+            requestAnimationFrame(() => {
+                const inputEl = this.getInputElement();
+                if (inputEl) {
+                    inputEl.setSelectionRange(0, 0);
+                }
+            });
+            return;
+        }
 
         // Update local state for reactivity
         this.state.localValue = value;
@@ -341,6 +386,10 @@ export class ExpressionInput extends Component {
     }
 
     onBlur() {
+        if (this._ignoreBlur) {
+            this._ignoreBlur = false;
+            return;
+        }
         this.state.isFocused = false;
         this.state.showSuggestions = false;
         this.state.activeSuggestionIndex = -1;
@@ -380,11 +429,11 @@ export class ExpressionInput extends Component {
     }
 
     onClickFixed() {
-        this.setMode('fixed');
+        this.setMode("fixed");
     }
 
     onClickExpression() {
-        this.setMode('expression');
+        this.setMode("expression");
     }
 
     onClickSideToggle() {
@@ -414,7 +463,7 @@ export class ExpressionInput extends Component {
     onDragOver(ev) {
         ev.preventDefault();
         // Allow drop
-        ev.dataTransfer.dropEffect = 'copy';
+        ev.dataTransfer.dropEffect = "copy";
     }
 
     _getDropPayload(ev) {
@@ -435,7 +484,7 @@ export class ExpressionInput extends Component {
         return {
             expression,
             path,
-            keyName: keyName || (meta && typeof meta.keyName === 'string' ? meta.keyName : ''),
+            keyName: keyName || (meta && typeof meta.keyName === "string" ? meta.keyName : ""),
             meta,
         };
     }
@@ -458,8 +507,8 @@ export class ExpressionInput extends Component {
             if (override && override.handled) {
                 const nextMode = this._normalizeMode(override.mode) || currentMode;
                 const nextSerialized = override.serializedValue !== undefined
-                    ? String(override.serializedValue ?? '')
-                    : this._serializeValue(override.value ?? '', nextMode);
+                    ? String(override.serializedValue ?? "")
+                    : this._serializeValue(override.value ?? "", nextMode);
 
                 if (!this.hasControlledMode) {
                     this.state.localMode = nextMode;
@@ -479,7 +528,7 @@ export class ExpressionInput extends Component {
             }
         }
 
-        const insertText = expression || (path ? wrapExpression(path) : '');
+        const insertText = expression || (path ? wrapExpression(path) : "");
         if (!insertText) {
             return;
         }
@@ -523,6 +572,7 @@ export class ExpressionInput extends Component {
             ev.preventDefault();
             this.state.showSuggestions = true;
             this.state.activeSuggestionIndex = 0;
+            this._scrollActiveSuggestionIntoView();
             return;
         }
 
@@ -536,12 +586,14 @@ export class ExpressionInput extends Component {
                 suggestions.length - 1,
                 this.state.activeSuggestionIndex + 1
             );
+            this._scrollActiveSuggestionIntoView();
             return;
         }
 
         if (ev.key === "ArrowUp") {
             ev.preventDefault();
             this.state.activeSuggestionIndex = Math.max(-1, this.state.activeSuggestionIndex - 1);
+            this._scrollActiveSuggestionIntoView();
             return;
         }
 
@@ -560,9 +612,54 @@ export class ExpressionInput extends Component {
         }
     }
 
-    onSuggestionMouseDown(ev, item) {
-        ev.preventDefault();
+    onSuggestionsPointerDown() {
+        this._ignoreBlur = true;
+    }
+
+    onSuggestionSelected(item) {
         this._applySuggestion(item);
+        requestAnimationFrame(() => {
+            const inputEl = this.getInputElement();
+            if (inputEl) {
+                inputEl.focus();
+            }
+        });
+    }
+
+    getSuggestionItemAttrs(index) {
+        const attrs = {
+            id: this.getSuggestionDomId(index),
+        };
+        if (index === this.state.activeSuggestionIndex) {
+            attrs["aria-selected"] = "true";
+        }
+        return attrs;
+    }
+
+    getSuggestionDomId(index) {
+        return `${this.suggestionIdPrefix}-${index}`;
+    }
+
+    getInputElement() {
+        const root = this.fieldRef.el;
+        if (!root) {
+            return null;
+        }
+        return root.querySelector("input, textarea");
+    }
+
+    _scrollActiveSuggestionIntoView() {
+        if (this.state.activeSuggestionIndex < 0) {
+            return;
+        }
+        requestAnimationFrame(() => {
+            const activeEl = document.getElementById(
+                this.getSuggestionDomId(this.state.activeSuggestionIndex)
+            );
+            if (activeEl && typeof activeEl.scrollIntoView === "function") {
+                activeEl.scrollIntoView({ block: "nearest" });
+            }
+        });
     }
 
     _applySuggestion(item) {

@@ -6,12 +6,16 @@ Spawns Odoo HTTP worker immediately, respawns on SIGUSR1
 (so code changes take effect without recreating the container).
 
 Config (env vars):
-  SUPERVISOR_KILL_IDLE   int  seconds idle before killing worker (0=off, default 0)
-  ODOO_ENABLE_DEBUGPY    0|1  wrap worker with debugpy --wait-for-client (default 0)
-  DEBUGPY_PORT           int  debugpy listen port (default 5678)
-  ODOO_EXTRA_ARGS        str  extra args appended to odoo-bin command
-  ODOO_BIN               str  path to odoo-bin (default /opt/odoo/source/odoo-bin)
-  ODOO_CONF              str  path to odoo.conf (default /etc/odoo/odoo.conf)
+    SUPERVISOR_KILL_IDLE   int  seconds idle before killing worker (0=off, default 0)
+    ODOO_ENABLE_DEBUGPY    0|1  wrap worker with debugpy --wait-for-client (default 0)
+    DEBUGPY_PORT           int  debugpy listen port (default 5678)
+    ODOO_EXTRA_ARGS        str  extra args appended to odoo-bin command
+    ODOO_BIN               str  path to odoo-bin (default /opt/odoo/source/odoo-bin)
+    ODOO_CONF              str  path to odoo.conf (default /etc/odoo/odoo.conf)
+    DB_HOST                str  overrides Odoo db_host when provided
+    DB_PORT                str  overrides Odoo db_port when provided
+    DB_USER                str  overrides Odoo db_user when provided
+    DB_PASSWORD            str  overrides Odoo db_password when provided
 """
 import logging
 import os
@@ -42,6 +46,21 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("supervisor-lite")
+
+
+def _db_override_args():
+    args = []
+    mappings = [
+        ("DB_HOST", "--db_host"),
+        ("DB_PORT", "--db_port"),
+        ("DB_USER", "--db_user"),
+        ("DB_PASSWORD", "--db_password"),
+    ]
+    for env_name, cli_flag in mappings:
+        value = os.environ.get(env_name)
+        if value:
+            args.extend([cli_flag, value])
+    return args
 
 
 # ---------------------------------------------------------------------------
@@ -99,13 +118,22 @@ def _spawn_worker():
     else:
         cmd = [sys.executable, ODOO_BIN]
 
+    db_override_args = _db_override_args()
     cmd += ["-c", ODOO_CONF, "--max-cron-threads=0"]
     cmd += EXTRA_ARGS
+    cmd += db_override_args
 
     _worker.proc = subprocess.Popen(cmd)
     _worker.started_at = time.monotonic()
     _last_activity = _worker.started_at
     log.info("HTTP worker spawned (pid=%d, debug=%s)", _worker.pid, DEBUGPY_ENABLED)
+    if db_override_args:
+        log.info(
+            "DB connection overridden from env (host=%s, port=%s, user=%s)",
+            os.environ.get("DB_HOST", "(config)"),
+            os.environ.get("DB_PORT", "(config)"),
+            os.environ.get("DB_USER", "(config)"),
+        )
 
 
 def _kill_worker(timeout=30):

@@ -3,6 +3,7 @@
 import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { ExpressionInput } from "../expression/ExpressionInput";
 import { CodeEditor } from "../code_editor";
+import { KeyValueTable } from "./key_value_table";
 import { getSuggestionsByKey, mergeUniqueSuggestions } from "@workflow_studio/utils/input_suggestion_utils";
 
 /**
@@ -35,7 +36,7 @@ const DEFAULT_BODY_SUGGESTIONS = {
 
 export class BodyTypeControl extends Component {
     static template = "workflow_studio.body_type_control";
-    static components = { ExpressionInput, CodeEditor };
+    static components = { ExpressionInput, CodeEditor, KeyValueTable };
 
     static props = {
         value: { type: Object, optional: true },
@@ -54,7 +55,6 @@ export class BodyTypeControl extends Component {
             rawBody: "Enter raw body...",
             jsonBody: "{}",
         };
-        this._nextPairId = 1;
 
         this.state = useState({
             bodyValue: this._normalize(this.props.value),
@@ -73,17 +73,10 @@ export class BodyTypeControl extends Component {
             return { content_type: "none", body: "", form_data: [], raw_type: "text/plain" };
         }
         const rawFormData = Array.isArray(val.form_data) ? val.form_data : [];
-        const formData = rawFormData.length
-            ? rawFormData.map(p => ({
-                id: p.id || this._nextPairId++,
-                key: p.key || "",
-                value: p.value || "",
-            }))
-            : [{ id: this._nextPairId++, key: "", value: "" }];
         return {
             content_type: val.content_type || "none",
             body: val.body || "",
-            form_data: formData,
+            form_data: rawFormData,
             raw_type: val.raw_type || "text/plain",
         };
     }
@@ -134,31 +127,9 @@ export class BodyTypeControl extends Component {
         this._emit();
     }
 
-    // Form data key-value management
-    onFormKeyChange(index, value) {
-        if (!this.state.bodyValue.form_data[index]) return;
-        this.state.bodyValue.form_data[index].key = value;
+    // Form data — delegated to KeyValueTable
+    onFormDataChange = (pairs) => {
+        this.state.bodyValue.form_data = pairs;
         this._emit();
-    }
-
-    onFormValueChange(index, value) {
-        if (!this.state.bodyValue.form_data[index]) return;
-        this.state.bodyValue.form_data[index].value = value;
-        this._emit();
-    }
-
-    addFormPair() {
-        this.state.bodyValue.form_data.push({
-            id: this._nextPairId++,
-            key: "",
-            value: "",
-        });
-        this._emit();
-    }
-
-    removeFormPair(index) {
-        if (this.state.bodyValue.form_data.length <= 1) return;
-        this.state.bodyValue.form_data.splice(index, 1);
-        this._emit();
-    }
+    };
 }

@@ -61,6 +61,31 @@ const WEBHOOK_METHOD_OPTIONS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const WEBHOOK_RESPONSE_OPTIONS = ["immediate", "last_node"];
 const RECORD_EVENT_OPTIONS = ["on_create_or_write", "on_create", "on_write", "on_unlink"];
 
+const PANEL_TOOLBAR_DESCRIPTION_FALLBACKS = {
+    http: "Make HTTP API calls to external services.",
+    loop: "Iterate over array items in batches.",
+    if: "Route data based on condition.",
+    switch: "Route data based on matching cases.",
+    noop: "Placeholder node.",
+    code: "Execute Python code and return the payload for the next step.",
+    validation: "Validate data against rules before branching.",
+    set_data: "Set or transform data fields before the next node.",
+    variable: "Set or retrieve workflow variables.",
+    record_operation: "Search, create, write, or delete Odoo records.",
+};
+
+const PANEL_TOOLBAR_TIPS_BY_NODE_TYPE = {
+    http: "Drag fields from Input into URL, params, headers, or body to map previous node data.",
+    loop: "Pick an array from Input, then run the node to verify batch size and loop output.",
+    if: "Use Input data in {{ ... }} expressions so each branch decision is easy to inspect.",
+    switch: "Match one Input value against clear cases so each route stays predictable.",
+    code: "Inspect Input on the left, then return only the JSON you want to pass onward.",
+    validation: "Use Input data to define the rules, then inspect valid and invalid outputs after each run.",
+    set_data: "Drag & drop keys from Input into mapping rows to reshape data from previous nodes.",
+    variable: "Use expressions to read Input or _vars before writing the next workflow variable value.",
+    record_operation: "Drag fields from Input into Domain, IDs, or Values to target records from previous nodes.",
+};
+
 function makeSelectOptions(values) {
     return values.map((value) => ({ value, label: value }));
 }
@@ -188,6 +213,7 @@ export class NodeConfigPanel extends Component {
         // getOdooModels() returns cached list immediately (fallback during fetch).
         this._odooModels = useOdooModels();
         this._triggerPollTimer = null;
+        const initialExecution = this.props.execution || null;
 
         this.state = useState({
             activeTab: 'parameters',  // 'parameters' | 'output'
@@ -205,6 +231,12 @@ export class NodeConfigPanel extends Component {
             selectedOutputSocket: null,  // null = first available socket
             selectedExecutionVersion: null,  // null = latest version
             pinBusy: false,
+            showInputPanel: !TRIGGER_NODE_TYPES.has(this.props.node.type),
+            showOutputPanel: this._shouldShowOutputByDefault(
+                initialExecution,
+                this.props.node,
+                this.props.viewMode
+            ),
             triggerLoading: false,
             triggerBusy: false,
             activeWebhookTab: "production",
@@ -250,6 +282,13 @@ export class NodeConfigPanel extends Component {
                 this.state.recordRefCache = {};
                 this.state.selectedOutputSocket = null;
                 this.state.selectedExecutionVersion = null;
+                this.state.showInputPanel = !TRIGGER_NODE_TYPES.has(nextProps.node.type);
+                this.state.showOutputPanel = this._shouldShowOutputByDefault(
+                    nextProps.execution || null,
+                    nextProps.node,
+                    nextProps.viewMode
+                );
+                this.state.execution = nextProps.execution || null;
                 this.state.navActiveOptionKeys.previous = null;
                 this.state.navActiveOptionKeys.next = null;
                 this.initControlValues(nextProps.node);
@@ -258,6 +297,19 @@ export class NodeConfigPanel extends Component {
                 } else {
                     this._resetTriggerState();
                 }
+                return;
+            }
+
+            if (nextProps.execution !== this.props.execution) {
+                this.state.execution = nextProps.execution || null;
+                if (this._hasNodeExecutionData(nextProps.execution || null, nextProps.node.id)) {
+                    this.state.showOutputPanel = true;
+                }
+            }
+
+            if (nextProps.viewMode !== this.props.viewMode && nextProps.viewMode === "execution") {
+                this.state.showInputPanel = true;
+                this.state.showOutputPanel = true;
             }
         });
 
@@ -403,31 +455,183 @@ export class NodeConfigPanel extends Component {
         }));
     }
 
+    _hasNodeExecutionData(execution, nodeId = this.props.node.id) {
+        if (!execution || !nodeId) {
+            return false;
+        }
+        const events = Array.isArray(execution.executionEvents) && execution.executionEvents.length
+            ? execution.executionEvents
+            : execution.nodeResults;
+        if (!Array.isArray(events)) {
+            return false;
+        }
+        return events.some((event) => event && event.node_id === nodeId);
+    }
+
+    _shouldShowOutputByDefault(execution, node = this.props.node, viewMode = this.props.viewMode) {
+        if (!node) {
+            return false;
+        }
+        if (TRIGGER_NODE_TYPES.has(node.type)) {
+            return true;
+        }
+        if (viewMode === "execution") {
+            return true;
+        }
+        return this._hasNodeExecutionData(execution, node.id);
+    }
+
+    _getControlRowPlans(sectionKey) {
+        const plans = {
+            general: [
+                {
+                    id: "model-event",
+                    keys: ["model_name", "trigger_event"],
+                    className: "ncp-control-row--keep-inline-md",
+                    cellClasses: ["ncp-control-cell--span-8", "ncp-control-cell--span-4"],
+                },
+            ],
+            operation: [
+                {
+                    id: "operation-model",
+                    keys: ["operation", "model"],
+                    className: "ncp-control-row--keep-inline-md",
+                    cellClasses: ["ncp-control-cell--span-4", "ncp-control-cell--span-8"],
+                },
+            ],
+            request: [
+                {
+                    id: "method-url",
+                    keys: ["method", "url"],
+                    kind: "url-shell",
+                    className: "ncp-control-row--url-shell",
+                    cellClasses: ["ncp-control-cell--span-2", "ncp-control-cell--span-10"],
+                },
+            ],
+            trigger: [
+                {
+                    id: "interval-row",
+                    keys: ["interval_number", "interval_type"],
+                    className: "ncp-control-row--keep-inline-md",
+                    cellClasses: ["ncp-control-cell--span-4", "ncp-control-cell--span-8"],
+                },
+            ],
+            webhook: [
+                {
+                    id: "webhook-options",
+                    keys: ["http_method", "response_mode"],
+                    className: "ncp-control-row--keep-inline-md",
+                    cellClasses: ["ncp-control-cell--span-6", "ncp-control-cell--span-6"],
+                },
+            ],
+        };
+        return plans[sectionKey] || [];
+    }
+
+    _getRenderedSectionKey(control) {
+        const baseSection = control && control.section ? control.section : "general";
+        if (this.props.node.type === "http" && control && control.key === "query_params") {
+            return "params";
+        }
+        return baseSection;
+    }
+
+    _getSectionSortRank(sectionKey) {
+        if (this.props.node.type === "http") {
+            const order = ["request", "headers", "authentication", "params", "body", "settings"];
+            const index = order.indexOf(sectionKey);
+            if (index !== -1) {
+                return index;
+            }
+        }
+        return Number.MAX_SAFE_INTEGER;
+    }
+
+    _buildControlRows(sectionKey, controls) {
+        const safeControls = Array.isArray(controls) ? controls : [];
+        const controlByKey = new Map(safeControls.map((control) => [control.key, control]));
+        const rows = [];
+        const consumed = new Set();
+
+        for (const plan of this._getControlRowPlans(sectionKey)) {
+            const matchedControls = plan.keys.map((key) => controlByKey.get(key));
+            if (matchedControls.some((control) => !control)) {
+                continue;
+            }
+
+            rows.push({
+                id: `${sectionKey}:${plan.id}`,
+                className: plan.className || "",
+                kind: plan.kind || "default",
+                cells: matchedControls.map((control, index) => ({
+                    id: control.key,
+                    control,
+                    className: plan.cellClasses && plan.cellClasses[index]
+                        ? plan.cellClasses[index]
+                        : "ncp-control-cell--span-6",
+                })),
+            });
+            plan.keys.forEach((key) => consumed.add(key));
+        }
+
+        for (const control of safeControls) {
+            if (consumed.has(control.key)) {
+                continue;
+            }
+            rows.push({
+                id: `${sectionKey}:${control.key}`,
+                className: "ncp-control-row--single",
+                kind: "default",
+                cells: [{
+                    id: control.key,
+                    control,
+                    className: "ncp-control-cell--full",
+                }],
+            });
+        }
+
+        return rows;
+    }
+
     /**
      * Group controls by section, filtering by visibleWhen conditions
      */
     get groupedControls() {
         const controls = this.getControls();
         const groups = {};
+        let orderIndex = 0;
 
         for (const control of controls) {
             // Check visibleWhen conditions
             if (control.visibleWhen && !this._evalVisibleWhen(control.visibleWhen)) {
                 continue;
             }
-            const section = control.section || 'general';
+            const section = this._getRenderedSectionKey(control);
             if (!groups[section]) {
                 groups[section] = {
                     name: this.formatSectionName(section),
                     key: section,
                     icon: this._getSectionIcon(section),
                     controls: [],
+                    rows: [],
+                    orderIndex: orderIndex++,
                 };
             }
             groups[section].controls.push(control);
         }
 
-        return Object.values(groups);
+        return Object.values(groups)
+            .sort((left, right) => {
+                const rankDiff = this._getSectionSortRank(left.key) - this._getSectionSortRank(right.key);
+                if (rankDiff !== 0) {
+                    return rankDiff;
+                }
+                return left.orderIndex - right.orderIndex;
+            })
+            .map((group) => ({
+                ...group,
+                rows: this._buildControlRows(group.key, group.controls),
+            }));
     }
 
     /**
@@ -455,6 +659,11 @@ export class NodeConfigPanel extends Component {
     _getSectionIcon(section) {
         const icons = {
             general: 'fa-cube',
+            operation: 'fa-sliders',
+            target: 'fa-bullseye',
+            search: 'fa-search',
+            values: 'fa-pencil-square-o',
+            params: 'fa-sliders',
             trigger: 'fa-bolt',
             webhook: 'fa-link',
             filters: 'fa-filter',
@@ -471,6 +680,9 @@ export class NodeConfigPanel extends Component {
     formatSectionName(section) {
         if (section === "webhook") {
             return "Webhook";
+        }
+        if (section === "params") {
+            return "Params";
         }
         if (section === "filters") {
             return "Filters";
@@ -546,6 +758,97 @@ export class NodeConfigPanel extends Component {
 
     get isExecutionView() {
         return this.props.viewMode === 'execution';
+    }
+
+    get showInputColumn() {
+        if (this.isTriggerNode) {
+            return false;
+        }
+        if (this.isExecutionView) {
+            return true;
+        }
+        return !!this.state.showInputPanel;
+    }
+
+    get showOutputColumn() {
+        if (this.isTriggerNode) {
+            return true;
+        }
+        if (this.isExecutionView) {
+            return true;
+        }
+        return !!this.state.showOutputPanel;
+    }
+
+    get inputRailVisible() {
+        return !this.isTriggerNode && !this.isExecutionView && !this.state.showInputPanel;
+    }
+
+    get outputRailVisible() {
+        return !this.isTriggerNode && !this.isExecutionView && !this.state.showOutputPanel;
+    }
+
+    get showPanelLayoutToolbar() {
+        return !this.isTriggerNode && !this.isExecutionView && this.state.activeTab === "parameters";
+    }
+
+    get nodeParameterDescription() {
+        const description = this.props.node && typeof this.props.node.description === "string"
+            ? this.props.node.description.trim()
+            : "";
+        if (description) {
+            return description;
+        }
+        return PANEL_TOOLBAR_DESCRIPTION_FALLBACKS[this.props.node.type]
+            || "Configure this node and map the data you want to pass to the next step.";
+    }
+
+    get visibleToolbarControls() {
+        return this.getControls().filter((control) => {
+            return !(control.visibleWhen && !this._evalVisibleWhen(control.visibleWhen));
+        });
+    }
+
+    get nodeParameterTip() {
+        if (!this.showInputColumn) {
+            return "Turn Input back on to drag data from previous nodes into this step.";
+        }
+
+        const typeTip = PANEL_TOOLBAR_TIPS_BY_NODE_TYPE[this.props.node.type];
+        if (typeTip) {
+            return typeTip;
+        }
+
+        const controls = this.visibleToolbarControls;
+        const controlTypes = new Set(controls.map((control) => control.type));
+
+        if (["field_values", "keyvalue", "query_params", "auth", "body_type"].some((type) => controlTypes.has(type))) {
+            return "Drag & drop keys from Input into mapping fields to reuse data from previous nodes.";
+        }
+        if (controlTypes.has("domain")) {
+            return "Drag fields from Input into the filter, or switch modes to build the domain faster.";
+        }
+        if (controlTypes.has("code")) {
+            return "Use Input as context and return only the payload you want to send to the next node.";
+        }
+        if (["expression", "text"].some((type) => controlTypes.has(type))) {
+            return "Use {{ ... }} expressions and drag fields from Input to reference previous node data.";
+        }
+
+        return this.panelLayoutSummary;
+    }
+
+    get panelLayoutSummary() {
+        if (!this.showInputColumn && !this.showOutputColumn) {
+            return "Input and output side panels are hidden. Toggle them back on whenever you need more context.";
+        }
+        if (!this._hasNodeExecutionData(this.state.execution)) {
+            return "Keep the editor focused on input + parameters. Output auto-opens after you run the node, or you can reveal it manually now.";
+        }
+        if (!this.showOutputColumn) {
+            return "Latest output is available but currently tucked away. Reveal it whenever you want to compare inputs and results.";
+        }
+        return "Use the side panels to compare incoming data, configuration, and output without leaving the editor.";
     }
 
     get isTriggerNode() {
@@ -1892,6 +2195,7 @@ export class NodeConfigPanel extends Component {
             console.error('[NodeConfigPanel] Execute error:', err);
         }
         this.state.execution = this.workflowEditor.getExecutionResults();
+        this.state.showOutputPanel = true;
     }
 
     // ============================================
@@ -1951,6 +2255,22 @@ export class NodeConfigPanel extends Component {
 
     onTabClick(tabName) {
         this.state.activeTab = tabName;
+    }
+
+    toggleSidePanel(panelKey) {
+        if (panelKey === "input") {
+            this.state.showInputPanel = !this.state.showInputPanel;
+            return;
+        }
+        if (panelKey === "output") {
+            this.state.showOutputPanel = !this.state.showOutputPanel;
+        }
+    }
+
+    collapsePanel(panelKey) {
+        if (!this.isExecutionView) {
+            this.toggleSidePanel(panelKey);
+        }
     }
 
     get tabDefs() {

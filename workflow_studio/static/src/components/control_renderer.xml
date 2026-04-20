@@ -6,7 +6,7 @@
 			<label t-if="label and controlType !== 'text' and controlType !== 'expression'" class="control-label" t-esc="label"/>
 			<!-- TEXT INPUT -->
 			<t t-if="controlType === 'text' or controlType === 'expression'">
-				<ExpressionInput value="value" placeholder="placeholder" label="label" context="props.inputContext" multiline="isMultiline" mode="props.mode" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
+				<ExpressionInput value="value" placeholder="placeholder" label="label" context="props.inputContext" multiline="isMultiline" mode="props.mode" toggleMode="'side'" suggestions="suggestions" valueSuggestions="valueSuggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onExpressionModeChange(m)" onChange="(v) => this.onExpressionChange(v)" readonly="props.readonly"/>
 			</t>
 			<!-- SELECT -->
 			<t t-elif="controlType === 'select'">
@@ -27,20 +27,21 @@
 			<!-- KEY-VALUE PAIRS -->
 			<t t-elif="controlType === 'keyvalue'">
 				<div class="control-keyvalue">
-					<t t-foreach="pairs" t-as="pair" t-key="pair.id">
-						<div class="kv-row kv-row--stack">
-							<div class="kv-row__meta d-flex align-items-center justify-content-end">
-								<button class="kv-remove" t-on-click="() => this.removePair(pair_index)" t-att-disabled="pairs.length &lt;= 1 or props.readonly">×</button>
-							</div>
-							<div class="kv-key-cell">
-								<ExpressionInput value="pair.key" label="'Name'" placeholder="props.control.keyPlaceholder" context="props.inputContext" mode="this.getPairKeyMode(pair.id)" suggestions="suggestions" valueSuggestions="suggestions" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairKeyModeChange(pair.id, m)" onChange="(v) => this.onKeyChange(pair_index, v)" readonly="props.readonly"/>
-							</div>
-							<div class="kv-value-cell">
-								<ExpressionInput value="pair.value" label="'Value'" placeholder="props.control.valuePlaceholder" context="props.inputContext" mode="this.getPairValueMode(pair.id)" suggestions="getPairValueSuggestions(pair)" valueSuggestions="getPairValueSuggestions(pair)" expressionSuggestions="expressionSuggestions" onModeChange="(m) => this.onPairValueModeChange(pair.id, m)" onChange="(v) => this.onValueExpressionChange(pair_index, v)" readonly="props.readonly"/>
-							</div>
-						</div>
-					</t>
-					<button t-if="!props.readonly" class="kv-add" t-on-click="addPair">Add Parameter</button>
+					<KeyValueTable
+						pairs="value"
+						withToggle="props.control.key === 'headers'"
+						onChange.bind="onKeyValueChange"
+						inputContext="props.inputContext"
+						keyPlaceholder="props.control.keyPlaceholder"
+						valuePlaceholder="props.control.valuePlaceholder"
+						keySuggestions="suggestions"
+						valueSuggestions="valueSuggestions"
+						expressionSuggestions="expressionSuggestions"
+						suggestionsByKey="suggestionsByKey"
+						pairModes="props.pairModes"
+						onPairModeChange="onKeyValuePairModeChange"
+						readonly="props.readonly"
+					/>
 				</div>
 			</t>
 			<!-- CODE EDITOR (Monaco) -->
@@ -75,15 +76,24 @@
 					readonly="props.readonly"
 				/>
 			</t>
-			<!-- QUERY PARAMS CONTROL -->
+			<!-- QUERY PARAMS CONTROL (keyvalue with toggle) -->
 			<t t-elif="controlType === 'query_params'">
-				<QueryParamsControl
-					value="value"
-					onChange.bind="onQueryParamsChange"
-					inputContext="props.inputContext"
-					suggestionsByKey="suggestionsByKey"
-					readonly="props.readonly"
-				/>
+				<div class="control-keyvalue">
+					<KeyValueTable
+						pairs="value"
+						onChange.bind="onKeyValueChange"
+						inputContext="props.inputContext"
+						keyPlaceholder="'Key'"
+						valuePlaceholder="'Value'"
+						keySuggestions="suggestions"
+						valueSuggestions="valueSuggestions"
+						expressionSuggestions="expressionSuggestions"
+						suggestionsByKey="suggestionsByKey"
+						pairModes="props.pairModes"
+						onPairModeChange="onKeyValuePairModeChange"
+						readonly="props.readonly"
+					/>
+				</div>
 			</t>
 			<!-- MODEL SELECT — ExpressionInput fixed mode with Odoo model autocomplete -->
 			<t t-elif="controlType === 'model_select'">

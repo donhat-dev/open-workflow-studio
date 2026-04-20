@@ -1,69 +1,52 @@
 .o_workflow_field_values {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+
+    .fv-table {
+        overflow: hidden;
+    }
 
     .fv-row {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        padding: 8px;
-        background: $wf-field-row-bg;
-        border-radius: $wf-radius-sm;
-        border: 1px solid $wf-field-row-border;
+        min-height: 42px;
     }
 
-    .fv-row-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 2px;
-    }
-
-    .fv-label {
-        font-size: 11px;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: $wf-text-muted;
-        letter-spacing: 0.03em;
-    }
-
-    .fv-remove {
-        background: none;
-        border: none;
-        color: $wf-text-faint;
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-        border-radius: 3px;
-        font-size: 14px;
-
-        &:hover {
-            color: $wf-danger-color;
-        }
-
-        &:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
+    .fv-field-cell,
+    .fv-value-cell,
+    .fv-actions {
+        min-width: 0;
     }
 
     .fv-add {
-        margin-top: 2px;
-        padding: 5px 10px;
-        font-size: 12px;
-        background: none;
-        border: 1px dashed $wf-action-color;
-        color: $wf-action-color;
-        border-radius: $wf-radius-sm;
-        cursor: pointer;
+        margin-top: 0;
         width: 100%;
         text-align: center;
-        transition: background 0.15s, color 0.15s;
+    }
 
-        &:hover {
-            background: $wf-action-color;
-            color: $wf-white;
+    .ncp-table-shell__actions .fv-remove {
+        width: 28px;
+        height: 28px;
+    }
+
+    .ncp-table-shell__heading:last-child {
+        text-align: center;
+    }
+
+    .ncp-table-shell__row--placeholder .ncp-table-shell__actions .fv-remove {
+        opacity: 0;
+    }
+
+    @media (max-width: 767.98px) {
+        .ncp-table-shell__header,
+        .ncp-table-shell__row {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .ncp-table-shell__actions {
+            justify-content: flex-end;
+            border-left: none;
+            border-top: 1px solid $wf-border-base;
+            padding: 6px 8px;
         }
     }
 }

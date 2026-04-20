@@ -3,7 +3,7 @@
 	<t t-name="workflow_studio.ConfigPanel">
 		<div class="node-config-panel d-flex flex-column h-100" t-on-wheel.stop="">
 			<t t-call="{{ constructor.subTemplates.header }}"/>
-			<div class="node-config-content row g-0" t-att-class="{ 'execution-view-mode': isExecutionView, 'node-config-content--trigger': isTriggerNode }">
+			<div class="node-config-content row g-0" t-att-class="{ 'execution-view-mode': isExecutionView, 'node-config-content--trigger': isTriggerNode, 'node-config-content--show-input': showInputColumn, 'node-config-content--show-output': showOutputColumn, 'node-config-content--input-rail': inputRailVisible, 'node-config-content--output-rail': outputRailVisible }">
 				<t t-call="{{ constructor.subTemplates.input }}"/>
 				<t t-call="{{ constructor.subTemplates.config }}"/>
 				<t t-call="{{ constructor.subTemplates.output }}"/>
@@ -13,10 +13,10 @@
 
 	<t t-name="workflow_studio.ConfigPanel.Header">
 		<!-- Single-row header: [icon · title] [Execute] [trigger actions] [←][→][×] -->
-		<div class="ncp-header d-flex align-items-stretch border-bottom" t-att-class="{ 'ncp-header--trigger': isTriggerNode }">
+			<div class="ncp-header d-flex align-items-stretch border-bottom" t-att-class="{ 'ncp-header--trigger': isTriggerNode }">
 
 			<!-- IDENTITY: node icon + title -->
-			<div class="ncp-header-identity d-flex align-items-center gap-2 flex-grow-1 min-w-0 px-3 py-2">
+				<div class="ncp-header-identity d-flex align-items-center flex-grow-1 min-w-0">
 				<div class="ncp-node-icon-badge flex-shrink-0">
 					<i t-att-class="'fa ' + nodeIcon"/>
 				</div>
@@ -126,18 +126,27 @@
 
 	<t t-name="workflow_studio.ConfigPanel.Input">
 		<t t-if="!isTriggerNode">
-			<div class="node-config-col-input d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
-				<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
+			<div class="node-config-col-input d-flex flex-column" t-att-class="{ 'node-config-col--collapsed': inputRailVisible }">
+				<t t-if="inputRailVisible">
+					<button type="button" class="col-panel-rail" t-on-click="() => this.toggleSidePanel('input')" aria-label="Expand Input panel" title="Expand Input panel">
+						<i class="fa fa-database col-panel-rail__icon"/>
+						<span class="col-panel-rail__label">Input</span>
+						<i class="fa fa-angle-right col-panel-rail__chevron"/>
+					</button>
+				</t>
+				<t t-else="">
+				<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold" t-att-class="{ 'col-panel-header--clickable': !isExecutionView }" t-on-click="() => this.collapsePanel('input')" title="Collapse Input panel" role="button">
 					<div class="d-flex align-items-center gap-2">
 						<i class="fa fa-database"/>
 						<span>INPUT</span>
 					</div>
-					<t t-if="versionOptions.length > 0">
-						<span class="output-item-count">Run <t t-esc="activeVersionIndex + 1"/>
- of <t t-esc="activeSocketEvents.length"/>
-					</span>
-				</t>
-			</div>
+					<div class="d-flex align-items-center gap-2">
+						<t t-if="versionOptions.length > 0">
+							<span class="output-item-count">Run <t t-esc="activeVersionIndex + 1"/> of <t t-esc="activeSocketEvents.length"/></span>
+						</t>
+						<i t-if="!isExecutionView" class="fa fa-angle-left col-panel-header__chevron"/>
+					</div>
+				</div>
 			<div class="col-panel-content">
 				<t t-if="leftPanelData and leftPanelData.length > 0">
 					<t t-foreach="leftPanelData" t-as="item" t-key="item.rowKey">
@@ -176,6 +185,7 @@
 					</div>
 				</t>
 			</div>
+			</t>
 		</div>
 	</t>
 </t>
@@ -187,7 +197,7 @@
 		</div>
 	</t>
 	<t t-else="">
-		<div class="node-config-col-config d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView, 'readonly-config': isExecutionView }">
+		<div class="node-config-col-config wf-container d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView, 'readonly-config': isExecutionView }">
 			<t t-call="{{ constructor.subTemplates.genericConfig }}"/>
 		</div>
 	</t>
@@ -197,14 +207,42 @@
 	<TabNav tabs="tabDefs" activeTab="state.activeTab" onTabClick.bind="onTabClick">
 		<div class="tab-content p-3">
 			<t t-if="state.activeTab === 'parameters'">
+					<div t-if="showPanelLayoutToolbar" class="node-config-parameter-toolbar">
+						<div class="node-config-parameter-toolbar__copy">
+							<span class="node-config-parameter-toolbar__eyebrow">About this node</span>
+							<p class="node-config-parameter-toolbar__description" t-esc="nodeParameterDescription"/>
+							<div class="node-config-parameter-toolbar__tip" t-if="nodeParameterTip">
+								<i class="fa fa-lightbulb-o"/>
+								<span t-esc="nodeParameterTip"/>
+							</div>
+						</div>
+
+					</div>
 				<t t-foreach="groupedControls" t-as="group" t-key="group.key">
 					<div class="node-config-section">
 						<div class="node-config-section-title">
 							<i t-att-class="'fa ' + (group.icon || 'fa-cube')"/>
 							<span t-esc="group.name"/>
 						</div>
-						<t t-foreach="group.controls" t-as="control" t-key="control.key">
-							<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
+							<t t-foreach="group.rows" t-as="row" t-key="row.id">
+								<div class="ncp-control-row" t-att-class="row.className">
+									<t t-if="row.kind === 'url-shell'">
+										<div class="ncp-url-control__meta">
+											<t t-foreach="row.cells" t-as="cell" t-key="cell.id + ':meta'">
+												<div class="ncp-url-control__meta-item" t-att-class="cell.className">
+													<span class="ncp-url-control__meta-label" t-esc="cell.control.label"/>
+												</div>
+											</t>
+										</div>
+									</t>
+									<div class="ncp-control-row__body" t-att-class="row.kind === 'url-shell' ? 'ncp-url-control__body' : ''">
+										<t t-foreach="row.cells" t-as="cell" t-key="cell.id">
+											<div class="ncp-control-cell" t-att-class="cell.className">
+												<ControlRenderer control="cell.control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(cell.control.key)" pairModes="getPairModes(cell.control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
+											</div>
+										</t>
+									</div>
+								</div>
 						</t>
 					</div>
 				</t>
@@ -281,9 +319,13 @@
 				<i t-att-class="'fa ' + (group.icon || 'fa-cube')"/>
 				<span t-esc="group.name"/>
 			</div>
-			<t t-foreach="group.controls" t-as="control" t-key="control.key">
-				<div class="kv-row kv-row--stack trigger-control-stack mb-3">
-					<ControlRenderer control="control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(control.key)" pairModes="getPairModes(control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
+				<t t-foreach="group.rows" t-as="row" t-key="row.id">
+					<div class="ncp-control-row trigger-control-stack mb-3" t-att-class="row.className">
+						<t t-foreach="row.cells" t-as="cell" t-key="cell.id">
+							<div class="ncp-control-cell" t-att-class="cell.className">
+								<ControlRenderer control="cell.control" onChange.bind="onControlChange" inputContext="expressionPreviewContext" mode="getControlMode(cell.control.key)" pairModes="getPairModes(cell.control.key)" onModeChange.bind="onControlModeChange" onPairModeChange.bind="onPairModeChange" readonly="isExecutionView" controlValues="state.controlValues"/>
+							</div>
+						</t>
 				</div>
 			</t>
 		</div>
@@ -418,8 +460,16 @@
 		</div>
 	</t>
 	<t t-else="">
-		<div class="node-config-col-output wf-container d-flex flex-column" t-att-class="{ 'col-4': isExecutionView, 'col-4': !isExecutionView }">
-			<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold">
+		<div class="node-config-col-output wf-container d-flex flex-column" t-att-class="{ 'node-config-col--collapsed': outputRailVisible }">
+			<t t-if="outputRailVisible">
+				<button type="button" class="col-panel-rail" t-on-click="() => this.toggleSidePanel('output')" aria-label="Expand Output panel" title="Expand Output panel">
+					<i class="fa fa-terminal col-panel-rail__icon"/>
+					<span class="col-panel-rail__label">Output</span>
+					<i class="fa fa-angle-left col-panel-rail__chevron"/>
+				</button>
+			</t>
+			<t t-else="">
+			<div class="col-panel-header d-flex align-items-center justify-content-between text-uppercase small fw-semibold" t-att-class="{ 'col-panel-header--clickable': !isExecutionView }" t-on-click="() => this.collapsePanel('output')" title="Collapse Output panel" role="button">
 				<div class="d-flex align-items-center gap-2">
 					<i class="fa fa-terminal"/>
 					<span>OUTPUT</span>
@@ -430,7 +480,7 @@
 						</span>
 					</t>
 				</div>
-				<div class="d-flex align-items-center gap-2">
+				<div class="d-flex align-items-center gap-2" t-on-click.stop="() => {}">
 					<button t-if="!isExecutionView" class="pin-toggle-btn wf-btn wf-btn-ghost wf-btn-icon" t-att-class="{ 'pin-active': isNodePinned }" t-on-click="onTogglePin" t-att-disabled="isPinButtonDisabled ? 'disabled' : undefined" t-att-title="isNodePinned ? 'Unpin data (resume live execution)' : 'Pin output data (skip execution)'" type="button">
 						<i t-if="state.pinBusy" class="fa fa-spinner fa-spin"/>
 						<i t-else="" t-att-class="'fa ' + (isNodePinned ? 'fa-thumb-tack text-warning' : 'fa-thumb-tack')"/>
@@ -449,6 +499,7 @@
  item<t t-if="outputItemCount !== 1">s</t>
 						</span>
 					</t>
+					<i t-if="!isExecutionView" class="fa fa-angle-right col-panel-header__chevron"/>
 				</div>
 			</div>
 			<div t-if="isNodePinned" class="pinned-data-banner wf-banner wf-banner-warning">
@@ -495,6 +546,7 @@
 					</div>
 				</t>
 			</div>
+			</t>
 		</div>
 	</t>
 </t>
