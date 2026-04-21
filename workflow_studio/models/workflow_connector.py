@@ -18,6 +18,7 @@ class WorkflowConnector(models.Model):
 
     _name = "workflow.connector"
     _description = "Workflow Connector"
+    _inherit = ["image.mixin"]
     _order = "company_id, name"
 
     name = fields.Char(
@@ -334,6 +335,12 @@ class WorkflowConnector(models.Model):
             node_type_key = f"ep_{self.code}_{ep.code}"
             description = f"{ep.method or 'HTTP'} {ep.path or '/'}"
 
+            connector_icon = (
+                f"/web/image/workflow.connector/{self.id}/image_128"
+                if self.image_128
+                else template.icon or ""
+            )
+
             result.append({
                 "id": False,
                 "node_type": node_type_key,
@@ -341,7 +348,7 @@ class WorkflowConnector(models.Model):
                 "category": self.code,
                 "group": self.name,
                 "description": description,
-                "icon": template.icon or "",
+                "icon": connector_icon,
                 "color": template.color or "",
                 "is_custom": False,
                 "runtime_backend": "builtin",

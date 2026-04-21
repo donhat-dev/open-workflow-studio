@@ -256,7 +256,11 @@ export class NodeConfigPanel extends Component {
             selectedOutputSocket: null,  // null = first available socket
             selectedExecutionVersion: null,  // null = latest version
             pinBusy: false,
-            showInputPanel: !TRIGGER_NODE_TYPES.has(this.props.node.type),
+            showInputPanel: this._shouldShowInputByDefault(
+                initialExecution,
+                this.props.node,
+                this.props.workflow
+            ),
             showOutputPanel: this._shouldShowOutputByDefault(
                 initialExecution,
                 this.props.node,
@@ -314,7 +318,11 @@ export class NodeConfigPanel extends Component {
                 this.state.recordRefCache = {};
                 this.state.selectedOutputSocket = null;
                 this.state.selectedExecutionVersion = null;
-                this.state.showInputPanel = !TRIGGER_NODE_TYPES.has(nextProps.node.type);
+                this.state.showInputPanel = this._shouldShowInputByDefault(
+                    nextProps.execution || null,
+                    nextProps.node,
+                    nextProps.workflow
+                );
                 this.state.showOutputPanel = this._shouldShowOutputByDefault(
                     nextProps.execution || null,
                     nextProps.node,
@@ -503,6 +511,33 @@ export class NodeConfigPanel extends Component {
             return false;
         }
         return events.some((event) => event && event.node_id === nodeId);
+    }
+
+    _shouldShowInputByDefault(execution, node = this.props.node, workflow = this.props.workflow) {
+        if (!node) {
+            return false;
+        }
+        if (TRIGGER_NODE_TYPES.has(node.type)) {
+            return false;
+        }
+        if (!workflow) {
+            return true;
+        }
+        const predecessorIds = getStructuralPredecessorIds(workflow, node.id);
+        if (!predecessorIds.length) {
+            return true;
+        }
+        if (!execution) {
+            return false;
+        }
+        const events = Array.isArray(execution.executionEvents) && execution.executionEvents.length
+            ? execution.executionEvents
+            : execution.nodeResults;
+        if (!Array.isArray(events) || !events.length) {
+            return false;
+        }
+        const predecessorResults = getLatestNodeResultsByNodeIds(events, predecessorIds);
+        return predecessorResults.length > 0;
     }
 
     _shouldShowOutputByDefault(execution, node = this.props.node, viewMode = this.props.viewMode) {

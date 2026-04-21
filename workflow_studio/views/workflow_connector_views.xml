@@ -93,7 +93,6 @@
 		<field name="domain">[('connector_id', '=', active_id)]</field>
 		<field name="context">{'default_connector_id': active_id, 'active_test': False}</field>
 	</record>
-
 	<record id="view_workflow_connector_form" model="ir.ui.view">
 		<field name="name">workflow.connector.form</field>
 		<field name="model">workflow.connector</field>
@@ -115,10 +114,15 @@
 							<field name="http_request_count" widget="statinfo" string="Connector Nodes"/>
 						</button>
 					</div>
-					<div class="oe_title">
-						<h1>
-							<field name="name" placeholder="Connector Name"/>
-						</h1>
+					<div class="row justify-content-between position-relative w-100 m-0 mb-2">
+						<div class="oe_title mw-75 ps-0 pe-2">
+							<h1 class="d-flex flex-row align-items-center">
+								<field name="name" placeholder="Connector Name"/>
+							</h1>
+						</div>
+						<div class="m-0 p-0">
+							<field name="image_1920" widget="image" class="oe_avatar m-0" />
+						</div>
 					</div>
 					<group>
 						<group string="Identity">
@@ -223,7 +227,6 @@
 		<field name="view_mode">list,form</field>
 		<field name="context">{"active_test": False}</field>
 	</record>
-
 	<!-- ================================================================
          Workflow Auth Profile Views
          ================================================================ -->
@@ -270,8 +273,8 @@
 							<field name="secret_refs_json" widget="ace" options="{'mode': 'python'}" placeholder='{"token": "my_token_secret", "username": "api_user"}'/>
 						</page>
 						<page string="Header Template" invisible="auth_type in ('basic', 'none')">
-							<div class="alert alert-info" role="status">                                Use 
-								<code>{{secret_key}}</code> placeholders.                                Values are resolved at runtime via the SecretBroker.                            
+							<div class="alert alert-info" role="status">                                Use 																																
+								<code>{{secret_key}}</code> placeholders.                                Values are resolved at runtime via the SecretBroker.                            																												
 							</div>
 							<field name="header_template_json" widget="ace" options="{'mode': 'python'}" placeholder='{"Authorization": "Bearer {{my_token_secret}}"}'/>
 						</page>
@@ -293,7 +296,6 @@
 		<field name="view_mode">list,form</field>
 		<field name="context">{"active_test": False}</field>
 	</record>
-
 	<!-- ================================================================
          Workflow HTTP Request (Bridge) Views
          ================================================================ -->
@@ -363,7 +365,6 @@
 		<field name="view_mode">list,form</field>
 		<field name="context">{"active_test": False}</field>
 	</record>
-
 	<!-- ================================================================
          Inherit ir.workflow form to add workspace selector
          ================================================================ -->
